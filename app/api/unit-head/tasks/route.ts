@@ -16,7 +16,7 @@ async function getUnitIdFromToken() {
         query: 'SELECT department FROM users WHERE id = ?',
         values: [decoded.userId]
     }) as any[];
-    if (users.length === 0 || !users[0].department) throw new Error('User has no department');
+    if (users.length === 0 || !users[0].department) throw new Error('User has no department assigned. Please contact the administrator.');
 
     const desc = users[0].department;
     const units = await query({
@@ -24,7 +24,7 @@ async function getUnitIdFromToken() {
         values: [desc]
     }) as any[];
 
-    if (units.length === 0) throw new Error('Department not mapped to unit');
+    if (units.length === 0) throw new Error(`Department '${desc}' is not mapped to any unit in the system. Please contact the administrator.`);
 
     return { unitId: units[0].id, userId: decoded.userId };
 }

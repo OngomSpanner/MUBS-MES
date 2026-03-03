@@ -40,6 +40,7 @@ export default function UnitTasks({ initialActivity }: UnitTasksProps) {
     const [availableActivities, setAvailableActivities] = useState<{ id: number, title: string }[]>([]);
     const [departmentUsers, setDepartmentUsers] = useState<{ id: number, full_name: string, role: string }[]>([]);
     const [loading, setLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
     const [activityFilter, setActivityFilter] = useState(initialActivity || 'All Strategic Activities');
     const [assigneeFilter, setAssigneeFilter] = useState('All Assignees');
 
@@ -63,8 +64,9 @@ export default function UnitTasks({ initialActivity }: UnitTasksProps) {
             setData(tasksRes.data.kanban ? tasksRes.data : { ...tasksRes.data, kanban: { todo: [], inProgress: [], underReview: [], completed: [] } });
             setAvailableActivities(tasksRes.data.availableActivities || []);
             setDepartmentUsers(usersRes.data || []);
-        } catch (error) {
+        } catch (error: any) {
             console.error('Error fetching unit tasks data:', error);
+            setError(error.response?.data?.message || 'Failed to load tasks data. Please try again.');
         } finally {
             setLoading(false);
         }
@@ -79,6 +81,20 @@ export default function UnitTasks({ initialActivity }: UnitTasksProps) {
             <div className="d-flex justify-content-center align-items-center vh-100">
                 <div className="spinner-border text-primary" role="status">
                     <span className="visually-hidden">Loading...</span>
+                </div>
+            </div>
+        );
+    }
+
+    if (error) {
+        return (
+            <div className="container mt-5">
+                <div className="alert alert-danger shadow-sm border-0 d-flex align-items-center gap-3 p-4" role="alert">
+                    <span className="material-symbols-outlined fs-2 text-danger">error</span>
+                    <div>
+                        <h5 className="alert-heading text-danger fw-bold mb-1">Error Loading Tasks</h5>
+                        <p className="mb-0 text-dark opacity-75">{error}</p>
+                    </div>
                 </div>
             </div>
         );

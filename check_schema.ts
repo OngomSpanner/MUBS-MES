@@ -1,4 +1,4 @@
-import { query } from './app/lib/db';
+import { query } from './lib/db';
 
 async function checkSchema() {
     try {
