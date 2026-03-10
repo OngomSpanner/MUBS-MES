@@ -107,7 +107,7 @@ export default function StaffFeedback() {
                                 <div className="p-3 rounded-3 mb-4" style={{ background: '#f8fafc', border: '1px solid #e2e8f0' }}>
                                     <div className="d-flex justify-content-between align-items-center mb-2 pb-2 border-bottom">
                                         <span className="text-muted fw-bold" style={{ fontSize: '.75rem' }}>EVALUATOR</span>
-                                        <span className="text-dark fw-bold text-end" style={{ fontSize: '.85rem' }}>{selectedItem.evaluator_name || 'Unit Head'}</span>
+                                        <span className="text-dark fw-bold text-end" style={{ fontSize: '.85rem' }}>{selectedItem.evaluator_name || 'Department Head'}</span>
                                     </div>
                                     <div className="d-flex justify-content-between align-items-center mb-2 pb-2 border-bottom">
                                         <span className="text-muted fw-bold" style={{ fontSize: '.75rem' }}>DATE</span>

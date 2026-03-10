@@ -28,7 +28,7 @@ export default function CommitteeNotifications() {
                             <div className="notif-item unread" style={{ display: 'flex', alignItems: 'flex-start', gap: '.9rem', padding: '.85rem 1rem', borderBottom: '1px solid #f1f5f9', background: '#eff6ff', cursor: 'pointer' }}>
                                 <div className="notif-icon" style={{ width: '38px', height: '38px', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, background: '#eff6ff' }}><span className="material-symbols-outlined" style={{ color: 'var(--mubs-blue)' }}>assignment_ind</span></div>
                                 <div className="flex-fill">
-                                    <div className="fw-bold text-dark" style={{ fontSize: '.85rem' }}>Unit Assigned: Research &amp; Innovation — Research Ethics Framework</div>
+                                    <div className="fw-bold text-dark" style={{ fontSize: '.85rem' }}>Department Assigned: Research &amp; Innovation — Research Ethics Framework</div>
                                     <div className="text-muted" style={{ fontSize: '.73rem' }}>HOD Dr. M. Kizito has been notified and will begin implementation tracking</div>
                                     <div className="text-muted" style={{ fontSize: '.71rem', marginTop: '2px' }}>Today, 09:16 AM</div>
                                 </div>

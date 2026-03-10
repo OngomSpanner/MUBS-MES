@@ -3,20 +3,20 @@ import { query } from '@/lib/db';
 
 export async function GET() {
     try {
-        // 1. Unit Comparison (All units)
-        const unitPerformance = await query({
+        // 1. Department Comparison (All departments)
+        const departmentPerformance = await query({
             query: `
                 SELECT 
                     u.name as \`label\`, 
                     ROUND(IFNULL(AVG(sa.progress), 0)) as \`value\`
-                FROM units u
-                LEFT JOIN strategic_activities sa ON u.id = sa.unit_id AND sa.parent_id IS NULL
+                FROM departments u
+                LEFT JOIN strategic_activities sa ON u.id = sa.department_id AND sa.parent_id IS NULL
                 GROUP BY u.id, u.name
                 ORDER BY \`value\` DESC
             `
         }) as any[];
 
-        const validUnits = unitPerformance.filter(u => u.value !== null && !isNaN(u.value));
+        const validUnits = departmentPerformance.filter(u => u.value !== null && !isNaN(u.value));
         const institutionAverage = validUnits.length > 0
             ? Math.round(validUnits.reduce((acc, curr) => acc + Number(curr.value), 0) / validUnits.length)
             : 0;
@@ -34,16 +34,16 @@ export async function GET() {
         }) as any[];
 
         // 3. Compliance Distribution
-        const compliantCount = unitPerformance.filter(u => u.value >= 75).length;
-        const watchCount = unitPerformance.filter(u => u.value >= 50 && u.value < 75).length;
-        const criticalCount = unitPerformance.filter(u => u.value < 50).length;
+        const compliantCount = departmentPerformance.filter(u => u.value >= 75).length;
+        const watchCount = departmentPerformance.filter(u => u.value >= 50 && u.value < 75).length;
+        const criticalCount = departmentPerformance.filter(u => u.value < 50).length;
 
         // 4. Staff Performance Summary (Top 6)
         const staffPerformance = await query({
             query: `
                 SELECT 
                     u.full_name as name,
-            u.department as unit,
+            u.department as department,
             COUNT(sa.id) as totalActivities,
             SUM(CASE WHEN sa.status = 'Completed' THEN 1 ELSE 0 END) as completed,
             ROUND(IFNULL(AVG(sa.progress), 0)) as rate
@@ -57,7 +57,7 @@ export async function GET() {
         }) as any[];
 
         return NextResponse.json({
-            unitPerformance,
+            departmentPerformance,
             institutionAverage,
             statusSplit,
             complianceDistribution: {

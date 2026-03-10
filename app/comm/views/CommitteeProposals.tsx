@@ -40,7 +40,7 @@ export default function CommitteeProposals({ status }: { status: string }) {
                         </div>
                         <div className="table-responsive">
                             <table className="table mb-0">
-                                <thead><tr style={{ background: '#f8fafc' }}><th style={{ fontSize: '.68rem', fontWeight: 800, letterSpacing: '.1em', textTransform: 'uppercase', color: 'var(--mubs-blue)' }}>Proposal</th><th style={{ fontSize: '.68rem', fontWeight: 800, letterSpacing: '.1em', textTransform: 'uppercase', color: 'var(--mubs-blue)' }}>Pillar</th><th style={{ fontSize: '.68rem', fontWeight: 800, letterSpacing: '.1em', textTransform: 'uppercase', color: 'var(--mubs-blue)' }}>Meeting Ref.</th><th style={{ fontSize: '.68rem', fontWeight: 800, letterSpacing: '.1em', textTransform: 'uppercase', color: 'var(--mubs-blue)' }}>Submitted</th><th style={{ fontSize: '.68rem', fontWeight: 800, letterSpacing: '.1em', textTransform: 'uppercase', color: 'var(--mubs-blue)' }}>Status</th><th style={{ fontSize: '.68rem', fontWeight: 800, letterSpacing: '.1em', textTransform: 'uppercase', color: 'var(--mubs-blue)' }}>Assigned Unit</th><th style={{ fontSize: '.68rem', fontWeight: 800, letterSpacing: '.1em', textTransform: 'uppercase', color: 'var(--mubs-blue)' }}>Evidence</th><th style={{ fontSize: '.68rem', fontWeight: 800, letterSpacing: '.1em', textTransform: 'uppercase', color: 'var(--mubs-blue)' }}>Actions</th></tr></thead>
+                                <thead><tr style={{ background: '#f8fafc' }}><th style={{ fontSize: '.68rem', fontWeight: 800, letterSpacing: '.1em', textTransform: 'uppercase', color: 'var(--mubs-blue)' }}>Proposal</th><th style={{ fontSize: '.68rem', fontWeight: 800, letterSpacing: '.1em', textTransform: 'uppercase', color: 'var(--mubs-blue)' }}>Pillar</th><th style={{ fontSize: '.68rem', fontWeight: 800, letterSpacing: '.1em', textTransform: 'uppercase', color: 'var(--mubs-blue)' }}>Meeting Ref.</th><th style={{ fontSize: '.68rem', fontWeight: 800, letterSpacing: '.1em', textTransform: 'uppercase', color: 'var(--mubs-blue)' }}>Submitted</th><th style={{ fontSize: '.68rem', fontWeight: 800, letterSpacing: '.1em', textTransform: 'uppercase', color: 'var(--mubs-blue)' }}>Status</th><th style={{ fontSize: '.68rem', fontWeight: 800, letterSpacing: '.1em', textTransform: 'uppercase', color: 'var(--mubs-blue)' }}>Assigned Department</th><th style={{ fontSize: '.68rem', fontWeight: 800, letterSpacing: '.1em', textTransform: 'uppercase', color: 'var(--mubs-blue)' }}>Evidence</th><th style={{ fontSize: '.68rem', fontWeight: 800, letterSpacing: '.1em', textTransform: 'uppercase', color: 'var(--mubs-blue)' }}>Actions</th></tr></thead>
                                 <tbody>
                                     <tr><td><div className="fw-bold text-dark" style={{ fontSize: '.85rem' }}>Research Ethics Framework</div><div className="text-muted" style={{ fontSize: '.72rem' }}>Priority: High</div></td><td><span className="status-badge" style={{ background: '#eff6ff', color: 'var(--mubs-blue)', fontSize: '.62rem' }}>Research</span></td><td style={{ fontSize: '.8rem' }}>Meeting #7</td><td style={{ fontSize: '.8rem', color: '#64748b' }}>03 Apr</td><td><span className="status-badge" style={{ background: '#dcfce7', color: '#15803d' }}>Approved</span></td><td style={{ fontSize: '.82rem', fontWeight: 700, color: '#059669' }}>Research &amp; Innovation</td><td><button className="btn btn-xs btn-outline-secondary py-0 px-1" style={{ fontSize: '.72rem' }}><span className="material-symbols-outlined" style={{ fontSize: '13px' }}>description</span></button></td><td><button className="btn btn-xs btn-outline-secondary py-0 px-2" style={{ fontSize: '.74rem' }} onClick={() => handleOpenModal('approved')}><span className="material-symbols-outlined" style={{ fontSize: '13px' }}>visibility</span></button></td></tr>
                                     {/* Additional rows omitted for brevity, mapping the same pattern */}
@@ -125,7 +125,7 @@ export default function CommitteeProposals({ status }: { status: string }) {
                 <div id="page-approved" className="page-section active-page">
                     <div className="alert d-flex align-items-center gap-2 mb-4" style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderLeft: '5px solid #10b981', borderRadius: '10px', color: '#14532d' }}>
                         <span className="material-symbols-outlined" style={{ fontSize: '20px' }}>info</span>
-                        <div>These proposals have been <strong>approved</strong> by the Principal and assigned to implementing units. Unit assignments and progress are shown below as <strong>read-only</strong>.</div>
+                        <div>These proposals have been <strong>approved</strong> by the Principal and assigned to implementing departments. Department assignments and progress are shown below as <strong>read-only</strong>.</div>
                     </div>
 
                     <div className="d-flex flex-column gap-0">
@@ -139,14 +139,14 @@ export default function CommitteeProposals({ status }: { status: string }) {
                                         <span className="status-badge" style={{ background: '#dcfce7', color: '#15803d' }}>Approved</span>
                                     </div>
                                     <div className="proposal-meta">Meeting #7 · Approved 08 Apr 2025 · Approved by: Principal Prof. R. Wamala</div>
-                                    <div className="unit-assign-card mt-3">
+                                    <div className="department-assign-card mt-3">
                                         <div className="d-flex align-items-center gap-2 mb-2">
                                             <span className="material-symbols-outlined" style={{ fontSize: '18px', color: '#059669' }}>assignment_ind</span>
-                                            <span className="fw-black text-dark" style={{ fontSize: '.85rem' }}>Assigned Implementation Unit</span>
+                                            <span className="fw-black text-dark" style={{ fontSize: '.85rem' }}>Assigned Implementation Department</span>
                                             <span className="read-only-badge ms-auto">Read Only</span>
                                         </div>
                                         <div className="row g-2">
-                                            <div className="col-sm-4"><div className="text-muted" style={{ fontSize: '.72rem', fontWeight: 700 }}>Unit</div><div className="fw-bold text-dark" style={{ fontSize: '.83rem' }}>Research &amp; Innovation</div></div>
+                                            <div className="col-sm-4"><div className="text-muted" style={{ fontSize: '.72rem', fontWeight: 700 }}>Department</div><div className="fw-bold text-dark" style={{ fontSize: '.83rem' }}>Research &amp; Innovation</div></div>
                                             <div className="col-sm-4"><div className="text-muted" style={{ fontSize: '.72rem', fontWeight: 700 }}>HOD</div><div className="fw-bold text-dark" style={{ fontSize: '.83rem' }}>Dr. M. Kizito</div></div>
                                             <div className="col-sm-4"><div className="text-muted" style={{ fontSize: '.72rem', fontWeight: 700 }}>Target Deadline</div><div className="fw-bold text-dark" style={{ fontSize: '.83rem' }}>31 Dec 2025</div></div>
                                         </div>
@@ -171,14 +171,14 @@ export default function CommitteeProposals({ status }: { status: string }) {
                                         <span className="status-badge" style={{ background: '#dcfce7', color: '#15803d' }}>Approved</span>
                                     </div>
                                     <div className="proposal-meta">Meeting #6 · Approved 02 Apr 2025 · Approved by: Principal Prof. R. Wamala</div>
-                                    <div className="unit-assign-card mt-3">
+                                    <div className="department-assign-card mt-3">
                                         <div className="d-flex align-items-center gap-2 mb-2">
                                             <span className="material-symbols-outlined" style={{ fontSize: '18px', color: '#059669' }}>assignment_ind</span>
-                                            <span className="fw-black text-dark" style={{ fontSize: '.85rem' }}>Assigned Implementation Unit</span>
+                                            <span className="fw-black text-dark" style={{ fontSize: '.85rem' }}>Assigned Implementation Department</span>
                                             <span className="read-only-badge ms-auto">Read Only</span>
                                         </div>
                                         <div className="row g-2">
-                                            <div className="col-sm-4"><div className="text-muted" style={{ fontSize: '.72rem', fontWeight: 700 }}>Unit</div><div className="fw-bold text-dark" style={{ fontSize: '.83rem' }}>Faculty of Computing</div></div>
+                                            <div className="col-sm-4"><div className="text-muted" style={{ fontSize: '.72rem', fontWeight: 700 }}>Department</div><div className="fw-bold text-dark" style={{ fontSize: '.83rem' }}>Faculty of Computing</div></div>
                                             <div className="col-sm-4"><div className="text-muted" style={{ fontSize: '.72rem', fontWeight: 700 }}>HOD</div><div className="fw-bold text-dark" style={{ fontSize: '.83rem' }}>Dr. A. Ssekandi</div></div>
                                             <div className="col-sm-4"><div className="text-muted" style={{ fontSize: '.72rem', fontWeight: 700 }}>Target Deadline</div><div className="fw-bold text-dark" style={{ fontSize: '.83rem' }}>30 Sep 2025</div></div>
                                         </div>
@@ -258,9 +258,9 @@ export default function CommitteeProposals({ status }: { status: string }) {
                             <div className="col-12"><div className="fw-bold small text-muted mb-1">Description</div>
                                 <div className="p-3 rounded" style={{ background: '#f8fafc', border: '1px solid #e2e8f0', fontSize: '.84rem', color: '#334155', lineHeight: 1.7 }}>Establish a formal research ethics review framework including an institutional review board, standardised data collection guidelines, and a researcher misconduct reporting mechanism aligned with the 2024–28 strategic plan.</div>
                             </div>
-                            <div className="col-12"><div className="fw-bold small text-muted mb-2">Assigned Unit (Read Only)</div>
+                            <div className="col-12"><div className="fw-bold small text-muted mb-2">Assigned Department (Read Only)</div>
                                 <div className="p-3 rounded" style={{ background: '#f0fdf4', border: '1px solid #bbf7d0' }}>
-                                    <div className="row g-2"><div className="col-4"><div className="text-muted" style={{ fontSize: '.72rem' }}>Unit</div><div className="fw-bold text-dark">Research &amp; Innovation</div></div><div className="col-4"><div className="text-muted" style={{ fontSize: '.72rem' }}>HOD</div><div className="fw-bold text-dark">Dr. M. Kizito</div></div><div className="col-4"><div className="text-muted" style={{ fontSize: '.72rem' }}>Progress</div><div className="fw-bold" style={{ color: '#059669' }}>29% In Progress</div></div></div>
+                                    <div className="row g-2"><div className="col-4"><div className="text-muted" style={{ fontSize: '.72rem' }}>Department</div><div className="fw-bold text-dark">Research &amp; Innovation</div></div><div className="col-4"><div className="text-muted" style={{ fontSize: '.72rem' }}>HOD</div><div className="fw-bold text-dark">Dr. M. Kizito</div></div><div className="col-4"><div className="text-muted" style={{ fontSize: '.72rem' }}>Progress</div><div className="fw-bold" style={{ color: '#059669' }}>29% In Progress</div></div></div>
                                 </div>
                             </div>
                         </div>

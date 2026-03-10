@@ -3,21 +3,21 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 
-interface UnitPerformance {
+interface DepartmentPerformance {
     label: string;
     value: number;
 }
 
 interface StaffPerformance {
     name: string;
-    unit: string;
+    department: string;
     totalActivities: number;
     completed: number;
     rate: number;
 }
 
 interface AnalyticsData {
-    unitPerformance: UnitPerformance[];
+    departmentPerformance: DepartmentPerformance[];
     institutionAverage: number;
     statusSplit: Array<{ status: string; count: number }>;
     complianceDistribution: {
@@ -31,7 +31,7 @@ interface AnalyticsData {
 export default function PerformanceAnalytics() {
     const [data, setData] = useState<AnalyticsData | null>(null);
     const [loading, setLoading] = useState(true);
-    const [activeTab, setActiveTab] = useState<'unit' | 'compliance' | 'staff'>('unit');
+    const [activeTab, setActiveTab] = useState<'department' | 'compliance' | 'staff'>('department');
 
     useEffect(() => {
         const fetchData = async () => {
@@ -57,7 +57,7 @@ export default function PerformanceAnalytics() {
         );
     }
 
-    const { unitPerformance, institutionAverage, statusSplit, complianceDistribution, staffPerformance } = data;
+    const { departmentPerformance, institutionAverage, statusSplit, complianceDistribution, staffPerformance } = data;
 
     const totalActivities = statusSplit.reduce((acc, curr) => acc + curr.count, 0) || 1;
     const onTrackCount = statusSplit.find(s => s.status === 'On Track')?.count || 0;
@@ -75,16 +75,16 @@ export default function PerformanceAnalytics() {
             <ul className="nav nav-pills mb-4 gap-2" id="analyticsTab">
                 <li className="nav-item">
                     <button
-                        className={`nav-link fw-bold ${activeTab === 'unit' ? 'active' : ''}`}
+                        className={`nav-link fw-bold ${activeTab === 'department' ? 'active' : ''}`}
                         style={{
-                            background: activeTab === 'unit' ? 'var(--mubs-blue)' : 'rgba(255,255,255,.05)',
-                            color: activeTab === 'unit' ? '#fff' : '#475569',
+                            background: activeTab === 'department' ? 'var(--mubs-blue)' : 'rgba(255,255,255,.05)',
+                            color: activeTab === 'department' ? '#fff' : '#475569',
                             borderRadius: '8px',
                             fontSize: '.83rem'
                         }}
-                        onClick={() => setActiveTab('unit')}
+                        onClick={() => setActiveTab('department')}
                     >
-                        <span className="material-symbols-outlined me-1" style={{ fontSize: '16px' }}>corporate_fare</span>Unit Comparison
+                        <span className="material-symbols-outlined me-1" style={{ fontSize: '16px' }}>corporate_fare</span>Department Comparison
                     </button>
                 </li>
                 <li className="nav-item">
@@ -117,29 +117,29 @@ export default function PerformanceAnalytics() {
                 </li>
             </ul>
 
-            {/* Tab 1: Unit Comparison */}
-            {activeTab === 'unit' && (
-                <div id="tab-unit" className="analytics-tab">
+            {/* Tab 1: Department Comparison */}
+            {activeTab === 'department' && (
+                <div id="tab-department" className="analytics-tab">
                     <div className="row g-4">
                         <div className="col-12 col-lg-8">
                             <div className="table-card bg-white rounded-3 shadow-sm border p-0">
                                 <div className="p-4 border-bottom d-flex align-items-center justify-content-between">
                                     <h5 className="mb-0 d-flex align-items-center gap-2" style={{ fontSize: '1.1rem', fontWeight: 800 }}>
                                         <span className="material-symbols-outlined text-primary">bar_chart</span>
-                                        Unit Performance Comparison
+                                        Department Performance Comparison
                                     </h5>
                                 </div>
                                 <div className="p-4">
-                                    {unitPerformance.map((unit, idx) => (
+                                    {departmentPerformance.map((department, idx) => (
                                         <div key={idx} className="mb-3">
                                             <div className="d-flex justify-content-between mb-1">
-                                                <span style={{ fontSize: '.85rem', fontWeight: 700, color: '#334155' }}>{unit.label}</span>
-                                                <span style={{ fontSize: '.85rem', fontWeight: 800, color: '#1e293b' }}>{unit.value}%</span>
+                                                <span style={{ fontSize: '.85rem', fontWeight: 700, color: '#334155' }}>{department.label}</span>
+                                                <span style={{ fontSize: '.85rem', fontWeight: 800, color: '#1e293b' }}>{department.value}%</span>
                                             </div>
                                             <div className="progress" style={{ height: '10px', borderRadius: '5px', background: '#f1f5f9' }}>
                                                 <div className="progress-bar" style={{
-                                                    width: `${unit.value}%`,
-                                                    background: unit.value >= 75 ? '#10b981' : (unit.value >= 50 ? '#ffcd00' : '#ef4444'),
+                                                    width: `${department.value}%`,
+                                                    background: department.value >= 75 ? '#10b981' : (department.value >= 50 ? '#ffcd00' : '#ef4444'),
                                                     borderRadius: '5px'
                                                 }}></div>
                                             </div>
@@ -222,29 +222,29 @@ export default function PerformanceAnalytics() {
                                 <div className="p-4 d-flex flex-column gap-4">
                                     <div>
                                         <div className="d-flex justify-content-between mb-2">
-                                            <span style={{ fontSize: '.85rem', fontWeight: 700, color: '#059669' }}>≥75% — Compliant Units</span>
+                                            <span style={{ fontSize: '.85rem', fontWeight: 700, color: '#059669' }}>≥75% — Compliant Departments</span>
                                             <span style={{ fontSize: '.85rem', fontWeight: 800, color: '#059669' }}>{complianceDistribution.compliant}</span>
                                         </div>
                                         <div className="progress" style={{ height: '12px', borderRadius: '6px', background: '#f1f5f9' }}>
-                                            <div className="progress-bar" style={{ width: `${(complianceDistribution.compliant / (unitPerformance.length || 1)) * 100}%`, background: '#10b981' }}></div>
+                                            <div className="progress-bar" style={{ width: `${(complianceDistribution.compliant / (departmentPerformance.length || 1)) * 100}%`, background: '#10b981' }}></div>
                                         </div>
                                     </div>
                                     <div>
                                         <div className="d-flex justify-content-between mb-2">
-                                            <span style={{ fontSize: '.85rem', fontWeight: 700, color: '#a16207' }}>50–74% — Watchlist Units</span>
+                                            <span style={{ fontSize: '.85rem', fontWeight: 700, color: '#a16207' }}>50–74% — Watchlist Departments</span>
                                             <span style={{ fontSize: '.85rem', fontWeight: 800, color: '#a16207' }}>{complianceDistribution.watch}</span>
                                         </div>
                                         <div className="progress" style={{ height: '12px', borderRadius: '6px', background: '#f1f5f9' }}>
-                                            <div className="progress-bar" style={{ width: `${(complianceDistribution.watch / (unitPerformance.length || 1)) * 100}%`, background: '#ffcd00' }}></div>
+                                            <div className="progress-bar" style={{ width: `${(complianceDistribution.watch / (departmentPerformance.length || 1)) * 100}%`, background: '#ffcd00' }}></div>
                                         </div>
                                     </div>
                                     <div>
                                         <div className="d-flex justify-content-between mb-2">
-                                            <span style={{ fontSize: '.85rem', fontWeight: 700, color: '#b91c1c' }}>&lt;50% — Critical Units</span>
+                                            <span style={{ fontSize: '.85rem', fontWeight: 700, color: '#b91c1c' }}>&lt;50% — Critical Departments</span>
                                             <span style={{ fontSize: '.85rem', fontWeight: 800, color: '#b91c1c' }}>{complianceDistribution.critical}</span>
                                         </div>
                                         <div className="progress" style={{ height: '12px', borderRadius: '6px', background: '#f1f5f9' }}>
-                                            <div className="progress-bar" style={{ width: `${(complianceDistribution.critical / (unitPerformance.length || 1)) * 100}%`, background: '#ef4444' }}></div>
+                                            <div className="progress-bar" style={{ width: `${(complianceDistribution.critical / (departmentPerformance.length || 1)) * 100}%`, background: '#ef4444' }}></div>
                                         </div>
                                     </div>
                                 </div>
@@ -257,7 +257,7 @@ export default function PerformanceAnalytics() {
                                 <div className="progress mt-4 mb-2" style={{ height: '8px', borderRadius: '4px' }}>
                                     <div className="progress-bar" style={{ width: `${institutionAverage}%`, background: 'var(--mubs-blue)' }}></div>
                                 </div>
-                                <div className="text-muted small">Based on {unitPerformance.length} units</div>
+                                <div className="text-muted small">Based on {departmentPerformance.length} departments</div>
                             </div>
                         </div>
                     </div>
@@ -279,7 +279,7 @@ export default function PerformanceAnalytics() {
                                 <thead className="bg-light">
                                     <tr>
                                         <th className="p-3 border-0" style={{ fontSize: '.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Staff Member</th>
-                                        <th className="p-3 border-0" style={{ fontSize: '.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Unit</th>
+                                        <th className="p-3 border-0" style={{ fontSize: '.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Department</th>
                                         <th className="p-3 border-0" style={{ fontSize: '.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Activities</th>
                                         <th className="p-3 border-0" style={{ fontSize: '.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Rate</th>
                                         <th className="p-3 border-0" style={{ fontSize: '.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Rating</th>
@@ -301,7 +301,7 @@ export default function PerformanceAnalytics() {
                                                         <span style={{ fontSize: '.88rem', fontWeight: 700, color: '#1e293b' }}>{staff.name}</span>
                                                     </div>
                                                 </td>
-                                                <td className="p-3 border-light text-muted" style={{ fontSize: '.85rem' }}>{staff.unit}</td>
+                                                <td className="p-3 border-light text-muted" style={{ fontSize: '.85rem' }}>{staff.department}</td>
                                                 <td className="p-3 border-light fw-bold" style={{ fontSize: '.85rem' }}>{staff.completed}/{staff.totalActivities}</td>
                                                 <td className="p-3 border-light">
                                                     <div className="d-flex align-items-center gap-2">

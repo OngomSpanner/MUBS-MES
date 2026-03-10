@@ -16,32 +16,32 @@ export async function GET() {
             `
         }) as any[];
 
-        // 2. Unit Drill-down
-        const units = await query({
+        // 2. Department Drill-down
+        const departments = await query({
             query: `
                 SELECT 
                     u.id,
                     u.name,
-                    (SELECT full_name FROM users WHERE department = u.name AND role = 'Unit Head' LIMIT 1) as head,
+                    (SELECT full_name FROM users WHERE department = u.name AND role = 'Department Head' LIMIT 1) as head,
                     COUNT(sa.id) as activitiesCount,
                     ROUND(IFNULL(AVG(sa.progress), 0)) as overallProgress,
                     SUM(CASE WHEN sa.status = 'Completed' THEN 1 ELSE 0 END) as completedCount,
                     SUM(CASE WHEN sa.status = 'In Progress' THEN 1 ELSE 0 END) as inProgressCount,
                     SUM(CASE WHEN sa.status = 'Delayed' THEN 1 ELSE 0 END) as delayedCount
-                FROM units u
-                LEFT JOIN strategic_activities sa ON u.id = sa.unit_id AND sa.parent_id IS NULL
+                FROM departments u
+                LEFT JOIN strategic_activities sa ON u.id = sa.department_id AND sa.parent_id IS NULL
                 GROUP BY u.id, u.name
                 ORDER BY overallProgress DESC
             `
         }) as any[];
 
-        // 3. Recent Activities for each unit (Top 2 for each)
+        // 3. Recent Activities for each department (Top 2 for each)
         const recentActivities = await query({
             query: `
                 SELECT 
                     sa.id,
                     sa.title,
-                    sa.unit_id,
+                    sa.department_id,
                     sa.progress,
                     sa.status,
                     sa.pillar
@@ -50,11 +50,11 @@ export async function GET() {
                 AND (
                     SELECT COUNT(*) 
                     FROM strategic_activities sa2 
-                    WHERE sa2.unit_id = sa.unit_id 
+                    WHERE sa2.department_id = sa.department_id 
                     AND sa2.parent_id IS NULL 
                     AND sa2.created_at >= sa.created_at
                 ) <= 2
-                ORDER BY sa.unit_id, sa.created_at DESC
+                ORDER BY sa.department_id, sa.created_at DESC
             `
         }) as any[];
 
@@ -64,7 +64,7 @@ export async function GET() {
                 SELECT 
                     sa.id,
                     sa.title,
-                    sa.unit_id,
+                    sa.department_id,
                     sa.description,
                     sa.end_date,
                     DATEDIFF(sa.end_date, CURDATE()) as daysLeft
@@ -75,10 +75,10 @@ export async function GET() {
 
         return NextResponse.json({
             stats: summaryStats[0],
-            units: units.map(u => ({
+            departments: departments.map(u => ({
                 ...u,
-                recentActivities: recentActivities.filter(a => a.unit_id === u.id),
-                risks: risks.filter(r => r.unit_id === u.id)
+                recentActivities: recentActivities.filter(a => a.department_id === u.id),
+                risks: risks.filter(r => r.department_id === u.id)
             }))
         });
     } catch (error: any) {

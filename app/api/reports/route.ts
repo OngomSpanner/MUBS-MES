@@ -8,7 +8,7 @@ export async function GET(request: Request) {
     const format = searchParams.get('format');
     const from = searchParams.get('from');
     const to = searchParams.get('to');
-    const unit = searchParams.get('unit'); // unit name for filtering
+    const department = searchParams.get('department'); // department name for filtering
 
     let data;
 
@@ -19,19 +19,19 @@ export async function GET(request: Request) {
           const vals: any[] = [];
           if (from) { whereClause += ' AND sa.created_at >= ?'; vals.push(from); }
           if (to) { whereClause += ' AND sa.created_at <= ?'; vals.push(to); }
-          if (unit && unit !== 'All Units') { whereClause += ' AND u.name = ?'; vals.push(unit); }
+          if (department && department !== 'All Departments') { whereClause += ' AND u.name = ?'; vals.push(department); }
 
           data = await query({
             query: `
               SELECT
-                u.name                                                              AS unit,
+                u.name                                                              AS department,
                 COUNT(sa.id)                                                        AS total_activities,
                 SUM(CASE WHEN sa.status = 'Completed'  THEN 1 ELSE 0 END)         AS completed,
                 SUM(CASE WHEN sa.status = 'In Progress' THEN 1 ELSE 0 END)        AS in_progress,
                 SUM(CASE WHEN sa.status = 'Delayed'     THEN 1 ELSE 0 END)        AS delayed_cnt,
                 ROUND(IFNULL(AVG(sa.progress), 0))                                 AS avg_progress
-              FROM units u
-              LEFT JOIN strategic_activities sa ON u.id = sa.unit_id
+              FROM departments u
+              LEFT JOIN strategic_activities sa ON u.id = sa.department_id
               ${whereClause}
               GROUP BY u.id, u.name
               ORDER BY avg_progress DESC
@@ -45,14 +45,14 @@ export async function GET(request: Request) {
         {
           let whereClause = "WHERE u.role NOT LIKE '%Super Admin%'";
           const vals: any[] = [];
-          if (unit && unit !== 'All Units') { whereClause += ' AND u.department = ?'; vals.push(unit); }
+          if (department && department !== 'All Departments') { whereClause += ' AND u.department = ?'; vals.push(department); }
           // Note: for staff evaluation, we usually look at current status, but we can filter by user join date if needed
 
           data = await query({
             query: `
               SELECT
                 u.full_name                                                          AS name,
-                u.department                                                         AS unit,
+                u.department                                                         AS department,
                 COUNT(sa.id)                                                         AS assigned,
                 SUM(CASE WHEN sa.status = 'Completed' THEN 1 ELSE 0 END)           AS completed,
                 ROUND(
@@ -60,8 +60,8 @@ export async function GET(request: Request) {
                   / NULLIF(COUNT(sa.id), 0),
                 0)                                                                   AS rate
               FROM users u
-              LEFT JOIN units un ON un.name = u.department
-              LEFT JOIN strategic_activities sa ON sa.unit_id = un.id
+              LEFT JOIN departments un ON un.name = u.department
+              LEFT JOIN strategic_activities sa ON sa.department_id = un.id
               ${whereClause}
               GROUP BY u.id, u.full_name, u.department
               ORDER BY rate DESC
@@ -94,19 +94,19 @@ export async function GET(request: Request) {
         {
           let whereClause = "WHERE sa.status = 'Delayed'";
           const vals: any[] = [];
-          if (unit && unit !== 'All Units') { whereClause += ' AND u.name = ?'; vals.push(unit); }
+          if (department && department !== 'All Departments') { whereClause += ' AND u.name = ?'; vals.push(department); }
 
           data = await query({
             query: `
               SELECT
                 sa.title,
-                u.name                                    AS unit,
+                u.name                                    AS department,
                 DATE_FORMAT(sa.end_date, '%d %b %Y')     AS deadline,
                 DATEDIFF(CURDATE(), sa.end_date)          AS days_overdue,
                 sa.progress,
                 sa.status
               FROM strategic_activities sa
-              LEFT JOIN units u ON sa.unit_id = u.id
+              LEFT JOIN departments u ON sa.department_id = u.id
               ${whereClause}
               ORDER BY days_overdue DESC
             `,
@@ -119,7 +119,7 @@ export async function GET(request: Request) {
         return NextResponse.json({ message: 'Invalid report type' }, { status: 400 });
     }
 
-    return NextResponse.json({ type, format, from, to, unit, data, generated_at: new Date().toISOString() });
+    return NextResponse.json({ type, format, from, to, department, data, generated_at: new Date().toISOString() });
   } catch (error) {
     console.error('Error generating report:', error);
     return NextResponse.json({ message: 'Error generating report' }, { status: 500 });

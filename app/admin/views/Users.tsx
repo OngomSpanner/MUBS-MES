@@ -37,6 +37,11 @@ export default function UsersView() {
     const [editForm, setEditForm] = useState({ full_name: '', email: '', role: '', department: '', status: '' });
     const [saving, setSaving] = useState(false);
 
+    // Delete modal state
+    const [userToDelete, setUserToDelete] = useState<User | null>(null);
+    const [showDeleteModal, setShowDeleteModal] = useState(false);
+    const [deleting, setDeleting] = useState(false);
+
     // Pagination
     const [currentPage, setCurrentPage] = useState(1);
     const PAGE_SIZE = 10;
@@ -107,6 +112,23 @@ export default function UsersView() {
         }
     };
 
+    const handleDeleteUser = async () => {
+        if (!userToDelete) return;
+        setDeleting(true);
+        try {
+            await axios.delete(`/api/users/${userToDelete.id}`);
+            setShowDeleteModal(false);
+            setUserToDelete(null);
+            fetchUsers();
+            fetchStats();
+        } catch (error) {
+            console.error('Error deleting user:', error);
+            alert('Failed to delete user.');
+        } finally {
+            setDeleting(false);
+        }
+    };
+
     const getStatusBadge = (status: string) => {
         const styles: { [key: string]: { bg: string; color: string } } = {
             'Active': { bg: '#dcfce7', color: '#15803d' },
@@ -120,7 +142,7 @@ export default function UsersView() {
         const styles: { [key: string]: { bg: string; color: string } } = {
             'System Administrator': { bg: '#eff6ff', color: 'var(--mubs-blue)' },
             'Strategy Manager': { bg: '#fdf2f8', color: '#9333ea' },
-            'Unit Head': { bg: '#fff7ed', color: '#ea580c' },
+            'Department Head': { bg: '#fff7ed', color: '#ea580c' },
             'HOD': { bg: '#f0f9ff', color: '#0369a1' },
             'Committee Member': { bg: '#f5f3ff', color: '#6d28d9' },
             'Staff': { bg: '#eff6ff', color: 'var(--mubs-blue)' }
@@ -131,7 +153,7 @@ export default function UsersView() {
     const getRoleIcon = (role: string) =>
         role === 'System Administrator' ? 'shield' :
             role === 'Strategy Manager' ? 'manage_accounts' :
-                role === 'Unit Head' || role === 'HOD' ? 'corporate_fare' :
+                role === 'Department Head' || role === 'HOD' ? 'corporate_fare' :
                     role === 'Committee Member' ? 'groups' : 'assignment_ind';
 
     // Client-side pagination
@@ -142,7 +164,7 @@ export default function UsersView() {
         <Layout>
             {/* Stat Cards */}
             <div className="row g-4 mb-4">
-                <div className="col-sm-6 col-xl-3">
+                <div className="col-sm-4 col-xl-4">
                     <div className="stat-card" style={{ borderLeftColor: 'var(--mubs-blue)' }}>
                         <div className="d-flex justify-content-between align-items-start mb-3">
                             <div className="stat-icon" style={{ background: '#eff6ff' }}>
@@ -154,7 +176,7 @@ export default function UsersView() {
                         <div className="stat-value">{stats.total}</div>
                     </div>
                 </div>
-                <div className="col-sm-6 col-xl-3">
+                <div className="col-sm-4 col-xl-4">
                     <div className="stat-card" style={{ borderLeftColor: '#10b981' }}>
                         <div className="d-flex justify-content-between align-items-start mb-3">
                             <div className="stat-icon" style={{ background: '#ecfdf5' }}>
@@ -166,7 +188,7 @@ export default function UsersView() {
                         <div className="stat-value">{stats.active}</div>
                     </div>
                 </div>
-                <div className="col-sm-6 col-xl-3">
+                <div className="col-sm-4 col-xl-4">
                     <div className="stat-card" style={{ borderLeftColor: 'var(--mubs-yellow)' }}>
                         <div className="d-flex justify-content-between align-items-start mb-3">
                             <div className="stat-icon" style={{ background: '#fffbeb' }}>
@@ -176,18 +198,6 @@ export default function UsersView() {
                         </div>
                         <div className="stat-label">Defined Roles</div>
                         <div className="stat-value">{stats.definedRoles}</div>
-                    </div>
-                </div>
-                <div className="col-sm-6 col-xl-3">
-                    <div className="stat-card" style={{ borderLeftColor: 'var(--mubs-red)' }}>
-                        <div className="d-flex justify-content-between align-items-start mb-3">
-                            <div className="stat-icon" style={{ background: '#fff1f2' }}>
-                                <span className="material-symbols-outlined" style={{ color: 'var(--mubs-red)' }}>block</span>
-                            </div>
-                            <span className="stat-badge" style={{ background: '#fff1f2', color: 'var(--mubs-red)' }}>Inactive</span>
-                        </div>
-                        <div className="stat-label">Suspended</div>
-                        <div className="stat-value">{stats.suspended}</div>
                     </div>
                 </div>
             </div>
@@ -221,7 +231,7 @@ export default function UsersView() {
                             <option>All Roles</option>
                             <option>System Administrator</option>
                             <option>Strategy Manager</option>
-                            <option>Unit Head</option>
+                            <option>Department Head</option>
                             <option>HOD</option>
                             <option>Committee Member</option>
                             <option>Staff</option>
@@ -239,15 +249,14 @@ export default function UsersView() {
                                 <th>User</th>
                                 <th>Email</th>
                                 <th>Role</th>
-                                <th>Department / Unit</th>
-                                <th>Status</th>
+                                <th>Department / Department</th>
                                 <th>Actions</th>
                             </tr>
                         </thead>
                         <tbody>
                             {loading ? (
                                 <tr>
-                                    <td colSpan={6} className="text-center py-4">
+                                    <td colSpan={5} className="text-center py-4">
                                         <div className="spinner-border text-primary" role="status">
                                             <span className="visually-hidden">Loading...</span>
                                         </div>
@@ -255,7 +264,7 @@ export default function UsersView() {
                                 </tr>
                             ) : paginatedUsers.length === 0 ? (
                                 <tr>
-                                    <td colSpan={6} className="text-center py-4 text-muted">No users found</td>
+                                    <td colSpan={5} className="text-center py-4 text-muted">No users found</td>
                                 </tr>
                             ) : (
                                 paginatedUsers.map((user) => {
@@ -291,12 +300,6 @@ export default function UsersView() {
                                             </td>
                                             <td style={{ fontSize: '.83rem' }}>{user.department}</td>
                                             <td>
-                                                <span className="status-badge" style={{ background: statusStyle.bg, color: statusStyle.color }}>
-                                                    <span className="material-symbols-outlined" style={{ fontSize: '12px' }}>circle</span>
-                                                    {user.status}
-                                                </span>
-                                            </td>
-                                            <td>
                                                 <div className="d-flex gap-1">
                                                     <button
                                                         className="btn btn-xs btn-outline-primary py-0 px-2"
@@ -306,25 +309,17 @@ export default function UsersView() {
                                                     >
                                                         <span className="material-symbols-outlined" style={{ fontSize: '14px' }}>edit</span>
                                                     </button>
-                                                    {user.status === 'Active' ? (
-                                                        <button
-                                                            className="btn btn-xs btn-outline-danger py-0 px-2"
-                                                            style={{ fontSize: '.75rem' }}
-                                                            title="Suspend user"
-                                                            onClick={() => handleStatusChange(user.id, 'Suspended')}
-                                                        >
-                                                            <span className="material-symbols-outlined" style={{ fontSize: '14px' }}>block</span>
-                                                        </button>
-                                                    ) : (
-                                                        <button
-                                                            className="btn btn-xs btn-outline-success py-0 px-2"
-                                                            style={{ fontSize: '.75rem' }}
-                                                            title="Activate user"
-                                                            onClick={() => handleStatusChange(user.id, 'Active')}
-                                                        >
-                                                            <span className="material-symbols-outlined" style={{ fontSize: '14px' }}>check</span>
-                                                        </button>
-                                                    )}
+                                                    <button
+                                                        className="btn btn-xs btn-outline-danger py-0 px-2"
+                                                        style={{ fontSize: '.75rem' }}
+                                                        title="Delete user"
+                                                        onClick={() => {
+                                                            setUserToDelete(user);
+                                                            setShowDeleteModal(true);
+                                                        }}
+                                                    >
+                                                        <span className="material-symbols-outlined" style={{ fontSize: '14px' }}>delete</span>
+                                                    </button>
                                                 </div>
                                             </td>
                                         </tr>
@@ -380,7 +375,7 @@ export default function UsersView() {
                         <div className="col-12">
                             <Form.Label className="fw-bold small">Roles (Select all that apply)</Form.Label>
                             <div className="d-flex flex-wrap gap-2 p-2 border rounded bg-light">
-                                {['System Administrator', 'Strategy Manager', 'Unit Head', 'HOD', 'Committee Member', 'Staff'].map(r => (
+                                {['System Administrator', 'Strategy Manager', 'Department Head', 'HOD', 'Committee Member', 'Staff'].map(r => (
                                     <div key={r} className="form-check">
                                         <input
                                             type="checkbox"
@@ -401,7 +396,7 @@ export default function UsersView() {
                             </div>
                         </div>
                         <div className="col-12">
-                            <Form.Label className="fw-bold small">Department / Unit</Form.Label>
+                            <Form.Label className="fw-bold small">Department / Department</Form.Label>
                             <Form.Control
                                 value={editForm.department}
                                 onChange={e => setEditForm({ ...editForm, department: e.target.value })}
@@ -430,6 +425,32 @@ export default function UsersView() {
                     >
                         <span className="material-symbols-outlined me-1" style={{ fontSize: '16px' }}>save</span>
                         {saving ? 'Saving...' : 'Save Changes'}
+                    </Button>
+                </Modal.Footer>
+            </Modal>
+
+            {/* Delete Confirmation Modal */}
+            <Modal show={showDeleteModal} onHide={() => !deleting && setShowDeleteModal(false)} centered>
+                <Modal.Header closeButton className="modal-header-mubs">
+                    <Modal.Title className="fw-bold d-flex align-items-center gap-2 text-danger">
+                        <span className="material-symbols-outlined">warning</span>
+                        Confirm Deletion
+                    </Modal.Title>
+                </Modal.Header>
+                <Modal.Body>
+                    <p>Are you sure you want to delete the user <strong>{userToDelete?.full_name}</strong>?</p>
+                    <p className="text-muted small mb-0">This action cannot be undone and will remove all their roles and access from the system.</p>
+                </Modal.Body>
+                <Modal.Footer>
+                    <Button variant="light" onClick={() => setShowDeleteModal(false)} disabled={deleting}>Cancel</Button>
+                    <Button
+                        variant="danger"
+                        className="fw-bold"
+                        disabled={deleting}
+                        onClick={handleDeleteUser}
+                    >
+                        <span className="material-symbols-outlined me-1" style={{ fontSize: '16px' }}>delete</span>
+                        {deleting ? 'Deleting...' : 'Delete User'}
                     </Button>
                 </Modal.Footer>
             </Modal>

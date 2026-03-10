@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 
-interface UnitActivity {
+interface DepartmentActivity {
     id: number;
     title: string;
     progress: number;
@@ -11,7 +11,7 @@ interface UnitActivity {
     pillar: string;
 }
 
-interface UnitRisk {
+interface DepartmentRisk {
     id: number;
     title: string;
     description: string;
@@ -19,7 +19,7 @@ interface UnitRisk {
     daysLeft: number;
 }
 
-interface UnitDrillDown {
+interface DepartmentDrillDown {
     id: number;
     name: string;
     head: string;
@@ -28,8 +28,8 @@ interface UnitDrillDown {
     completedCount: number;
     inProgressCount: number;
     delayedCount: number;
-    recentActivities: UnitActivity[];
-    risks: UnitRisk[];
+    recentActivities: DepartmentActivity[];
+    risks: DepartmentRisk[];
 }
 
 interface StrategicSummaryData {
@@ -39,7 +39,7 @@ interface StrategicSummaryData {
         inProgress: number;
         delayed: number;
     };
-    units: UnitDrillDown[];
+    departments: DepartmentDrillDown[];
 }
 
 export default function StrategicSummary() {
@@ -88,7 +88,7 @@ export default function StrategicSummary() {
         <div id="page-strategic" className="page-section active-page">
             <div className="alert alert-primary alert-strip alert-dismissible fade show mb-4 d-flex align-items-center gap-2" role="alert" style={{ background: '#eff6ff', borderColor: '#93c5fd', color: '#1d4ed8' }}>
                 <span className="material-symbols-outlined" style={{ fontSize: '20px', color: 'var(--mubs-blue)' }}>info</span>
-                <div>You are viewing a <strong>live snapshot</strong> of the institutional strategic plan. Click any unit row to drill down.</div>
+                <div>You are viewing a <strong>live snapshot</strong> of the institutional strategic plan. Click any department row to drill down.</div>
                 <button type="button" className="btn-close ms-auto" data-bs-dismiss="alert"></button>
             </div>
 
@@ -120,7 +120,7 @@ export default function StrategicSummary() {
                 </div>
             </div>
 
-            {/* Drill-down by unit */}
+            {/* Drill-down by department */}
             <div className="mb-3 d-flex align-items-center justify-content-between flex-wrap gap-2">
                 <h6 className="fw-bold text-dark mb-0 d-flex align-items-center" style={{ fontSize: '1rem' }}>
                     <span className="material-symbols-outlined me-2 text-primary" style={{ fontSize: '20px' }}>corporate_fare</span>
@@ -153,15 +153,15 @@ export default function StrategicSummary() {
                 </div>
             </div>
 
-            {/* Unit rows */}
+            {/* Department rows */}
             <div className="d-flex flex-column gap-3">
-                {data.units.map((unit) => {
-                    const perf = getPerformanceLabel(unit.overallProgress);
+                {data.departments.map((department) => {
+                    const perf = getPerformanceLabel(department.overallProgress);
                     return (
                         <div
-                            key={unit.id}
-                            className={`unit-drill-row bg-white p-3 rounded-3 shadow-sm border ${expandedUnit === unit.id ? 'border-primary' : ''}`}
-                            onClick={() => toggleUnit(unit.id)}
+                            key={department.id}
+                            className={`department-drill-row bg-white p-3 rounded-3 shadow-sm border ${expandedUnit === department.id ? 'border-primary' : ''}`}
+                            onClick={() => toggleUnit(department.id)}
                             style={{ cursor: 'pointer', transition: 'all 0.2s ease' }}
                         >
                             <div className="d-flex align-items-center justify-content-between flex-wrap gap-2">
@@ -170,54 +170,54 @@ export default function StrategicSummary() {
                                         <span className="material-symbols-outlined" style={{ color: 'var(--mubs-blue)' }}>corporate_fare</span>
                                     </div>
                                     <div>
-                                        <div className="fw-bold text-dark" style={{ fontSize: '.92rem' }}>{unit.name}</div>
-                                        <div className="text-muted" style={{ fontSize: '.75rem' }}>{unit.activitiesCount} activities · {unit.head || 'No Unit Head Assigned'}</div>
+                                        <div className="fw-bold text-dark" style={{ fontSize: '.92rem' }}>{department.name}</div>
+                                        <div className="text-muted" style={{ fontSize: '.75rem' }}>{department.activitiesCount} activities · {department.head || 'No Department Head Assigned'}</div>
                                     </div>
                                 </div>
                                 <div className="d-flex align-items-center gap-4 flex-wrap">
                                     <div className="text-center">
-                                        <div className="fw-bold text-dark" style={{ fontSize: '1.1rem' }}>{unit.overallProgress}%</div>
+                                        <div className="fw-bold text-dark" style={{ fontSize: '1.1rem' }}>{department.overallProgress}%</div>
                                         <div style={{ fontSize: '.65rem', color: '#64748b', textTransform: 'uppercase', fontWeight: 700 }}>Progress</div>
                                     </div>
                                     <div className="text-center">
                                         <span className="status-badge" style={{ background: perf.bg, color: perf.color, padding: '4px 10px', borderRadius: '6px', fontWeight: 800, fontSize: '.68rem' }}>{perf.label}</span>
                                     </div>
-                                    <span className="material-symbols-outlined text-muted" style={{ fontSize: '20px', transition: 'transform 0.2s ease', transform: expandedUnit === unit.id ? 'rotate(180deg)' : 'rotate(0deg)' }}>
+                                    <span className="material-symbols-outlined text-muted" style={{ fontSize: '20px', transition: 'transform 0.2s ease', transform: expandedUnit === department.id ? 'rotate(180deg)' : 'rotate(0deg)' }}>
                                         expand_more
                                     </span>
                                 </div>
                             </div>
 
-                            {expandedUnit === unit.id && (
-                                <div className="unit-drill-detail mt-3 pt-3 border-top border-light">
+                            {expandedUnit === department.id && (
+                                <div className="department-drill-detail mt-3 pt-3 border-top border-light">
                                     <div className="row g-3">
                                         <div className="col-sm-4">
                                             <div className="p-3 rounded-3 text-center" style={{ background: '#f8fafc' }}>
-                                                <div className="fw-bold text-dark" style={{ fontSize: '1.1rem' }}>{unit.completedCount}</div>
+                                                <div className="fw-bold text-dark" style={{ fontSize: '1.1rem' }}>{department.completedCount}</div>
                                                 <div className="text-muted" style={{ fontSize: '.72rem', textTransform: 'uppercase', fontWeight: 700 }}>Completed</div>
                                             </div>
                                         </div>
                                         <div className="col-sm-4">
                                             <div className="p-3 rounded-3 text-center" style={{ background: '#f8fafc' }}>
-                                                <div className="fw-bold text-dark" style={{ fontSize: '1.1rem' }}>{unit.inProgressCount}</div>
+                                                <div className="fw-bold text-dark" style={{ fontSize: '1.1rem' }}>{department.inProgressCount}</div>
                                                 <div className="text-muted" style={{ fontSize: '.72rem', textTransform: 'uppercase', fontWeight: 700 }}>In Progress</div>
                                             </div>
                                         </div>
                                         <div className="col-sm-4">
                                             <div className="p-3 rounded-3 text-center" style={{ background: '#f8fafc' }}>
-                                                <div className={`fw-bold ${unit.delayedCount > 0 ? 'text-danger' : 'text-success'}`} style={{ fontSize: '1.1rem' }}>{unit.delayedCount}</div>
+                                                <div className={`fw-bold ${department.delayedCount > 0 ? 'text-danger' : 'text-success'}`} style={{ fontSize: '1.1rem' }}>{department.delayedCount}</div>
                                                 <div className="text-muted" style={{ fontSize: '.72rem', textTransform: 'uppercase', fontWeight: 700 }}>Delayed</div>
                                             </div>
                                         </div>
                                     </div>
 
-                                    {unit.risks.length > 0 && (
+                                    {department.risks.length > 0 && (
                                         <div className="mt-3">
                                             <div className="fw-bold text-danger mb-2 d-flex align-items-center gap-1" style={{ fontSize: '.83rem' }}>
                                                 <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>warning</span> Risk Areas
                                             </div>
                                             <div className="d-flex flex-column gap-2">
-                                                {unit.risks.map(risk => (
+                                                {department.risks.map(risk => (
                                                     <div key={risk.id} className="d-flex align-items-start gap-2 p-2 rounded" style={{ background: '#fff1f2', borderLeft: '3px solid #e31837' }}>
                                                         <div style={{ fontSize: '.8rem', color: '#450a0a' }}><strong>{risk.title}</strong> — {risk.description || 'No additional details provided.'}</div>
                                                     </div>
@@ -229,7 +229,7 @@ export default function StrategicSummary() {
                                     <div className="mt-3">
                                         <div className="fw-bold text-dark mb-2" style={{ fontSize: '.83rem' }}>Recent Activities</div>
                                         <div className="d-flex flex-column gap-2">
-                                            {unit.recentActivities.length > 0 ? unit.recentActivities.map(act => (
+                                            {department.recentActivities.length > 0 ? department.recentActivities.map(act => (
                                                 <div key={act.id} className="d-flex align-items-center gap-3 p-2 rounded-3 hover-bg-light" style={{ transition: 'background 0.2s' }}>
                                                     <div className="activity-icon" style={{ width: '32px', height: '32px', borderRadius: '8px', background: '#eff6ff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                                                         <span className="material-symbols-outlined" style={{ fontSize: '18px', color: 'var(--mubs-blue)' }}>flag</span>
@@ -245,7 +245,7 @@ export default function StrategicSummary() {
                                                     </div>
                                                 </div>
                                             )) : (
-                                                <div className="text-muted small text-center py-2 italic">No recent activities found for this unit.</div>
+                                                <div className="text-muted small text-center py-2 italic">No recent activities found for this department.</div>
                                             )}
                                         </div>
                                     </div>

@@ -12,7 +12,7 @@ export async function GET() {
                     SUM(CASE WHEN status IN ('On Track', 'Completed') THEN 1 ELSE 0 END) as \`onTrack\`,
                     SUM(CASE WHEN status = 'In Progress' THEN 1 ELSE 0 END) as \`inProgress\`,
                     SUM(CASE WHEN status = 'Delayed' THEN 1 ELSE 0 END) as \`delayed\`,
-                    (SELECT COUNT(*) FROM units) as \`totalUnits\`,
+                    (SELECT COUNT(*) FROM departments) as \`totalUnits\`,
                     (SELECT COUNT(*) FROM users WHERE status = 'Active' OR status = 'active') as \`activeStaff\`
                 FROM strategic_activities
                 WHERE parent_id IS NULL
@@ -21,14 +21,14 @@ export async function GET() {
 
     const stats = kpiStats[0];
 
-    // 2. Compliance by Unit (Top 5)
+    // 2. Compliance by Department (Top 5)
     const complianceByUnit = await query({
       query: `
                 SELECT 
-                    u.name as unit, 
+                    u.name as department, 
                     ROUND(IFNULL(AVG(sa.progress), 0)) as progress
-                FROM units u
-                LEFT JOIN strategic_activities sa ON u.id = sa.unit_id AND sa.parent_id IS NULL
+                FROM departments u
+                LEFT JOIN strategic_activities sa ON u.id = sa.department_id AND sa.parent_id IS NULL
                 GROUP BY u.id, u.name
                 ORDER BY progress DESC
                 LIMIT 5
@@ -41,7 +41,7 @@ export async function GET() {
                 SELECT 
                     sa.id,
                     sa.title,
-                    u.name as unit,
+                    u.name as department,
                     sa.status,
                     sa.progress,
                     sa.end_date,
@@ -52,7 +52,7 @@ export async function GET() {
                     DATEDIFF(sa.end_date, CURDATE()) as daysLeft,
                     DATEDIFF(CURDATE(), sa.end_date) as daysPast
                 FROM strategic_activities sa
-                LEFT JOIN units u ON sa.unit_id = u.id
+                LEFT JOIN departments u ON sa.department_id = u.id
                 WHERE (sa.status = 'Delayed' OR (sa.status != 'Completed' AND DATEDIFF(sa.end_date, CURDATE()) <= 7))
                 AND sa.parent_id IS NULL
                 ORDER BY sa.end_date ASC
@@ -66,18 +66,18 @@ export async function GET() {
                 SELECT 
                     sa.id,
                     sa.title,
-                    u.name as unit,
+                    u.name as department,
                     DATEDIFF(CURDATE(), sa.end_date) as daysOverdue,
                     sa.progress
                 FROM strategic_activities sa
-                LEFT JOIN units u ON sa.unit_id = u.id
+                LEFT JOIN departments u ON sa.department_id = u.id
                 WHERE sa.status = 'Delayed' AND sa.parent_id IS NULL
                 ORDER BY daysOverdue DESC
                 LIMIT 4
             `
     }) as any[];
 
-    // Compliance rate (units with progress >= 75%)
+    // Compliance rate (departments with progress >= 75%)
     const complianceRate = Math.round((complianceByUnit.filter(u => u.progress >= 75).length / (stats.totalUnits || 1)) * 100);
 
     return NextResponse.json({

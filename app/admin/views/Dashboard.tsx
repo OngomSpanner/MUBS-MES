@@ -18,7 +18,7 @@ interface DashboardStats {
   delayedActivities: number;
 }
 
-interface UnitPerformance {
+interface DepartmentPerformance {
   name: string;
   progress: number;
 }
@@ -42,7 +42,7 @@ export default function Dashboard() {
     pendingProposals: 0,
     delayedActivities: 0
   });
-  const [unitPerformance, setUnitPerformance] = useState<UnitPerformance[]>([]);
+  const [departmentPerformance, setUnitPerformance] = useState<DepartmentPerformance[]>([]);
   const [recentActivities, setRecentActivities] = useState<RecentActivity[]>([]);
   const [showCreateUserModal, setShowCreateUserModal] = useState(false);
   const [showCreateActivityModal, setShowCreateActivityModal] = useState(false);
@@ -55,7 +55,7 @@ export default function Dashboard() {
     try {
       const response = await axios.get('/api/dashboard/stats');
       setStats(response.data.stats);
-      setUnitPerformance(response.data.unitPerformance);
+      setUnitPerformance(response.data.departmentPerformance);
       setRecentActivities(response.data.recentActivities);
     } catch (error) {
       console.error('Error fetching dashboard data:', error);
@@ -187,7 +187,7 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* Unit Performance */}
+        {/* Department Performance */}
         <div className="col-12 col-md-8">
           <div className="table-card p-0">
             <div className="table-card-header">
@@ -195,27 +195,27 @@ export default function Dashboard() {
                 <span className="material-symbols-outlined me-2" style={{ color: 'var(--mubs-blue)' }}>
                   corporate_fare
                 </span>
-                Unit Performance Overview
+                Department Performance Overview
               </h5>
               <button className="btn btn-sm btn-outline-secondary" onClick={() => { window.location.href = '/admin?pg=reports'; }}>
                 Full Report
               </button>
             </div>
             <div className="p-4">
-              {unitPerformance.map((unit, index) => (
-                <div className="unit-bar-row" key={index}>
-                  <span className="unit-bar-label">{unit.name}</span>
-                  <div className="unit-bar-track">
+              {departmentPerformance.map((department, index) => (
+                <div className="department-bar-row" key={index}>
+                  <span className="department-bar-label">{department.name}</span>
+                  <div className="department-bar-track">
                     <div
-                      className="unit-bar-fill"
+                      className="department-bar-fill"
                       style={{
-                        width: `${unit.progress}%`,
-                        background: unit.progress >= 70 ? '#005696' :
-                          unit.progress >= 50 ? '#ffcd00' : '#e31837'
+                        width: `${department.progress}%`,
+                        background: department.progress >= 70 ? '#005696' :
+                          department.progress >= 50 ? '#ffcd00' : '#e31837'
                       }}
                     />
                   </div>
-                  <span className="unit-bar-pct">{unit.progress}%</span>
+                  <span className="department-bar-pct">{department.progress}%</span>
                 </div>
               ))}
             </div>

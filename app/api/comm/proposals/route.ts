@@ -41,7 +41,7 @@ export async function POST(req: Request) {
                 (
                     title, description, priority, end_date, 
                     status, progress, created_by, 
-                    proposal_kpi, evidence_url, meeting_reference, committee_suggestion_unit_id
+                    proposal_kpi, evidence_url, meeting_reference, committee_suggestion_department_id
                 ) 
                 VALUES (?, ?, ?, ?, 'Pending', 0, ?, ?, ?, ?, ?)
             `,

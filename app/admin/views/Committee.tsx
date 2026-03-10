@@ -9,7 +9,7 @@ interface Proposal {
     id: number;
     title: string;
     submitted_by: string;
-    unit: string;
+    department: string;
     submitted_date: string;
     budget: number;
     status: string;
@@ -176,7 +176,7 @@ export default function CommitteeView() {
                                 <th>Activity / Minute Ref</th>
                                 <th>Source Committee</th>
                                 <th>Submitted By</th>
-                                <th>Unit</th>
+                                <th>Department</th>
                                 <th>Date</th>
                                 <th>Status</th>
                                 <th>Actions</th>
@@ -198,7 +198,7 @@ export default function CommitteeView() {
                                             <span className="badge bg-light text-dark">{p.committee_type}</span>
                                         </td>
                                         <td>{p.submitted_by}</td>
-                                        <td>{p.unit}</td>
+                                        <td>{p.department}</td>
                                         <td>{p.submitted_date}</td>
                                         <td>
                                             <span className={`status-badge ${p.status.toLowerCase().replace(' ', '-')}`}>
@@ -266,8 +266,8 @@ export default function CommitteeView() {
                                     <div>UGX {selectedProposal.budget.toLocaleString()}</div>
                                 </div>
                                 <div className="col-6 mb-3">
-                                    <label className="fw-bold small">Unit</label>
-                                    <div>{selectedProposal.unit}</div>
+                                    <label className="fw-bold small">Department</label>
+                                    <div>{selectedProposal.department}</div>
                                 </div>
                                 {selectedProposal.pillar_title && (
                                     <div className="col-12 mb-3">

@@ -9,7 +9,7 @@ export async function GET(
   const { id } = await params;
   try {
     const user = await query({
-      query: 'SELECT id, full_name, email, role, department, status FROM users WHERE id = ?',
+      query: 'SELECT id, full_name, email, role, department_id, status FROM users WHERE id = ?',
       values: [id]
     });
 
@@ -37,9 +37,9 @@ export async function PUT(
   const { id } = await params;
   try {
     const body = await request.json();
-    const { full_name, email, role, department, status } = body;
+    const { full_name, email, role, department_id, status } = body;
 
-    if (!full_name || !email || !role || !department || !status) {
+    if (!full_name || !email || !role || !department_id || !status) {
       return NextResponse.json(
         { message: 'Missing required fields' },
         { status: 400 }
@@ -47,8 +47,8 @@ export async function PUT(
     }
 
     await query({
-      query: 'UPDATE users SET full_name = ?, email = ?, role = ?, department = ?, status = ? WHERE id = ?',
-      values: [full_name, email, role, department, status, id]
+      query: 'UPDATE users SET full_name = ?, email = ?, role = ?, department_id = ?, status = ? WHERE id = ?',
+      values: [full_name, email, role, department_id, status, id]
     });
 
     return NextResponse.json({ message: 'User updated successfully' });

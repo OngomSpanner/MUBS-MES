@@ -26,7 +26,7 @@ export async function GET() {
                     sa.reviewer_notes
                 FROM strategic_activities sa
                 LEFT JOIN strategic_activities p ON sa.parent_id = p.id
-                LEFT JOIN users u ON p.unit_id = (SELECT id FROM units WHERE name = u.department LIMIT 1) AND u.role = 'Unit Head'
+                LEFT JOIN users u ON p.department_id = (SELECT id FROM departments WHERE name = u.department LIMIT 1) AND u.role = 'Department Head'
                 WHERE sa.assigned_to = ?
                 AND sa.status IN ('Completed', 'Returned')
                 ORDER BY sa.updated_at DESC

@@ -562,21 +562,21 @@ body {
   }
 }
 
-.unit-bar-row {
+.department-bar-row {
   display: flex;
   align-items: center;
   gap: 10px;
   margin-bottom: 0.65rem;
 }
 
-.unit-bar-label {
+.department-bar-label {
   font-size: 0.78rem;
   font-weight: 600;
   color: #334155;
   min-width: 160px;
 }
 
-.unit-bar-track {
+.department-bar-track {
   flex: 1;
   height: 10px;
   background: #e2e8f0;
@@ -584,12 +584,12 @@ body {
   overflow: hidden;
 }
 
-.unit-bar-fill {
+.department-bar-fill {
   height: 100%;
   border-radius: 99px;
 }
 
-.unit-bar-pct {
+.department-bar-pct {
   font-size: 0.75rem;
   font-weight: 800;
   color: #475569;
@@ -695,11 +695,11 @@ body {
 .share-chip { display: inline-flex; align-items: center; gap: 6px; background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 99px; padding: .25rem .7rem; font-size: .78rem; font-weight: 600; color: var(--mubs-blue); margin: .2rem; }
 .share-chip button { background: none; border: none; padding: 0; line-height: 1; color: #94a3b8; cursor: pointer; }
 
-/* --- Drill-down unit row --- */
-.unit-drill-row { background: #fff; border-radius: 12px; padding: 1rem 1.25rem; box-shadow: 0 2px 12px rgba(0,0,0,.07); margin-bottom: .75rem; cursor: pointer; border: 2px solid transparent; transition: border-color .18s, box-shadow .18s; }
-.unit-drill-row:hover, .unit-drill-row.expanded { border-color: var(--mubs-blue); box-shadow: 0 4px 20px rgba(0,86,150,.12); }
-.unit-drill-detail { display: none; padding-top: 1rem; margin-top: 1rem; border-top: 1px solid #f1f5f9; }
-.unit-drill-row.expanded .unit-drill-detail { display: block; }
+/* --- Drill-down department row --- */
+.department-drill-row { background: #fff; border-radius: 12px; padding: 1rem 1.25rem; box-shadow: 0 2px 12px rgba(0,0,0,.07); margin-bottom: .75rem; cursor: pointer; border: 2px solid transparent; transition: border-color .18s, box-shadow .18s; }
+.department-drill-row:hover, .department-drill-row.expanded { border-color: var(--mubs-blue); box-shadow: 0 4px 20px rgba(0,86,150,.12); }
+.department-drill-detail { display: none; padding-top: 1rem; margin-top: 1rem; border-top: 1px solid #f1f5f9; }
+.department-drill-row.expanded .department-drill-detail { display: block; }
 
 /* --- Override for responsive KPI font size if needed --- */
 @media (max-width: 991px) {

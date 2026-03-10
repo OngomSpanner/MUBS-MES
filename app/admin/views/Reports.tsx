@@ -5,8 +5,8 @@ import Layout from '@/components/Layout';
 import axios from 'axios';
 import * as XLSX from 'xlsx';
 
-interface UnitSummary {
-    unit: string;
+interface DepartmentSummary {
+    department: string;
     total: number;
     completed: number;
     inProgress: number;
@@ -17,7 +17,7 @@ interface UnitSummary {
 
 interface StaffEvaluation {
     name: string;
-    unit: string;
+    department: string;
     assigned: number;
     completed: number;
     rate: number;
@@ -31,21 +31,21 @@ const getEvaluation = (rate: number) =>
     rate >= 80 ? 'Excellent' : rate >= 60 ? 'Good' : rate >= 40 ? 'Fair' : 'Poor';
 
 export default function ReportsView() {
-    const [unitSummaries, setUnitSummaries] = useState<UnitSummary[]>([]);
+    const [departmentSummaries, setUnitSummaries] = useState<DepartmentSummary[]>([]);
     const [staffEvaluations, setStaffEvaluations] = useState<StaffEvaluation[]>([]);
     const [trendData, setTrendData] = useState<{ label: string; avg_progress: number }[]>([]);
     const [loadingUnits, setLoadingUnits] = useState(true);
     const [loadingStaff, setLoadingStaff] = useState(true);
     const [loadingTrend, setLoadingTrend] = useState(true);
 
-    const [summaryUnitFilter, setSummaryUnitFilter] = useState('All Units');
-    const [selectedUnit, setSelectedUnit] = useState('All Units');
+    const [summaryUnitFilter, setSummaryUnitFilter] = useState('All Departments');
+    const [selectedUnit, setSelectedUnit] = useState('All Departments');
     const [dateFrom, setDateFrom] = useState('');
     const [dateTo, setDateTo] = useState('');
     const [activeTab, setActiveTab] = useState<'summary' | 'staff' | 'trends'>('summary');
 
     // Pagination — Activity Summary
-    const [unitPage, setUnitPage] = useState(1);
+    const [departmentPage, setUnitPage] = useState(1);
     const UNIT_PAGE_SIZE = 5;
 
     // Pagination — Staff Evaluations
@@ -60,13 +60,13 @@ export default function ReportsView() {
         try {
             const params = new URLSearchParams();
             params.append('type', 'activity-summary');
-            if (summaryUnitFilter !== 'All Units') params.append('unit', summaryUnitFilter);
+            if (summaryUnitFilter !== 'All Departments') params.append('department', summaryUnitFilter);
             if (dateFrom) params.append('from', dateFrom);
             if (dateTo) params.append('to', dateTo);
 
             const { data } = await axios.get(`/api/reports?${params.toString()}`);
-            const rows: UnitSummary[] = (data.data as any[]).map(r => ({
-                unit: r.unit,
+            const rows: DepartmentSummary[] = (data.data as any[]).map(r => ({
+                department: r.department,
                 total: Number(r.total_activities),
                 completed: Number(r.completed),
                 inProgress: Number(r.in_progress),
@@ -90,13 +90,13 @@ export default function ReportsView() {
         setLoadingStaff(true);
         const params = new URLSearchParams();
         params.append('type', 'staff-evaluation');
-        if (selectedUnit !== 'All Units') params.append('unit', selectedUnit);
+        if (selectedUnit !== 'All Departments') params.append('department', selectedUnit);
 
         axios.get(`/api/reports?${params.toString()}`)
             .then(({ data }) => {
                 const rows: StaffEvaluation[] = (data.data as any[]).map(r => ({
                     name: r.name,
-                    unit: r.unit ?? '—',
+                    department: r.department ?? '—',
                     assigned: Number(r.assigned),
                     completed: Number(r.completed),
                     rate: Number(r.rate ?? 0),
@@ -128,15 +128,15 @@ export default function ReportsView() {
     };
 
     // ── Export helpers ─────────────────────────────────────────────
-    const exportExcel = (dataset: 'units' | 'staff', filename: string) => {
-        const rows = dataset === 'units'
+    const exportExcel = (dataset: 'departments' | 'staff', filename: string) => {
+        const rows = dataset === 'departments'
             ? filteredUnitSummaries.map(u => ({
-                Unit: u.unit, Total: u.total, Completed: u.completed,
+                Department: u.department, Total: u.total, Completed: u.completed,
                 'In Progress': u.inProgress, Delayed: u.delayed,
                 'Avg Progress (%)': u.progress, Score: u.score
             }))
             : filteredStaff.map(s => ({
-                'Staff Name': s.name, Unit: s.unit, Assigned: s.assigned,
+                'Staff Name': s.name, Department: s.department, Assigned: s.assigned,
                 Completed: s.completed, 'Completion Rate (%)': s.rate, Evaluation: s.evaluation
             }));
 
@@ -146,7 +146,7 @@ export default function ReportsView() {
         XLSX.writeFile(wb, `${filename}.xlsx`);
     };
 
-    const exportPDF = async (dataset: 'units' | 'staff', filename: string) => {
+    const exportPDF = async (dataset: 'departments' | 'staff', filename: string) => {
         const { default: jsPDF } = await import('jspdf');
         const { default: autoTable } = await import('jspdf-autotable');
         const doc = new jsPDF({ orientation: 'landscape' });
@@ -155,11 +155,11 @@ export default function ReportsView() {
         doc.setFontSize(9);
         doc.text(`Generated: ${new Date().toLocaleString()}`, 14, 22);
 
-        if (dataset === 'units') {
+        if (dataset === 'departments') {
             autoTable(doc, {
                 startY: 28,
-                head: [['Unit', 'Total', 'Completed', 'In Progress', 'Delayed', 'Avg Progress', 'Score']],
-                body: filteredUnitSummaries.map(u => [u.unit, u.total, u.completed, u.inProgress, u.delayed, `${u.progress}%`, u.score]),
+                head: [['Department', 'Total', 'Completed', 'In Progress', 'Delayed', 'Avg Progress', 'Score']],
+                body: filteredUnitSummaries.map(u => [u.department, u.total, u.completed, u.inProgress, u.delayed, `${u.progress}%`, u.score]),
                 foot: [['TOTAL / AVG', totals.total, totals.completed, totals.inProgress, totals.delayed, `${avgProgress}%`, '']],
                 styles: { fontSize: 8 },
                 headStyles: { fillColor: [30, 92, 164] },
@@ -168,8 +168,8 @@ export default function ReportsView() {
         } else {
             autoTable(doc, {
                 startY: 28,
-                head: [['Staff Name', 'Unit', 'Assigned', 'Completed', 'Rate', 'Evaluation']],
-                body: filteredStaff.map(s => [s.name, s.unit, s.assigned, s.completed, `${s.rate}%`, s.evaluation]),
+                head: [['Staff Name', 'Department', 'Assigned', 'Completed', 'Rate', 'Evaluation']],
+                body: filteredStaff.map(s => [s.name, s.department, s.assigned, s.completed, `${s.rate}%`, s.evaluation]),
                 styles: { fontSize: 8 },
                 headStyles: { fillColor: [30, 92, 164] }
             });
@@ -177,10 +177,10 @@ export default function ReportsView() {
         doc.save(`${filename}.pdf`);
     };
 
-    // Filtered Unit Summaries
-    const filteredUnitSummaries = summaryUnitFilter === 'All Units'
-        ? unitSummaries
-        : unitSummaries.filter(u => u.unit === summaryUnitFilter);
+    // Filtered Department Summaries
+    const filteredUnitSummaries = summaryUnitFilter === 'All Departments'
+        ? departmentSummaries
+        : departmentSummaries.filter(u => u.department === summaryUnitFilter);
 
     // Computed totals row
     const totals = filteredUnitSummaries.reduce(
@@ -196,25 +196,25 @@ export default function ReportsView() {
         ? Math.round(filteredUnitSummaries.reduce((s, u) => s + u.progress, 0) / filteredUnitSummaries.length)
         : 0;
 
-    // Paginated unit summaries
+    // Paginated department summaries
     const totalUnitPages = Math.max(1, Math.ceil(filteredUnitSummaries.length / UNIT_PAGE_SIZE));
-    const paginatedUnits = filteredUnitSummaries.slice((unitPage - 1) * UNIT_PAGE_SIZE, unitPage * UNIT_PAGE_SIZE);
+    const paginatedUnits = filteredUnitSummaries.slice((departmentPage - 1) * UNIT_PAGE_SIZE, departmentPage * UNIT_PAGE_SIZE);
 
     // Filtered + paginated staff evaluations
-    const filteredStaff = selectedUnit === 'All Units'
+    const filteredStaff = selectedUnit === 'All Departments'
         ? staffEvaluations
-        : staffEvaluations.filter(s => s.unit === selectedUnit);
+        : staffEvaluations.filter(s => s.department === selectedUnit);
     const totalStaffPages = Math.max(1, Math.ceil(filteredStaff.length / STAFF_PAGE_SIZE));
     const paginatedStaff = filteredStaff.slice((staffPage - 1) * STAFF_PAGE_SIZE, staffPage * STAFF_PAGE_SIZE);
 
-    // Unique units for staff filter
-    const uniqueStaffUnits = Array.from(new Set(staffEvaluations.map(s => s.unit))).filter(Boolean);
+    // Unique departments for staff filter
+    const uniqueStaffUnits = Array.from(new Set(staffEvaluations.map(s => s.department))).filter(Boolean);
 
-    const reportCards: { title: string; description: string; icon: string; color: string; dataset: 'units' | 'staff' }[] = [
-        { title: 'Activity Progress Summary', description: 'Overview of all activities by status & unit', icon: 'bar_chart', color: 'var(--mubs-blue)', dataset: 'units' },
-        { title: 'Unit Performance Snapshots', description: 'Per-unit activity completion rates', icon: 'corporate_fare', color: '#10b981', dataset: 'units' },
+    const reportCards: { title: string; description: string; icon: string; color: string; dataset: 'departments' | 'staff' }[] = [
+        { title: 'Activity Progress Summary', description: 'Overview of all activities by status & department', icon: 'bar_chart', color: 'var(--mubs-blue)', dataset: 'departments' },
+        { title: 'Department Performance Snapshots', description: 'Per-department activity completion rates', icon: 'corporate_fare', color: '#10b981', dataset: 'departments' },
         { title: 'Staff Evaluation Summaries', description: 'Individual & departmental evaluation scores', icon: 'person_search', color: '#b45309', dataset: 'staff' },
-        { title: 'Delayed Activities Report', description: 'All overdue items with escalation log', icon: 'report', color: 'var(--mubs-red)', dataset: 'units' }
+        { title: 'Delayed Activities Report', description: 'All overdue items with escalation log', icon: 'report', color: 'var(--mubs-red)', dataset: 'departments' }
     ];
 
     const Paginator = ({ page, total, onPrev, onNext, onPage }: { page: number; total: number; onPrev: () => void; onNext: () => void; onPage: (p: number) => void }) => (
@@ -285,7 +285,7 @@ export default function ReportsView() {
                         <span className="material-symbols-outlined" style={{ color: 'var(--mubs-blue)' }}>tune</span>
                         Custom Report Filters
                     </h6>
-                    <button className="btn btn-sm btn-light border" onClick={() => { setDateFrom(''); setDateTo(''); setSummaryUnitFilter('All Units'); }}>
+                    <button className="btn btn-sm btn-light border" onClick={() => { setDateFrom(''); setDateTo(''); setSummaryUnitFilter('All Departments'); }}>
                         Reset Filters
                     </button>
                 </div>
@@ -299,10 +299,10 @@ export default function ReportsView() {
                         <input type="date" className="form-control form-control-sm" value={dateTo} onChange={e => setDateTo(e.target.value)} />
                     </div>
                     <div className="col-md-3">
-                        <label className="fw-bold small mb-1">Impact Unit</label>
+                        <label className="fw-bold small mb-1">Impact Department</label>
                         <select className="form-select form-select-sm" value={summaryUnitFilter} onChange={e => setSummaryUnitFilter(e.target.value)}>
-                            <option>All Units</option>
-                            {unitSummaries.map(u => <option key={u.unit}>{u.unit}</option>)}
+                            <option>All Departments</option>
+                            {departmentSummaries.map(u => <option key={u.department}>{u.department}</option>)}
                         </select>
                     </div>
                     <div className="col-md-3 d-flex align-items-end">
@@ -377,7 +377,7 @@ export default function ReportsView() {
                             Activity Progress Summary
                         </h5>
                         <div className="d-flex gap-2">
-                            <button className="btn btn-sm btn-success fw-bold" onClick={() => exportExcel('units', 'Activity Progress Summary')}>
+                            <button className="btn btn-sm btn-success fw-bold" onClick={() => exportExcel('departments', 'Activity Progress Summary')}>
                                 <span className="material-symbols-outlined me-1" style={{ fontSize: '16px' }}>download</span>
                                 Export Current View
                             </button>
@@ -387,7 +387,7 @@ export default function ReportsView() {
                         <table className="table mb-0">
                             <thead>
                                 <tr>
-                                    <th>Unit</th>
+                                    <th>Department</th>
                                     <th>Total Activities</th>
                                     <th>Completed</th>
                                     <th>In Progress</th>
@@ -401,23 +401,23 @@ export default function ReportsView() {
                                     <tr><td colSpan={7} className="text-center py-4"><div className="spinner-border text-primary" role="status"><span className="visually-hidden">Loading...</span></div></td></tr>
                                 ) : paginatedUnits.length === 0 ? (
                                     <tr><td colSpan={7} className="text-center py-4 text-muted">No data found</td></tr>
-                                ) : paginatedUnits.map((unit, index) => {
-                                    const scoreStyle = getScoreBadge(unit.score);
+                                ) : paginatedUnits.map((department, index) => {
+                                    const scoreStyle = getScoreBadge(department.score);
                                     return (
                                         <tr key={index}>
-                                            <td className="fw-bold text-dark" style={{ fontSize: '.85rem' }}>{unit.unit}</td>
-                                            <td style={{ fontSize: '.83rem' }}>{unit.total}</td>
-                                            <td><span className="badge bg-success">{unit.completed}</span></td>
-                                            <td><span className="badge bg-warning text-dark">{unit.inProgress}</span></td>
-                                            <td><span className={`badge ${unit.delayed === 0 ? 'bg-success' : 'bg-danger'}`}>{unit.delayed}</span></td>
+                                            <td className="fw-bold text-dark" style={{ fontSize: '.85rem' }}>{department.department}</td>
+                                            <td style={{ fontSize: '.83rem' }}>{department.total}</td>
+                                            <td><span className="badge bg-success">{department.completed}</span></td>
+                                            <td><span className="badge bg-warning text-dark">{department.inProgress}</span></td>
+                                            <td><span className={`badge ${department.delayed === 0 ? 'bg-success' : 'bg-danger'}`}>{department.delayed}</span></td>
                                             <td>
                                                 <div className="progress-bar-custom" style={{ width: '100px', display: 'inline-block', verticalAlign: 'middle' }}>
-                                                    <div className="progress-bar-fill" style={{ width: `${unit.progress}%`, background: unit.progress >= 70 ? '#10b981' : unit.progress >= 50 ? '#ffcd00' : '#e31837' }} />
+                                                    <div className="progress-bar-fill" style={{ width: `${department.progress}%`, background: department.progress >= 70 ? '#10b981' : department.progress >= 50 ? '#ffcd00' : '#e31837' }} />
                                                 </div>
-                                                <span style={{ fontSize: '.75rem', marginLeft: '6px' }}>{unit.progress}%</span>
+                                                <span style={{ fontSize: '.75rem', marginLeft: '6px' }}>{department.progress}%</span>
                                             </td>
                                             <td>
-                                                <span className="status-badge" style={{ background: scoreStyle.bg, color: scoreStyle.color }}>{unit.score}</span>
+                                                <span className="status-badge" style={{ background: scoreStyle.bg, color: scoreStyle.color }}>{department.score}</span>
                                             </td>
                                         </tr>
                                     );
@@ -444,9 +444,9 @@ export default function ReportsView() {
                     </div>
                     <div className="table-card-footer">
                         <span className="footer-label">
-                            Showing {filteredUnitSummaries.length === 0 ? 0 : (unitPage - 1) * UNIT_PAGE_SIZE + 1}–{Math.min(unitPage * UNIT_PAGE_SIZE, filteredUnitSummaries.length)} of {filteredUnitSummaries.length} units
+                            Showing {filteredUnitSummaries.length === 0 ? 0 : (departmentPage - 1) * UNIT_PAGE_SIZE + 1}–{Math.min(departmentPage * UNIT_PAGE_SIZE, filteredUnitSummaries.length)} of {filteredUnitSummaries.length} departments
                         </span>
-                        <Paginator page={unitPage} total={totalUnitPages} onPrev={() => setUnitPage(p => p - 1)} onNext={() => setUnitPage(p => p + 1)} onPage={setUnitPage} />
+                        <Paginator page={departmentPage} total={totalUnitPages} onPrev={() => setUnitPage(p => p - 1)} onNext={() => setUnitPage(p => p + 1)} onPage={setUnitPage} />
                     </div>
                 </div>
             )}
@@ -475,7 +475,7 @@ export default function ReportsView() {
                             <thead>
                                 <tr>
                                     <th>Staff Name</th>
-                                    <th>Unit</th>
+                                    <th>Department</th>
                                     <th>Activities Assigned</th>
                                     <th>Completed</th>
                                     <th>Completion Rate</th>
@@ -492,7 +492,7 @@ export default function ReportsView() {
                                     return (
                                         <tr key={index}>
                                             <td className="fw-bold text-dark" style={{ fontSize: '.85rem' }}>{staff.name}</td>
-                                            <td style={{ fontSize: '.83rem' }}>{staff.unit}</td>
+                                            <td style={{ fontSize: '.83rem' }}>{staff.department}</td>
                                             <td style={{ fontSize: '.83rem' }}>{staff.assigned}</td>
                                             <td style={{ fontSize: '.83rem' }}>{staff.completed}</td>
                                             <td>

@@ -121,7 +121,7 @@ export default function StaffSubmissions() {
                                 {/* Evaluation Section if reviewed */}
                                 {(selectedItem.status === 'Completed' || selectedItem.status === 'Returned') && (
                                     <>
-                                        <h6 className="fw-bold border-bottom pb-2 mb-3 mt-4 text-dark">Unit Head Evaluation</h6>
+                                        <h6 className="fw-bold border-bottom pb-2 mb-3 mt-4 text-dark">Department Head Evaluation</h6>
                                         <div className="row g-4 align-items-center">
                                             <div className="col-12 col-md-3 text-center">
                                                 <div className="score-ring shadow-sm mx-auto mb-2" style={{

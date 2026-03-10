@@ -32,8 +32,8 @@ export default function PrincipalReports() {
                         <div className="report-card-icon" style={{ background: '#ecfdf5' }}>
                             <span className="material-symbols-outlined" style={{ color: '#059669', fontSize: '26px' }}>corporate_fare</span>
                         </div>
-                        <h6>Unit Performance Report</h6>
-                        <p>Per-unit activity completion rates, compliance scores, and comparative analysis across departments.</p>
+                        <h6>Department Performance Report</h6>
+                        <p>Per-department activity completion rates, compliance scores, and comparative analysis across departments.</p>
                         <div className="d-flex gap-2 flex-wrap">
                             <button className="btn btn-sm btn-success fw-bold flex-fill">
                                 <span className="material-symbols-outlined me-1" style={{ fontSize: '15px' }}>picture_as_pdf</span>PDF
@@ -110,7 +110,7 @@ export default function PrincipalReports() {
                                         <td><div className="d-flex gap-1"><button className="btn btn-xs btn-outline-primary py-0 px-2" style={{ fontSize: '.75rem' }}><span className="material-symbols-outlined" style={{ fontSize: '14px' }}>open_in_new</span></button><button className="btn btn-xs btn-outline-success py-0 px-2" style={{ fontSize: '.75rem' }}><span className="material-symbols-outlined" style={{ fontSize: '14px' }}>download</span></button><button className="btn btn-xs btn-outline-secondary py-0 px-2" style={{ fontSize: '.75rem' }}><span className="material-symbols-outlined" style={{ fontSize: '14px' }}>share</span></button></div></td>
                                     </tr>
                                     <tr>
-                                        <td><div className="fw-bold text-dark" style={{ fontSize: '.85rem' }}>Unit Performance Snapshot — Mar 2025</div><div className="text-muted" style={{ fontSize: '.72rem' }}>All 14 academic units</div></td>
+                                        <td><div className="fw-bold text-dark" style={{ fontSize: '.85rem' }}>Department Performance Snapshot — Mar 2025</div><div className="text-muted" style={{ fontSize: '.72rem' }}>All 14 academic departments</div></td>
                                         <td style={{ fontSize: '.83rem' }}>12 Apr 2025, 02:14 PM</td>
                                         <td><span className="badge bg-success">Excel</span></td>
                                         <td><div className="d-flex gap-1"><button className="btn btn-xs btn-outline-primary py-0 px-2" style={{ fontSize: '.75rem' }}><span className="material-symbols-outlined" style={{ fontSize: '14px' }}>open_in_new</span></button><button className="btn btn-xs btn-outline-success py-0 px-2" style={{ fontSize: '.75rem' }}><span className="material-symbols-outlined" style={{ fontSize: '14px' }}>download</span></button><button className="btn btn-xs btn-outline-secondary py-0 px-2" style={{ fontSize: '.75rem' }}><span className="material-symbols-outlined" style={{ fontSize: '14px' }}>share</span></button></div></td>
@@ -184,7 +184,7 @@ export default function PrincipalReports() {
                         <div className="p-3 d-flex flex-column gap-2">
                             <div className="row g-2">
                                 <div className="col-6"><select className="form-select form-select-sm" defaultValue="Q1 2025"><option>Q1 2025</option><option>Q2 2025</option><option>Annual 2024</option></select></div>
-                                <div className="col-6"><select className="form-select form-select-sm" defaultValue="Executive Summary"><option>Executive Summary</option><option>Unit Performance</option><option>Staff Evaluation</option><option>Risk Report</option></select></div>
+                                <div className="col-6"><select className="form-select form-select-sm" defaultValue="Executive Summary"><option>Executive Summary</option><option>Department Performance</option><option>Staff Evaluation</option><option>Risk Report</option></select></div>
                             </div>
                             <div className="row g-2">
                                 <div className="col-6"><select className="form-select form-select-sm" defaultValue="PDF"><option>PDF</option><option>Excel</option></select></div>

@@ -5,7 +5,7 @@ export default function CommApproved() {
         <div className="content-area-comm">
             <div className="alert d-flex align-items-center gap-2 mb-4" style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderLeft: '5px solid #10b981', borderRadius: '10px', color: '#14532d' }}>
                 <span className="material-symbols-outlined" style={{ fontSize: '20px' }}>info</span>
-                <div>These proposals have been <strong>approved</strong> by the Principal and assigned to implementing units. Unit assignments and progress are shown below as <strong>read-only</strong>.</div>
+                <div>These proposals have been <strong>approved</strong> by the Principal and assigned to implementing departments. Department assignments and progress are shown below as <strong>read-only</strong>.</div>
             </div>
 
             <div className="d-flex flex-column gap-0">
@@ -20,14 +20,14 @@ export default function CommApproved() {
                             </div>
                             <div className="proposal-meta">Meeting #7 · Approved 08 Apr 2025 · Approved by: Principal Prof. R. Wamala</div>
 
-                            <div className="unit-assign-card mt-3">
+                            <div className="department-assign-card mt-3">
                                 <div className="d-flex align-items-center gap-2 mb-2">
                                     <span className="material-symbols-outlined" style={{ fontSize: '18px', color: '#059669' }}>assignment_ind</span>
-                                    <span className="fw-black text-dark" style={{ fontSize: '.85rem' }}>Assigned Implementation Unit</span>
+                                    <span className="fw-black text-dark" style={{ fontSize: '.85rem' }}>Assigned Implementation Department</span>
                                     <span className="read-only-badge ms-auto">Read Only</span>
                                 </div>
                                 <div className="row g-2">
-                                    <div className="col-sm-4"><div className="text-muted" style={{ fontSize: '.72rem', fontWeight: 700 }}>Unit</div><div className="fw-bold text-dark" style={{ fontSize: '.83rem' }}>Research &amp; Innovation</div></div>
+                                    <div className="col-sm-4"><div className="text-muted" style={{ fontSize: '.72rem', fontWeight: 700 }}>Department</div><div className="fw-bold text-dark" style={{ fontSize: '.83rem' }}>Research &amp; Innovation</div></div>
                                     <div className="col-sm-4"><div className="text-muted" style={{ fontSize: '.72rem', fontWeight: 700 }}>HOD</div><div className="fw-bold text-dark" style={{ fontSize: '.83rem' }}>Dr. M. Kizito</div></div>
                                     <div className="col-sm-4"><div className="text-muted" style={{ fontSize: '.72rem', fontWeight: 700 }}>Target Deadline</div><div className="fw-bold text-dark" style={{ fontSize: '.83rem' }}>31 Dec 2025</div></div>
                                 </div>
@@ -52,14 +52,14 @@ export default function CommApproved() {
                                 <span className="status-badge" style={{ background: '#dcfce7', color: '#15803d' }}>Approved</span>
                             </div>
                             <div className="proposal-meta">Meeting #6 · Approved 02 Apr 2025 · Approved by: Principal Prof. R. Wamala</div>
-                            <div className="unit-assign-card mt-3">
+                            <div className="department-assign-card mt-3">
                                 <div className="d-flex align-items-center gap-2 mb-2">
                                     <span className="material-symbols-outlined" style={{ fontSize: '18px', color: '#059669' }}>assignment_ind</span>
-                                    <span className="fw-black text-dark" style={{ fontSize: '.85rem' }}>Assigned Implementation Unit</span>
+                                    <span className="fw-black text-dark" style={{ fontSize: '.85rem' }}>Assigned Implementation Department</span>
                                     <span className="read-only-badge ms-auto">Read Only</span>
                                 </div>
                                 <div className="row g-2">
-                                    <div className="col-sm-4"><div className="text-muted" style={{ fontSize: '.72rem', fontWeight: 700 }}>Unit</div><div className="fw-bold text-dark" style={{ fontSize: '.83rem' }}>Faculty of Computing</div></div>
+                                    <div className="col-sm-4"><div className="text-muted" style={{ fontSize: '.72rem', fontWeight: 700 }}>Department</div><div className="fw-bold text-dark" style={{ fontSize: '.83rem' }}>Faculty of Computing</div></div>
                                     <div className="col-sm-4"><div className="text-muted" style={{ fontSize: '.72rem', fontWeight: 700 }}>HOD</div><div className="fw-bold text-dark" style={{ fontSize: '.83rem' }}>Dr. A. Ssekandi</div></div>
                                     <div className="col-sm-4"><div className="text-muted" style={{ fontSize: '.72rem', fontWeight: 700 }}>Target Deadline</div><div className="fw-bold text-dark" style={{ fontSize: '.83rem' }}>30 Sep 2025</div></div>
                                 </div>
@@ -80,14 +80,14 @@ export default function CommApproved() {
                                 <span className="status-badge" style={{ background: '#dcfce7', color: '#15803d' }}>Approved</span>
                             </div>
                             <div className="proposal-meta">Meeting #6 · Approved 02 Apr 2025 · Pillar: Infrastructure</div>
-                            <div className="unit-assign-card mt-3">
+                            <div className="department-assign-card mt-3">
                                 <div className="d-flex align-items-center gap-2 mb-2">
                                     <span className="material-symbols-outlined" style={{ fontSize: '18px', color: '#059669' }}>assignment_ind</span>
-                                    <span className="fw-black text-dark" style={{ fontSize: '.85rem' }}>Assigned Implementation Unit</span>
+                                    <span className="fw-black text-dark" style={{ fontSize: '.85rem' }}>Assigned Implementation Department</span>
                                     <span className="read-only-badge ms-auto">Read Only</span>
                                 </div>
                                 <div className="row g-2">
-                                    <div className="col-sm-4"><div className="text-muted" style={{ fontSize: '.72rem', fontWeight: 700 }}>Unit</div><div className="fw-bold text-dark" style={{ fontSize: '.83rem' }}>Library Unit</div></div>
+                                    <div className="col-sm-4"><div className="text-muted" style={{ fontSize: '.72rem', fontWeight: 700 }}>Department</div><div className="fw-bold text-dark" style={{ fontSize: '.83rem' }}>Library Department</div></div>
                                     <div className="col-sm-4"><div className="text-muted" style={{ fontSize: '.72rem', fontWeight: 700 }}>HOD</div><div className="fw-bold text-dark" style={{ fontSize: '.83rem' }}>Mr. J. Byaruhanga</div></div>
                                     <div className="col-sm-4"><div className="text-muted" style={{ fontSize: '.72rem', fontWeight: 700 }}>Target Deadline</div><div className="fw-bold text-dark" style={{ fontSize: '.83rem' }}>30 Jun 2025</div></div>
                                 </div>

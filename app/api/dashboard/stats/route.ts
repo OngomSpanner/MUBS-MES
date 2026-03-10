@@ -48,12 +48,12 @@ export async function GET() {
       query: 'SELECT COUNT(*) as count FROM strategic_activities WHERE status = "Delayed"'
     });
 
-    // Get unit performance
-    const unitPerformance = await query({
+    // Get department performance
+    const departmentPerformance = await query({
       query: `
         SELECT u.name, AVG(sa.progress) as progress
-        FROM units u
-        LEFT JOIN strategic_activities sa ON u.id = sa.unit_id
+        FROM departments u
+        LEFT JOIN strategic_activities sa ON u.id = sa.department_id
         GROUP BY u.id
         LIMIT 6
       `
@@ -111,9 +111,9 @@ export async function GET() {
         delayedActivities: (delayedActivities as any[])[0]?.count || 0,
         hrAlertCount: (hrAlerts as any[]).length
       },
-      unitPerformance: (unitPerformance as any[]).map(unit => ({
-        name: unit.name,
-        progress: Math.round(unit.progress || 0)
+      departmentPerformance: (departmentPerformance as any[]).map(department => ({
+        name: department.name,
+        progress: Math.round(department.progress || 0)
       })),
       recentActivities: recentActivities,
       hrAlerts: hrAlerts

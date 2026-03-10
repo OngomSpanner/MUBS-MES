@@ -29,7 +29,7 @@ interface HRAlert {
     color: string;
 }
 
-interface UnitPerformance {
+interface DepartmentPerformance {
     name: string;
     progress: number;
 }
@@ -54,7 +54,7 @@ export default function AdminDashboard() {
         delayedActivities: 0,
         hrAlertCount: 0
     });
-    const [unitPerformance, setUnitPerformance] = useState<UnitPerformance[]>([]);
+    const [departmentPerformance, setUnitPerformance] = useState<DepartmentPerformance[]>([]);
     const [recentActivities, setRecentActivities] = useState<RecentActivity[]>([]);
     const [hrAlerts, setHrAlerts] = useState<HRAlert[]>([]);
     const [showCreateUserModal, setShowCreateUserModal] = useState(false);
@@ -68,7 +68,7 @@ export default function AdminDashboard() {
         try {
             const response = await axios.get('/api/dashboard/stats');
             setStats(response.data.stats);
-            setUnitPerformance(response.data.unitPerformance);
+            setUnitPerformance(response.data.departmentPerformance);
             setRecentActivities(response.data.recentActivities);
             setHrAlerts(response.data.hrAlerts || []);
         } catch (error) {
@@ -231,7 +231,7 @@ export default function AdminDashboard() {
                     </div>
                 </div>
 
-                {/* Unit Performance */}
+                {/* Department Performance */}
                 <div className="col-12 col-md-4">
                     <div className="table-card p-0 h-100">
                         <div className="table-card-header">
@@ -239,30 +239,30 @@ export default function AdminDashboard() {
                                 <span className="material-symbols-outlined me-2" style={{ color: 'var(--mubs-blue)' }}>
                                     corporate_fare
                                 </span>
-                                Unit Stats
+                                Department Stats
                             </h5>
                         </div>
                         <div className="p-3">
-                            {unitPerformance.slice(0, 4).map((unit, index) => (
-                                <div className="unit-bar-row mb-3" key={index}>
+                            {departmentPerformance.slice(0, 4).map((department, index) => (
+                                <div className="department-bar-row mb-3" key={index}>
                                     <div className="d-flex justify-content-between mb-1" style={{ fontSize: '.75rem' }}>
-                                        <span className="fw-bold">{unit.name}</span>
-                                        <span>{unit.progress}%</span>
+                                        <span className="fw-bold">{department.name}</span>
+                                        <span>{department.progress}%</span>
                                     </div>
-                                    <div className="unit-bar-track" style={{ height: '6px' }}>
+                                    <div className="department-bar-track" style={{ height: '6px' }}>
                                         <div
-                                            className="unit-bar-fill"
+                                            className="department-bar-fill"
                                             style={{
-                                                width: `${unit.progress}%`,
-                                                background: unit.progress >= 70 ? '#005696' :
-                                                    unit.progress >= 50 ? '#ffcd00' : '#e31837'
+                                                width: `${department.progress}%`,
+                                                background: department.progress >= 70 ? '#005696' :
+                                                    department.progress >= 50 ? '#ffcd00' : '#e31837'
                                             }}
                                         />
                                     </div>
                                 </div>
                             ))}
                             <button className="btn btn-sm btn-outline-secondary w-100 mt-2" style={{ fontSize: '.75rem' }} onClick={() => { window.location.href = '/reports'; }}>
-                                View All Units
+                                View All Departments
                             </button>
                         </div>
                     </div>

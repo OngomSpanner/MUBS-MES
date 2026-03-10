@@ -36,28 +36,31 @@ export async function PUT(
   const { id } = await params;
   try {
     const body = await request.json();
-    const { title, pillar, unit_id, target_kpi, status, priority, parent_id, progress, start_date, end_date, description } = body;
+    const { title, strategic_objective, pillar, department_id, target_kpi, status, priority, parent_id, progress, start_date, end_date, timeline, description } = body;
+
+    const parsedParentId = parent_id ? parseInt(parent_id, 10) : null;
+    const departmentIdString = Array.isArray(department_id) ? department_id.join(',') : String(department_id || '');
 
     await query({
       query: `
         UPDATE strategic_activities 
-        SET title = ?, pillar = ?, unit_id = ?, target_kpi = ?, 
+        SET title = ?, strategic_objective = ?, pillar = ?, department_id = ?, target_kpi = ?, 
             status = ?, priority = ?, parent_id = ?, progress = ?, 
-            start_date = ?, end_date = ?, description = ?
+            start_date = ?, end_date = ?, timeline = ?, description = ?
         WHERE id = ?
       `,
       values: [
-        title, pillar, unit_id, target_kpi,
-        status, priority || 'Medium', parent_id || null,
-        progress ?? 0, start_date, end_date, description, id
+        title, strategic_objective, pillar, departmentIdString, target_kpi,
+        status, priority || 'Medium', parsedParentId,
+        progress ?? 0, start_date || null, end_date || null, timeline || null, description || null, id
       ]
     });
 
     return NextResponse.json({ message: 'Activity updated successfully' });
-  } catch (error) {
-    console.error('Error updating activity:', error);
+  } catch (error: any) {
+    console.error('Error updating activity. Details:', error.message || error);
     return NextResponse.json(
-      { message: 'Error updating activity' },
+      { message: 'Error updating activity: ' + (error.message || 'Unknown error') },
       { status: 500 }
     );
   }

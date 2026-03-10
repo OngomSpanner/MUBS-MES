@@ -31,7 +31,7 @@ export default function CommNotifications() {
                             <div className="notif-item unread">
                                 <div className="notif-icon" style={{ background: '#eff6ff' }}><span className="material-symbols-outlined" style={{ color: 'var(--mubs-blue)' }}>assignment_ind</span></div>
                                 <div className="flex-fill">
-                                    <div className="fw-bold text-dark" style={{ fontSize: '.85rem' }}>Unit Assigned: Research &amp; Innovation — Research Ethics Framework</div>
+                                    <div className="fw-bold text-dark" style={{ fontSize: '.85rem' }}>Department Assigned: Research &amp; Innovation — Research Ethics Framework</div>
                                     <div className="text-muted" style={{ fontSize: '.73rem' }}>HOD Dr. M. Kizito has been notified and will begin implementation tracking</div>
                                     <div className="text-muted" style={{ fontSize: '.71rem', marginTop: '2px' }}>Today, 09:16 AM</div>
                                 </div>

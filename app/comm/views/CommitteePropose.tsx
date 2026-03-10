@@ -94,7 +94,7 @@ export default function CommitteePropose() {
                                     <input type="text" className="form-control" placeholder="e.g. 50 post-grad students enrolled by Dec 2025" />
                                 </div>
                                 <div className="col-md-6">
-                                    <label className="form-label fw-black text-dark small">Suggested Implementation Unit</label>
+                                    <label className="form-label fw-black text-dark small">Suggested Implementation Department</label>
                                     <select className="form-select">
                                         <option value="">— Optional suggestion —</option>
                                         <option>Faculty of Computing</option>
@@ -214,11 +214,11 @@ export default function CommitteePropose() {
                             </div>
                             <div className="d-flex gap-3 mb-3 align-items-start">
                                 <div style={{ width: '36px', height: '36px', borderRadius: '8px', background: '#ecfdf5', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}><span className="material-symbols-outlined" style={{ fontSize: '18px', color: '#059669' }}>fact_check</span></div>
-                                <div><div className="fw-bold text-dark" style={{ fontSize: '.84rem' }}>Be specific about outcomes</div><div className="text-muted" style={{ fontSize: '.76rem' }}>State a measurable KPI. Vague proposals are harder to approve and assign to units.</div></div>
+                                <div><div className="fw-bold text-dark" style={{ fontSize: '.84rem' }}>Be specific about outcomes</div><div className="text-muted" style={{ fontSize: '.76rem' }}>State a measurable KPI. Vague proposals are harder to approve and assign to departments.</div></div>
                             </div>
                             <div className="d-flex gap-3 mb-3 align-items-start">
                                 <div style={{ width: '36px', height: '36px', borderRadius: '8px', background: '#eff6ff', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}><span className="material-symbols-outlined" style={{ fontSize: '18px', color: 'var(--mubs-blue)' }}>assignment_ind</span></div>
-                                <div><div className="fw-bold text-dark" style={{ fontSize: '.84rem' }}>Suggest an implementation unit</div><div className="text-muted" style={{ fontSize: '.76rem' }}>Although not required, suggesting a unit speeds up the approval and assignment process.</div></div>
+                                <div><div className="fw-bold text-dark" style={{ fontSize: '.84rem' }}>Suggest an implementation department</div><div className="text-muted" style={{ fontSize: '.76rem' }}>Although not required, suggesting a department speeds up the approval and assignment process.</div></div>
                             </div>
                         </div>
                     </div>

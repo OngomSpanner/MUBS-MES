@@ -77,7 +77,7 @@ export default function CreateUserModal({ show, onHide, onUserCreated }: CreateU
             <div className="col-12">
               <Form.Label className="fw-bold small">Assign Roles (Select all that apply)</Form.Label>
               <div className="d-flex flex-wrap gap-2 p-2 border rounded bg-light">
-                {['System Administrator', 'Strategy Manager', 'Unit Head', 'HOD', 'Committee Member', 'Staff'].map(r => (
+                {['System Administrator', 'Strategy Manager', 'Department Head', 'HOD', 'Committee Member', 'Staff'].map(r => (
                   <div key={r} className="form-check">
                     <input
                       type="checkbox"
@@ -98,7 +98,7 @@ export default function CreateUserModal({ show, onHide, onUserCreated }: CreateU
               </div>
             </div>
             <div className="col-md-6">
-              <Form.Label className="fw-bold small">Department / Unit</Form.Label>
+              <Form.Label className="fw-bold small">Department / Department</Form.Label>
               <Form.Select
                 value={formData.department}
                 onChange={(e) => setFormData({ ...formData, department: e.target.value })}

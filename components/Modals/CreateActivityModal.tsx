@@ -6,8 +6,9 @@ import { Modal, Button, Form } from 'react-bootstrap';
 interface Activity {
   id?: number;
   title: string;
+  strategic_objective: string;
   pillar: string;
-  unit_id: string | number;
+  department_id: string | number | string[];
   target_kpi: string;
   status: string;
   priority?: string;
@@ -15,6 +16,7 @@ interface Activity {
   progress?: number;
   start_date: string;
   end_date: string;
+  timeline: string;
   description: string;
 }
 
@@ -28,14 +30,16 @@ interface CreateActivityModalProps {
 
 const BLANK = {
   title: '',
+  strategic_objective: '',
   pillar: 'Teaching & Learning',
-  unit_id: '',
+  department_id: [] as string[],
   target_kpi: '',
   status: 'Not Started',
   priority: 'Medium',
   parent_id: '',
   start_date: '',
   end_date: '',
+  timeline: '',
   description: ''
 };
 
@@ -72,14 +76,16 @@ export default function CreateActivityModal({
     if (activity && show) {
       setFormData({
         title: activity.title || '',
+        strategic_objective: activity.strategic_objective || '',
         pillar: activity.pillar || 'Teaching & Learning',
-        unit_id: String(activity.unit_id ?? ''),
+        department_id: activity.department_id ? String(activity.department_id).split(',').map(s => s.trim()) : [],
         target_kpi: activity.target_kpi || '',
         status: activity.status || 'Not Started',
         priority: activity.priority || 'Medium',
         parent_id: activity.parent_id ? String(activity.parent_id) : '',
         start_date: activity.start_date ? activity.start_date.slice(0, 10) : '',
         end_date: activity.end_date ? activity.end_date.slice(0, 10) : '',
+        timeline: activity.timeline || '',
         description: activity.description || ''
       });
     } else if (!activity && show) {
@@ -159,8 +165,20 @@ export default function CreateActivityModal({
               <div className="col-12">
                 <div className="alert alert-info py-2 px-3 small mb-0">
                   <strong>{formData.title}</strong>
-                  <span className="text-muted ms-2">— select a new unit below</span>
+                  <span className="text-muted ms-2">— select a new department below</span>
                 </div>
+              </div>
+            )}
+
+            {mode !== 'reassign' && (
+              <div className="col-12">
+                <Form.Label className="fw-bold small">Strategic Objective</Form.Label>
+                <Form.Control
+                  type="text"
+                  placeholder="e.g. Enhance quality of academic programs"
+                  value={formData.strategic_objective}
+                  onChange={(e) => setFormData({ ...formData, strategic_objective: e.target.value })}
+                />
               </div>
             )}
 
@@ -181,14 +199,24 @@ export default function CreateActivityModal({
 
             <div className="col-md-6">
               <Form.Label className="fw-bold small">
-                {mode === 'reassign' ? '🔁 Assign to New Unit' : 'Assign to Unit'}
+                {mode === 'reassign' ? '🔁 Assign to New Department(s)' : 'Assign to Department(s) (Hold Ctrl/Cmd to select multiple)'}
               </Form.Label>
               <Form.Select
-                value={formData.unit_id}
-                onChange={(e) => setFormData({ ...formData, unit_id: e.target.value })}
+                multiple
+                value={Array.isArray(formData.department_id) ? formData.department_id : formData.department_id ? String(formData.department_id).split(',') : []}
+                onChange={(e) => {
+                  const options = e.target.options;
+                  const selectedValues = [];
+                  for (let i = 0; i < options.length; i++) {
+                    if (options[i].selected) {
+                      selectedValues.push(options[i].value);
+                    }
+                  }
+                  setFormData({ ...formData, department_id: selectedValues });
+                }}
                 required
+                style={{ minHeight: '120px' }}
               >
-                <option value="">Select Unit</option>
                 <option value="1">Faculty of Computing</option>
                 <option value="2">Faculty of Commerce</option>
                 <option value="3">School of Grad Studies</option>
@@ -262,6 +290,15 @@ export default function CreateActivityModal({
                     value={formData.end_date}
                     onChange={(e) => setFormData({ ...formData, end_date: e.target.value })}
                     required
+                  />
+                </div>
+                <div className="col-12">
+                  <Form.Label className="fw-bold small">Timeline Description (Optional manually overridden string)</Form.Label>
+                  <Form.Control
+                    type="text"
+                    placeholder="e.g. Q1 2024 - Q3 2025"
+                    value={formData.timeline}
+                    onChange={(e) => setFormData({ ...formData, timeline: e.target.value })}
                   />
                 </div>
                 <div className="col-12">

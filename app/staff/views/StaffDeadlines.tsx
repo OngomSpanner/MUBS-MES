@@ -66,7 +66,7 @@ export default function StaffDeadlines() {
                                 <thead>
                                     <tr>
                                         <th>Task</th>
-                                        <th>Unit</th>
+                                        <th>Department</th>
                                         <th>Due Date</th>
                                         <th>Status</th>
                                         <th>Timeline</th>

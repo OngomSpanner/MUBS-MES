@@ -21,7 +21,7 @@ export async function GET() {
 
     // Fetch proposals (strategic activities created by committee members)
     // Note: For now, we assume ALL activities with a 'Pending' or 'Rejected' status, or where committee_suggestion is not null
-    // were proposals. Or simply we fetch all activities. To match the view, we join users and units.
+    // were proposals. Or simply we fetch all activities. To match the view, we join users and departments.
 
     const sql = `
             SELECT 
@@ -35,12 +35,12 @@ export async function GET() {
                 s.proposal_kpi as implementation_status,
                 u.full_name as submitted_by,
                 u.role as committee_type, 
-                un.name as unit,
+                un.name as department,
                 15000000 as budget, /* mock budget for UI consistency until field is added */
                 s.pillar /* using the generic pillar string if we had one */
             FROM strategic_activities s
             LEFT JOIN users u ON s.created_by = u.id
-            LEFT JOIN units un ON s.committee_suggestion_unit_id = un.id
+            LEFT JOIN departments un ON s.committee_suggestion_department_id = un.id
             WHERE s.parent_id IS NULL AND u.role LIKE '%Committee Member%'
             ORDER BY s.created_at DESC
         `;
@@ -52,7 +52,7 @@ export async function GET() {
       id: p.id,
       title: p.title,
       submitted_by: p.submitted_by || 'Unknown',
-      unit: p.unit || 'Not specified',
+      department: p.department || 'Not specified',
       submitted_date: p.submitted_date,
       budget: p.budget || 0,
       status: p.status, // e.g. Pending, Approved, Rejected

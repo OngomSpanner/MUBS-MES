@@ -6,7 +6,7 @@ export const dynamic = 'force-dynamic';
 export async function GET() {
     try {
         // Fetch all activities as "tasks" for the staff member
-        // In a real system, we would filter by assigned_to or unit_id + user role
+        // In a real system, we would filter by assigned_to or department_id + user role
         const tasks = await query({
             query: `
                 SELECT 

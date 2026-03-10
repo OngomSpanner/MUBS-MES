@@ -5,7 +5,7 @@ import Layout from '@/components/Layout';
 import { Modal, Button } from 'react-bootstrap';
 import axios from 'axios';
 
-interface UnitProgress {
+interface DepartmentProgress {
     name: string;
     activities: number;
     progress: number;
@@ -18,13 +18,13 @@ interface Alert {
     description: string;
     days: number;
     type: 'overdue' | 'due';
-    unit: string;
+    department: string;
 }
 
 interface DelayedActivity {
     id: number;
     title: string;
-    unit: string;
+    department: string;
     deadline: string;
     daysOverdue: number;
     progress: number;
@@ -38,15 +38,15 @@ interface Summary {
 }
 
 export default function TrackingView() {
-    const [unitProgress, setUnitProgress] = useState<UnitProgress[]>([]);
+    const [departmentProgress, setUnitProgress] = useState<DepartmentProgress[]>([]);
     const [alerts, setAlerts] = useState<Alert[]>([]);
     const [delayedActivities, setDelayedActivities] = useState<DelayedActivity[]>([]);
     const [summary, setSummary] = useState<Summary>({ onTrack: 0, delayed: 0, atRisk: 0, alerts: 0 });
     const [loading, setLoading] = useState(true);
     const [healthFilter, setHealthFilter] = useState('All');
-    const [unitPage, setUnitPage] = useState(1);
+    const [departmentPage, setUnitPage] = useState(1);
     const UNIT_PAGE_SIZE = 5;
-    const [delayedUnitFilter, setDelayedUnitFilter] = useState('All Units');
+    const [delayedUnitFilter, setDelayedUnitFilter] = useState('All Departments');
     const [delayedPage, setDelayedPage] = useState(1);
     const DELAYED_PAGE_SIZE = 5;
     const [escalateTarget, setEscalateTarget] = useState<DelayedActivity | null>(null);
@@ -60,7 +60,7 @@ export default function TrackingView() {
     const fetchTrackingData = async () => {
         try {
             const { data } = await axios.get('/api/tracking');
-            setUnitProgress(data.unitProgress);
+            setUnitProgress(data.departmentProgress);
             setAlerts(data.alerts);
             setDelayedActivities(data.delayedActivities);
             setSummary(data.summary);
@@ -81,15 +81,15 @@ export default function TrackingView() {
     };
 
     const filteredUnits = healthFilter === 'All'
-        ? unitProgress
-        : unitProgress.filter(u => u.health === healthFilter);
-    const unitTotalPages = Math.max(1, Math.ceil(filteredUnits.length / UNIT_PAGE_SIZE));
-    const paginatedUnits = filteredUnits.slice((unitPage - 1) * UNIT_PAGE_SIZE, unitPage * UNIT_PAGE_SIZE);
+        ? departmentProgress
+        : departmentProgress.filter(u => u.health === healthFilter);
+    const departmentTotalPages = Math.max(1, Math.ceil(filteredUnits.length / UNIT_PAGE_SIZE));
+    const paginatedUnits = filteredUnits.slice((departmentPage - 1) * UNIT_PAGE_SIZE, departmentPage * UNIT_PAGE_SIZE);
 
-    const uniqueDelayedUnits = Array.from(new Set(delayedActivities.map(a => a.unit))).filter(Boolean);
-    const filteredDelayed = delayedUnitFilter === 'All Units'
+    const uniqueDelayedUnits = Array.from(new Set(delayedActivities.map(a => a.department))).filter(Boolean);
+    const filteredDelayed = delayedUnitFilter === 'All Departments'
         ? delayedActivities
-        : delayedActivities.filter(a => a.unit === delayedUnitFilter);
+        : delayedActivities.filter(a => a.department === delayedUnitFilter);
     const delayedTotalPages = Math.max(1, Math.ceil(filteredDelayed.length / DELAYED_PAGE_SIZE));
     const paginatedDelayed = filteredDelayed.slice((delayedPage - 1) * DELAYED_PAGE_SIZE, delayedPage * DELAYED_PAGE_SIZE);
 
@@ -175,7 +175,7 @@ export default function TrackingView() {
             </div>
 
             <div className="row g-4 mb-4">
-                {/* Unit progress table */}
+                {/* Department progress table */}
                 <div className="col-12 col-lg-7">
                     <div className="table-card">
                         <div className="table-card-header">
@@ -183,7 +183,7 @@ export default function TrackingView() {
                                 <span className="material-symbols-outlined me-2" style={{ color: 'var(--mubs-blue)' }}>
                                     corporate_fare
                                 </span>
-                                All Units Progress
+                                All Departments Progress
                             </h5>
                             <select
                                 className="form-select form-select-sm"
@@ -201,7 +201,7 @@ export default function TrackingView() {
                             <table className="table mb-0">
                                 <thead>
                                     <tr>
-                                        <th>Unit</th>
+                                        <th>Department</th>
                                         <th>Activities</th>
                                         <th>Avg. Progress</th>
                                         <th>Delayed</th>
@@ -217,39 +217,39 @@ export default function TrackingView() {
                                                 </div>
                                             </td>
                                         </tr>
-                                    ) : paginatedUnits.map((unit, index) => {
-                                        const healthStyle = getHealthBadge(unit.health);
+                                    ) : paginatedUnits.map((department, index) => {
+                                        const healthStyle = getHealthBadge(department.health);
                                         return (
                                             <tr key={index}>
-                                                <td className="fw-bold text-dark" style={{ fontSize: '.85rem' }}>{unit.name}</td>
-                                                <td style={{ fontSize: '.83rem' }}>{unit.activities}</td>
+                                                <td className="fw-bold text-dark" style={{ fontSize: '.85rem' }}>{department.name}</td>
+                                                <td style={{ fontSize: '.83rem' }}>{department.activities}</td>
                                                 <td>
                                                     <div className="progress-bar-custom" style={{ width: '120px', display: 'inline-block' }}>
                                                         <div
                                                             className="progress-bar-fill"
                                                             style={{
-                                                                width: `${unit.progress}%`,
-                                                                background: unit.progress >= 70 ? '#10b981' :
-                                                                    unit.progress >= 50 ? '#ffcd00' : '#e31837'
+                                                                width: `${department.progress}%`,
+                                                                background: department.progress >= 70 ? '#10b981' :
+                                                                    department.progress >= 50 ? '#ffcd00' : '#e31837'
                                                             }}
                                                         />
                                                     </div>
                                                     <span style={{ fontSize: '.75rem', color: '#475569', marginLeft: '6px' }}>
-                                                        {unit.progress}%
+                                                        {department.progress}%
                                                     </span>
                                                 </td>
                                                 <td>
-                                                    {unit.delayed === 0 ? (
+                                                    {department.delayed === 0 ? (
                                                         <span className="badge bg-success">0</span>
-                                                    ) : unit.delayed === 1 ? (
-                                                        <span className="badge bg-warning text-dark">{unit.delayed}</span>
+                                                    ) : department.delayed === 1 ? (
+                                                        <span className="badge bg-warning text-dark">{department.delayed}</span>
                                                     ) : (
-                                                        <span className="badge bg-danger">{unit.delayed}</span>
+                                                        <span className="badge bg-danger">{department.delayed}</span>
                                                     )}
                                                 </td>
                                                 <td>
                                                     <span className="status-badge" style={{ background: healthStyle.bg, color: healthStyle.color }}>
-                                                        {unit.health}
+                                                        {department.health}
                                                     </span>
                                                 </td>
                                             </tr>
@@ -261,18 +261,18 @@ export default function TrackingView() {
                         {/* Paginator */}
                         <div className="table-card-footer">
                             <span className="footer-label">
-                                Showing {filteredUnits.length === 0 ? 0 : (unitPage - 1) * UNIT_PAGE_SIZE + 1}–{Math.min(unitPage * UNIT_PAGE_SIZE, filteredUnits.length)} of {filteredUnits.length} units
+                                Showing {filteredUnits.length === 0 ? 0 : (departmentPage - 1) * UNIT_PAGE_SIZE + 1}–{Math.min(departmentPage * UNIT_PAGE_SIZE, filteredUnits.length)} of {filteredUnits.length} departments
                             </span>
                             <div className="d-flex gap-1">
-                                <button className="page-btn" disabled={unitPage === 1} onClick={() => setUnitPage(p => p - 1)}>‹</button>
-                                {Array.from({ length: unitTotalPages }, (_, i) => i + 1).map(pg => (
+                                <button className="page-btn" disabled={departmentPage === 1} onClick={() => setUnitPage(p => p - 1)}>‹</button>
+                                {Array.from({ length: departmentTotalPages }, (_, i) => i + 1).map(pg => (
                                     <button
                                         key={pg}
-                                        className={`page-btn ${pg === unitPage ? 'active' : ''}`}
+                                        className={`page-btn ${pg === departmentPage ? 'active' : ''}`}
                                         onClick={() => setUnitPage(pg)}
                                     >{pg}</button>
                                 ))}
-                                <button className="page-btn" disabled={unitPage === unitTotalPages} onClick={() => setUnitPage(p => p + 1)}>›</button>
+                                <button className="page-btn" disabled={departmentPage === departmentTotalPages} onClick={() => setUnitPage(p => p + 1)}>›</button>
                             </div>
                         </div>
                     </div>
@@ -313,14 +313,14 @@ export default function TrackingView() {
                                     <div>
                                         <div className="fw-bold text-dark" style={{ fontSize: '.83rem' }}>{al.title}</div>
                                         <div className="text-muted" style={{ fontSize: '.73rem' }}>
-                                            {al.description} · {al.unit}
+                                            {al.description} · {al.department}
                                         </div>
                                         <button
                                             className={`btn btn-xs py-0 px-2 mt-1 ${al.type === 'overdue' ? 'btn-danger' : 'btn-warning'}`}
                                             style={{ fontSize: '.72rem' }}
                                             onClick={() => sendReminder(al.title)}
                                         >
-                                            {al.type === 'overdue' ? 'Send Reminder' : 'Notify Unit'}
+                                            {al.type === 'overdue' ? 'Send Reminder' : 'Notify Department'}
                                         </button>
                                     </div>
                                 </div>
@@ -345,7 +345,7 @@ export default function TrackingView() {
                         value={delayedUnitFilter}
                         onChange={e => setDelayedUnitFilter(e.target.value)}
                     >
-                        <option>All Units</option>
+                        <option>All Departments</option>
                         {uniqueDelayedUnits.map(u => (
                             <option key={u} value={u}>{u}</option>
                         ))}
@@ -356,7 +356,7 @@ export default function TrackingView() {
                         <thead>
                             <tr>
                                 <th>Activity</th>
-                                <th>Unit</th>
+                                <th>Department</th>
                                 <th>Deadline</th>
                                 <th>Days Overdue</th>
                                 <th>Progress</th>
@@ -379,7 +379,7 @@ export default function TrackingView() {
                             ) : paginatedDelayed.map((activity) => (
                                 <tr key={activity.id}>
                                     <td className="fw-bold text-dark" style={{ fontSize: '.85rem' }}>{activity.title}</td>
-                                    <td style={{ fontSize: '.83rem' }}>{activity.unit}</td>
+                                    <td style={{ fontSize: '.83rem' }}>{activity.department}</td>
                                     <td style={{ fontSize: '.83rem' }}>{activity.deadline}</td>
                                     <td>
                                         <span className="badge bg-danger">
@@ -465,8 +465,8 @@ export default function TrackingView() {
                             </p>
                             <div className="row g-2 mt-1">
                                 <div className="col-6">
-                                    <div className="small text-muted fw-bold">Unit</div>
-                                    <div className="fw-bold text-dark" style={{ fontSize: '.85rem' }}>{escalateTarget.unit}</div>
+                                    <div className="small text-muted fw-bold">Department</div>
+                                    <div className="fw-bold text-dark" style={{ fontSize: '.85rem' }}>{escalateTarget.department}</div>
                                 </div>
                                 <div className="col-6">
                                     <div className="small text-muted fw-bold">Progress</div>

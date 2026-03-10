@@ -7,7 +7,7 @@ export default function CommPropose() {
     const [minutesPreview, setMinutesPreview] = useState(false);
     const [evidenceLink, setEvidenceLink] = useState('');
     const [evidenceLinkPreview, setEvidenceLinkPreview] = useState(false);
-    const [units, setUnits] = useState<{ id: number, name: string }[]>([]);
+    const [departments, setUnits] = useState<{ id: number, name: string }[]>([]);
 
     // Form State
     const [title, setTitle] = useState('');
@@ -24,10 +24,10 @@ export default function CommPropose() {
     useEffect(() => {
         const fetchUnits = async () => {
             try {
-                const res = await axios.get('/api/units');
+                const res = await axios.get('/api/departments');
                 setUnits(res.data);
             } catch (err) {
-                console.error("Failed to fetch units", err);
+                console.error("Failed to fetch departments", err);
             }
         };
         fetchUnits();
@@ -138,10 +138,10 @@ export default function CommPropose() {
                                     <input type="text" className="form-control" placeholder="e.g. 50 post-grad students enrolled by Dec 2025" value={kpi} onChange={(e) => setKpi(e.target.value)} />
                                 </div>
                                 <div className="col-md-6">
-                                    <label className="form-label fw-black text-dark small">Suggested Implementation Unit</label>
+                                    <label className="form-label fw-black text-dark small">Suggested Implementation Department</label>
                                     <select className="form-select" value={suggestedUnit} onChange={(e) => setSuggestedUnit(e.target.value ? parseInt(e.target.value) : '')}>
                                         <option value="">— Optional suggestion —</option>
-                                        {units.map(u => (
+                                        {departments.map(u => (
                                             <option key={u.id} value={u.id}>{u.name}</option>
                                         ))}
                                     </select>
@@ -250,15 +250,15 @@ export default function CommPropose() {
                             </div>
                             <div className="d-flex gap-3 mb-3 align-items-start">
                                 <div style={{ width: '36px', height: '36px', borderRadius: '8px', background: '#ecfdf5', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}><span className="material-symbols-outlined" style={{ fontSize: '18px', color: '#059669' }}>fact_check</span></div>
-                                <div><div className="fw-bold text-dark" style={{ fontSize: '.84rem' }}>Be specific about outcomes</div><div className="text-muted" style={{ fontSize: '.76rem' }}>State a measurable KPI. Vague proposals are harder to approve and assign to units.</div></div>
+                                <div><div className="fw-bold text-dark" style={{ fontSize: '.84rem' }}>Be specific about outcomes</div><div className="text-muted" style={{ fontSize: '.76rem' }}>State a measurable KPI. Vague proposals are harder to approve and assign to departments.</div></div>
                             </div>
                             <div className="d-flex gap-3 mb-3 align-items-start">
                                 <div style={{ width: '36px', height: '36px', borderRadius: '8px', background: '#eff6ff', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}><span className="material-symbols-outlined" style={{ fontSize: '18px', color: 'var(--mubs-blue)' }}>assignment_ind</span></div>
-                                <div><div className="fw-bold text-dark" style={{ fontSize: '.84rem' }}>Suggest an implementation unit</div><div className="text-muted" style={{ fontSize: '.76rem' }}>Although not required, suggesting a unit speeds up the approval and assignment process.</div></div>
+                                <div><div className="fw-bold text-dark" style={{ fontSize: '.84rem' }}>Suggest an implementation department</div><div className="text-muted" style={{ fontSize: '.76rem' }}>Although not required, suggesting a department speeds up the approval and assignment process.</div></div>
                             </div>
                             <div className="d-flex gap-3 align-items-start">
                                 <div style={{ width: '36px', height: '36px', borderRadius: '8px', background: '#fef9c3', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}><span className="material-symbols-outlined" style={{ fontSize: '18px', color: '#b45309' }}>schedule</span></div>
-                                <div><div className="fw-bold text-dark" style={{ fontSize: '.84rem' }}>Approval takes 5–10 working days</div><div className="text-muted" style={{ fontSize: '.76rem' }}>Proposals go to Admin for review, then to the Principal for final sign-off before a unit is assigned.</div></div>
+                                <div><div className="fw-bold text-dark" style={{ fontSize: '.84rem' }}>Approval takes 5–10 working days</div><div className="text-muted" style={{ fontSize: '.76rem' }}>Proposals go to Admin for review, then to the Principal for final sign-off before a department is assigned.</div></div>
                             </div>
                         </div>
                     </div>
@@ -283,8 +283,8 @@ export default function CommPropose() {
                             </div>
                             <div className="timeline-item">
                                 <div className="timeline-dot" style={{ background: '#dcfce7' }}><span className="material-symbols-outlined" style={{ color: '#059669' }}>assignment_ind</span></div>
-                                <div className="fw-bold text-dark" style={{ fontSize: '.85rem' }}>4 · Unit Assigned (if approved)</div>
-                                <div className="text-muted" style={{ fontSize: '.75rem' }}>Responsible unit notified; activity tracked</div>
+                                <div className="fw-bold text-dark" style={{ fontSize: '.85rem' }}>4 · Department Assigned (if approved)</div>
+                                <div className="text-muted" style={{ fontSize: '.75rem' }}>Responsible department notified; activity tracked</div>
                             </div>
                         </div>
                     </div>

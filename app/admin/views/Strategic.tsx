@@ -9,8 +9,8 @@ interface Activity {
     id: number;
     title: string;
     pillar: string;
-    unit: string;
-    unit_id: number;
+    department: string;
+    department_id: number;
     target_kpi: string;
     start_date: string;
     end_date: string;
@@ -19,6 +19,7 @@ interface Activity {
     priority: string;
     parent_id: number | null;
     parent_title?: string;
+    strategic_objective: string;
     timeline: string;
     description: string;
 }
@@ -27,10 +28,11 @@ export default function StrategicView() {
     const [activities, setActivities] = useState<Activity[]>([]);
     const [loading, setLoading] = useState(true);
     const [showCreateModal, setShowCreateModal] = useState(false);
+    const [showViewModal, setShowViewModal] = useState(false);
     const [selectedActivity, setSelectedActivity] = useState<Activity | null>(null);
     const [modalMode, setModalMode] = useState<'create' | 'edit' | 'reassign'>('create');
     const [statusFilter, setStatusFilter] = useState('All Statuses');
-    const [unitFilter, setUnitFilter] = useState('All Units');
+    const [departmentFilter, setUnitFilter] = useState('All Departments');
     const [currentPage, setCurrentPage] = useState(1);
     const PAGE_SIZE = 10;
     const [stats, setStats] = useState({
@@ -42,7 +44,7 @@ export default function StrategicView() {
 
     const filteredActivities = activities.filter(a => {
         const matchStatus = statusFilter === 'All Statuses' || a.status === statusFilter;
-        const matchUnit = unitFilter === 'All Units' || a.unit === unitFilter;
+        const matchUnit = departmentFilter === 'All Departments' || a.department === departmentFilter;
         return matchStatus && matchUnit;
     });
 
@@ -52,10 +54,10 @@ export default function StrategicView() {
         currentPage * PAGE_SIZE
     );
 
-    const uniqueUnits = Array.from(new Set(activities.map(a => a.unit))).filter(Boolean);
+    const uniqueUnits = Array.from(new Set(activities.map(a => a.department))).filter(Boolean);
 
     // Reset to page 1 whenever filters change
-    useEffect(() => { setCurrentPage(1); }, [statusFilter, unitFilter]);
+    useEffect(() => { setCurrentPage(1); }, [statusFilter, departmentFilter]);
 
     useEffect(() => {
         fetchActivities();
@@ -91,6 +93,11 @@ export default function StrategicView() {
         setModalMode(mode);
         setSelectedActivity(activity ?? null);
         setShowCreateModal(true);
+    };
+
+    const openViewModal = (activity: Activity) => {
+        setSelectedActivity(activity);
+        setShowViewModal(true);
     };
 
     const handleDelete = async (activity: Activity) => {
@@ -204,12 +211,12 @@ export default function StrategicView() {
                         <select
                             className="form-select form-select-sm"
                             style={{ width: '160px' }}
-                            value={unitFilter}
+                            value={departmentFilter}
                             onChange={e => setUnitFilter(e.target.value)}
                         >
-                            <option>All Units</option>
-                            {uniqueUnits.map(unit => (
-                                <option key={unit}>{unit}</option>
+                            <option>All Departments</option>
+                            {uniqueUnits.map(department => (
+                                <option key={department}>{department}</option>
                             ))}
                         </select>
                         <button
@@ -226,9 +233,11 @@ export default function StrategicView() {
                         <thead>
                             <tr>
                                 <th>Activity</th>
-                                <th>Assigned Unit</th>
+                                <th>Strategic Objective</th>
+                                <th>Assigned Department</th>
                                 <th>Priority</th>
                                 <th>Timeline</th>
+                                <th>Description</th>
                                 <th>Progress</th>
                                 <th>Status</th>
                                 <th>Actions</th>
@@ -271,7 +280,10 @@ export default function StrategicView() {
                                                 </div>
                                             </div>
                                         </td>
-                                        <td style={{ fontSize: '.83rem' }}>{activity.unit}</td>
+                                        <td style={{ fontSize: '.83rem', maxWidth: '150px' }} className="text-truncate" title={activity.strategic_objective}>
+                                            {activity.strategic_objective || '-'}
+                                        </td>
+                                        <td style={{ fontSize: '.83rem' }}>{activity.department}</td>
                                         <td>
                                             <span
                                                 className="status-badge"
@@ -281,6 +293,9 @@ export default function StrategicView() {
                                             </span>
                                         </td>
                                         <td style={{ fontSize: '.83rem' }}>{activity.timeline}</td>
+                                        <td style={{ fontSize: '.83rem', maxWidth: '150px' }} className="text-truncate" title={activity.description}>
+                                            {activity.description || '-'}
+                                        </td>
                                         <td style={{ minWidth: '100px' }}>
                                             <div className="progress-bar-custom">
                                                 <div
@@ -306,44 +321,13 @@ export default function StrategicView() {
                                             </span>
                                         </td>
                                         <td>
-                                            <div className="dropdown">
-                                                <button className="btn btn-sm btn-light" data-bs-toggle="dropdown">
-                                                    <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>more_vert</span>
-                                                </button>
-                                                <ul className="dropdown-menu dropdown-menu-end shadow">
-                                                    <li>
-                                                        <a
-                                                            className="dropdown-item"
-                                                            href="#"
-                                                            onClick={(e) => { e.preventDefault(); openModal('edit', activity); }}
-                                                        >
-                                                            <span className="material-symbols-outlined me-2" style={{ fontSize: '16px' }}>edit</span>
-                                                            Edit
-                                                        </a>
-                                                    </li>
-                                                    <li>
-                                                        <a
-                                                            className="dropdown-item"
-                                                            href="#"
-                                                            onClick={(e) => { e.preventDefault(); openModal('reassign', activity); }}
-                                                        >
-                                                            <span className="material-symbols-outlined me-2" style={{ fontSize: '16px' }}>assignment_ind</span>
-                                                            Reassign
-                                                        </a>
-                                                    </li>
-                                                    <li><hr className="dropdown-divider" /></li>
-                                                    <li>
-                                                        <a
-                                                            className="dropdown-item text-danger"
-                                                            href="#"
-                                                            onClick={(e) => { e.preventDefault(); handleDelete(activity); }}
-                                                        >
-                                                            <span className="material-symbols-outlined me-2" style={{ fontSize: '16px' }}>delete</span>
-                                                            Delete
-                                                        </a>
-                                                    </li>
-                                                </ul>
-                                            </div>
+                                            <button 
+                                                className="btn btn-sm btn-outline-primary d-flex align-items-center gap-1" 
+                                                onClick={(e) => { e.preventDefault(); openViewModal(activity); }}
+                                            >
+                                                <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>visibility</span>
+                                                View
+                                            </button>
                                         </td>
                                     </tr>
                                 ))
@@ -384,6 +368,116 @@ export default function StrategicView() {
                 activity={selectedActivity}
                 mode={modalMode}
             />
+
+            {/* View Activity Modal */}
+            {selectedActivity && (
+                <div className={`modal fade ${showViewModal ? 'show d-block' : ''}`} tabIndex={-1} style={{ backgroundColor: showViewModal ? 'rgba(0,0,0,0.5)' : 'transparent' }}>
+                    <div className="modal-dialog modal-dialog-centered modal-lg">
+                        <div className="modal-content border-0 shadow-lg" style={{ borderRadius: '12px' }}>
+                            <div className="modal-header modal-header-mubs text-white" style={{ borderTopLeftRadius: '12px', borderTopRightRadius: '12px' }}>
+                                <h5 className="modal-title d-flex align-items-center gap-2 fw-bold">
+                                    <span className="material-symbols-outlined">visibility</span>
+                                    Activity Details
+                                </h5>
+                                <button type="button" className="btn-close btn-close-white" onClick={() => setShowViewModal(false)}></button>
+                            </div>
+                            <div className="modal-body p-4">
+                                <div className="row g-4">
+                                    <div className="col-12 border-bottom pb-3">
+                                        <h4 className="fw-bold mb-1" style={{ color: '#005696' }}>{selectedActivity.title}</h4>
+                                        <span className="badge" style={getPriorityBadge(selectedActivity.priority)}>{selectedActivity.priority} Priority</span>
+                                        <span className="badge ms-2" style={getStatusBadge(selectedActivity.status)}>{selectedActivity.status}</span>
+                                    </div>
+                                    
+                                    <div className="col-md-6">
+                                        <p className="text-muted small fw-bold mb-1 text-uppercase">Strategic Pillar</p>
+                                        <p className="mb-0">{selectedActivity.pillar}</p>
+                                    </div>
+                                    <div className="col-md-6">
+                                        <p className="text-muted small fw-bold mb-1 text-uppercase">Strategic Objective</p>
+                                        <p className="mb-0">{selectedActivity.strategic_objective || 'N/A'}</p>
+                                    </div>
+
+                                    <div className="col-md-6">
+                                        <p className="text-muted small fw-bold mb-1 text-uppercase">Assigned Department</p>
+                                        <p className="mb-0">{selectedActivity.department}</p>
+                                    </div>
+                                    <div className="col-md-6">
+                                        <p className="text-muted small fw-bold mb-1 text-uppercase">Target / KPI</p>
+                                        <p className="mb-0">{selectedActivity.target_kpi || 'N/A'}</p>
+                                    </div>
+
+                                    <div className="col-md-6">
+                                        <p className="text-muted small fw-bold mb-1 text-uppercase">Timeline</p>
+                                        <p className="mb-0">{selectedActivity.timeline}</p>
+                                    </div>
+                                    <div className="col-md-6">
+                                        <p className="text-muted small fw-bold mb-1 text-uppercase">Progress</p>
+                                        <div className="d-flex align-items-center gap-2">
+                                            <div className="progress flex-grow-1" style={{ height: '8px' }}>
+                                                <div 
+                                                    className="progress-bar" 
+                                                    role="progressbar" 
+                                                    style={{ width: `${selectedActivity.progress}%`, backgroundColor: '#005696' }}
+                                                ></div>
+                                            </div>
+                                            <span className="small fw-bold">{selectedActivity.progress}%</span>
+                                        </div>
+                                    </div>
+
+                                    <div className="col-12">
+                                        <p className="text-muted small fw-bold mb-1 text-uppercase">Description / Notes</p>
+                                        <div className="p-3 bg-light rounded text-dark" style={{ minHeight: '80px', fontSize: '0.9rem' }}>
+                                            {selectedActivity.description || 'No description provided.'}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div className="modal-footer border-0 p-3 pt-0 d-flex justify-content-between">
+                                <button type="button" className="btn btn-light" onClick={() => setShowViewModal(false)}>
+                                    <span className="material-symbols-outlined align-middle me-1" style={{ fontSize: '18px' }}>close</span>
+                                    Close
+                                </button>
+                                <div className="d-flex gap-2">
+                                    <button 
+                                        type="button" 
+                                        className="btn btn-outline-primary"
+                                        onClick={() => {
+                                            setShowViewModal(false);
+                                            openModal('edit', selectedActivity);
+                                        }}
+                                    >
+                                        <span className="material-symbols-outlined align-middle me-1" style={{ fontSize: '18px' }}>edit</span>
+                                        Edit
+                                    </button>
+                                    <button 
+                                        type="button" 
+                                        className="btn btn-outline-warning"
+                                        onClick={() => {
+                                            setShowViewModal(false);
+                                            openModal('reassign', selectedActivity);
+                                        }}
+                                    >
+                                        <span className="material-symbols-outlined align-middle me-1" style={{ fontSize: '18px' }}>assignment_ind</span>
+                                        Reassign
+                                    </button>
+                                    <button 
+                                        type="button" 
+                                        className="btn btn-outline-danger"
+                                        onClick={() => {
+                                            setShowViewModal(false);
+                                            handleDelete(selectedActivity);
+                                        }}
+                                    >
+                                        <span className="material-symbols-outlined align-middle me-1" style={{ fontSize: '18px' }}>delete</span>
+                                        Delete
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
         </Layout>
     );
 }

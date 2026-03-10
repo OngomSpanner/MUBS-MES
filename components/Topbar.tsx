@@ -43,10 +43,10 @@ export default function Topbar({ pageTitle, toggleSidebar }: TopbarProps) {
       if (res.ok) {
         // Force hard redirect to the new role's dashboard to reload everything
         let redirectPath = '/staff';
-        if (newRole === 'Super Admin' || newRole === 'Manager' || newRole === 'Strategy Manager' || newRole === 'System Administrator') redirectPath = '/admin';
+        if (newRole === 'Strategy Manager' || newRole === 'System Administrator') redirectPath = '/admin';
         else if (newRole === 'Committee Member') redirectPath = '/comm';
         else if (newRole === 'Principal') redirectPath = '/principal';
-        else if (newRole === 'Unit Head' || newRole === 'HOD') redirectPath = '/unit-head';
+        else if (newRole === 'Department Head' || newRole === 'HOD') redirectPath = '/department-head';
 
         window.location.href = redirectPath;
       } else {

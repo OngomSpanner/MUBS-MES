@@ -13,7 +13,7 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen, onLogoutClick }: 
   const pathname = usePathname();
   const searchParams = useSearchParams();
 
-  const currentKey = (pathname.startsWith('/admin') || pathname.startsWith('/principal') || pathname.startsWith('/unit-head'))
+  const currentKey = (pathname.startsWith('/admin') || pathname.startsWith('/principal') || pathname.startsWith('/department-head'))
     ? (searchParams.get('pg') || (pathname.startsWith('/principal') ? 'executive' : 'dashboard'))
     : (pathname.substring(1) || 'dashboard');
 
@@ -33,13 +33,13 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen, onLogoutClick }: 
     { key: 'reports', href: '/principal?pg=reports', icon: 'description', label: 'Reports' },
   ];
 
-  const unitHeadMenuItems = [
-    { key: 'dashboard', href: '/unit-head?pg=dashboard', icon: 'dashboard', label: 'Dashboard' },
-    { key: 'activities', href: '/unit-head?pg=activities', icon: 'track_changes', label: 'Strategic Activities' },
-    { key: 'tasks', href: '/unit-head?pg=tasks', icon: 'task_alt', label: 'Tasks', badge: '3', badgeType: 'warning' },
-    { key: 'staff', href: '/unit-head?pg=staff', icon: 'group', label: 'Staff & Warnings', badge: '2', badgeType: 'danger' },
-    { key: 'submissions', href: '/unit-head?pg=submissions', icon: 'inbox', label: 'Submissions' },
-    { key: 'evaluations', href: '/unit-head?pg=evaluations', icon: 'rate_review', label: 'Evaluations' },
+  const departmentHeadMenuItems = [
+    { key: 'dashboard', href: '/department-head?pg=dashboard', icon: 'dashboard', label: 'Dashboard' },
+    { key: 'activities', href: '/department-head?pg=activities', icon: 'track_changes', label: 'Strategic Activities' },
+    { key: 'tasks', href: '/department-head?pg=tasks', icon: 'task_alt', label: 'Tasks', badge: '3', badgeType: 'warning' },
+    { key: 'staff', href: '/department-head?pg=staff', icon: 'group', label: 'Staff & Warnings', badge: '2', badgeType: 'danger' },
+    { key: 'submissions', href: '/department-head?pg=submissions', icon: 'inbox', label: 'Submissions' },
+    { key: 'evaluations', href: '/department-head?pg=evaluations', icon: 'rate_review', label: 'Evaluations' },
   ];
 
   const staffMenuItems = [
@@ -66,8 +66,8 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen, onLogoutClick }: 
 
   if (pathname.startsWith('/principal')) {
     menuItems = principalMenuItems;
-  } else if (pathname.startsWith('/unit-head')) {
-    menuItems = unitHeadMenuItems;
+  } else if (pathname.startsWith('/department-head')) {
+    menuItems = departmentHeadMenuItems;
   } else if (pathname.startsWith('/staff')) {
     menuItems = staffMenuItems;
   } else if (pathname.startsWith('/comm')) {
@@ -87,7 +87,7 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen, onLogoutClick }: 
             />
           </div>
           <div>
-            <div className="brand-title text-white">MUBS Strategy Planning </div>
+            <div className="brand-title text-white">MUBS Strategy Plan </div>
             <div className="brand-sub">System</div>
           </div>
         </div>

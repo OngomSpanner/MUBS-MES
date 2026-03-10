@@ -108,8 +108,8 @@
     color: #7c3aed;
 }
 
-/* ── Unit assignment card (read-only) ───────────────────────── */
-.unit-assign-card {
+/* ── Department assignment card (read-only) ───────────────────────── */
+.department-assign-card {
     border-radius: 12px;
     padding: 1.1rem 1.3rem;
     margin-bottom: .7rem;
@@ -117,7 +117,7 @@
     background: #f8fafc;
 }
 
-.unit-assign-card .read-only-badge {
+.department-assign-card .read-only-badge {
     font-size: .62rem;
     font-weight: 800;
     background: #f1f5f9;

@@ -70,7 +70,7 @@ export default function CommDashboard() {
                         </div>
                         <div className="stat-label">Approved</div>
                         <div className="stat-value">6</div>
-                        <div className="stat-sub">Units assigned &amp; active</div>
+                        <div className="stat-sub">Departments assigned &amp; active</div>
                     </div>
                 </div>
                 <div className="col-12 col-sm-6 col-xl-3">
@@ -106,7 +106,7 @@ export default function CommDashboard() {
                                         <div className="proposal-meta">Proposed 03 Apr 2025 · Minutes: Meeting #7 · Assigned to: Research &amp; Innovation</div>
                                         <div className="mt-2 d-flex gap-2 flex-wrap">
                                             <span style={{ fontSize: '.73rem', background: '#f5f3ff', color: '#6d28d9', padding: '.18rem .55rem', borderRadius: '99px', fontWeight: 700 }}>Evidence Attached</span>
-                                            <span style={{ fontSize: '.73rem', background: '#ecfdf5', color: '#059669', padding: '.18rem .55rem', borderRadius: '99px', fontWeight: 700 }}>Unit: Research &amp; Innovation</span>
+                                            <span style={{ fontSize: '.73rem', background: '#ecfdf5', color: '#059669', padding: '.18rem .55rem', borderRadius: '99px', fontWeight: 700 }}>Department: Research &amp; Innovation</span>
                                         </div>
                                     </div>
                                     <button className="btn btn-sm btn-outline-secondary fw-bold" style={{ fontSize: '.78rem' }}>View</button>

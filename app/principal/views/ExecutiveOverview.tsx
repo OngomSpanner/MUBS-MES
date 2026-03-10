@@ -16,9 +16,9 @@ interface PrincipalData {
         riskAlerts: number;
         activeStaff: number;
     };
-    complianceByUnit: Array<{ unit: string; progress: number }>;
-    riskAlerts: Array<{ id: number; title: string; unit: string; daysPast?: number; daysLeft?: number; progress: number; status: string }>;
-    overdueActivities: Array<{ id: number; title: string; unit: string; daysOverdue: number; progress: number }>;
+    complianceByUnit: Array<{ department: string; progress: number }>;
+    riskAlerts: Array<{ id: number; title: string; department: string; daysPast?: number; daysLeft?: number; progress: number; status: string }>;
+    overdueActivities: Array<{ id: number; title: string; department: string; daysOverdue: number; progress: number }>;
 }
 
 export default function ExecutiveOverview() {
@@ -100,7 +100,7 @@ export default function ExecutiveOverview() {
                             </div>
                             <div className="col-6 col-sm-3 col-md-6 col-lg-3 text-center">
                                 <div style={{ fontSize: '1.5rem', fontWeight: 900, color: '#c4b5fd' }}>{stats.totalUnits}</div>
-                                <div style={{ fontSize: '.68rem', fontWeight: 700, color: '#c4b5fd', textTransform: 'uppercase', letterSpacing: '.08em' }}>Units</div>
+                                <div style={{ fontSize: '.68rem', fontWeight: 700, color: '#c4b5fd', textTransform: 'uppercase', letterSpacing: '.08em' }}>Departments</div>
                             </div>
                         </div>
                     </div>
@@ -175,7 +175,7 @@ export default function ExecutiveOverview() {
                                     <div className="flex-fill overflow-hidden">
                                         <div className="risk-title text-dark fw-bold" style={{ fontSize: '.85rem' }}>{risk.title}</div>
                                         <div className="risk-meta text-muted" style={{ fontSize: '.72rem' }}>
-                                            {risk.unit} · {risk.daysPast ? `${risk.daysPast} days overdue` : `${risk.daysLeft} days left`} · {risk.progress}% complete
+                                            {risk.department} · {risk.daysPast ? `${risk.daysPast} days overdue` : `${risk.daysLeft} days left`} · {risk.progress}% complete
                                         </div>
                                         <span className="status-badge mt-1" style={{
                                             background: risk.status === 'Critical' ? '#fee2e2' : '#fef9c3',
@@ -198,19 +198,19 @@ export default function ExecutiveOverview() {
                 <div className="col-12 col-lg-7">
                     <div className="table-card mb-4">
                         <div className="table-card-header">
-                            <h5><span className="material-symbols-outlined me-2" style={{ color: 'var(--mubs-blue)' }}>fact_check</span>Compliance by Unit</h5>
+                            <h5><span className="material-symbols-outlined me-2" style={{ color: 'var(--mubs-blue)' }}>fact_check</span>Compliance by Department</h5>
                         </div>
                         <div className="p-4">
-                            {complianceByUnit.map((unit, index) => (
+                            {complianceByUnit.map((department, index) => (
                                 <div key={index} className="compare-bar-wrap mb-3">
                                     <div className="d-flex justify-content-between mb-1">
-                                        <span className="compare-bar-label fw-bold" style={{ fontSize: '.8rem' }}>{unit.unit}</span>
-                                        <span className="compare-bar-pct fw-bold text-dark" style={{ fontSize: '.83rem' }}>{unit.progress}%</span>
+                                        <span className="compare-bar-label fw-bold" style={{ fontSize: '.8rem' }}>{department.department}</span>
+                                        <span className="compare-bar-pct fw-bold text-dark" style={{ fontSize: '.83rem' }}>{department.progress}%</span>
                                     </div>
                                     <div className="progress" style={{ height: '8px', borderRadius: '4px', background: '#e2e8f0' }}>
                                         <div className="progress-bar" style={{
-                                            width: `${unit.progress}%`,
-                                            background: unit.progress >= 75 ? '#10b981' : (unit.progress >= 50 ? '#ffcd00' : '#e31837'),
+                                            width: `${department.progress}%`,
+                                            background: department.progress >= 75 ? '#10b981' : (department.progress >= 50 ? '#ffcd00' : '#e31837'),
                                             borderRadius: '4px'
                                         }}></div>
                                     </div>
@@ -232,12 +232,12 @@ export default function ExecutiveOverview() {
                         </div>
                         <div className="table-responsive">
                             <table className="table mb-0">
-                                <thead><tr><th style={{ fontSize: '.75rem' }}>Activity</th><th style={{ fontSize: '.75rem' }}>Unit</th><th style={{ fontSize: '.75rem' }}>Days Overdue</th><th style={{ fontSize: '.75rem' }}>Progress</th></tr></thead>
+                                <thead><tr><th style={{ fontSize: '.75rem' }}>Activity</th><th style={{ fontSize: '.75rem' }}>Department</th><th style={{ fontSize: '.75rem' }}>Days Overdue</th><th style={{ fontSize: '.75rem' }}>Progress</th></tr></thead>
                                 <tbody>
                                     {overdueActivities.length > 0 ? overdueActivities.map((act, index) => (
                                         <tr key={index}>
                                             <td className="fw-bold text-dark text-truncate" style={{ fontSize: '.83rem', maxWidth: '200px' }}>{act.title}</td>
-                                            <td style={{ fontSize: '.8rem' }}>{act.unit}</td>
+                                            <td style={{ fontSize: '.8rem' }}>{act.department}</td>
                                             <td><span className="badge bg-danger">+{act.daysOverdue}</span></td>
                                             <td>
                                                 <div className="d-flex align-items-center gap-2">

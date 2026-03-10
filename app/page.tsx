@@ -3,6 +3,10 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
+import { GoogleOAuthProvider, GoogleLogin } from '@react-oauth/google';
+import { Modal, Button, Form } from 'react-bootstrap';
+
+const clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || 'dummy';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -10,6 +14,39 @@ export default function LoginPage() {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+
+  // Forgot Password States
+  const [showForgotModal, setShowForgotModal] = useState(false);
+  const [forgotEmail, setForgotEmail] = useState('');
+  const [forgotLoading, setForgotLoading] = useState(false);
+  const [forgotMessage, setForgotMessage] = useState({ type: '', text: '' });
+
+  const handleForgotPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setForgotLoading(true);
+    setForgotMessage({ type: '', text: '' });
+
+    try {
+      const res = await fetch('/api/auth/forgot-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: forgotEmail }),
+      });
+
+      const data = await res.json();
+      
+      if (!res.ok) {
+        throw new Error(data.message || 'Failed to send reset link');
+      }
+
+      setForgotMessage({ type: 'success', text: data.message });
+      setForgotEmail('');
+    } catch (err: any) {
+      setForgotMessage({ type: 'danger', text: err.message || 'Failed to send reset link' });
+    } finally {
+      setForgotLoading(false);
+    }
+  };
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -31,14 +68,14 @@ export default function LoginPage() {
 
       const role = data.user.activeRole || data.user.roles[0];
 
-      if (role === 'Super Admin' || role === 'Manager' || role === 'Strategy Manager' || role === 'System Administrator') {
+      if (role === 'Strategy Manager' || role === 'System Administrator' ) {
         router.push('/admin');
       } else if (role === 'Committee Member') {
         router.push('/comm');
       } else if (role === 'Principal') {
         router.push('/principal');
-      } else if (role === 'Unit Head' || role === 'HOD') {
-        router.push('/unit-head');
+      } else if (role === 'Department Head' || role === 'HOD') {
+        router.push('/department-head');
       } else {
         router.push('/staff');
       }
@@ -48,7 +85,44 @@ export default function LoginPage() {
     }
   };
 
+  const handleGoogleSuccess = async (credentialResponse: any) => {
+    setLoading(true);
+    setError('');
+
+    try {
+      const res = await fetch('/api/auth/google', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ credential: credentialResponse.credential }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.message || 'Google Sign-In failed');
+      }
+
+      const role = data.user.activeRole || data.user.roles[0];
+
+      if (role === 'Strategy Manager' || role === 'System Administrator') {
+        router.push('/admin');
+      } else if (role === 'Committee Member') {
+        router.push('/comm');
+      } else if (role === 'Principal') {
+        router.push('/principal');
+      } else if (role === 'Department Head' || role === 'HOD') {
+        router.push('/department-head');
+      } else {
+        router.push('/staff');
+      }
+    } catch (err: any) {
+      setError(err.message || 'Google Sign-In failed');
+      setLoading(false);
+    }
+  };
+
   return (
+    <GoogleOAuthProvider clientId={clientId}>
     <div style={{
       minHeight: '100vh',
       display: 'flex',
@@ -75,7 +149,7 @@ export default function LoginPage() {
         style={{
           maxWidth: '440px',
           width: '90%',
-          padding: '2.5rem 2rem',
+          padding: '2rem 2rem',
           borderRadius: '20px',
           background: 'rgba(255, 255, 255, 0.98)',
           backdropFilter: 'blur(20px)',
@@ -83,8 +157,8 @@ export default function LoginPage() {
           boxShadow: '0 20px 40px rgba(0,0,0,0.3)'
         }}
       >
-        <div className="text-center mb-4">
-          <div className="mb-3 d-flex justify-content-center">
+        <div className="text-center mb-3">
+          <div className="mb-2 d-flex justify-content-center">
             <Image
               src="/logo.png"
               alt="MUBS Logo"
@@ -99,7 +173,7 @@ export default function LoginPage() {
         </div>
 
         {error && (
-          <div className="alert alert-danger py-2 small d-flex align-items-center gap-2 mb-4" style={{ borderLeft: '4px solid #e31837' }}>
+          <div className="alert alert-danger py-2 small d-flex align-items-center gap-2 mb-3" style={{ borderLeft: '4px solid #e31837' }}>
             <span className="material-symbols-outlined" style={{ fontSize: '18px', color: '#e31837' }}>error</span>
             <span className="fw-medium text-dark">{error}</span>
           </div>
@@ -119,7 +193,7 @@ export default function LoginPage() {
             />
             <label htmlFor="email" className="text-muted">Email address</label>
           </div>
-          <div className="form-floating mb-4">
+          <div className="form-floating mb-3">
             <input
               type="password"
               className="form-control"
@@ -131,6 +205,20 @@ export default function LoginPage() {
               style={{ borderRadius: '10px', border: '1px solid #ced4da' }}
             />
             <label htmlFor="password" className="text-muted">Password</label>
+          </div>
+          <div className="d-flex justify-content-end mb-3 mt-n2">
+            <button 
+              type="button" 
+              className="btn btn-link text-decoration-none small p-0"
+              style={{ color: '#005696', fontSize: '0.85rem' }}
+              onClick={() => {
+                setShowForgotModal(true);
+                setForgotMessage({ type: '', text: '' });
+                setForgotEmail('');
+              }}
+            >
+              Forgot your password?
+            </button>
           </div>
 
           <button
@@ -163,9 +251,27 @@ export default function LoginPage() {
               <div style={{ flex: 1, background: '#005696' /* Blue */ }}></div>
             </div>
           </button>
+
+          <div className="d-flex align-items-center my-3">
+            <div style={{ flex: 1, height: '1px', background: '#e2e8f0' }}></div>
+            <span className="mx-3 text-muted small fw-medium">OR CONTINUE WITH</span>
+            <div style={{ flex: 1, height: '1px', background: '#e2e8f0' }}></div>
+          </div>
+
+          <div className="d-flex justify-content-center">
+            <GoogleLogin
+              onSuccess={handleGoogleSuccess}
+              onError={() => setError('Google Sign-In failed')}
+              useOneTap
+              theme="outline"
+              size="large"
+              shape="pill"
+              text="signin_with"
+            />
+          </div>
         </form>
 
-        <div className="text-center mt-5">
+        <div className="text-center mt-4">
           {/* Subtle line with brand colors */}
           <div className="mx-auto mb-3" style={{ height: '3px', width: '50px', display: 'flex', borderRadius: '4px', overflow: 'hidden' }}>
             <div style={{ flex: 1, background: '#e31837' }}></div>
@@ -177,6 +283,62 @@ export default function LoginPage() {
           </small>
         </div>
       </div>
+
+      {/* Forgot Password Modal */}
+      <Modal show={showForgotModal} onHide={() => !forgotLoading && setShowForgotModal(false)} centered>
+        <Modal.Header closeButton className="modal-header-mubs">
+          <Modal.Title className="fw-bold d-flex align-items-center gap-2">
+            <span className="material-symbols-outlined">lock_reset</span>
+            Reset Password
+          </Modal.Title>
+        </Modal.Header>
+        <Form onSubmit={handleForgotPassword}>
+          <Modal.Body className="p-4">
+            <p className="text-muted small mb-4">Enter your email address and we will send you a link to securely reset your password.</p>
+            
+            {forgotMessage.text && (
+              <div className={`alert alert-${forgotMessage.type} small py-2 d-flex align-items-center gap-2 mb-4`} style={{ borderLeft: `4px solid ${forgotMessage.type === 'success' ? '#10b981' : '#e31837'}` }}>
+                <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>
+                  {forgotMessage.type === 'success' ? 'check_circle' : 'error'}
+                </span>
+                <span className="fw-medium text-dark">{forgotMessage.text}</span>
+              </div>
+            )}
+
+            <div className="form-floating mb-2">
+              <input
+                type="email"
+                className="form-control"
+                id="forgot-email"
+                placeholder="name@example.com"
+                value={forgotEmail}
+                onChange={(e) => setForgotEmail(e.target.value)}
+                required
+                disabled={forgotLoading || forgotMessage.type === 'success'}
+                style={{ borderRadius: '10px', border: '1px solid #ced4da' }}
+              />
+              <label htmlFor="forgot-email" className="text-muted">Email address</label>
+            </div>
+          </Modal.Body>
+          <Modal.Footer>
+            <Button variant="light" onClick={() => setShowForgotModal(false)} disabled={forgotLoading}>Close</Button>
+            <Button 
+              type="submit"
+              disabled={forgotLoading || !forgotEmail.trim() || forgotMessage.type === 'success'}
+              style={{ background: 'var(--mubs-blue)', borderColor: 'var(--mubs-blue)' }}
+              className="fw-bold text-white d-flex align-items-center"
+            >
+              {forgotLoading ? (
+                <><span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span> Sending...</>
+              ) : (
+                <><span className="material-symbols-outlined me-1" style={{ fontSize: '16px' }}>send</span> Send Reset Link</>
+              )}
+            </Button>
+          </Modal.Footer>
+        </Form>
+      </Modal>
+
     </div>
+    </GoogleOAuthProvider>
   );
 }

@@ -4,12 +4,12 @@ import { query } from '@/lib/db';
 export async function GET() {
     try {
         // 1. Assign sub-activities (tasks) to users for testing
-        // Users for Faculty of Computing (unit_id: 1)
+        // Users for Faculty of Computing (department_id: 1)
         // IDs: 17 (P. Kato), 18 (J. Amuge), 19 (Test Agent User)
 
-        // Find sub-activities for unit 1
+        // Find sub-activities for department 1
         const tasks = await query({
-            query: 'SELECT id FROM strategic_activities WHERE unit_id = 1 AND parent_id IS NOT NULL'
+            query: 'SELECT id FROM strategic_activities WHERE department_id = 1 AND parent_id IS NOT NULL'
         }) as any[];
 
         if (tasks.length > 0) {
