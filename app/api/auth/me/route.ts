@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { query } from '@/lib/db';
 import { verifyToken } from '@/lib/auth';
+import { parseRoles, pickDefaultActiveRole, normalizeRoleForCookie, roleMatches } from '@/lib/role-routing';
 
 export async function GET() {
     try {
@@ -20,7 +21,7 @@ export async function GET() {
 
         // Find user
         const users = await query({
-            query: 'SELECT id, full_name, email, role, status FROM users WHERE id = ?',
+            query: 'SELECT id, full_name, email, role, status, position FROM users WHERE id = ?',
             values: [decoded.userId]
         });
 
@@ -30,14 +31,16 @@ export async function GET() {
             return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
         }
 
-        const rolesArray = user.role.split(',').map((r: string) => r.trim());
+        const rolesArray = parseRoles(user.role);
 
-        // Determine active role - prioritize cookie, fallback to token's role, fallback to first in list
-        let activeRole = activeRoleCookie || decoded.role || rolesArray[0];
-
-        // Safety check: ensure the active role is actually in the user's role list
-        if (!rolesArray.includes(activeRole)) {
-            activeRole = rolesArray[0];
+        // Determine active role: cookie (if valid) → token role (if valid) → priority pick
+        // Accept both canonical ("Strategy Manager") and DB form ("strategy_manager")
+        let activeRole = activeRoleCookie || decoded.role;
+        const cookieValid = activeRole && (rolesArray.includes(activeRole) || roleMatches(rolesArray, activeRole));
+        if (!cookieValid) {
+            activeRole = pickDefaultActiveRole(rolesArray);
+        } else {
+            activeRole = normalizeRoleForCookie(activeRole);
         }
 
         return NextResponse.json({
@@ -45,6 +48,7 @@ export async function GET() {
                 id: user.id,
                 full_name: user.full_name,
                 email: user.email,
+                position: user.position ?? null,
             },
             roles: rolesArray,
             activeRole: activeRole

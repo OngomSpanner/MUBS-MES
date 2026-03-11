@@ -27,6 +27,7 @@ interface EvaluationData {
 export default function DepartmentEvaluations() {
     const [data, setData] = useState<EvaluationData | null>(null);
     const [loading, setLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
 
     // Draft states for evaluations
     const [scores, setScores] = useState<{ [key: number]: number }>({});
@@ -45,12 +46,27 @@ export default function DepartmentEvaluations() {
             setLoading(true);
             const response = await axios.get('/api/department-head/evaluations');
             setData(response.data);
-        } catch (error) {
+        } catch (error: any) {
             console.error('Error fetching department evaluations:', error);
+            setError(error.response?.data?.message || 'Failed to load evaluations. Please try again.');
         } finally {
             setLoading(false);
         }
     };
+
+    if (error) {
+        return (
+            <div className="container mt-5">
+                <div className="alert alert-danger shadow-sm border-0 d-flex align-items-center gap-3 p-4" role="alert">
+                    <span className="material-symbols-outlined fs-2 text-danger">error</span>
+                    <div>
+                        <h5 className="alert-heading text-danger fw-bold mb-1">Error Loading Evaluations</h5>
+                        <p className="mb-0 text-dark opacity-75">{error}</p>
+                    </div>
+                </div>
+            </div>
+        );
+    }
 
     if (loading || !data) {
         return (
@@ -80,10 +96,10 @@ export default function DepartmentEvaluations() {
         }
 
         try {
-            await axios.put('/api/department-head/tasks', {
+            await axios.put('/api/department-head/evaluations', {
                 id,
                 status,
-                score: score || null,
+                score: status === 'Completed' ? (score ?? undefined) : undefined,
                 reviewer_notes: comment || ''
             });
 
@@ -94,9 +110,10 @@ export default function DepartmentEvaluations() {
             setScores(prev => { const newScores = { ...prev }; delete newScores[id]; return newScores; });
             setComments(prev => { const newComments = { ...prev }; delete newComments[id]; return newComments; });
 
-        } catch (error) {
+        } catch (error: any) {
             console.error('Error submitting evaluation:', error);
-            alert("Failed to submit evaluation.");
+            const msg = error.response?.data?.message || error.response?.data?.detail || 'Failed to submit evaluation.';
+            alert(msg);
         }
     };
 

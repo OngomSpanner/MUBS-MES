@@ -33,16 +33,17 @@ interface KanbanData {
 
 interface DepartmentTasksProps {
     initialActivity?: string;
+    initialAssignee?: string;
 }
 
-export default function DepartmentTasks({ initialActivity }: DepartmentTasksProps) {
+export default function DepartmentTasks({ initialActivity, initialAssignee }: DepartmentTasksProps) {
     const [data, setData] = useState<KanbanData | null>(null);
     const [availableActivities, setAvailableActivities] = useState<{ id: number, title: string }[]>([]);
-    const [departmentUsers, setDepartmentUsers] = useState<{ id: number, full_name: string, role: string }[]>([]);
+    const [departmentUsers, setDepartmentUsers] = useState<{ id: number; full_name: string; position: string | null }[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [activityFilter, setActivityFilter] = useState(initialActivity || 'All Strategic Activities');
-    const [assigneeFilter, setAssigneeFilter] = useState('All Assignees');
+    const [assigneeFilter, setAssigneeFilter] = useState(initialAssignee || 'All Assignees');
 
     // Modal States
     const [showTaskModal, setShowTaskModal] = useState(false);
@@ -61,7 +62,11 @@ export default function DepartmentTasks({ initialActivity }: DepartmentTasksProp
                 axios.get('/api/department-head/tasks'),
                 axios.get('/api/users/department')
             ]);
-            setData(tasksRes.data.kanban ? tasksRes.data : { ...tasksRes.data, kanban: { todo: [], inProgress: [], underReview: [], completed: [] } });
+            setData(tasksRes.data.kanban ? tasksRes.data : {
+                kanban: tasksRes.data?.kanban || { todo: [], inProgress: [], underReview: [], completed: [] },
+                availableActivities: tasksRes.data?.availableActivities || [],
+                filters: tasksRes.data?.filters || { activities: [], assignees: [] }
+            });
             setAvailableActivities(tasksRes.data.availableActivities || []);
             setDepartmentUsers(usersRes.data || []);
         } catch (error: any) {
@@ -76,16 +81,6 @@ export default function DepartmentTasks({ initialActivity }: DepartmentTasksProp
         fetchData();
     }, []);
 
-    if (loading || !data) {
-        return (
-            <div className="d-flex justify-content-center align-items-center vh-100">
-                <div className="spinner-border text-primary" role="status">
-                    <span className="visually-hidden">Loading...</span>
-                </div>
-            </div>
-        );
-    }
-
     if (error) {
         return (
             <div className="container mt-5">
@@ -95,6 +90,16 @@ export default function DepartmentTasks({ initialActivity }: DepartmentTasksProp
                         <h5 className="alert-heading text-danger fw-bold mb-1">Error Loading Tasks</h5>
                         <p className="mb-0 text-dark opacity-75">{error}</p>
                     </div>
+                </div>
+            </div>
+        );
+    }
+
+    if (loading || !data) {
+        return (
+            <div className="d-flex justify-content-center align-items-center vh-100">
+                <div className="spinner-border text-primary" role="status">
+                    <span className="visually-hidden">Loading...</span>
                 </div>
             </div>
         );
@@ -115,7 +120,10 @@ export default function DepartmentTasks({ initialActivity }: DepartmentTasksProp
     };
 
     const handleOpenCreate = () => {
-        setTaskForm({ priority: 'Medium', status: 'Not Started' });
+        const initialId = initialActivity && availableActivities.length
+            ? availableActivities.find(a => a.title === initialActivity)?.id
+            : undefined;
+        setTaskForm({ priority: 'Medium', status: 'Not Started', activity_id: initialId });
         setShowTaskModal(true);
     };
 
@@ -147,9 +155,10 @@ export default function DepartmentTasks({ initialActivity }: DepartmentTasksProp
             }
             setShowTaskModal(false);
             await fetchData();
-        } catch (error) {
+        } catch (error: any) {
             console.error('Error saving task:', error);
-            alert('Failed to save task. Please try again.');
+            const msg = error.response?.data?.message || error.response?.data?.detail || 'Failed to save task. Please try again.';
+            alert(msg);
         } finally {
             setIsSubmitting(false);
         }
@@ -167,9 +176,10 @@ export default function DepartmentTasks({ initialActivity }: DepartmentTasksProp
             });
             setShowEvaluateModal(false);
             await fetchData();
-        } catch (error) {
+        } catch (error: any) {
             console.error('Error evaluating task:', error);
-            alert('Failed to evaluate task. Please try again.');
+            const msg = error.response?.data?.message || error.response?.data?.detail || 'Failed to evaluate task.';
+            alert(msg);
         } finally {
             setIsSubmitting(false);
         }
@@ -211,7 +221,9 @@ export default function DepartmentTasks({ initialActivity }: DepartmentTasksProp
                             onChange={(e) => setAssigneeFilter(e.target.value)}
                         >
                             <option>All Assignees</option>
-                            {data.filters.assignees.map(a => <option key={a}>{a}</option>)}
+                            {[...new Set((assigneeFilter && assigneeFilter !== 'All Assignees' ? [assigneeFilter] : []).concat(data.filters.assignees))].map(a => (
+                                <option key={a}>{a}</option>
+                            ))}
                         </select>
                         <button
                             className="btn btn-sm btn-primary d-flex align-items-center gap-2 ms-auto fw-bold shadow-sm"
@@ -350,7 +362,11 @@ export default function DepartmentTasks({ initialActivity }: DepartmentTasksProp
                                         <label className="form-label fw-semibold small mb-1">Assign To</label>
                                         <select className="form-select" value={taskForm.assigned_to || ''} onChange={(e) => setTaskForm({ ...taskForm, assigned_to: parseInt(e.target.value) || undefined })}>
                                             <option value="">Unassigned</option>
-                                            {departmentUsers.map(u => <option key={u.id} value={u.id}>{u.full_name} ({u.role})</option>)}
+                                            {departmentUsers.map(u => (
+                                                <option key={u.id} value={u.id}>
+                                                    {u.full_name}{u.position ? ` (${u.position})` : ''}
+                                                </option>
+                                            ))}
                                         </select>
                                     </div>
                                     <div className="col-md-3">

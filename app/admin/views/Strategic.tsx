@@ -4,13 +4,40 @@ import { useState, useEffect } from 'react';
 import Layout from '@/components/Layout';
 import CreateActivityModal from '@/components/Modals/CreateActivityModal';
 import axios from 'axios';
+import { linkify } from '@/lib/linkify';
+
+function isUnassigned(a: { department_id?: number | null; department?: string }): boolean {
+    return a.department_id == null || !a.department?.trim() || a.department === '-';
+}
+
+// DB status values: pending, in_progress, completed, overdue
+const STATUS_OPTIONS = [
+    { value: '', label: 'All Statuses' },
+    { value: 'pending', label: 'Not Started' },
+    { value: 'in_progress', label: 'In Progress' },
+    { value: 'completed', label: 'Completed' },
+    { value: 'overdue', label: 'Delayed' }
+];
+
+function statusToLabel(s: string): string {
+    const map: Record<string, string> = {
+        pending: 'Not Started',
+        in_progress: 'In Progress',
+        completed: 'Completed',
+        overdue: 'Delayed'
+    };
+    return map[s] ?? s;
+}
 
 interface Activity {
     id: number;
+    row_key?: string;
     title: string;
     pillar: string;
     department: string;
-    department_id: number;
+    department_id: number | null;
+    department_ids?: number[];
+    faculty_office: string;
     target_kpi: string;
     start_date: string;
     end_date: string;
@@ -31,8 +58,11 @@ export default function StrategicView() {
     const [showViewModal, setShowViewModal] = useState(false);
     const [selectedActivity, setSelectedActivity] = useState<Activity | null>(null);
     const [modalMode, setModalMode] = useState<'create' | 'edit' | 'reassign'>('create');
-    const [statusFilter, setStatusFilter] = useState('All Statuses');
-    const [departmentFilter, setUnitFilter] = useState('All Departments');
+    const [statusFilter, setStatusFilter] = useState('');
+    const [facultyFilter, setFacultyFilter] = useState('All Offices/Faculties');
+    const [departmentFilter, setDepartmentFilter] = useState('All Departments/Units');
+    const [officeFacultyOptions, setOfficeFacultyOptions] = useState<{ id: number; name: string }[]>([]);
+    const [departmentUnitOptions, setDepartmentUnitOptions] = useState<{ id: number; name: string }[]>([]);
     const [currentPage, setCurrentPage] = useState(1);
     const PAGE_SIZE = 10;
     const [stats, setStats] = useState({
@@ -43,9 +73,10 @@ export default function StrategicView() {
     });
 
     const filteredActivities = activities.filter(a => {
-        const matchStatus = statusFilter === 'All Statuses' || a.status === statusFilter;
-        const matchUnit = departmentFilter === 'All Departments' || a.department === departmentFilter;
-        return matchStatus && matchUnit;
+        const matchStatus = !statusFilter || a.status === statusFilter;
+        const matchDept = departmentFilter === 'All Departments/Units' || a.department === departmentFilter;
+        const matchFaculty = facultyFilter === 'All Offices/Faculties' || a.faculty_office === facultyFilter;
+        return matchStatus && matchDept && matchFaculty;
     });
 
     const totalPages = Math.max(1, Math.ceil(filteredActivities.length / PAGE_SIZE));
@@ -54,22 +85,36 @@ export default function StrategicView() {
         currentPage * PAGE_SIZE
     );
 
-    const uniqueUnits = Array.from(new Set(activities.map(a => a.department))).filter(Boolean);
-
     // Reset to page 1 whenever filters change
-    useEffect(() => { setCurrentPage(1); }, [statusFilter, departmentFilter]);
+    useEffect(() => { setCurrentPage(1); }, [statusFilter, departmentFilter, facultyFilter]);
 
     useEffect(() => {
         fetchActivities();
         fetchStats();
     }, []);
 
+    useEffect(() => {
+        const loadDepartments = async () => {
+            try {
+                const response = await axios.get('/api/departments');
+                const list = Array.isArray(response.data) ? response.data : [];
+                setOfficeFacultyOptions(list.filter((d: { parent_id: number | null }) => d.parent_id == null).map((d: { id: number; name: string }) => ({ id: d.id, name: d.name })));
+                setDepartmentUnitOptions(list.filter((d: { parent_id: number | null }) => d.parent_id != null).map((d: { id: number; name: string }) => ({ id: d.id, name: d.name })));
+            } catch (e) {
+                console.error('Error loading departments for filters', e);
+            }
+        };
+        loadDepartments();
+    }, []);
+
     const fetchActivities = async () => {
         try {
             const response = await axios.get('/api/activities');
-            setActivities(response.data);
+            const data = response?.data;
+            setActivities(Array.isArray(data) ? data : []);
         } catch (error) {
             console.error('Error fetching activities:', error);
+            setActivities([]);
         } finally {
             setLoading(false);
         }
@@ -113,11 +158,10 @@ export default function StrategicView() {
 
     const getStatusBadge = (status: string) => {
         const styles: { [key: string]: { bg: string; color: string } } = {
-            'On Track': { bg: '#dcfce7', color: '#15803d' },
+            'Not Started': { bg: '#f1f5f9', color: '#475569' },
             'In Progress': { bg: '#fef9c3', color: '#a16207' },
-            'Delayed': { bg: '#fee2e2', color: '#b91c1c' },
             'Completed': { bg: '#dcfce7', color: '#15803d' },
-            'Not Started': { bg: '#f1f5f9', color: '#475569' }
+            'Delayed': { bg: '#fee2e2', color: '#b91c1c' }
         };
         const style = styles[status] || styles['Not Started'];
         return { backgroundColor: style.bg, color: style.color };
@@ -194,29 +238,41 @@ export default function StrategicView() {
                         </span>
                         Strategic Plan Activities
                     </h5>
-                    <div className="d-flex gap-2 flex-wrap">
+                    <div className="d-flex gap-2 flex-wrap align-items-center">
+                        <span className="text-muted small me-1">Filters:</span>
                         <select
                             className="form-select form-select-sm"
-                            style={{ width: '130px' }}
-                            value={statusFilter}
-                            onChange={e => setStatusFilter(e.target.value)}
+                            style={{ width: '200px' }}
+                            value={facultyFilter}
+                            onChange={e => setFacultyFilter(e.target.value)}
+                            title="Filter by Office/Faculty"
                         >
-                            <option>All Statuses</option>
-                            <option>On Track</option>
-                            <option>In Progress</option>
-                            <option>Delayed</option>
-                            <option>Completed</option>
-                            <option>Not Started</option>
+                            <option value="All Offices/Faculties">All Offices/Faculties</option>
+                            {officeFacultyOptions.map(o => (
+                                <option key={o.id} value={o.name}>{o.name}</option>
+                            ))}
                         </select>
                         <select
                             className="form-select form-select-sm"
-                            style={{ width: '160px' }}
+                            style={{ width: '200px' }}
                             value={departmentFilter}
-                            onChange={e => setUnitFilter(e.target.value)}
+                            onChange={e => setDepartmentFilter(e.target.value)}
+                            title="Filter by Department/Unit"
                         >
-                            <option>All Departments</option>
-                            {uniqueUnits.map(department => (
-                                <option key={department}>{department}</option>
+                            <option value="All Departments/Units">All Departments/Units</option>
+                            {departmentUnitOptions.map(d => (
+                                <option key={d.id} value={d.name}>{d.name}</option>
+                            ))}
+                        </select>
+                        <select
+                            className="form-select form-select-sm"
+                            style={{ width: '140px' }}
+                            value={statusFilter}
+                            onChange={e => setStatusFilter(e.target.value)}
+                            title="Filter by Status"
+                        >
+                            {STATUS_OPTIONS.map(opt => (
+                                <option key={opt.value || 'all'} value={opt.value}>{opt.label}</option>
                             ))}
                         </select>
                         <button
@@ -234,10 +290,10 @@ export default function StrategicView() {
                             <tr>
                                 <th>Activity</th>
                                 <th>Strategic Objective</th>
-                                <th>Assigned Department</th>
+                                <th>Office/Faculty</th>
+                                <th>Department/Unit</th>
                                 <th>Priority</th>
                                 <th>Timeline</th>
-                                <th>Description</th>
                                 <th>Progress</th>
                                 <th>Status</th>
                                 <th>Actions</th>
@@ -246,7 +302,7 @@ export default function StrategicView() {
                         <tbody>
                             {loading ? (
                                 <tr>
-                                    <td colSpan={7} className="text-center py-4">
+                                    <td colSpan={9} className="text-center py-4">
                                         <div className="spinner-border text-primary" role="status">
                                             <span className="visually-hidden">Loading...</span>
                                         </div>
@@ -254,20 +310,21 @@ export default function StrategicView() {
                                 </tr>
                             ) : activities.length === 0 ? (
                                 <tr>
-                                    <td colSpan={7} className="text-center py-4 text-muted">
+                                    <td colSpan={9} className="text-center py-4 text-muted">
                                         No activities found
                                     </td>
                                 </tr>
                             ) : (
                                 paginatedActivities.map((activity) => (
-                                    <tr key={activity.id}>
+                                    <tr key={activity.row_key ?? `${activity.id}-${activity.department_id ?? 0}`}>
                                         <td>
                                             <div className="d-flex align-items-center gap-2">
                                                 <div className="activity-icon">
                                                     <span className="material-symbols-outlined">
-                                                        {activity.pillar === 'Infrastructure' ? 'laptop' :
-                                                            activity.pillar === 'Teaching & Learning' ? 'school' :
-                                                                activity.pillar === 'Research & Innovation' ? 'science' : 'assignment'}
+                                                        {activity.pillar?.includes('Research') ? 'science' :
+                                                            activity.pillar?.includes('Equity') ? 'shield' :
+                                                                activity.pillar?.includes('Human Capital') ? 'groups' :
+                                                                    activity.pillar?.includes('Partnerships') ? 'handshake' : 'assignment'}
                                                     </span>
                                                 </div>
                                                 <div>
@@ -283,7 +340,13 @@ export default function StrategicView() {
                                         <td style={{ fontSize: '.83rem', maxWidth: '150px' }} className="text-truncate" title={activity.strategic_objective}>
                                             {activity.strategic_objective || '-'}
                                         </td>
-                                        <td style={{ fontSize: '.83rem' }}>{activity.department}</td>
+                                        <td style={{ fontSize: '.83rem' }}>{activity.faculty_office || '-'}</td>
+                                        <td style={{ fontSize: '.83rem' }}>
+                                            {activity.department || '—'}
+                                            {isUnassigned(activity) && (
+                                                <span className="badge bg-warning text-dark ms-1" style={{ fontSize: '.65rem' }} title="No department assigned">Needs assignment</span>
+                                            )}
+                                        </td>
                                         <td>
                                             <span
                                                 className="status-badge"
@@ -292,10 +355,7 @@ export default function StrategicView() {
                                                 {activity.priority}
                                             </span>
                                         </td>
-                                        <td style={{ fontSize: '.83rem' }}>{activity.timeline}</td>
-                                        <td style={{ fontSize: '.83rem', maxWidth: '150px' }} className="text-truncate" title={activity.description}>
-                                            {activity.description || '-'}
-                                        </td>
+                                        <td style={{ fontSize: '.83rem' }}>{activity.timeline || '-'}</td>
                                         <td style={{ minWidth: '100px' }}>
                                             <div className="progress-bar-custom">
                                                 <div
@@ -314,10 +374,10 @@ export default function StrategicView() {
                                         <td>
                                             <span
                                                 className="status-badge"
-                                                style={getStatusBadge(activity.status)}
+                                                style={getStatusBadge(statusToLabel(activity.status))}
                                             >
                                                 <span className="material-symbols-outlined" style={{ fontSize: '12px' }}>circle</span>
-                                                {activity.status}
+                                                {statusToLabel(activity.status)}
                                             </span>
                                         </td>
                                         <td>
@@ -395,16 +455,21 @@ export default function StrategicView() {
                                     </div>
                                     <div className="col-md-6">
                                         <p className="text-muted small fw-bold mb-1 text-uppercase">Strategic Objective</p>
-                                        <p className="mb-0">{selectedActivity.strategic_objective || 'N/A'}</p>
+                                        <p className="mb-0" style={{ wordBreak: 'break-word' }}>{linkify(selectedActivity.strategic_objective) || 'N/A'}</p>
                                     </div>
 
                                     <div className="col-md-6">
                                         <p className="text-muted small fw-bold mb-1 text-uppercase">Assigned Department</p>
-                                        <p className="mb-0">{selectedActivity.department}</p>
+                                        <p className="mb-0">
+                                            {selectedActivity.department || '—'}
+                                            {isUnassigned(selectedActivity) && (
+                                                <span className="badge bg-warning text-dark ms-2" style={{ fontSize: '.7rem' }}>Needs assignment</span>
+                                            )}
+                                        </p>
                                     </div>
                                     <div className="col-md-6">
                                         <p className="text-muted small fw-bold mb-1 text-uppercase">Target / KPI</p>
-                                        <p className="mb-0">{selectedActivity.target_kpi || 'N/A'}</p>
+                                        <p className="mb-0" style={{ wordBreak: 'break-word' }}>{linkify(selectedActivity.target_kpi) || 'N/A'}</p>
                                     </div>
 
                                     <div className="col-md-6">
@@ -426,9 +491,9 @@ export default function StrategicView() {
                                     </div>
 
                                     <div className="col-12">
-                                        <p className="text-muted small fw-bold mb-1 text-uppercase">Description / Notes</p>
-                                        <div className="p-3 bg-light rounded text-dark" style={{ minHeight: '80px', fontSize: '0.9rem' }}>
-                                            {selectedActivity.description || 'No description provided.'}
+                                        <p className="text-muted small fw-bold mb-1 text-uppercase">Strategic Objectives</p>
+                                        <div className="p-3 bg-light rounded text-dark" style={{ minHeight: '80px', fontSize: '0.9rem', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
+                                            {linkify(selectedActivity.strategic_objective || selectedActivity.description) || 'None provided.'}
                                         </div>
                                     </div>
                                 </div>

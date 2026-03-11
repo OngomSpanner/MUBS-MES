@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { formatRoleForDisplay, dashboardPathForRole, normalizeRoleForCookie } from '@/lib/role-routing';
 
 interface TopbarProps {
   pageTitle: string;
@@ -36,18 +37,15 @@ export default function Topbar({ pageTitle, toggleSidebar }: TopbarProps) {
     try {
       const res = await fetch('/api/auth/switch-role', {
         method: 'POST',
+        credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ newRole })
       });
 
       if (res.ok) {
-        // Force hard redirect to the new role's dashboard to reload everything
-        let redirectPath = '/staff';
-        if (newRole === 'Strategy Manager' || newRole === 'System Administrator') redirectPath = '/admin';
-        else if (newRole === 'Committee Member') redirectPath = '/comm';
-        else if (newRole === 'Principal') redirectPath = '/principal';
-        else if (newRole === 'Department Head' || newRole === 'HOD') redirectPath = '/department-head';
-
+        const data = await res.json().catch(() => ({}));
+        const canonicalRole = normalizeRoleForCookie(data.activeRole || newRole);
+        const redirectPath = dashboardPathForRole(canonicalRole) || '/staff';
         window.location.href = redirectPath;
       } else {
         alert('Failed to switch role');
@@ -81,38 +79,16 @@ export default function Topbar({ pageTitle, toggleSidebar }: TopbarProps) {
 
       <div className="d-flex align-items-center gap-3">
 
-        <div className="notif-btn" data-bs-toggle="dropdown" role="button">
-          <span className="material-symbols-outlined text-white" style={{ fontSize: '22px' }}>notifications</span>
-          <span className="notif-dot"></span>
-        </div>
-
-        <ul className="dropdown-menu dropdown-menu-end shadow-lg" style={{ minWidth: '300px' }}>
-          <li><h6 className="dropdown-header fw-bold text-dark">Notifications</h6></li>
-          <li>
-            <a className="dropdown-item py-2" href="#">
-              <div className="d-flex gap-2 align-items-start">
-                <span className="material-symbols-outlined text-danger mt-1" style={{ fontSize: '18px' }}>warning</span>
-                <div>
-                  <div className="fw-bold small">Deadline Alert</div>
-                  <div className="text-muted" style={{ fontSize: '.75rem' }}>Research Modernization is delayed by 3 weeks</div>
-                </div>
-              </div>
-            </a>
-          </li>
-          <li>
-            <a className="dropdown-item py-2" href="#">
-              <div className="d-flex gap-2 align-items-start">
-                <span className="material-symbols-outlined text-success mt-1" style={{ fontSize: '18px' }}>check_circle</span>
-                <div>
-                  <div className="fw-bold small">User Created</div>
-                  <div className="text-muted" style={{ fontSize: '.75rem' }}>New staff account activated: B. Nakato</div>
-                </div>
-              </div>
-            </a>
-          </li>
-          <li><hr className="dropdown-divider" /></li>
-          <li><a className="dropdown-item text-center small fw-bold" href="#">View all notifications</a></li>
-        </ul>
+        <a
+          href="/mubs%20strategic%20plan%20template.pdf"
+          download="mubs-strategic-plan-template.pdf"
+          className="btn btn-sm d-flex align-items-center gap-1 text-white border border-white border-opacity-50 rounded-pill px-3 py-1"
+          style={{ fontSize: '.8rem' }}
+          title="Download Strategic Plan manual"
+        >
+          <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>download</span>
+          <span className="d-none d-md-inline">Download Strategic Plan manual</span>
+        </a>
 
         <div className="vr bg-white-50 mx-1 d-none d-sm-block" style={{ opacity: '.2', height: '28px' }}></div>
 
@@ -122,7 +98,7 @@ export default function Topbar({ pageTitle, toggleSidebar }: TopbarProps) {
               {user ? user.full_name : 'Loading...'}
             </div>
             <div className="text-white-50" style={{ fontSize: '.68rem' }}>
-              {activeRole === 'HOD' ? 'Head of Department' : (activeRole || '...')}
+              {formatRoleForDisplay(activeRole) || '...'}
             </div>
           </div>
           <div style={{
@@ -155,7 +131,7 @@ export default function Topbar({ pageTitle, toggleSidebar }: TopbarProps) {
                       onClick={() => handleRoleSwitch(role)}
                       disabled={loadingRole === role}
                     >
-                      <span>View as {role === 'HOD' ? 'Head of Department' : role}</span>
+                      <span>View as {formatRoleForDisplay(role)}</span>
                       {loadingRole === role && <span className="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>}
                     </button>
                   </li>

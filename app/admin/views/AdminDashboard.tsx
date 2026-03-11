@@ -231,7 +231,7 @@ export default function AdminDashboard() {
                     </div>
                 </div>
 
-                {/* Department Performance */}
+                {/* Office/Faculty Performance */}
                 <div className="col-12 col-md-4">
                     <div className="table-card p-0 h-100">
                         <div className="table-card-header">
@@ -239,30 +239,46 @@ export default function AdminDashboard() {
                                 <span className="material-symbols-outlined me-2" style={{ color: 'var(--mubs-blue)' }}>
                                     corporate_fare
                                 </span>
-                                Department Stats
+                                Office/Faculty Performance Overview
                             </h5>
                         </div>
                         <div className="p-3">
-                            {departmentPerformance.slice(0, 4).map((department, index) => (
-                                <div className="department-bar-row mb-3" key={index}>
-                                    <div className="d-flex justify-content-between mb-1" style={{ fontSize: '.75rem' }}>
-                                        <span className="fw-bold">{department.name}</span>
-                                        <span>{department.progress}%</span>
-                                    </div>
-                                    <div className="department-bar-track" style={{ height: '6px' }}>
-                                        <div
-                                            className="department-bar-fill"
-                                            style={{
-                                                width: `${department.progress}%`,
-                                                background: department.progress >= 70 ? '#005696' :
-                                                    department.progress >= 50 ? '#ffcd00' : '#e31837'
-                                            }}
-                                        />
-                                    </div>
+                            {departmentPerformance.length === 0 ? (
+                                <div className="text-center py-3 text-muted" style={{ fontSize: '.85rem' }}>
+                                    No office/faculty data yet.
                                 </div>
-                            ))}
+                            ) : (
+                                departmentPerformance.map((department, index) => {
+                                    const pct = Math.min(100, Math.max(0, department.progress));
+                                    const barColor = pct >= 70 ? '#005696' : pct >= 50 ? '#ffcd00' : '#e31837';
+                                    return (
+                                        <div className="department-bar-row mb-3" key={index}>
+                                            <div className="d-flex justify-content-between mb-1" style={{ fontSize: '.75rem' }}>
+                                                <span className="fw-bold text-truncate me-2">{department.name}</span>
+                                                <span className="text-nowrap">{pct}%</span>
+                                            </div>
+                                            <div
+                                                className="department-bar-track"
+                                                style={{ height: '8px', borderRadius: '4px', backgroundColor: '#e2e8f0', overflow: 'hidden' }}
+                                            >
+                                                <div
+                                                    className="department-bar-fill"
+                                                    style={{
+                                                        width: `${pct}%`,
+                                                        minWidth: pct > 0 ? '4px' : 0,
+                                                        height: '100%',
+                                                        background: barColor,
+                                                        borderRadius: '4px',
+                                                        transition: 'width 0.2s ease'
+                                                    }}
+                                                />
+                                            </div>
+                                        </div>
+                                    );
+                                })
+                            )}
                             <button className="btn btn-sm btn-outline-secondary w-100 mt-2" style={{ fontSize: '.75rem' }} onClick={() => { window.location.href = '/reports'; }}>
-                                View All Departments
+                                View All Reports
                             </button>
                         </div>
                     </div>

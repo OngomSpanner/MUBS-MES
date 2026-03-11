@@ -2,6 +2,15 @@ import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { query } from '@/lib/db';
 import { generateToken, verifyToken } from '@/lib/auth';
+import { parseRoles, roleMatches, getCanonicalRole } from '@/lib/role-routing';
+
+const COOKIE_OPTS = {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'strict' as const,
+    maxAge: 60 * 60 * 24, // 1 day
+    path: '/',
+};
 
 export async function POST(request: Request) {
     try {
@@ -17,13 +26,13 @@ export async function POST(request: Request) {
             return NextResponse.json({ message: 'Invalid token' }, { status: 401 });
         }
 
-        const { newRole } = await request.json();
+        const body = await request.json().catch(() => ({}));
+        const newRoleInput = typeof body?.newRole === 'string' ? body.newRole.trim() : '';
 
-        if (!newRole) {
+        if (!newRoleInput) {
             return NextResponse.json({ message: 'New role is required' }, { status: 400 });
         }
 
-        // Fetch user from DB to ensure they actually possess this role
         const users = await query({
             query: 'SELECT id, role, status FROM users WHERE id = ?',
             values: [decoded.userId]
@@ -35,39 +44,25 @@ export async function POST(request: Request) {
             return NextResponse.json({ message: 'Invalid user or account not active' }, { status: 403 });
         }
 
-        const rolesArray = user.role.split(',').map((r: string) => r.trim());
+        const rolesArray = parseRoles(user.role);
 
-        if (!rolesArray.includes(newRole)) {
+        if (!roleMatches(rolesArray, newRoleInput)) {
             return NextResponse.json({ message: 'User does not have permission for this role' }, { status: 403 });
         }
 
-        // Generate new token with the new active role
-        const newToken = generateToken(user.id, newRole);
+        // Use canonical role so middleware always recognizes the cookie value
+        const activeRole = getCanonicalRole(rolesArray, newRoleInput);
+        const newToken = generateToken(user.id, activeRole);
 
-        cookieStore.set({
-            name: 'token',
-            value: newToken,
-            httpOnly: true,
-            secure: process.env.NODE_ENV === 'production',
-            sameSite: 'strict',
-            maxAge: 60 * 60 * 24, // 1 day
-            path: '/',
-        });
-
-        cookieStore.set({
-            name: 'active_role',
-            value: newRole,
-            httpOnly: false,
-            secure: process.env.NODE_ENV === 'production',
-            sameSite: 'strict',
-            maxAge: 60 * 60 * 24, // 1 day
-            path: '/',
-        });
-
-        return NextResponse.json({
+        const res = NextResponse.json({
             message: 'Role switched successfully',
-            activeRole: newRole,
+            activeRole,
         });
+
+        res.cookies.set('token', newToken, { ...COOKIE_OPTS });
+        res.cookies.set('active_role', activeRole, { ...COOKIE_OPTS, httpOnly: false });
+
+        return res;
 
     } catch (error) {
         console.error('Role switch error:', error);

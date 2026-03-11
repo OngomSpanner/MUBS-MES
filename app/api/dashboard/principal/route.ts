@@ -1,97 +1,146 @@
 import { NextResponse } from 'next/server';
 import { query } from '@/lib/db';
+import { cookies } from 'next/headers';
+import { verifyToken } from '@/lib/auth';
 
 export async function GET() {
   try {
-    // 1. Institutional KPIs
+    const cookieStore = await cookies();
+    const token = cookieStore.get('token')?.value;
+    if (!token) {
+      return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
+    }
+    verifyToken(token);
+
+    // strategic_activities: status enum('pending','in_progress','completed','overdue'). Only top-level (parent_id IS NULL).
+    // departments.is_active = 1. users.status = 'Active'.
     const kpiStats = await query({
       query: `
                 SELECT 
                     COUNT(*) as \`totalActivities\`,
                     ROUND(IFNULL(AVG(progress), 0)) as \`overallProgress\`,
-                    SUM(CASE WHEN status IN ('On Track', 'Completed') THEN 1 ELSE 0 END) as \`onTrack\`,
-                    SUM(CASE WHEN status = 'In Progress' THEN 1 ELSE 0 END) as \`inProgress\`,
-                    SUM(CASE WHEN status = 'Delayed' THEN 1 ELSE 0 END) as \`delayed\`,
-                    (SELECT COUNT(*) FROM departments) as \`totalUnits\`,
-                    (SELECT COUNT(*) FROM users WHERE status = 'Active' OR status = 'active') as \`activeStaff\`
+                    COALESCE(SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END), 0) as \`onTrack\`,
+                    COALESCE(SUM(CASE WHEN status IN ('in_progress', 'pending') THEN 1 ELSE 0 END), 0) as \`inProgress\`,
+                    COALESCE(SUM(CASE WHEN status = 'overdue' OR (end_date IS NOT NULL AND end_date < CURDATE() AND status != 'completed') THEN 1 ELSE 0 END), 0) as \`delayed\`,
+                    (SELECT COUNT(*) FROM departments WHERE is_active = 1) as \`totalUnits\`,
+                    (SELECT COUNT(*) FROM users WHERE status = 'Active') as \`activeStaff\`
                 FROM strategic_activities
                 WHERE parent_id IS NULL
             `
     }) as any[];
 
-    const stats = kpiStats[0];
+    const row0 = kpiStats[0];
 
-    // 2. Compliance by Department (Top 5)
+    // 2. Compliance by Department — all departments with parent_id for hierarchy (faculty/office → departments/units)
     const complianceByUnit = await query({
       query: `
                 SELECT 
-                    u.name as department, 
+                    d.id,
+                    d.parent_id,
+                    d.unit_type,
+                    d.name as department, 
                     ROUND(IFNULL(AVG(sa.progress), 0)) as progress
-                FROM departments u
-                LEFT JOIN strategic_activities sa ON u.id = sa.department_id AND sa.parent_id IS NULL
-                GROUP BY u.id, u.name
-                ORDER BY progress DESC
-                LIMIT 5
+                FROM departments d
+                LEFT JOIN strategic_activities sa ON d.id = sa.department_id AND sa.parent_id IS NULL
+                WHERE d.is_active = 1
+                GROUP BY d.id, d.parent_id, d.unit_type, d.name
+                ORDER BY (d.parent_id IS NULL) DESC, d.name ASC
             `
     }) as any[];
 
-    // 3. Active Risk Alerts (Delayed or near-deadline)
+    const compliantResult = await query({
+      query: `
+                SELECT COUNT(*) as compliant FROM (
+                    SELECT d.id, ROUND(IFNULL(AVG(sa.progress), 0)) as p
+                    FROM departments d
+                    LEFT JOIN strategic_activities sa ON d.id = sa.department_id AND sa.parent_id IS NULL
+                    WHERE d.is_active = 1
+                    GROUP BY d.id
+                    HAVING p >= 75
+                ) t
+            `
+    }) as any[];
+    const totalUnitsResult = await query({ query: 'SELECT COUNT(*) as c FROM departments WHERE is_active = 1', values: [] }) as any[];
+    const compliantCount = Number(compliantResult[0]?.compliant ?? 0);
+    const totalUnitsDept = Number(totalUnitsResult[0]?.c ?? 0);
+    const complianceRate = totalUnitsDept ? Math.round((compliantCount / totalUnitsDept) * 100) : 0;
+
+    // 3. Active Risk Alerts (overdue or due within 7 days)
     const riskAlerts = await query({
       query: `
                 SELECT 
                     sa.id,
                     sa.title,
-                    u.name as department,
+                    d.name as department,
                     sa.status,
                     sa.progress,
                     sa.end_date,
-                    CASE 
-                        WHEN sa.status = 'Delayed' THEN 'Critical'
-                        ELSE 'Warning'
-                    END as statusLabel,
+                    CASE WHEN sa.status = 'overdue' OR (sa.end_date IS NOT NULL AND sa.end_date < CURDATE()) THEN 'Critical' ELSE 'Warning' END as statusLabel,
                     DATEDIFF(sa.end_date, CURDATE()) as daysLeft,
                     DATEDIFF(CURDATE(), sa.end_date) as daysPast
                 FROM strategic_activities sa
-                LEFT JOIN departments u ON sa.department_id = u.id
-                WHERE (sa.status = 'Delayed' OR (sa.status != 'Completed' AND DATEDIFF(sa.end_date, CURDATE()) <= 7))
-                AND sa.parent_id IS NULL
+                LEFT JOIN departments d ON sa.department_id = d.id
+                WHERE sa.parent_id IS NULL
+                AND (sa.status = 'overdue' OR (sa.end_date IS NOT NULL AND sa.end_date < CURDATE()) OR (sa.status != 'completed' AND sa.end_date IS NOT NULL AND DATEDIFF(sa.end_date, CURDATE()) <= 7))
                 ORDER BY sa.end_date ASC
-                LIMIT 4
+                LIMIT 10
             `
     }) as any[];
 
-    // 4. Overdue Activities for the table
+    // 4. Overdue Activities
     const overdueActivities = await query({
       query: `
                 SELECT 
                     sa.id,
                     sa.title,
-                    u.name as department,
+                    d.name as department,
                     DATEDIFF(CURDATE(), sa.end_date) as daysOverdue,
                     sa.progress
                 FROM strategic_activities sa
-                LEFT JOIN departments u ON sa.department_id = u.id
-                WHERE sa.status = 'Delayed' AND sa.parent_id IS NULL
-                ORDER BY daysOverdue DESC
-                LIMIT 4
+                LEFT JOIN departments d ON sa.department_id = d.id
+                WHERE sa.parent_id IS NULL AND sa.end_date IS NOT NULL AND sa.end_date < CURDATE() AND sa.status != 'completed'
+                ORDER BY sa.end_date ASC
+                LIMIT 10
             `
     }) as any[];
 
-    // Compliance rate (departments with progress >= 75%)
-    const complianceRate = Math.round((complianceByUnit.filter(u => u.progress >= 75).length / (stats.totalUnits || 1)) * 100);
+    const stats = {
+      totalActivities: Number(row0?.totalActivities ?? 0),
+      overallProgress: Number(row0?.overallProgress ?? 0),
+      complianceRate,
+      onTrack: Number(row0?.onTrack ?? 0),
+      inProgress: Number(row0?.inProgress ?? 0),
+      delayed: Number(row0?.delayed ?? 0),
+      totalUnits: Number(row0?.totalUnits ?? 0),
+      riskAlerts: riskAlerts.length,
+      activeStaff: Number(row0?.activeStaff ?? 0),
+    };
 
     return NextResponse.json({
-      stats: {
-        ...stats,
-        complianceRate,
-        riskAlerts: riskAlerts.length
-      },
-      complianceByUnit,
-      riskAlerts: riskAlerts.map(r => ({
-        ...r,
-        status: r.statusLabel
+      stats,
+      complianceByUnit: (complianceByUnit as any[]).map((r: any) => ({
+        id: Number(r.id),
+        parent_id: r.parent_id != null ? Number(r.parent_id) : null,
+        unit_type: r.unit_type ?? null,
+        department: r.department ?? '',
+        progress: Math.max(0, Math.min(100, Number(r.progress ?? 0))),
       })),
-      overdueActivities
+      riskAlerts: riskAlerts.map((r: any) => ({
+        id: r.id,
+        title: r.title,
+        department: r.department ?? '—',
+        daysPast: r.daysPast != null ? Number(r.daysPast) : undefined,
+        daysLeft: r.daysLeft != null ? Number(r.daysLeft) : undefined,
+        progress: Number(r.progress ?? 0),
+        status: r.statusLabel,
+      })),
+      overdueActivities: (overdueActivities as any[]).map((r: any) => ({
+        id: r.id,
+        title: r.title,
+        department: r.department ?? '—',
+        daysOverdue: Number(r.daysOverdue ?? 0),
+        progress: Number(r.progress ?? 0),
+      })),
     });
   } catch (error: any) {
     console.error('Principal Dashboard API Error:', error);

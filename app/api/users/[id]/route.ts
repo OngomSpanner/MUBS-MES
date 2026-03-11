@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { query } from '@/lib/db';
 import bcrypt from 'bcryptjs';
+import { cookies } from 'next/headers';
+import { verifyToken } from '@/lib/auth';
 
 export async function GET(
   request: Request,
@@ -36,20 +38,37 @@ export async function PUT(
 ) {
   const { id } = await params;
   try {
+    const cookieStore = await cookies();
+    const token = cookieStore.get('token')?.value;
+    if (!token) {
+      return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
+    }
+    verifyToken(token);
+
     const body = await request.json();
     const { full_name, email, role, department_id, status } = body;
 
-    if (!full_name || !email || !role || !department_id || !status) {
+    if (!full_name?.trim() || !email?.trim() || !role) {
       return NextResponse.json(
-        { message: 'Missing required fields' },
+        { message: 'Full name, email and role are required' },
         { status: 400 }
       );
     }
 
-    await query({
-      query: 'UPDATE users SET full_name = ?, email = ?, role = ?, department_id = ?, status = ? WHERE id = ?',
-      values: [full_name, email, role, department_id, status, id]
-    });
+    const roleStr = typeof role === 'string' ? role : (Array.isArray(role) ? role.join(',') : '');
+    const departmentId = department_id !== undefined && department_id !== '' ? Number(department_id) : null;
+
+    if (status !== undefined && status !== null && status !== '') {
+      await query({
+        query: 'UPDATE users SET full_name = ?, email = ?, role = ?, department_id = ?, status = ? WHERE id = ?',
+        values: [full_name.trim(), email.trim(), roleStr, departmentId, status, id]
+      });
+    } else {
+      await query({
+        query: 'UPDATE users SET full_name = ?, email = ?, role = ?, department_id = ? WHERE id = ?',
+        values: [full_name.trim(), email.trim(), roleStr, departmentId, id]
+      });
+    }
 
     return NextResponse.json({ message: 'User updated successfully' });
   } catch (error) {

@@ -1,36 +1,55 @@
 import { NextResponse } from 'next/server';
 import { query } from '@/lib/db';
+import { cookies } from 'next/headers';
+import { verifyToken } from '@/lib/auth';
+import { getVisibleDepartmentIds, inPlaceholders } from '@/lib/department-head';
 
 export async function GET() {
     try {
-        const departmentName = 'Faculty of Computing and Informatics';
+        const cookieStore = await cookies();
+        const token = cookieStore.get('token')?.value;
 
-        // Fetch all staff for the department
+        if (!token) {
+            return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
+        }
+
+        const decoded = verifyToken(token) as any;
+        if (!decoded || !decoded.userId) {
+            return NextResponse.json({ message: 'Invalid token' }, { status: 401 });
+        }
+
+        const departmentIds = await getVisibleDepartmentIds(decoded.userId);
+        if (departmentIds.length === 0) {
+            return NextResponse.json({ staff: [], alerts: [] });
+        }
+
+        const placeholders = inPlaceholders(departmentIds.length);
+
         const staff = await query({
             query: `
                 SELECT 
                     u.id,
                     u.full_name,
                     u.email,
-                    u.role,
+                    u.position,
                     u.leave_status,
                     u.contract_end_date,
-                    (SELECT COUNT(*) FROM strategic_activities WHERE assigned_to = u.id AND status != 'Completed') as active_tasks
+                    (SELECT COUNT(*) FROM activity_assignments WHERE assigned_to_user_id = u.id AND status NOT IN ('completed')) as active_tasks
                 FROM users u
-                WHERE u.department = ?
-                AND u.role != 'Admin' AND u.role != 'Principal'
+                WHERE u.department_id IN (${placeholders})
+                AND u.role NOT LIKE '%Admin%' AND u.role NOT LIKE '%Principal%'
             `,
-            values: [departmentName]
+            values: [...departmentIds]
         }) as any[];
 
         // HR Alerts
-        const alerts = staff.filter(s =>
+        const alerts = staff.filter((s: any) =>
             s.leave_status !== 'On Duty' ||
             (s.contract_end_date && new Date(s.contract_end_date).getTime() - new Date().getTime() < 30 * 24 * 3600 * 1000)
-        ).map(s => ({
+        ).map((s: any) => ({
             id: s.id,
             name: s.full_name,
-            role: s.role,
+            position: s.position,
             type: s.leave_status !== 'On Duty' ? 'Leave' : 'Contract',
             message: s.leave_status !== 'On Duty' ? `On ${s.leave_status}` : `Expires on ${new Date(s.contract_end_date).toLocaleDateString()}`,
             daysRemaining: s.contract_end_date ? Math.ceil((new Date(s.contract_end_date).getTime() - new Date().getTime()) / (1000 * 3600 * 24)) : null,

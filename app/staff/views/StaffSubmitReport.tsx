@@ -66,7 +66,7 @@ export default function StaffSubmitReport() {
             alert("Please select a task.");
             return;
         }
-        if (!description) {
+        if (!isDraft && !description) {
             alert("Please provide report details.");
             return;
         }

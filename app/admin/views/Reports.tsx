@@ -33,7 +33,10 @@ const getEvaluation = (rate: number) =>
 export default function ReportsView() {
     const [departmentSummaries, setUnitSummaries] = useState<DepartmentSummary[]>([]);
     const [staffEvaluations, setStaffEvaluations] = useState<StaffEvaluation[]>([]);
-    const [trendData, setTrendData] = useState<{ label: string; avg_progress: number }[]>([]);
+    const [strategicOverview, setStrategicOverview] = useState<{
+        byPillar: { pillar: string; label: string; avg_progress: number; count: number }[];
+        status: { completed: number; in_progress: number; delayed: number; pending: number };
+    } | null>(null);
     const [loadingUnits, setLoadingUnits] = useState(true);
     const [loadingStaff, setLoadingStaff] = useState(true);
     const [loadingTrend, setLoadingTrend] = useState(true);
@@ -43,6 +46,8 @@ export default function ReportsView() {
     const [dateFrom, setDateFrom] = useState('');
     const [dateTo, setDateTo] = useState('');
     const [activeTab, setActiveTab] = useState<'summary' | 'staff' | 'trends'>('summary');
+
+    const [departmentsList, setDepartmentsList] = useState<string[]>([]);
 
     // Pagination — Activity Summary
     const [departmentPage, setUnitPage] = useState(1);
@@ -54,6 +59,12 @@ export default function ReportsView() {
 
     useEffect(() => { setUnitPage(1); }, [summaryUnitFilter]);
     useEffect(() => { setStaffPage(1); }, [selectedUnit]);
+
+    useEffect(() => {
+        axios.get('/api/departments')
+            .then(({ data }) => setDepartmentsList((Array.isArray(data) ? data : []).map((d: any) => d.name)))
+            .catch(() => setDepartmentsList([]));
+    }, []);
 
     const fetchActivitySummary = async () => {
         setLoadingUnits(true);
@@ -108,14 +119,24 @@ export default function ReportsView() {
             .finally(() => setLoadingStaff(false));
     }, [selectedUnit]);
 
+    const fetchStrategicOverview = async () => {
+        setLoadingTrend(true);
+        try {
+            const { data } = await axios.get('/api/reports?type=strategic-plan-overview');
+            setStrategicOverview(data.data || null);
+        } catch (err) {
+            console.error('strategic-plan-overview error', err);
+            setStrategicOverview(null);
+        } finally {
+            setLoadingTrend(false);
+        }
+    };
+
     useEffect(() => {
-        axios.get('/api/reports?type=trend-analysis')
-            .then(({ data }) => {
-                setTrendData(data.data || []);
-            })
-            .catch(err => console.error('trend-analysis error', err))
-            .finally(() => setLoadingTrend(false));
-    }, []);
+        if (activeTab === 'trends') {
+            fetchStrategicOverview();
+        }
+    }, [activeTab]);
 
     const getScoreBadge = (score: string) => {
         const styles: { [key: string]: { bg: string; color: string } } = {
@@ -227,52 +248,120 @@ export default function ReportsView() {
         </div>
     );
 
-    const TrendChart = () => {
-        if (loadingTrend) return <div className="text-center p-5"><div className="spinner-border text-primary" /></div>;
-        if (!trendData.length) return <div className="text-center p-5 text-muted">No trend data available</div>;
-
-        const height = 200;
-        const width = 800;
-        const padding = 40;
-        const maxVal = 100;
-
-        const points = trendData.map((d, i) => {
-            const x = padding + (i * (width - 2 * padding) / (trendData.length - 1));
-            const y = height - padding - (d.avg_progress * (height - 2 * padding) / maxVal);
-            return { x, y, ...d };
+    // Performance Trends: status overview (donut-style counts) + progress by pillar (horizontal bars)
+    const StatusDonut = ({ status }: { status: { completed: number; in_progress: number; delayed: number; pending: number } }) => {
+        const total = status.completed + status.in_progress + status.delayed + status.pending;
+        if (total === 0) {
+            return (
+                <div className="d-flex flex-column align-items-center justify-content-center p-4 text-muted">
+                    <span className="material-symbols-outlined mb-2" style={{ fontSize: '48px' }}>donut_large</span>
+                    <span className="small">No activities yet</span>
+                </div>
+            );
+        }
+        const items = [
+            { key: 'completed', label: 'Completed', value: status.completed, color: '#10b981' },
+            { key: 'in_progress', label: 'In progress', value: status.in_progress, color: 'var(--mubs-blue)' },
+            { key: 'delayed', label: 'Delayed', value: status.delayed, color: '#ef4444' },
+            { key: 'pending', label: 'Not started', value: status.pending, color: '#94a3b8' },
+        ].filter((i) => i.value > 0);
+        const circumference = 2 * Math.PI * 42;
+        let offset = 0;
+        const segments = items.map((i) => {
+            const pct = i.value / total;
+            const strokeDasharray = `${pct * circumference} ${circumference}`;
+            const strokeDashoffset = -offset;
+            offset += pct * circumference;
+            return { ...i, strokeDasharray, strokeDashoffset };
         });
-
-        const pathD = `M ${points.map(p => `${p.x},${p.y}`).join(' L ')}`;
-
         return (
-            <div className="bg-white p-4 rounded-3 border" style={{ overflowX: 'auto' }}>
-                <h6 className="fw-bold mb-4 d-flex align-items-center gap-2">
-                    <span className="material-symbols-outlined text-primary">trending_up</span>
-                    Institution-wide Progress Trend (Last 90 Days)
+            <div className="d-flex flex-column align-items-center">
+                <svg width={120} height={120} viewBox="0 0 120 120" className="mb-2">
+                    <circle cx="60" cy="60" r="42" fill="none" stroke="#e2e8f0" strokeWidth="16" />
+                    {segments.map((seg) => (
+                        <circle
+                            key={seg.key}
+                            cx="60"
+                            cy="60"
+                            r="42"
+                            fill="none"
+                            stroke={seg.color}
+                            strokeWidth="16"
+                            strokeDasharray={seg.strokeDasharray}
+                            strokeDashoffset={seg.strokeDashoffset}
+                            transform="rotate(-90 60 60)"
+                        />
+                    ))}
+                    <text x="60" y="58" textAnchor="middle" style={{ fontSize: '18px', fontWeight: 700, fill: '#1e293b' }}>{total}</text>
+                    <text x="60" y="72" textAnchor="middle" style={{ fontSize: '10px', fill: '#64748b' }}>activities</text>
+                </svg>
+                <div className="d-flex flex-wrap gap-3 justify-content-center small">
+                    {items.map((i) => (
+                        <span key={i.key} className="d-flex align-items-center gap-1">
+                            <span style={{ width: 10, height: 10, borderRadius: 2, background: i.color }} />
+                            {i.label}: <strong>{i.value}</strong>
+                        </span>
+                    ))}
+                </div>
+            </div>
+        );
+    };
+
+    const PillarBarChart = ({ byPillar }: { byPillar: { pillar: string; label: string; avg_progress: number; count: number }[] }) => {
+        const maxVal = 100;
+        const barHeight = 28;
+        const gap = 12;
+        const labelWidth = 180;
+        const barMaxWidth = 320;
+        const height = byPillar.length * (barHeight + gap) - gap;
+        const colors = ['var(--mubs-blue)', '#0d9488', '#b45309', '#7c3aed'];
+        return (
+            <div className="bg-white p-4 rounded-3 border">
+                <h6 className="fw-bold mb-3 d-flex align-items-center gap-2">
+                    <span className="material-symbols-outlined text-primary">stacked_bar_chart</span>
+                    Progress by strategic pillar
                 </h6>
-                <svg width={width} height={height} style={{ overflow: 'visible' }}>
-                    {/* Grid lines */}
-                    {[0, 25, 50, 75, 100].map(h => {
-                        const y = height - padding - (h * (height - 2 * padding) / maxVal);
+                <p className="small text-muted mb-4">Average progress of main activities per pillar (Strategic Plan 2025–2030)</p>
+                <svg width={labelWidth + barMaxWidth + 60} height={height + 40} style={{ overflow: 'visible' }}>
+                    {byPillar.map((row, i) => {
+                        const y = 24 + i * (barHeight + gap);
+                        const w = (row.avg_progress / maxVal) * barMaxWidth;
                         return (
-                            <g key={h}>
-                                <line x1={padding} y1={y} x2={width - padding} y2={y} stroke="#e2e8f0" strokeDasharray="4" />
-                                <text x={padding - 10} y={y + 4} textAnchor="end" style={{ fontSize: '10px', fill: '#64748b' }}>{h}%</text>
+                            <g key={row.pillar}>
+                                <text x={0} y={y + barHeight / 2 + 4} textAnchor="start" style={{ fontSize: '12px', fill: '#334155', fontWeight: 500 }}>{row.label}</text>
+                                <rect x={labelWidth} y={y} width={barMaxWidth} height={barHeight} rx={4} fill="#f1f5f9" />
+                                <rect x={labelWidth} y={y} width={w} height={barHeight} rx={4} fill={colors[i % colors.length]} />
+                                <text x={labelWidth + barMaxWidth + 8} y={y + barHeight / 2 + 4} textAnchor="start" style={{ fontSize: '12px', fontWeight: 600, fill: '#1e293b' }}>{row.avg_progress}%{row.count > 0 ? ` (${row.count})` : ''}</text>
                             </g>
                         );
                     })}
-                    {/* Data line */}
-                    <path d={pathD} fill="none" stroke="var(--mubs-blue)" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
-                    {/* Dots */}
-                    {points.map((p, i) => (
-                        <g key={i}>
-                            <circle cx={p.x} cy={p.y} r="5" fill="var(--mubs-blue)" />
-                            <text x={p.x} y={height - 10} textAnchor="middle" style={{ fontSize: '10px', fill: '#64748b' }}>{p.label}</text>
-                            <text x={p.x} y={p.y - 10} textAnchor="middle" className="fw-bold" style={{ fontSize: '10px', fill: 'var(--mubs-blue)' }}>{p.avg_progress}%</text>
-                        </g>
-                    ))}
                 </svg>
             </div>
+        );
+    };
+
+    const StrategicTrendSection = () => {
+        if (loadingTrend) return <div className="text-center p-5"><div className="spinner-border text-primary" /></div>;
+        if (!strategicOverview) return <div className="text-center p-5 text-muted">Could not load strategic plan overview</div>;
+        const { byPillar, status } = strategicOverview;
+        return (
+            <>
+                <div className="row g-4 mb-4">
+                    <div className="col-12 col-md-4">
+                        <div className="bg-white p-4 rounded-3 border h-100">
+                            <h6 className="fw-bold mb-3 d-flex align-items-center gap-2">
+                                <span className="material-symbols-outlined text-primary">donut_large</span>
+                                Activity status
+                            </h6>
+                            <p className="small text-muted mb-3">Main activities by status</p>
+                            <StatusDonut status={status} />
+                        </div>
+                    </div>
+                    <div className="col-12 col-md-8">
+                        <PillarBarChart byPillar={byPillar} />
+                    </div>
+                </div>
+            </>
         );
     };
 
@@ -302,7 +391,7 @@ export default function ReportsView() {
                         <label className="fw-bold small mb-1">Impact Department</label>
                         <select className="form-select form-select-sm" value={summaryUnitFilter} onChange={e => setSummaryUnitFilter(e.target.value)}>
                             <option>All Departments</option>
-                            {departmentSummaries.map(u => <option key={u.department}>{u.department}</option>)}
+                            {departmentsList.map(name => <option key={name} value={name}>{name}</option>)}
                         </select>
                     </div>
                     <div className="col-md-3 d-flex align-items-end">
@@ -332,7 +421,11 @@ export default function ReportsView() {
                 </li>
             </ul>
 
-            {activeTab === 'trends' && <div className="mb-4"><TrendChart /></div>}
+            {activeTab === 'trends' && (
+                <div className="mb-4">
+                    <StrategicTrendSection />
+                </div>
+            )}
 
             {/* Report Cards - Only show if not on trends tab */}
             {activeTab === 'summary' && (
@@ -459,7 +552,16 @@ export default function ReportsView() {
                             <span className="material-symbols-outlined me-2" style={{ color: 'var(--mubs-blue)' }}>person_search</span>
                             Staff Evaluation Snapshots
                         </h5>
-                        <div className="d-flex gap-2">
+                        <div className="d-flex gap-2 flex-wrap align-items-center">
+                            <select
+                                className="form-select form-select-sm"
+                                style={{ width: '180px' }}
+                                value={selectedUnit}
+                                onChange={e => setSelectedUnit(e.target.value)}
+                            >
+                                <option>All Departments</option>
+                                {departmentsList.map(name => <option key={name} value={name}>{name}</option>)}
+                            </select>
                             <button
                                 className="btn btn-sm btn-primary fw-bold"
                                 style={{ background: 'var(--mubs-blue)', borderColor: 'var(--mubs-blue)' }}

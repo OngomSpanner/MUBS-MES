@@ -120,8 +120,8 @@ export default function StaffDashboard() {
                     <StatCard
                         icon="grade"
                         label="Average Score"
-                        value="4.5"
-                        badge="Excellent"
+                        value={data?.averageScore != null ? String(data.averageScore) : '—'}
+                        badge={data?.averageScore != null ? (data.averageScore >= 4 ? 'Excellent' : data.averageScore >= 3 ? 'Good' : 'Improving') : 'No ratings'}
                         badgeIcon="verified"
                         color="green"
                     />
@@ -333,7 +333,7 @@ export default function StaffDashboard() {
                         </div>
                         <div className="p-4 pt-0">
                             {feedbackList.map((feedback, index) => (
-                                <div key={index} className="feedback-premium-card p-3 rounded-4 mb-3" style={{
+                                <div key={feedback.id ?? index} className="feedback-premium-card p-3 rounded-4 mb-3" style={{
                                     background: 'linear-gradient(135deg, #f0fdf4 0%, #ffffff 100%)',
                                     border: '1px solid #dcfce7',
                                     boxShadow: '0 2px 8px rgba(0,0,0,0.02)'
@@ -341,7 +341,7 @@ export default function StaffDashboard() {
                                     <div className="d-flex align-items-center justify-content-between mb-2">
                                         <div className="fw-black text-dark text-truncate" style={{ fontSize: '.9rem', maxWidth: '180px' }}>{feedback.task}</div>
                                         <div className="d-flex align-items-center gap-1">
-                                            <span className="fw-black" style={{ color: '#15803d', fontSize: '1rem' }}>{feedback.score.toFixed(1)}</span>
+                                            <span className="fw-black" style={{ color: '#15803d', fontSize: '1rem' }}>{(feedback.score ?? 0).toFixed(1)}</span>
                                             <span className="material-symbols-outlined" style={{ fontSize: '16px', color: '#fbbf24', fontVariationSettings: "'FILL' 1" }}>star</span>
                                         </div>
                                     </div>

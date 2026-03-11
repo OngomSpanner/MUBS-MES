@@ -17,54 +17,90 @@ export async function GET() {
       return NextResponse.json({ message: 'Invalid token' }, { status: 401 });
     }
 
-    // Must be auth'd, ideally check Admin role but letting UI handle auth guards for now
+    let rows: any[];
+    const sqlWithPosition = `
+      SELECT 
+        cp.id,
+        cp.committee_type,
+        cp.title,
+        cp.minute_reference,
+        cp.description,
+        cp.submitted_by,
+        cp.department_id,
+        cp.budget,
+        cp.pillar_id,
+        cp.status,
+        cp.implementation_status,
+        cp.submitted_date,
+        cp.reviewed_date,
+        cp.reviewer_notes,
+        cp.created_at,
+        cp.committee_position,
+        u.full_name AS submitted_by_name,
+        d.name AS department_name
+      FROM committee_proposals cp
+      LEFT JOIN users u ON cp.submitted_by = u.id
+      LEFT JOIN departments d ON cp.department_id = d.id
+      ORDER BY cp.created_at DESC
+    `;
+    const sqlWithoutPosition = `
+      SELECT 
+        cp.id,
+        cp.committee_type,
+        cp.title,
+        cp.minute_reference,
+        cp.description,
+        cp.submitted_by,
+        cp.department_id,
+        cp.budget,
+        cp.pillar_id,
+        cp.status,
+        cp.implementation_status,
+        cp.submitted_date,
+        cp.reviewed_date,
+        cp.reviewer_notes,
+        cp.created_at,
+        u.full_name AS submitted_by_name,
+        d.name AS department_name
+      FROM committee_proposals cp
+      LEFT JOIN users u ON cp.submitted_by = u.id
+      LEFT JOIN departments d ON cp.department_id = d.id
+      ORDER BY cp.created_at DESC
+    `;
 
-    // Fetch proposals (strategic activities created by committee members)
-    // Note: For now, we assume ALL activities with a 'Pending' or 'Rejected' status, or where committee_suggestion is not null
-    // were proposals. Or simply we fetch all activities. To match the view, we join users and departments.
+    try {
+      rows = (await query({ query: sqlWithPosition, values: [] })) as any[];
+    } catch (qErr: any) {
+      const msg = String(qErr?.message || '');
+      if (msg.includes('committee_position') || (qErr as any)?.code === 'ER_BAD_FIELD_ERROR') {
+        rows = (await query({ query: sqlWithoutPosition, values: [] })) as any[];
+      } else {
+        throw qErr;
+      }
+    }
 
-    const sql = `
-            SELECT 
-                s.id, 
-                s.title, 
-                s.description, 
-                s.status, 
-                s.priority,
-                DATE_FORMAT(s.created_at, '%d-%b-%Y') as submitted_date,
-                s.meeting_reference as minute_reference,
-                s.proposal_kpi as implementation_status,
-                u.full_name as submitted_by,
-                u.role as committee_type, 
-                un.name as department,
-                15000000 as budget, /* mock budget for UI consistency until field is added */
-                s.pillar /* using the generic pillar string if we had one */
-            FROM strategic_activities s
-            LEFT JOIN users u ON s.created_by = u.id
-            LEFT JOIN departments un ON s.committee_suggestion_department_id = un.id
-            WHERE s.parent_id IS NULL AND u.role LIKE '%Committee Member%'
-            ORDER BY s.created_at DESC
-        `;
-
-    const proposals = await query({ query: sql, values: [] }) as any[];
-
-    // Map data to precisely fit the 'Proposal' TypeScript interface expected by AdminCommittee.tsx
-    const formattedProposals = proposals.map(p => ({
+    const proposals = rows.map((p) => ({
       id: p.id,
       title: p.title,
-      submitted_by: p.submitted_by || 'Unknown',
-      department: p.department || 'Not specified',
-      submitted_date: p.submitted_date,
-      budget: p.budget || 0,
-      status: p.status, // e.g. Pending, Approved, Rejected
-      description: p.description,
-      committee_type: p.committee_type === 'Committee Member' ? 'Academic Board' : (p.committee_type || 'Other'), // Mock mapping for UI dropdown filters
+      committee_type: p.committee_type || 'Other',
       minute_reference: p.minute_reference,
-      pillar_title: p.pillar || 'Strategic Alignment Pending',
-      implementation_status: p.implementation_status || ''
+      description: p.description,
+      submitted_by: p.submitted_by_name?.trim() || (p.submitted_by != null ? `User #${p.submitted_by}` : 'Unknown'),
+      submitted_by_id: p.submitted_by,
+      committee_position: p.committee_position ?? null,
+      department: p.department_name || 'Not specified',
+      department_id: p.department_id,
+      budget: p.budget != null ? Number(p.budget) : 0,
+      pillar_id: p.pillar_id,
+      status: p.status || 'Pending',
+      implementation_status: p.implementation_status || 'Pending',
+      submitted_date: p.submitted_date ? (typeof p.submitted_date === 'string' ? p.submitted_date.split('T')[0] : p.submitted_date) : null,
+      reviewed_date: p.reviewed_date ? (typeof p.reviewed_date === 'string' ? p.reviewed_date.split('T')[0] : p.reviewed_date) : null,
+      reviewer_notes: p.reviewer_notes,
+      created_at: p.created_at
     }));
 
-    return NextResponse.json(formattedProposals);
-
+    return NextResponse.json(proposals);
   } catch (error: any) {
     console.error('Admin Proposals API Error:', error);
     return NextResponse.json(

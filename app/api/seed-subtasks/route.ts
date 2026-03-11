@@ -21,7 +21,7 @@ export async function GET() {
                 query: `
                     INSERT INTO strategic_activities 
                     (title, pillar, department_id, status, priority, parent_id, progress, assigned_to, description, start_date, end_date) 
-                    VALUES (?, 'Infrastructure', 1, ?, ?, 1, ?, ?, ?, DATE_SUB(CURDATE(), INTERVAL 7 DAY), DATE_ADD(CURDATE(), INTERVAL 14 DAY))
+                    VALUES (?, 'Human Capital & Sustainability', 1, ?, ?, 1, ?, ?, ?, DATE_SUB(CURDATE(), INTERVAL 7 DAY), DATE_ADD(CURDATE(), INTERVAL 14 DAY))
                 `,
                 values: [
                     task.title,

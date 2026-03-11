@@ -14,6 +14,7 @@ interface DepartmentProgress {
 }
 
 interface Alert {
+    activity_id?: number;
     title: string;
     description: string;
     days: number;
@@ -52,6 +53,7 @@ export default function TrackingView() {
     const [escalateTarget, setEscalateTarget] = useState<DelayedActivity | null>(null);
     const [showEscalate, setShowEscalate] = useState(false);
     const [escalating, setEscalating] = useState(false);
+    const [remindingId, setRemindingId] = useState<number | null>(null);
 
     useEffect(() => { setUnitPage(1); }, [healthFilter]);
     useEffect(() => { setDelayedPage(1); }, [delayedUnitFilter]);
@@ -93,7 +95,27 @@ export default function TrackingView() {
     const delayedTotalPages = Math.max(1, Math.ceil(filteredDelayed.length / DELAYED_PAGE_SIZE));
     const paginatedDelayed = filteredDelayed.slice((delayedPage - 1) * DELAYED_PAGE_SIZE, delayedPage * DELAYED_PAGE_SIZE);
 
-    const sendReminder = (title: string) => alert(`Reminder sent for: ${title}`);
+    const sendReminder = async (title: string, activityId?: number) => {
+        if (activityId == null) {
+            const act = delayedActivities.find(a => a.title === title);
+            activityId = act?.id;
+        }
+        if (activityId == null) {
+            alert('Activity not found.');
+            return;
+        }
+        setRemindingId(activityId);
+        try {
+            const res = await axios.post('/api/tracking/reminder', { activity_id: activityId, title }, { withCredentials: true });
+            alert(res.data?.message ?? `Reminder sent for: ${title}`);
+        } catch (e: any) {
+            console.error(e);
+            const msg = e.response?.data?.message ?? e.response?.data?.detail ?? 'Failed to send reminder.';
+            alert(msg);
+        } finally {
+            setRemindingId(null);
+        }
+    };
 
     const openEscalate = (activity: DelayedActivity) => {
         setEscalateTarget(activity);
@@ -103,16 +125,26 @@ export default function TrackingView() {
     const confirmEscalate = async () => {
         if (!escalateTarget) return;
         setEscalating(true);
-        // Here you would call your escalation API; for now we simulate a brief delay
-        await new Promise(r => setTimeout(r, 800));
-        setEscalating(false);
-        setShowEscalate(false);
-        setEscalateTarget(null);
-        alert(`Escalation submitted for: ${escalateTarget.title}`);
+        try {
+            const res = await axios.post('/api/tracking/escalate', {
+                activity_id: escalateTarget.id,
+                title: escalateTarget.title
+            });
+            alert(res.data?.message ?? `Escalation submitted for: ${escalateTarget.title}`);
+            setShowEscalate(false);
+            setEscalateTarget(null);
+            fetchTrackingData();
+        } catch (e) {
+            console.error(e);
+            alert('Failed to submit escalation.');
+        } finally {
+            setEscalating(false);
+        }
     };
 
     return (
         <Layout>
+            {summary.delayed > 0 && (
             <div className="alert alert-danger alert-strip alert-dismissible fade show mb-4 d-flex align-items-center gap-2" role="alert">
                 <span className="material-symbols-outlined">alarm</span>
                 <div>
@@ -121,6 +153,7 @@ export default function TrackingView() {
                 </div>
                 <button type="button" className="btn-close ms-auto" data-bs-dismiss="alert"></button>
             </div>
+            )}
 
             {/* Stat Cards */}
             <div className="row g-4 mb-4">
@@ -318,9 +351,11 @@ export default function TrackingView() {
                                         <button
                                             className={`btn btn-xs py-0 px-2 mt-1 ${al.type === 'overdue' ? 'btn-danger' : 'btn-warning'}`}
                                             style={{ fontSize: '.72rem' }}
-                                            onClick={() => sendReminder(al.title)}
+                                            onClick={() => sendReminder(al.title, al.activity_id)}
+                                            disabled={remindingId != null || al.activity_id == null}
+                                            title={al.activity_id == null ? 'Activity not linked' : undefined}
                                         >
-                                            {al.type === 'overdue' ? 'Send Reminder' : 'Notify Department'}
+                                            {remindingId === al.activity_id ? 'Sending...' : (al.type === 'overdue' ? 'Send Reminder' : 'Notify Department')}
                                         </button>
                                     </div>
                                 </div>
@@ -414,9 +449,10 @@ export default function TrackingView() {
                                             <button
                                                 className="btn btn-xs btn-warning py-0 px-2 fw-bold text-dark"
                                                 style={{ fontSize: '.75rem' }}
-                                                onClick={() => sendReminder(activity.title)}
+                                                onClick={() => sendReminder(activity.title, activity.id)}
+                                                disabled={remindingId != null}
                                             >
-                                                Remind
+                                                {remindingId === activity.id ? 'Sending...' : 'Remind'}
                                             </button>
                                         )}
                                     </td>

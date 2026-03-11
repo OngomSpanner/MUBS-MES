@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import axios from 'axios';
 import StatCard from '@/components/StatCard';
 
@@ -12,9 +13,9 @@ interface Submission {
     submitted_at: string;
     status: string;
     progress: number;
-    score: number;
-    description: string;
-    reviewer_notes: string;
+    score?: number;
+    description?: string;
+    reviewer_notes?: string;
 }
 
 interface SubmissionData {
@@ -34,8 +35,10 @@ interface SubmissionData {
 }
 
 export default function DepartmentSubmissions() {
+    const router = useRouter();
     const [data, setData] = useState<SubmissionData | null>(null);
     const [loading, setLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
     const [statusFilter, setStatusFilter] = useState('All Status');
     const [staffFilter, setStaffFilter] = useState('All Staff');
     const [selectedItem, setSelectedItem] = useState<Submission | null>(null);
@@ -45,14 +48,29 @@ export default function DepartmentSubmissions() {
             try {
                 const response = await axios.get('/api/department-head/submissions');
                 setData(response.data);
-            } catch (error) {
+            } catch (error: any) {
                 console.error('Error fetching department submissions:', error);
+                setError(error.response?.data?.message || 'Failed to load submissions. Please try again.');
             } finally {
                 setLoading(false);
             }
         };
         fetchData();
     }, []);
+
+    if (error) {
+        return (
+            <div className="container mt-5">
+                <div className="alert alert-danger shadow-sm border-0 d-flex align-items-center gap-3 p-4" role="alert">
+                    <span className="material-symbols-outlined fs-2 text-danger">error</span>
+                    <div>
+                        <h5 className="alert-heading text-danger fw-bold mb-1">Error Loading Submissions</h5>
+                        <p className="mb-0 text-dark opacity-75">{error}</p>
+                    </div>
+                </div>
+            </div>
+        );
+    }
 
     if (loading || !data) {
         return (
@@ -65,7 +83,7 @@ export default function DepartmentSubmissions() {
     }
 
     const filteredSubmissions = data.submissions.filter(s => {
-        const matchesStatus = statusFilter === 'All Status' || s.status === statusFilter;
+        const matchesStatus = statusFilter === 'All Status' || s.status === statusFilter || (statusFilter === 'Pending' && s.status === 'Under Review');
         const matchesStaff = staffFilter === 'All Staff' || s.staff_name === staffFilter;
         return matchesStatus && matchesStaff;
     });
@@ -179,10 +197,7 @@ export default function DepartmentSubmissions() {
                             {selectedItem?.status === 'Pending' || selectedItem?.status === 'Under Review' ? (
                                 <button type="button" className="btn btn-primary fw-bold shadow-sm d-flex align-items-center gap-2" style={{ borderRadius: '8px' }} onClick={() => {
                                     setSelectedItem(null);
-                                    const params = new URLSearchParams(window.location.search);
-                                    params.set('pg', 'evaluations');
-                                    window.history.pushState(null, '', `?${params.toString()}`);
-                                    window.dispatchEvent(new Event('popstate'));
+                                    router.push('/department-head?pg=evaluations');
                                 }}>
                                     <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>rate_review</span>
                                     Evaluate Submission

@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { query } from '@/lib/db';
 import { cookies } from 'next/headers';
 import { verifyToken } from '@/lib/auth';
+import { getVisibleDepartmentIds, inPlaceholders } from '@/lib/department-head';
 
 export async function GET() {
     try {
@@ -17,45 +18,61 @@ export async function GET() {
             return NextResponse.json({ message: 'Invalid token' }, { status: 401 });
         }
 
-        // 1. Get user's department
-        const users = await query({
-            query: 'SELECT department FROM users WHERE id = ?',
-            values: [decoded.userId]
-        }) as any[];
-
-        if (users.length === 0 || !users[0].department) {
+        const departmentIds = await getVisibleDepartmentIds(decoded.userId);
+        if (departmentIds.length === 0) {
             return NextResponse.json({ activities: [], stats: { total: 0, onTrack: 0, inProgress: 0, delayed: 0 } });
         }
 
-        const userDept = users[0].department;
+        const placeholders = inPlaceholders(departmentIds.length);
 
-        // 2. Get department ID
-        const departments = await query({
-            query: 'SELECT id FROM departments WHERE name = ?',
-            values: [userDept]
-        }) as any[];
-
-        if (departments.length === 0) {
-            return NextResponse.json({ activities: [], stats: { total: 0, onTrack: 0, inProgress: 0, delayed: 0 } });
-        }
-
-        const departmentId = departments[0].id;
-
-        // Fetch all activities for the mapped department
-        const activities = await query({
+        // Fetch main activities (parent_id IS NULL) for visible departments
+        const mainQuery = await query({
             query: `
                 SELECT 
                     sa.*,
                     u.name as unit_name,
                     (SELECT COUNT(*) FROM strategic_activities WHERE parent_id = sa.id) as total_tasks,
-                    (SELECT COUNT(*) FROM strategic_activities WHERE parent_id = sa.id AND status = 'Completed') as completed_tasks
+                    (SELECT COUNT(*) FROM strategic_activities WHERE parent_id = sa.id AND status = 'completed') as completed_tasks,
+                    NULL as parent_title
                 FROM strategic_activities sa
                 LEFT JOIN departments u ON sa.department_id = u.id
-                WHERE sa.department_id = ? AND sa.parent_id IS NULL
+                WHERE sa.department_id IN (${placeholders}) AND sa.parent_id IS NULL
                 ORDER BY sa.end_date ASC
             `,
-            values: [departmentId]
+            values: [...departmentIds]
         }) as any[];
+
+        // Fetch detailed/child activities in visible departments
+        const childQuery = await query({
+            query: `
+                SELECT 
+                    sa.*,
+                    u.name as unit_name,
+                    1 as total_tasks,
+                    IF(sa.status = 'completed', 1, 0) as completed_tasks,
+                    p.title as parent_title
+                FROM strategic_activities sa
+                LEFT JOIN departments u ON sa.department_id = u.id
+                LEFT JOIN strategic_activities p ON sa.parent_id = p.id
+                WHERE sa.department_id IN (${placeholders}) AND sa.parent_id IS NOT NULL
+                ORDER BY sa.end_date ASC
+            `,
+            values: [...departmentIds]
+        }) as any[];
+
+        const activitiesQuery = [...mainQuery, ...childQuery];
+
+        const dbStatusMap: Record<string, string> = {
+            'pending': 'Not Started',
+            'in_progress': 'In Progress',
+            'completed': 'On Track',
+            'overdue': 'Delayed'
+        };
+
+        const activities = activitiesQuery.map((a: any) => ({
+            ...a,
+            status: dbStatusMap[a.status] || a.status
+        }));
 
         // Calculate stats
         const stats = {

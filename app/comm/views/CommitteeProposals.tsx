@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import { Modal, Button } from 'react-bootstrap';
+import { STRATEGIC_PILLARS_2025_2030 } from '@/lib/strategic-plan';
 
 export default function CommitteeProposals({ status }: { status: string }) {
     const [showModal, setShowModal] = useState(false);
@@ -32,7 +33,7 @@ export default function CommitteeProposals({ status }: { status: string }) {
                                     <input type="text" className="form-control" placeholder="Search proposals..." />
                                 </div>
                                 <select className="form-select form-select-sm" style={{ width: '140px' }}><option>All Status</option><option>Pending</option><option>Approved</option><option>Rejected</option></select>
-                                <select className="form-select form-select-sm" style={{ width: '160px' }}><option>All Pillars</option><option>Teaching &amp; Learning</option><option>Research &amp; Innovation</option><option>Infrastructure</option><option>Governance</option></select>
+                                <select className="form-select form-select-sm" style={{ width: '160px' }}><option>All Pillars</option>{STRATEGIC_PILLARS_2025_2030.map((p) => (<option key={p} value={p}>{p}</option>))}</select>
                                 <a href="/committee?pg=propose" className="btn btn-sm fw-bold text-white d-flex align-items-center" style={{ background: '#7c3aed' }}>
                                     <span className="material-symbols-outlined me-1" style={{ fontSize: '15px' }}>add</span>New Proposal
                                 </a>

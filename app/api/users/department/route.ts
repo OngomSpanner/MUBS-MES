@@ -17,22 +17,24 @@ export async function GET() {
             return NextResponse.json({ message: 'Invalid token' }, { status: 401 });
         }
 
-        // 1. First get the logged-in user's department
+        // 1. First get the logged-in user's department and role
         const me = await query({
-            query: 'SELECT department FROM users WHERE id = ?',
+            query: 'SELECT department_id, role FROM users WHERE id = ?',
             values: [decoded.userId]
         }) as any[];
 
-        if (me.length === 0 || !me[0].department) {
+        if (me.length === 0 || !me[0].department_id) {
             return NextResponse.json([]);
         }
 
-        const myDept = me[0].department;
+        const myDept = me[0].department_id;
+        const myRole = (me[0].role || '').toLowerCase();
+        const isHod = myRole === 'hod';
 
-        // 2. Query for all users assigned to that department
+        // 2. Department users: id, full_name, position. If HOD, exclude self so they can only assign to staff.
         const deptUsers = await query({
-            query: 'SELECT id, full_name, role FROM users WHERE department = ? ORDER BY full_name ASC',
-            values: [myDept]
+            query: `SELECT id, full_name, position FROM users WHERE department_id = ? ${isHod ? 'AND id != ?' : ''} ORDER BY full_name ASC`,
+            values: isHod ? [myDept, decoded.userId] : [myDept]
         }) as any[];
 
         return NextResponse.json(deptUsers);

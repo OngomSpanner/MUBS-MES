@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Modal, Button, Form } from 'react-bootstrap';
+import { formatRoleForDisplay } from '@/lib/role-routing';
 
 interface CreateUserModalProps {
   show: boolean;
@@ -9,22 +10,68 @@ interface CreateUserModalProps {
   onUserCreated: () => void;
 }
 
+interface Department {
+  id: number;
+  name: string;
+}
+
 export default function CreateUserModal({ show, onHide, onUserCreated }: CreateUserModalProps) {
   const [formData, setFormData] = useState({
     full_name: '',
     email: '',
-    role: 'Staff',
-    department: '',
+    role: '',
+    department_id: '' as string | number,
     password: ''
   });
+  const [roles, setRoles] = useState<string[]>([]);
+  const [departments, setDepartments] = useState<Department[]>([]);
+  const [loadingOptions, setLoadingOptions] = useState(false);
+
+  useEffect(() => {
+    if (!show) return;
+    const load = async () => {
+      setLoadingOptions(true);
+      try {
+        const [rolesRes, deptRes] = await Promise.all([
+          fetch('/api/users/roles'),
+          fetch('/api/departments')
+        ]);
+        if (rolesRes.ok) {
+          const data = await rolesRes.json();
+          setRoles(data.roles || []);
+        }
+        if (deptRes.ok) {
+          const list = await deptRes.json();
+          setDepartments(Array.isArray(list) ? list : []);
+        }
+      } catch (e) {
+        console.error('Error loading roles/departments', e);
+      } finally {
+        setLoadingOptions(false);
+      }
+    };
+    load();
+  }, [show]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    const roleList = formData.role ? formData.role.split(',').map((r) => r.trim()).filter(Boolean) : [];
+    if (roleList.length === 0) {
+      alert('Please select at least one role.');
+      return;
+    }
+    const departmentId = formData.department_id === '' ? null : Number(formData.department_id);
     try {
       const response = await fetch('/api/users', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData)
+        body: JSON.stringify({
+          full_name: formData.full_name,
+          email: formData.email,
+          password: formData.password || undefined,
+          role: roleList.join(','),
+          department_id: departmentId
+        })
       });
 
       if (response.ok) {
@@ -33,13 +80,17 @@ export default function CreateUserModal({ show, onHide, onUserCreated }: CreateU
         setFormData({
           full_name: '',
           email: '',
-          role: 'Staff',
-          department: '',
+          role: '',
+          department_id: '',
           password: ''
         });
+      } else {
+        const data = await response.json().catch(() => ({}));
+        alert(data.message || 'Failed to create user.');
       }
     } catch (error) {
       console.error('Error creating user:', error);
+      alert('Failed to create user.');
     }
   };
 
@@ -77,38 +128,49 @@ export default function CreateUserModal({ show, onHide, onUserCreated }: CreateU
             <div className="col-12">
               <Form.Label className="fw-bold small">Assign Roles (Select all that apply)</Form.Label>
               <div className="d-flex flex-wrap gap-2 p-2 border rounded bg-light">
-                {['System Administrator', 'Strategy Manager', 'Department Head', 'HOD', 'Committee Member', 'Staff'].map(r => (
-                  <div key={r} className="form-check">
-                    <input
-                      type="checkbox"
-                      className="form-check-input"
-                      id={`role-${r}`}
-                      checked={formData.role.split(',').map(x => x.trim()).includes(r)}
-                      onChange={e => {
-                        const roles = formData.role.split(',').map(x => x.trim()).filter(Boolean);
-                        const newRoles = e.target.checked
-                          ? [...roles, r]
-                          : roles.filter(x => x !== r);
-                        setFormData({ ...formData, role: newRoles.join(', ') });
-                      }}
-                    />
-                    <label className="form-check-label small" htmlFor={`role-${r}`}>{r}</label>
-                  </div>
-                ))}
+                {loadingOptions ? (
+                  <span className="text-muted small">Loading roles...</span>
+                ) : roles.length === 0 ? (
+                  <span className="text-muted small">No roles available.</span>
+                ) : (
+                  roles.map((r) => {
+                    const roleList = formData.role ? formData.role.split(',').map((x) => x.trim()).filter(Boolean) : [];
+                    const checked = roleList.includes(r);
+                    return (
+                      <div key={r} className="form-check">
+                        <input
+                          type="checkbox"
+                          className="form-check-input"
+                          id={`role-${r}`}
+                          checked={checked}
+                          onChange={(e) => {
+                            const newRoles = e.target.checked
+                              ? [...roleList, r]
+                              : roleList.filter((x) => x !== r);
+                            setFormData({ ...formData, role: newRoles.join(',') });
+                          }}
+                        />
+                        <label className="form-check-label small" htmlFor={`role-${r}`}>
+                          {formatRoleForDisplay(r)}
+                        </label>
+                      </div>
+                    );
+                  })
+                )}
               </div>
             </div>
             <div className="col-md-6">
-              <Form.Label className="fw-bold small">Department / Department</Form.Label>
+              <Form.Label className="fw-bold small">Department</Form.Label>
               <Form.Select
-                value={formData.department}
-                onChange={(e) => setFormData({ ...formData, department: e.target.value })}
+                value={formData.department_id === '' ? '' : String(formData.department_id)}
+                onChange={(e) => setFormData({ ...formData, department_id: e.target.value === '' ? '' : Number(e.target.value) })}
               >
-                <option>Faculty of Computing</option>
-                <option>Faculty of Commerce</option>
-                <option>School of Grad Studies</option>
-                <option>Finance & Admin</option>
-                <option>Research & Innovation</option>
-                <option>eLearning Centre</option>
+                <option value="">Select department</option>
+                {departments.map((d) => (
+                  <option key={d.id} value={d.id}>
+                    {d.name}
+                  </option>
+                ))}
               </Form.Select>
             </div>
             <div className="col-12">

@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import Layout from '@/components/Layout';
 import { Modal, Button, Form } from 'react-bootstrap';
 import CreateUserModal from '@/components/Modals/CreateUserModal';
+import { formatRoleForDisplay } from '@/lib/role-routing';
 import axios from 'axios';
 
 interface User {
@@ -11,6 +12,7 @@ interface User {
     full_name: string;
     email: string;
     role: string;
+    department_id: number | null;
     department: string;
     status: string;
     created_date: string;
@@ -29,12 +31,14 @@ export default function UsersView() {
     const [stats, setStats] = useState<UserStats>({ total: 0, active: 0, suspended: 0, definedRoles: 0 });
     const [showCreateModal, setShowCreateModal] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
-    const [roleFilter, setRoleFilter] = useState('All Roles');
+    const [roleFilter, setRoleFilter] = useState('');
+    const [rolesList, setRolesList] = useState<string[]>([]);
 
     // Edit modal state
     const [selectedUser, setSelectedUser] = useState<User | null>(null);
     const [showEditModal, setShowEditModal] = useState(false);
-    const [editForm, setEditForm] = useState({ full_name: '', email: '', role: '', department: '', status: '' });
+    const [editForm, setEditForm] = useState({ full_name: '', email: '', role: '', department_id: '' as string | number });
+    const [departments, setDepartments] = useState<{ id: number; name: string }[]>([]);
     const [saving, setSaving] = useState(false);
 
     // Delete modal state
@@ -52,6 +56,30 @@ export default function UsersView() {
     useEffect(() => { fetchUsers(); }, [searchTerm, roleFilter]);
     useEffect(() => { fetchStats(); }, []);
 
+    useEffect(() => {
+        const loadRoles = async () => {
+            try {
+                const { data } = await axios.get('/api/users/roles');
+                setRolesList(data.roles || []);
+            } catch (e) {
+                console.error('Error loading roles for filter', e);
+            }
+        };
+        loadRoles();
+    }, []);
+
+    useEffect(() => {
+        const loadDepartments = async () => {
+            try {
+                const { data } = await axios.get('/api/departments');
+                setDepartments(Array.isArray(data) ? data : []);
+            } catch (e) {
+                console.error('Error loading departments', e);
+            }
+        };
+        loadDepartments();
+    }, []);
+
     const fetchStats = async () => {
         try {
             const { data } = await axios.get('/api/users/stats');
@@ -65,7 +93,7 @@ export default function UsersView() {
         try {
             const params = new URLSearchParams();
             if (searchTerm) params.append('search', searchTerm);
-            if (roleFilter !== 'All Roles') params.append('role', roleFilter);
+            if (roleFilter) params.append('role', roleFilter);
             const response = await axios.get(`/api/users?${params.toString()}`);
             setUsers(response.data);
         } catch (error) {
@@ -81,8 +109,7 @@ export default function UsersView() {
             full_name: user.full_name,
             email: user.email,
             role: user.role,
-            department: user.department,
-            status: user.status
+            department_id: user.department_id != null ? user.department_id : ''
         });
         setShowEditModal(true);
     };
@@ -91,12 +118,19 @@ export default function UsersView() {
         if (!selectedUser) return;
         setSaving(true);
         try {
-            await axios.put(`/api/users/${selectedUser.id}`, editForm);
+            const payload = {
+                full_name: editForm.full_name.trim(),
+                email: editForm.email.trim(),
+                role: editForm.role,
+                department_id: editForm.department_id === '' ? null : Number(editForm.department_id)
+            };
+            await axios.put(`/api/users/${selectedUser.id}`, payload);
             setShowEditModal(false);
             fetchUsers();
             fetchStats();
-        } catch (error) {
+        } catch (error: any) {
             console.error('Error updating user:', error);
+            alert(error.response?.data?.message ?? 'Failed to update user.');
         } finally {
             setSaving(false);
         }
@@ -224,17 +258,14 @@ export default function UsersView() {
                         </div>
                         <select
                             className="form-select form-select-sm"
-                            style={{ width: '140px' }}
+                            style={{ width: '180px' }}
                             value={roleFilter}
                             onChange={(e) => setRoleFilter(e.target.value)}
                         >
-                            <option>All Roles</option>
-                            <option>System Administrator</option>
-                            <option>Strategy Manager</option>
-                            <option>Department Head</option>
-                            <option>HOD</option>
-                            <option>Committee Member</option>
-                            <option>Staff</option>
+                            <option value="">All Roles</option>
+                            {rolesList.map((r) => (
+                                <option key={r} value={r}>{formatRoleForDisplay(r)}</option>
+                            ))}
                         </select>
                         <button className="btn btn-sm create-btn" onClick={() => setShowCreateModal(true)}>
                             <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>person_add</span>
@@ -249,7 +280,7 @@ export default function UsersView() {
                                 <th>User</th>
                                 <th>Email</th>
                                 <th>Role</th>
-                                <th>Department / Department</th>
+                                <th>Department/Unit</th>
                                 <th>Actions</th>
                             </tr>
                         </thead>
@@ -288,11 +319,12 @@ export default function UsersView() {
                                                 <div className="d-flex flex-wrap gap-1">
                                                     {(user.role || '').split(',').map((r, i) => {
                                                         const cleanRole = r.trim();
-                                                        const roleStyle = getRoleBadge(cleanRole);
+                                                        const displayRole = formatRoleForDisplay(cleanRole);
+                                                        const roleStyle = getRoleBadge(displayRole);
                                                         return (
                                                             <span key={i} className="role-badge" style={{ background: roleStyle.bg, color: roleStyle.color }}>
-                                                                <span className="material-symbols-outlined" style={{ fontSize: '14px' }}>{getRoleIcon(cleanRole)}</span>
-                                                                {cleanRole}
+                                                                <span className="material-symbols-outlined" style={{ fontSize: '14px' }}>{getRoleIcon(displayRole)}</span>
+                                                                {displayRole}
                                                             </span>
                                                         );
                                                     })}
@@ -375,42 +407,39 @@ export default function UsersView() {
                         <div className="col-12">
                             <Form.Label className="fw-bold small">Roles (Select all that apply)</Form.Label>
                             <div className="d-flex flex-wrap gap-2 p-2 border rounded bg-light">
-                                {['System Administrator', 'Strategy Manager', 'Department Head', 'HOD', 'Committee Member', 'Staff'].map(r => (
-                                    <div key={r} className="form-check">
-                                        <input
-                                            type="checkbox"
-                                            className="form-check-input"
-                                            id={`edit-role-${r}`}
-                                            checked={editForm.role.split(',').map(x => x.trim()).includes(r)}
-                                            onChange={e => {
-                                                const roles = editForm.role.split(',').map(x => x.trim()).filter(Boolean);
-                                                const newRoles = e.target.checked
-                                                    ? [...roles, r]
-                                                    : roles.filter(x => x !== r);
-                                                setEditForm({ ...editForm, role: newRoles.join(', ') });
-                                            }}
-                                        />
-                                        <label className="form-check-label small" htmlFor={`edit-role-${r}`}>{r}</label>
-                                    </div>
-                                ))}
+                                {rolesList.map((r) => {
+                                    const displayName = formatRoleForDisplay(r);
+                                    return (
+                                        <div key={r} className="form-check">
+                                            <input
+                                                type="checkbox"
+                                                className="form-check-input"
+                                                id={`edit-role-${r}`}
+                                                checked={editForm.role.split(',').map((x: string) => x.trim()).includes(r)}
+                                                onChange={e => {
+                                                    const roles = editForm.role.split(',').map((x: string) => x.trim()).filter(Boolean);
+                                                    const newRoles = e.target.checked
+                                                        ? [...roles, r]
+                                                        : roles.filter((x: string) => x !== r);
+                                                    setEditForm({ ...editForm, role: newRoles.join(', ') });
+                                                }}
+                                            />
+                                            <label className="form-check-label small" htmlFor={`edit-role-${r}`}>{displayName}</label>
+                                        </div>
+                                    );
+                                })}
                             </div>
                         </div>
                         <div className="col-12">
-                            <Form.Label className="fw-bold small">Department / Department</Form.Label>
-                            <Form.Control
-                                value={editForm.department}
-                                onChange={e => setEditForm({ ...editForm, department: e.target.value })}
-                            />
-                        </div>
-                        <div className="col-12">
-                            <Form.Label className="fw-bold small">Status</Form.Label>
+                            <Form.Label className="fw-bold small">Department/Unit</Form.Label>
                             <Form.Select
-                                value={editForm.status}
-                                onChange={e => setEditForm({ ...editForm, status: e.target.value })}
+                                value={editForm.department_id === '' ? '' : String(editForm.department_id)}
+                                onChange={e => setEditForm({ ...editForm, department_id: e.target.value === '' ? '' : Number(e.target.value) })}
                             >
-                                <option>Active</option>
-                                <option>Pending</option>
-                                <option>Suspended</option>
+                                <option value="">Select department/unit</option>
+                                {departments.map((d) => (
+                                    <option key={d.id} value={d.id}>{d.name}</option>
+                                ))}
                             </Form.Select>
                         </div>
                     </div>

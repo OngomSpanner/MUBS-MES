@@ -16,6 +16,7 @@ interface Activity {
     unit_name: string;
     total_tasks: number;
     completed_tasks: number;
+    parent_title?: string | null;
 }
 
 interface ActivityData {
@@ -32,6 +33,7 @@ export default function DepartmentStrategicActivities() {
     const router = useRouter();
     const [data, setData] = useState<ActivityData | null>(null);
     const [loading, setLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
     const [searchTerm, setSearchTerm] = useState('');
     const [statusFilter, setStatusFilter] = useState('All Statuses');
 
@@ -40,14 +42,29 @@ export default function DepartmentStrategicActivities() {
             try {
                 const response = await axios.get('/api/department-head/activities');
                 setData(response.data);
-            } catch (error) {
+            } catch (error: any) {
                 console.error('Error fetching activities:', error);
+                setError(error.response?.data?.message || 'Failed to load department activities. Please try again.');
             } finally {
                 setLoading(false);
             }
         };
         fetchData();
     }, []);
+
+    if (error) {
+        return (
+            <div className="container mt-5">
+                <div className="alert alert-danger shadow-sm border-0 d-flex align-items-center gap-3 p-4" role="alert">
+                    <span className="material-symbols-outlined fs-2 text-danger">error</span>
+                    <div>
+                        <h5 className="alert-heading text-danger fw-bold mb-1">Error Loading Activities</h5>
+                        <p className="mb-0 text-dark opacity-75">{error}</p>
+                    </div>
+                </div>
+            </div>
+        );
+    }
 
     if (loading || !data) {
         return (
@@ -62,7 +79,7 @@ export default function DepartmentStrategicActivities() {
     const filteredActivities = data.activities.filter(a => {
         const matchesSearch = a.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
             (a.pillar && a.pillar.toLowerCase().includes(searchTerm.toLowerCase()));
-        const matchesStatus = statusFilter === 'All Statuses' || a.status === statusFilter;
+        const matchesStatus = statusFilter === 'All Statuses' || a.status === statusFilter || (statusFilter === 'Completed' && a.status === 'On Track');
         return matchesSearch && matchesStatus;
     });
 
@@ -191,20 +208,22 @@ export default function DepartmentStrategicActivities() {
                                                     color: 'var(--mubs-blue)'
                                                 }}>
                                                     <span className="material-symbols-outlined" style={{ fontSize: '20px' }}>
-                                                        {a.pillar?.toLowerCase().includes('infra') ? 'laptop' :
-                                                            a.pillar?.toLowerCase().includes('teaching') ? 'school' : 'description'}
+                                                        {a.pillar?.includes('Research') ? 'science' :
+                                                            a.pillar?.includes('Equity') ? 'shield' :
+                                                                a.pillar?.includes('Human Capital') ? 'groups' :
+                                                                    a.pillar?.includes('Partnerships') ? 'handshake' : 'description'}
                                                     </span>
                                                 </div>
                                                 <div>
                                                     <div className="fw-bold text-dark" style={{ fontSize: '.85rem' }}>{a.title}</div>
-                                                    <div className="text-muted small">ID: #{a.id}</div>
+                                                    <div className="text-muted small">{a.parent_title ? `Under: ${a.parent_title}` : `ID: #${a.id}`}</div>
                                                 </div>
                                             </div>
                                         </td>
                                         <td>
                                             <span className="status-badge" style={{
-                                                background: a.pillar === 'Infrastructure' ? '#eff6ff' : (a.pillar === 'Teaching' ? '#fdf2f8' : '#f0fdf4'),
-                                                color: a.pillar === 'Infrastructure' ? '#1d4ed8' : (a.pillar === 'Teaching' ? '#9333ea' : '#15803d'),
+                                                background: a.pillar?.includes('Research') ? '#eff6ff' : (a.pillar?.includes('Equity') ? '#fef3c7' : (a.pillar?.includes('Human Capital') ? '#ecfdf5' : (a.pillar?.includes('Partnerships') ? '#f5f3ff' : '#f1f5f9'))),
+                                                color: a.pillar?.includes('Research') ? '#1d4ed8' : (a.pillar?.includes('Equity') ? '#b45309' : (a.pillar?.includes('Human Capital') ? '#059669' : (a.pillar?.includes('Partnerships') ? '#7c3aed' : '#475569'))),
                                                 fontSize: '0.7rem'
                                             }}>{a.pillar || 'Uncategorized'}</span>
                                         </td>
@@ -231,7 +250,16 @@ export default function DepartmentStrategicActivities() {
                                             }}>{a.status}</span>
                                         </td>
                                         <td className="pe-4 text-end">
-                                            {a.total_tasks === 0 ? (
+                                            {a.parent_title ? (
+                                                <button
+                                                    className="btn btn-sm btn-outline-secondary d-inline-flex align-items-center gap-1 fw-bold"
+                                                    style={{ fontSize: '.75rem' }}
+                                                    onClick={() => router.push(`/department-head?pg=tasks&activity=${encodeURIComponent(a.parent_title!)}`)}
+                                                >
+                                                    <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>visibility</span>
+                                                    <span>View in Tasks</span>
+                                                </button>
+                                            ) : a.total_tasks === 0 ? (
                                                 <button
                                                     className="btn btn-sm btn-primary d-inline-flex align-items-center gap-1 fw-bold shadow-sm"
                                                     style={{ fontSize: '.75rem', background: 'var(--mubs-blue)', borderColor: 'var(--mubs-blue)' }}

@@ -1,27 +1,79 @@
 "use client";
 
+import { useEffect, useState } from 'react';
+import axios from 'axios';
 import Link from 'next/link';
 
-export default function CommAllProposals() {
+interface ProposalRow {
+    id: number;
+    title: string;
+    status: string;
+    date: string | null;
+    committee_type?: string;
+    minute_reference?: string;
+    department_name?: string;
+}
+
+interface CommAllProposalsProps {
+    showOnlyMine?: boolean;
+}
+
+export default function CommAllProposals({ showOnlyMine }: CommAllProposalsProps) {
+    const [list, setList] = useState<ProposalRow[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [statusFilter, setStatusFilter] = useState<string>('');
+
+    useEffect(() => {
+        const fetchData = async () => {
+            try {
+                let url = '/api/comm/proposals';
+                const params = new URLSearchParams();
+                if (showOnlyMine) params.set('my', '1');
+                if (statusFilter) params.set('status', statusFilter);
+                if (params.toString()) url += '?' + params.toString();
+                const res = await axios.get(url);
+                setList(Array.isArray(res.data) ? res.data : []);
+            } catch (e) {
+                console.error('Proposals list fetch error', e);
+            } finally {
+                setLoading(false);
+            }
+        };
+        fetchData();
+    }, [showOnlyMine, statusFilter]);
+
+    const total = list.length;
+    const pendingCount = list.filter((p) => p.status === 'Pending' || p.status === 'Edit Requested').length;
+    const approvedCount = list.filter((p) => p.status === 'Approved').length;
+    const rejectedCount = list.filter((p) => p.status === 'Rejected').length;
+
+    const statusStyle = (s: string) => {
+        if (s === 'Approved') return { background: '#dcfce7', color: '#15803d' };
+        if (s === 'Pending' || s === 'Edit Requested') return { background: '#fef9c3', color: '#a16207' };
+        if (s === 'Rejected') return { background: '#fee2e2', color: '#b91c1c' };
+        return { background: '#f1f5f9', color: '#475569' };
+    };
+
     return (
         <div className="content-area-comm">
             <div className="row g-3 mb-4">
-                <div className="col-6 col-sm-3"><div className="stat-card text-center" style={{ borderLeftColor: '#7c3aed', padding: '.9rem' }}><div className="stat-value" style={{ fontSize: '1.8rem', color: '#7c3aed' }}>12</div><div className="stat-label">Total</div></div></div>
-                <div className="col-6 col-sm-3"><div className="stat-card text-center" style={{ borderLeftColor: 'var(--mubs-yellow)', padding: '.9rem' }}><div className="stat-value" style={{ fontSize: '1.8rem', color: '#b45309' }}>4</div><div className="stat-label">Pending</div></div></div>
-                <div className="col-6 col-sm-3"><div className="stat-card text-center" style={{ borderLeftColor: '#10b981', padding: '.9rem' }}><div className="stat-value" style={{ fontSize: '1.8rem', color: '#059669' }}>6</div><div className="stat-label">Approved</div></div></div>
-                <div className="col-6 col-sm-3"><div className="stat-card text-center" style={{ borderLeftColor: 'var(--mubs-red)', padding: '.9rem' }}><div className="stat-value" style={{ fontSize: '1.8rem', color: 'var(--mubs-red)' }}>2</div><div className="stat-label">Rejected</div></div></div>
+                <div className="col-6 col-sm-3"><div className="stat-card text-center" style={{ borderLeftColor: '#7c3aed', padding: '.9rem' }}><div className="stat-value" style={{ fontSize: '1.8rem', color: '#7c3aed' }}>{loading ? '…' : total}</div><div className="stat-label">Total</div></div></div>
+                <div className="col-6 col-sm-3"><div className="stat-card text-center" style={{ borderLeftColor: 'var(--mubs-yellow)', padding: '.9rem' }}><div className="stat-value" style={{ fontSize: '1.8rem', color: '#b45309' }}>{loading ? '…' : pendingCount}</div><div className="stat-label">Pending</div></div></div>
+                <div className="col-6 col-sm-3"><div className="stat-card text-center" style={{ borderLeftColor: '#10b981', padding: '.9rem' }}><div className="stat-value" style={{ fontSize: '1.8rem', color: '#059669' }}>{loading ? '…' : approvedCount}</div><div className="stat-label">Approved</div></div></div>
+                <div className="col-6 col-sm-3"><div className="stat-card text-center" style={{ borderLeftColor: 'var(--mubs-red)', padding: '.9rem' }}><div className="stat-value" style={{ fontSize: '1.8rem', color: 'var(--mubs-red)' }}>{loading ? '…' : rejectedCount}</div><div className="stat-label">Rejected</div></div></div>
             </div>
 
             <div className="table-card">
                 <div className="table-card-header">
-                    <h5><span className="material-symbols-outlined me-2" style={{ color: '#7c3aed' }}>list_alt</span>All Committee Proposals</h5>
+                    <h5><span className="material-symbols-outlined me-2" style={{ color: '#7c3aed' }}>list_alt</span>{showOnlyMine ? 'My Committee Proposals' : 'All Committee Proposals'}</h5>
                     <div className="d-flex gap-2 flex-wrap">
-                        <div className="input-group input-group-sm" style={{ width: '200px' }}>
-                            <span className="input-group-text bg-white"><span className="material-symbols-outlined" style={{ fontSize: '15px', color: '#64748b' }}>search</span></span>
-                            <input type="text" className="form-control" placeholder="Search proposals..." />
-                        </div>
-                        <select className="form-select form-select-sm" style={{ width: '140px' }}><option>All Status</option><option>Pending</option><option>Approved</option><option>Rejected</option></select>
-                        <select className="form-select form-select-sm" style={{ width: '160px' }}><option>All Pillars</option><option>Teaching &amp; Learning</option><option>Research &amp; Innovation</option><option>Infrastructure</option><option>Governance</option></select>
+                        <select className="form-select form-select-sm" style={{ width: '140px' }} value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
+                            <option value="">All Status</option>
+                            <option value="Pending">Pending</option>
+                            <option value="Approved">Approved</option>
+                            <option value="Rejected">Rejected</option>
+                            <option value="Edit Requested">Edit Requested</option>
+                        </select>
                         <Link href="/comm?pg=propose" className="btn btn-sm fw-bold text-white" style={{ background: '#7c3aed' }}>
                             <span className="material-symbols-outlined me-1" style={{ fontSize: '15px' }}>add</span>New Proposal
                         </Link>
@@ -29,28 +81,40 @@ export default function CommAllProposals() {
                 </div>
                 <div className="table-responsive">
                     <table className="table mb-0">
-                        <thead><tr><th>Proposal</th><th>Pillar</th><th>Meeting Ref.</th><th>Submitted</th><th>Status</th><th>Assigned Department</th><th>Evidence</th><th>Actions</th></tr></thead>
+                        <thead><tr><th>Proposal</th><th>Committee</th><th>Meeting Ref.</th><th>Submitted</th><th>Status</th><th>Department</th><th>Actions</th></tr></thead>
                         <tbody>
-                            <tr><td><div className="fw-bold text-dark" style={{ fontSize: '.85rem' }}>Research Ethics Framework</div><div className="text-muted" style={{ fontSize: '.72rem' }}>Priority: High</div></td><td><span className="status-badge" style={{ background: '#eff6ff', color: 'var(--mubs-blue)', fontSize: '.62rem' }}>Research</span></td><td style={{ fontSize: '.8rem' }}>Meeting #7</td><td style={{ fontSize: '.8rem', color: '#64748b' }}>03 Apr</td><td><span className="status-badge" style={{ background: '#dcfce7', color: '#15803d' }}>Approved</span></td><td style={{ fontSize: '.82rem', fontWeight: 700, color: '#059669' }}>Research &amp; Innovation</td><td><button className="btn btn-xs btn-outline-secondary py-0 px-1" style={{ fontSize: '.72rem' }}><span className="material-symbols-outlined" style={{ fontSize: '13px' }}>description</span></button></td><td><button className="btn btn-xs btn-outline-secondary py-0 px-2" style={{ fontSize: '.74rem' }}><span className="material-symbols-outlined" style={{ fontSize: '13px' }}>visibility</span></button></td></tr>
-                            <tr><td><div className="fw-bold text-dark" style={{ fontSize: '.85rem' }}>Digital Literacy for Staff</div><div className="text-muted" style={{ fontSize: '.72rem' }}>Priority: Medium</div></td><td><span className="status-badge" style={{ background: '#fdf2f8', color: '#9333ea', fontSize: '.62rem' }}>Teaching</span></td><td style={{ fontSize: '.8rem' }}>Meeting #6</td><td style={{ fontSize: '.8rem', color: '#64748b' }}>25 Mar</td><td><span className="status-badge" style={{ background: '#dcfce7', color: '#15803d' }}>Approved</span></td><td style={{ fontSize: '.82rem', fontWeight: 700, color: '#059669' }}>Faculty of Computing</td><td><button className="btn btn-xs btn-outline-secondary py-0 px-1" style={{ fontSize: '.72rem' }}><span className="material-symbols-outlined" style={{ fontSize: '13px' }}>description</span></button></td><td><button className="btn btn-xs btn-outline-secondary py-0 px-2" style={{ fontSize: '.74rem' }}><span className="material-symbols-outlined" style={{ fontSize: '13px' }}>visibility</span></button></td></tr>
-                            <tr><td><div className="fw-bold text-dark" style={{ fontSize: '.85rem' }}>Open Access Library Repository</div><div className="text-muted" style={{ fontSize: '.72rem' }}>Priority: High</div></td><td><span className="status-badge" style={{ background: '#ecfdf5', color: '#059669', fontSize: '.62rem' }}>Infrastructure</span></td><td style={{ fontSize: '.8rem' }}>Meeting #6</td><td style={{ fontSize: '.8rem', color: '#64748b' }}>25 Mar</td><td><span className="status-badge" style={{ background: '#dcfce7', color: '#15803d' }}>Approved</span></td><td style={{ fontSize: '.82rem', fontWeight: 700, color: '#059669' }}>Library Department</td><td><button className="btn btn-xs btn-outline-secondary py-0 px-1" style={{ fontSize: '.72rem' }}><span className="material-symbols-outlined" style={{ fontSize: '13px' }}>description</span></button></td><td><button className="btn btn-xs btn-outline-secondary py-0 px-2" style={{ fontSize: '.74rem' }}><span className="material-symbols-outlined" style={{ fontSize: '13px' }}>visibility</span></button></td></tr>
-                            <tr style={{ background: '#fffbeb' }}><td><div className="fw-bold text-dark" style={{ fontSize: '.85rem' }}>AI Integration Policy for Teaching</div><div className="text-muted" style={{ fontSize: '.72rem' }}>Priority: High</div></td><td><span className="status-badge" style={{ background: '#fdf2f8', color: '#9333ea', fontSize: '.62rem' }}>Teaching</span></td><td style={{ fontSize: '.8rem' }}>Meeting #8</td><td style={{ fontSize: '.8rem', color: '#64748b' }}>10 Apr</td><td><span className="status-badge" style={{ background: '#fef9c3', color: '#a16207' }}>Pending</span></td><td style={{ fontSize: '.8rem', color: '#94a3b8', fontStyle: 'italic' }}>Awaiting approval</td><td><button className="btn btn-xs btn-outline-secondary py-0 px-1" style={{ fontSize: '.72rem' }}><span className="material-symbols-outlined" style={{ fontSize: '13px' }}>description</span></button></td><td><button className="btn btn-xs btn-outline-secondary py-0 px-2" style={{ fontSize: '.74rem' }}><span className="material-symbols-outlined" style={{ fontSize: '13px' }}>visibility</span></button></td></tr>
-                            <tr style={{ background: '#fffbeb' }}><td><div className="fw-bold text-dark" style={{ fontSize: '.85rem' }}>Student Fee Restructuring 2025–26</div><div className="text-muted" style={{ fontSize: '.72rem' }}>Priority: High</div></td><td><span className="status-badge" style={{ background: '#eff6ff', color: 'var(--mubs-blue)', fontSize: '.62rem' }}>Finance</span></td><td style={{ fontSize: '.8rem' }}>Meeting #9</td><td style={{ fontSize: '.8rem', color: '#64748b' }}>12 Apr</td><td><span className="status-badge" style={{ background: '#fef9c3', color: '#a16207' }}>Pending</span></td><td style={{ fontSize: '.8rem', color: '#94a3b8', fontStyle: 'italic' }}>Awaiting approval</td><td><button className="btn btn-xs btn-outline-secondary py-0 px-1" style={{ fontSize: '.72rem' }}><span className="material-symbols-outlined" style={{ fontSize: '13px' }}>description</span></button></td><td><button className="btn btn-xs btn-outline-secondary py-0 px-2" style={{ fontSize: '.74rem' }}><span className="material-symbols-outlined" style={{ fontSize: '13px' }}>visibility</span></button></td></tr>
-                            <tr style={{ background: '#fffbeb' }}><td><div className="fw-bold text-dark" style={{ fontSize: '.85rem' }}>Industry MoU Framework</div><div className="text-muted" style={{ fontSize: '.72rem' }}>Priority: Medium</div></td><td><span className="status-badge" style={{ background: '#ecfdf5', color: '#059669', fontSize: '.62rem' }}>Partnerships</span></td><td style={{ fontSize: '.8rem' }}>Meeting #9</td><td style={{ fontSize: '.8rem', color: '#64748b' }}>12 Apr</td><td><span className="status-badge" style={{ background: '#fef9c3', color: '#a16207' }}>Pending</span></td><td style={{ fontSize: '.8rem', color: '#94a3b8', fontStyle: 'italic' }}>Awaiting approval</td><td><button className="btn btn-xs btn-outline-secondary py-0 px-1" style={{ fontSize: '.72rem' }}><span className="material-symbols-outlined" style={{ fontSize: '13px' }}>description</span></button></td><td><button className="btn btn-xs btn-outline-secondary py-0 px-2" style={{ fontSize: '.74rem' }}><span className="material-symbols-outlined" style={{ fontSize: '13px' }}>visibility</span></button></td></tr>
-                            <tr style={{ background: '#fffbeb' }}><td><div className="fw-bold text-dark" style={{ fontSize: '.85rem' }}>Staff Welfare Programme</div><div className="text-muted" style={{ fontSize: '.72rem' }}>Priority: Low</div></td><td><span className="status-badge" style={{ background: '#eff6ff', color: 'var(--mubs-blue)', fontSize: '.62rem' }}>Governance</span></td><td style={{ fontSize: '.8rem' }}>Meeting #8</td><td style={{ fontSize: '.8rem', color: '#64748b' }}>10 Apr</td><td><span className="status-badge" style={{ background: '#fef9c3', color: '#a16207' }}>Pending</span></td><td style={{ fontSize: '.8rem', color: '#94a3b8', fontStyle: 'italic' }}>Awaiting approval</td><td><button className="btn btn-xs btn-outline-secondary py-0 px-1" style={{ fontSize: '.72rem' }}><span className="material-symbols-outlined" style={{ fontSize: '13px' }}>description</span></button></td><td><button className="btn btn-xs btn-outline-secondary py-0 px-2" style={{ fontSize: '.74rem' }}><span className="material-symbols-outlined" style={{ fontSize: '13px' }}>visibility</span></button></td></tr>
-                            <tr style={{ background: '#fff9f9' }}><td><div className="fw-bold text-dark" style={{ fontSize: '.85rem' }}>Third-Party Accreditation Programme</div><div className="text-muted" style={{ fontSize: '.72rem' }}>Priority: High</div></td><td><span className="status-badge" style={{ background: '#eff6ff', color: 'var(--mubs-blue)', fontSize: '.62rem' }}>Governance</span></td><td style={{ fontSize: '.8rem' }}>Meeting #7</td><td style={{ fontSize: '.8rem', color: '#64748b' }}>01 Apr</td><td><span className="status-badge" style={{ background: '#fee2e2', color: '#b91c1c' }}>Rejected</span></td><td style={{ fontSize: '.8rem', color: '#94a3b8', fontStyle: 'italic' }}>Not assigned</td><td><button className="btn btn-xs btn-outline-secondary py-0 px-1" style={{ fontSize: '.72rem' }}><span className="material-symbols-outlined" style={{ fontSize: '13px' }}>description</span></button></td><td><button className="btn btn-xs btn-outline-secondary py-0 px-2" style={{ fontSize: '.74rem' }}><span className="material-symbols-outlined" style={{ fontSize: '13px' }}>visibility</span></button></td></tr>
-                            <tr style={{ background: '#fff9f9' }}><td><div className="fw-bold text-dark" style={{ fontSize: '.85rem' }}>External Examiner Travel Allowance</div><div className="text-muted" style={{ fontSize: '.72rem' }}>Priority: Medium</div></td><td><span className="status-badge" style={{ background: '#eff6ff', color: 'var(--mubs-blue)', fontSize: '.62rem' }}>Finance</span></td><td style={{ fontSize: '.8rem' }}>Meeting #6</td><td style={{ fontSize: '.8rem', color: '#64748b' }}>25 Mar</td><td><span className="status-badge" style={{ background: '#fee2e2', color: '#b91c1c' }}>Rejected</span></td><td style={{ fontSize: '.8rem', color: '#94a3b8', fontStyle: 'italic' }}>Not assigned</td><td><button className="btn btn-xs btn-outline-secondary py-0 px-1" style={{ fontSize: '.72rem' }}><span className="material-symbols-outlined" style={{ fontSize: '13px' }}>description</span></button></td><td><button className="btn btn-xs btn-outline-secondary py-0 px-2" style={{ fontSize: '.74rem' }}><span className="material-symbols-outlined" style={{ fontSize: '13px' }}>visibility</span></button></td></tr>
+                            {loading ? (
+                                <tr><td colSpan={7} className="text-center p-4 text-muted">Loading…</td></tr>
+                            ) : list.length === 0 ? (
+                                <tr><td colSpan={7} className="text-center p-4 text-muted">No proposals found.</td></tr>
+                            ) : (
+                                list.map((p) => (
+                                    <tr key={p.id} style={p.status === 'Pending' || p.status === 'Edit Requested' ? { background: '#fffbeb' } : p.status === 'Rejected' ? { background: '#fff9f9' } : undefined}>
+                                        <td>
+                                            <div className="fw-bold text-dark" style={{ fontSize: '.85rem' }}>{p.title}</div>
+                                        </td>
+                                        <td><span className="status-badge" style={{ background: '#eff6ff', color: 'var(--mubs-blue)', fontSize: '.62rem' }}>{p.committee_type || '—'}</span></td>
+                                        <td style={{ fontSize: '.8rem' }}>{p.minute_reference || '—'}</td>
+                                        <td style={{ fontSize: '.8rem', color: '#64748b' }}>{p.date || '—'}</td>
+                                        <td><span className="status-badge" style={statusStyle(p.status)}>{p.status}</span></td>
+                                        <td style={{ fontSize: '.82rem', fontWeight: p.status === 'Approved' ? 700 : 400, color: p.status === 'Approved' ? '#059669' : '#94a3b8' }}>{p.department_name || (p.status !== 'Approved' ? 'Awaiting approval' : '—')}</td>
+                                        <td>
+                                        <Link
+                                            href={p.status === 'Approved' ? '/comm?pg=approved' : p.status === 'Rejected' ? '/comm?pg=rejected' : `/comm?pg=pending&id=${p.id}`}
+                                            className="btn btn-xs btn-outline-secondary py-0 px-2"
+                                            style={{ fontSize: '.74rem' }}
+                                        >
+                                            <span className="material-symbols-outlined" style={{ fontSize: '13px' }}>visibility</span>
+                                        </Link>
+                                    </td>
+                                    </tr>
+                                ))
+                            )}
                         </tbody>
                     </table>
                 </div>
                 <div className="table-card-footer">
-                    <span className="footer-label">Showing 9 of 12 proposals</span>
-                    <div className="d-flex gap-1">
-                        <button className="page-btn" disabled>‹</button>
-                        <button className="page-btn active">1</button>
-                        <button className="page-btn">2</button>
-                        <button className="page-btn">›</button>
-                    </div>
+                    <span className="footer-label">Showing {list.length} proposal{list.length !== 1 ? 's' : ''}</span>
                 </div>
             </div>
         </div>

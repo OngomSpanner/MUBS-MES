@@ -53,6 +53,22 @@ export default function LoginPage() {
     setLoading(true);
     setError('');
 
+    const pickRedirect = (roles: string[], activeRole?: string) => {
+      const set = new Set(roles);
+      const role = activeRole && roles.includes(activeRole) ? activeRole : undefined;
+      if (role === 'Strategy Manager' || role === 'System Administrator') return '/admin';
+      if (role === 'Committee Member') return '/comm';
+      if (role === 'Principal') return '/principal';
+      if (role === 'Department Head' || role === 'Unit Head' || role === 'HOD') return '/department-head';
+      if (role === 'Staff' || role === 'Viewer') return '/staff';
+
+      if (set.has('System Administrator') || set.has('Strategy Manager')) return '/admin';
+      if (set.has('Committee Member')) return '/comm';
+      if (set.has('Principal')) return '/principal';
+      if (set.has('Department Head') || set.has('Unit Head') || set.has('HOD')) return '/department-head';
+      return '/staff';
+    };
+
     try {
       const res = await fetch('/api/auth/login', {
         method: 'POST',
@@ -66,19 +82,9 @@ export default function LoginPage() {
         throw new Error(data.message || 'Invalid email or password');
       }
 
-      const role = data.user.activeRole || data.user.roles[0];
-
-      if (role === 'Strategy Manager' || role === 'System Administrator' ) {
-        router.push('/admin');
-      } else if (role === 'Committee Member') {
-        router.push('/comm');
-      } else if (role === 'Principal') {
-        router.push('/principal');
-      } else if (role === 'Department Head' || role === 'HOD') {
-        router.push('/department-head');
-      } else {
-        router.push('/staff');
-      }
+      const roles: string[] = Array.isArray(data?.user?.roles) ? data.user.roles : [];
+      const activeRole: string | undefined = data?.user?.activeRole;
+      router.push(pickRedirect(roles, activeRole));
     } catch (err: any) {
       setError(err.message || 'Invalid email or password');
       setLoading(false);
@@ -102,19 +108,20 @@ export default function LoginPage() {
         throw new Error(data.message || 'Google Sign-In failed');
       }
 
-      const role = data.user.activeRole || data.user.roles[0];
-
-      if (role === 'Strategy Manager' || role === 'System Administrator') {
-        router.push('/admin');
-      } else if (role === 'Committee Member') {
-        router.push('/comm');
-      } else if (role === 'Principal') {
-        router.push('/principal');
-      } else if (role === 'Department Head' || role === 'HOD') {
-        router.push('/department-head');
-      } else {
-        router.push('/staff');
-      }
+      const roles: string[] = Array.isArray(data?.user?.roles) ? data.user.roles : [];
+      const activeRole: string | undefined = data?.user?.activeRole;
+      // same routing priority as password login
+      const set = new Set(roles);
+      if (activeRole === 'Strategy Manager' || activeRole === 'System Administrator') router.push('/admin');
+      else if (activeRole === 'Committee Member') router.push('/comm');
+      else if (activeRole === 'Principal') router.push('/principal');
+      else if (activeRole === 'Department Head' || activeRole === 'Unit Head' || activeRole === 'HOD') router.push('/department-head');
+      else if (activeRole === 'Staff' || activeRole === 'Viewer') router.push('/staff');
+      else if (set.has('System Administrator') || set.has('Strategy Manager')) router.push('/admin');
+      else if (set.has('Committee Member')) router.push('/comm');
+      else if (set.has('Principal')) router.push('/principal');
+      else if (set.has('Department Head') || set.has('Unit Head') || set.has('HOD')) router.push('/department-head');
+      else router.push('/staff');
     } catch (err: any) {
       setError(err.message || 'Google Sign-In failed');
       setLoading(false);
@@ -168,7 +175,7 @@ export default function LoginPage() {
               priority
             />
           </div>
-          <h4 className="fw-bold mb-1" style={{ color: '#005696' }}>Strategy Plan System</h4>
+          <h4 className="fw-bold mb-1" style={{ color: '#005696' }}>Strategic Plan System</h4>
           <p className="text-muted small mb-0">Sign in to access your dashboard</p>
         </div>
 

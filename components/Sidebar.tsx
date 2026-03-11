@@ -87,8 +87,8 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen, onLogoutClick }: 
             />
           </div>
           <div>
-            <div className="brand-title text-white">MUBS Strategy Plan </div>
-            <div className="brand-sub">System</div>
+            <div className="brand-title text-white">STRATEGIC</div>
+            <div className="brand-sub">PLAN SYSTEM</div>
           </div>
         </div>
 

@@ -15,13 +15,14 @@ export default async function DepartmentHeadPage({ searchParams }: DepartmentHea
     const params = await searchParams;
     const pg = params?.pg || 'dashboard';
     const activityParam = params?.activity as string | undefined;
+    const assigneeParam = params?.assignee as string | undefined;
 
     const renderContent = () => {
         switch (pg) {
             case 'activities':
                 return <DepartmentStrategicActivities />;
             case 'tasks':
-                return <DepartmentTasks initialActivity={activityParam} />;
+                return <DepartmentTasks initialActivity={activityParam} initialAssignee={assigneeParam} />;
             case 'staff':
                 return <DepartmentStaff />;
             case 'submissions':

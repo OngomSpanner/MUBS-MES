@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import axios from 'axios';
 import StatCard from '@/components/StatCard';
 
@@ -32,25 +33,43 @@ interface DepartmentHeadData {
         date: string;
         status: string;
     }>;
+    noDepartment?: boolean;
 }
 
 export default function DepartmentHeadDashboard() {
+    const router = useRouter();
     const [data, setData] = useState<DepartmentHeadData | null>(null);
     const [loading, setLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
 
     useEffect(() => {
         const fetchData = async () => {
             try {
                 const response = await axios.get('/api/dashboard/department-head');
                 setData(response.data);
-            } catch (error) {
+            } catch (error: any) {
                 console.error('Error fetching department head dashboard data:', error);
+                setError(error.response?.data?.message || 'Failed to load department dashboard. Please try again.');
             } finally {
                 setLoading(false);
             }
         };
         fetchData();
     }, []);
+
+    if (error) {
+        return (
+            <div className="container mt-5">
+                <div className="alert alert-danger shadow-sm border-0 d-flex align-items-center gap-3 p-4" role="alert">
+                    <span className="material-symbols-outlined fs-2 text-danger">error</span>
+                    <div>
+                        <h5 className="alert-heading text-danger fw-bold mb-1">Error Loading Dashboard</h5>
+                        <p className="mb-0 text-dark opacity-75">{error}</p>
+                    </div>
+                </div>
+            </div>
+        );
+    }
 
     if (loading || !data) {
         return (
@@ -62,7 +81,25 @@ export default function DepartmentHeadDashboard() {
         );
     }
 
-    const { stats, hrWarnings, activityProgress, recentSubmissions } = data;
+    const { stats, hrWarnings, activityProgress, recentSubmissions, noDepartment } = data;
+
+    if (noDepartment) {
+        return (
+            <div id="page-dashboard" className="page-section active-page">
+                <div className="container py-5">
+                    <div className="alert alert-info border-0 shadow-sm d-flex align-items-start gap-3 p-4" role="alert">
+                        <span className="material-symbols-outlined fs-1 text-primary">info</span>
+                        <div>
+                            <h5 className="alert-heading fw-bold mb-2">No department assigned</h5>
+                            <p className="mb-0 text-secondary">
+                                Your account is not linked to a department or unit. To see activities, staff, and submissions here, an administrator must assign you to a department (e.g. Faculty of Commerce) in User Management.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div id="page-dashboard" className="page-section active-page">
@@ -72,7 +109,7 @@ export default function DepartmentHeadDashboard() {
                     <span className="material-symbols-outlined" style={{ fontSize: '20px' }}>warning</span>
                     <div>
                         <strong>Department Warnings:</strong> {stats.hrAlerts} staff members require attention (leave or contract expiry).
-                        <a href="#" className="alert-link fw-semibold" onClick={(e) => { e.preventDefault(); }}> Review staff →</a>
+                        <button type="button" className="alert-link fw-semibold btn btn-link p-0 border-0 text-decoration-underline" onClick={() => router.push('/department-head?pg=staff')}> Review staff →</button>
                     </div>
                     <button type="button" className="btn-close ms-auto" data-bs-dismiss="alert"></button>
                 </div>
@@ -134,7 +171,7 @@ export default function DepartmentHeadDashboard() {
                                 <span className="material-symbols-outlined me-2" style={{ color: 'var(--mubs-blue)' }}>analytics</span>
                                 Department Activity Progress
                             </h5>
-                            <button className="btn btn-sm btn-outline-secondary">View All</button>
+                            <button className="btn btn-sm btn-outline-secondary" onClick={() => router.push('/department-head?pg=activities')}>View All</button>
                         </div>
                         <div className="table-responsive">
                             <table className="table mb-0">
@@ -159,7 +196,7 @@ export default function DepartmentHeadDashboard() {
                                                     </div>
                                                     <div>
                                                         <div className="fw-bold text-dark text-truncate" style={{ fontSize: '.85rem', maxWidth: '250px' }}>{act.title}</div>
-                                                        <div className="text-muted" style={{ fontSize: '.72rem' }}>Due {new Date(act.end_date).toLocaleDateString()}</div>
+                                                        <div className="text-muted" style={{ fontSize: '.72rem' }}>Due {act.end_date ? new Date(act.end_date).toLocaleDateString() : 'TBD'}</div>
                                                     </div>
                                                 </div>
                                             </td>
@@ -192,7 +229,7 @@ export default function DepartmentHeadDashboard() {
                                 <span className="material-symbols-outlined me-2" style={{ color: 'var(--mubs-blue)' }}>inbox</span>
                                 Recent Submissions
                             </h5>
-                            <button className="btn btn-sm btn-outline-secondary">View All</button>
+                            <button className="btn btn-sm btn-outline-secondary" onClick={() => router.push('/department-head?pg=submissions')}>View All</button>
                         </div>
                         <div className="table-responsive">
                             <table className="table mb-0">
@@ -225,7 +262,7 @@ export default function DepartmentHeadDashboard() {
                                                 }}>{sub.status}</span>
                                             </td>
                                             <td>
-                                                <button className="btn btn-xs btn-primary py-0 px-2 fw-bold" style={{ fontSize: '.75rem', background: 'var(--mubs-blue)' }}>
+                                                <button type="button" className="btn btn-xs btn-primary py-0 px-2 fw-bold" style={{ fontSize: '.75rem', background: 'var(--mubs-blue)' }} onClick={() => router.push(sub.status === 'Reviewed' ? '/department-head?pg=evaluations' : '/department-head?pg=submissions')}>
                                                     <span className="material-symbols-outlined" style={{ fontSize: '14px' }}>{sub.status === 'Reviewed' ? 'visibility' : 'rate_review'}</span>
                                                     {sub.status === 'Reviewed' ? ' View' : ' Review'}
                                                 </button>
@@ -279,25 +316,25 @@ export default function DepartmentHeadDashboard() {
                             </h5>
                         </div>
                         <div className="p-3 d-flex flex-column gap-2">
-                            <button className="btn btn-outline-primary fw-bold text-start d-flex align-items-center gap-2">
+                            <button type="button" className="btn btn-outline-primary fw-bold text-start d-flex align-items-center gap-2" onClick={() => router.push('/department-head?pg=tasks')}>
                                 <span className="material-symbols-outlined" style={{ fontSize: '18px', color: 'var(--mubs-blue)' }}>add_task</span>
                                 Create Sub-Activity / Task
                             </button>
-                            <button className="btn btn-outline-primary fw-bold text-start d-flex align-items-center gap-2">
+                            <button type="button" className="btn btn-outline-primary fw-bold text-start d-flex align-items-center gap-2" onClick={() => router.push('/department-head?pg=tasks')}>
                                 <span className="material-symbols-outlined" style={{ fontSize: '18px', color: 'var(--mubs-blue)' }}>assignment_ind</span>
                                 Assign Task to Staff
                             </button>
-                            <button className="btn btn-outline-warning fw-bold text-start d-flex align-items-center gap-2 text-dark">
+                            <button type="button" className="btn btn-outline-warning fw-bold text-start d-flex align-items-center gap-2 text-dark" onClick={() => router.push('/department-head?pg=submissions')}>
                                 <span className="material-symbols-outlined" style={{ fontSize: '18px', color: '#b45309' }}>inbox</span>
                                 Review Submissions
                                 <span className="badge bg-warning text-dark ms-auto">{stats.pendingSubmissions}</span>
                             </button>
-                            <button className="btn btn-outline-danger fw-bold text-start d-flex align-items-center gap-2">
+                            <button type="button" className="btn btn-outline-danger fw-bold text-start d-flex align-items-center gap-2" onClick={() => router.push('/department-head?pg=staff')}>
                                 <span className="material-symbols-outlined" style={{ fontSize: '18px', color: 'var(--mubs-red)' }}>warning</span>
                                 View HR Warnings
                                 <span className="badge bg-danger ms-auto">{stats.hrAlerts}</span>
                             </button>
-                            <button className="btn btn-outline-success fw-bold text-start d-flex align-items-center gap-2">
+                            <button type="button" className="btn btn-outline-success fw-bold text-start d-flex align-items-center gap-2" onClick={() => router.push('/department-head?pg=evaluations')}>
                                 <span className="material-symbols-outlined" style={{ fontSize: '18px', color: '#059669' }}>rate_review</span>
                                 Evaluate Staff Reports
                             </button>

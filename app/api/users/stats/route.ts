@@ -1,15 +1,24 @@
 import { NextResponse } from 'next/server';
 import { query } from '@/lib/db';
+import { cookies } from 'next/headers';
+import { verifyToken } from '@/lib/auth';
 
 export async function GET() {
     try {
+        const cookieStore = await cookies();
+        const token = cookieStore.get('token')?.value;
+        if (!token) {
+            return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
+        }
+        verifyToken(token);
+
         const rows = await query({
             query: `
         SELECT
-          COUNT(*)                                                      AS total,
-          SUM(CASE WHEN status = 'Active'    THEN 1 ELSE 0 END)       AS active,
-          SUM(CASE WHEN status = 'Suspended' THEN 1 ELSE 0 END)       AS suspended,
-          5                                                       AS definedRoles
+          (SELECT COUNT(*) FROM users) AS total,
+          SUM(CASE WHEN status = 'Active' THEN 1 ELSE 0 END) AS active,
+          SUM(CASE WHEN status = 'Suspended' THEN 1 ELSE 0 END) AS suspended,
+          (SELECT COUNT(DISTINCT role) FROM user_roles) AS definedRoles
         FROM users
       `
         }) as any[];

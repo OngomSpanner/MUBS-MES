@@ -503,6 +503,63 @@ body {
   filter: invert(1);
 }
 
+/* Modals: stat-card style (all modals match stat card) */
+.modal-content {
+  background: #fff;
+  border-radius: 12px;
+  border: none;
+  border-left: 5px solid var(--mubs-blue);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.12);
+  overflow: hidden;
+  color: #1e293b;
+}
+
+.modal-header {
+  padding: 1.25rem 1.4rem;
+  background: #fff !important;
+  color: #1e293b !important;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 12px 12px 0 0;
+}
+
+.modal-header .btn-close {
+  filter: none;
+  opacity: 0.7;
+}
+
+.modal-header-mubs.modal-header {
+  background: #fff !important;
+  color: #1e293b !important;
+}
+
+.modal-header-mubs .btn-close {
+  filter: none;
+  opacity: 0.7;
+}
+
+/* Reject/danger modal: red left border */
+.modal-content.modal-content-danger {
+  border-left-color: var(--mubs-red);
+}
+
+.modal-header.bg-danger {
+  background: #fff !important;
+  color: var(--mubs-red) !important;
+  border-bottom-color: rgba(0, 0, 0, 0.08);
+}
+
+.modal-body {
+  padding: 1.25rem 1.4rem;
+  color: #1e293b;
+}
+
+.modal-footer {
+  padding: 1.25rem 1.4rem;
+  border-top: 1px solid rgba(0, 0, 0, 0.08);
+  background: #fff;
+  border-radius: 0 0 12px 12px;
+}
+
 /* Alert strip */
 .alert-strip {
   border-radius: 10px;

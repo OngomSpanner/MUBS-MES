@@ -3,6 +3,7 @@ import { cookies } from 'next/headers';
 import { query } from '@/lib/db';
 import bcrypt from 'bcryptjs';
 import { generateToken } from '@/lib/auth';
+import { parseRoles, pickDefaultActiveRole } from '@/lib/role-routing';
 
 export async function POST(request: Request) {
   try {
@@ -41,8 +42,8 @@ export async function POST(request: Request) {
     }
 
     // Handle multiple roles (comma separated)
-    const rolesArray = user.role.split(',').map((r: string) => r.trim());
-    const activeRole = rolesArray[0];
+    const rolesArray = parseRoles(user.role);
+    const activeRole = pickDefaultActiveRole(rolesArray);
 
     // Generate token with active role and all available roles
     const token = generateToken(user.id, activeRole);

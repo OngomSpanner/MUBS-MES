@@ -17,9 +17,9 @@ export async function GET() {
             return NextResponse.json({ message: 'Invalid token' }, { status: 401 });
         }
 
-        // Fetch all active departments
+        // Fetch all active departments with parent_id and unit_type for filtering (faculty/office vs department/unit)
         const departments = await query({
-            query: 'SELECT id, name FROM departments ORDER BY name ASC',
+            query: 'SELECT id, name, parent_id, unit_type FROM departments WHERE is_active = 1 ORDER BY parent_id IS NULL DESC, name ASC',
             values: []
         }) as any[];
 

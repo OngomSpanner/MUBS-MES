@@ -1,32 +1,42 @@
 import { NextResponse } from 'next/server';
 import { query } from '@/lib/db';
 import bcrypt from 'bcryptjs';
+import { cookies } from 'next/headers';
+import { verifyToken } from '@/lib/auth';
 
 export async function GET(request: Request) {
   try {
+    const cookieStore = await cookies();
+    const token = cookieStore.get('token')?.value;
+    if (!token) {
+      return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
+    }
+    verifyToken(token);
     const { searchParams } = new URL(request.url);
     const role = searchParams.get('role');
     const search = searchParams.get('search');
 
     let sql = `
-      SELECT id, full_name, email, role, department, status, 
-             DATE_FORMAT(created_at, '%d %b %Y') as created_date
-      FROM users
+      SELECT u.id, u.full_name, u.email, u.role, u.status, u.department_id,
+             d.name AS department,
+             DATE_FORMAT(u.created_at, '%d %b %Y') as created_date
+      FROM users u
+      LEFT JOIN departments d ON u.department_id = d.id
       WHERE 1=1
     `;
     const values: any[] = [];
 
     if (role && role !== 'All Roles') {
-      sql += ' AND role LIKE ?';
+      sql += ' AND u.role LIKE ?';
       values.push(`%${role}%`);
     }
 
     if (search) {
-      sql += ' AND (full_name LIKE ? OR email LIKE ?)';
+      sql += ' AND (u.full_name LIKE ? OR u.email LIKE ?)';
       values.push(`%${search}%`, `%${search}%`);
     }
 
-    sql += ' ORDER BY created_at DESC LIMIT 50';
+    sql += ' ORDER BY u.created_at DESC LIMIT 50';
 
     const users = await query({ query: sql, values });
     return NextResponse.json(users);
@@ -41,18 +51,24 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
-    const body = await request.json();
-    const { full_name, email, password, role, department } = body;
+    const cookieStore = await cookies();
+    const token = cookieStore.get('token')?.value;
+    if (!token) {
+      return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
+    }
+    const decoded = verifyToken(token) as any;
+    const assignedBy = decoded?.userId ?? null;
 
-    // Validate required fields
-    if (!full_name || !email || !role || !department) {
+    const body = await request.json();
+    const { full_name, email, password, role, department_id } = body;
+
+    if (!full_name || !email || !role) {
       return NextResponse.json(
-        { message: 'Missing required fields' },
+        { message: 'Full name, email and at least one role are required' },
         { status: 400 }
       );
     }
 
-    // Check if user exists
     const existing = await query({
       query: 'SELECT id FROM users WHERE email = ?',
       values: [email]
@@ -65,18 +81,30 @@ export async function POST(request: Request) {
       );
     }
 
-    // Hash password (use default if not provided)
     const passwordToHash = password || 'Welcome@2025';
     const hashedPassword = await bcrypt.hash(passwordToHash, 10);
 
+    const roleStr = typeof role === 'string' ? role : (Array.isArray(role) ? role.join(',') : '');
+    const departmentId = department_id != null && department_id !== '' ? Number(department_id) : null;
+
     const result = await query({
-      query: 'INSERT INTO users (full_name, email, password_hash, role, department, status) VALUES (?, ?, ?, ?, ?, ?)',
-      values: [full_name, email, hashedPassword, role, department, 'Active']
+      query: 'INSERT INTO users (full_name, email, password_hash, role, department_id, status) VALUES (?, ?, ?, ?, ?, ?)',
+      values: [full_name, email, hashedPassword, roleStr, departmentId, 'Active']
     });
+
+    const newUserId = (result as any).insertId;
+    const roleList = roleStr.split(',').map((r: string) => r.trim()).filter(Boolean);
+
+    for (const r of roleList) {
+      await query({
+        query: 'INSERT INTO user_roles (user_id, role, assigned_by) VALUES (?, ?, ?)',
+        values: [newUserId, r, assignedBy]
+      });
+    }
 
     return NextResponse.json({
       message: 'User created successfully',
-      userId: (result as any).insertId
+      userId: newUserId
     }, { status: 201 });
   } catch (error) {
     console.error('Error creating user:', error);

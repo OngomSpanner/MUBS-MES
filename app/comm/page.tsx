@@ -22,7 +22,7 @@ function CommContent() {
     case 'propose':
       return <CommPropose />;
     case 'my-proposals':
-      return <CommAllProposals />;
+      return <CommAllProposals showOnlyMine />;
     case 'pending':
       return <CommPending />;
     case 'approved':

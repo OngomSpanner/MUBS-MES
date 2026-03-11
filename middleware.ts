@@ -1,9 +1,25 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
+function dashboardPathForRole(activeRole: string | undefined) {
+    if (!activeRole) return null;
+    const r = activeRole.trim().toLowerCase();
+    if (r === 'strategy manager' || r === 'system administrator') return '/admin';
+    if (r === 'committee member') return '/comm';
+    if (r === 'principal') return '/principal';
+    if (r === 'department head' || r === 'unit head' || r === 'hod') return '/department-head';
+    if (r === 'staff' || r === 'viewer') return '/staff';
+    return null;
+}
+
+function roleAllowedForPath(activeRole: string, allowedRoles: string[]) {
+    const r = activeRole.trim().toLowerCase();
+    return allowedRoles.some((a) => a.trim().toLowerCase() === r);
+}
+
 export function middleware(request: NextRequest) {
     const token = request.cookies.get('token')?.value;
-    const activeRole = request.cookies.get('active_role')?.value;
+    const activeRole = request.cookies.get('active_role')?.value?.trim();
 
     const path = request.nextUrl.pathname;
 
@@ -12,7 +28,7 @@ export function middleware(request: NextRequest) {
         '/admin': ['Strategy Manager', 'System Administrator'],
         '/comm': ['Committee Member'],
         '/principal': ['Principal'],
-        '/unit-head': ['Unit Head', 'HOD'],
+        '/department-head': ['Department Head', 'Unit Head', 'HOD'],
         '/staff': ['Staff', 'Viewer'] // Fallbacks
     };
 
@@ -28,12 +44,24 @@ export function middleware(request: NextRequest) {
         const allowedRoles = routeRequirements[matchingPrefix];
 
         // If active role doesn't match the path requirements, block and redirect to their actual active role dashboard
-        if (!allowedRoles.includes(activeRole)) {
-            let redirectPath = '/staff'; // Default fallback
-            if (activeRole === 'Strategy Manager' || activeRole === 'System Administrator') redirectPath = '/admin';
-            else if (activeRole === 'Committee Member') redirectPath = '/comm';
-            else if (activeRole === 'Principal') redirectPath = '/principal';
-            else if (activeRole === 'Unit Head' || activeRole === 'HOD') redirectPath = '/unit-head';
+        if (!roleAllowedForPath(activeRole, allowedRoles)) {
+            const redirectPath = dashboardPathForRole(activeRole);
+
+            // Unknown/invalid role cookie: break redirect loops by forcing logout
+            if (!redirectPath) {
+                const res = NextResponse.redirect(new URL('/', request.url));
+                res.cookies.delete('token');
+                res.cookies.delete('active_role');
+                return res;
+            }
+
+            // Avoid redirecting to the same place (infinite loop)
+            if (path.startsWith(redirectPath)) {
+                const res = NextResponse.redirect(new URL('/', request.url));
+                res.cookies.delete('token');
+                res.cookies.delete('active_role');
+                return res;
+            }
 
             return NextResponse.redirect(new URL(redirectPath, request.url));
         }
@@ -41,12 +69,13 @@ export function middleware(request: NextRequest) {
 
     // Prevent logged-in users from seeing the login page
     if (token && activeRole && path === '/') {
-        let redirectPath = '/staff'; // Default fallback
-        if (activeRole === 'Strategy Manager' || activeRole === 'System Administrator') redirectPath = '/admin';
-        else if (activeRole === 'Committee Member') redirectPath = '/comm';
-        else if (activeRole === 'Principal') redirectPath = '/principal';
-        else if (activeRole === 'Unit Head' || activeRole === 'HOD') redirectPath = '/unit-head';
-
+        const redirectPath = dashboardPathForRole(activeRole);
+        if (!redirectPath) {
+            const res = NextResponse.next();
+            res.cookies.delete('token');
+            res.cookies.delete('active_role');
+            return res;
+        }
         return NextResponse.redirect(new URL(redirectPath, request.url));
     }
 

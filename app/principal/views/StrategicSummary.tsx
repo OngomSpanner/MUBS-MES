@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import { STRATEGIC_PILLARS_2025_2030 } from '@/lib/strategic-plan';
 
 interface DepartmentActivity {
     id: number;
@@ -21,13 +22,16 @@ interface DepartmentRisk {
 
 interface DepartmentDrillDown {
     id: number;
+    parent_id: number | null;
+    unit_type: string | null;
     name: string;
-    head: string;
+    head: string | null;
     activitiesCount: number;
     overallProgress: number;
     completedCount: number;
     inProgressCount: number;
     delayedCount: number;
+    pillars?: string[];
     recentActivities: DepartmentActivity[];
     risks: DepartmentRisk[];
 }
@@ -65,13 +69,40 @@ export default function StrategicSummary() {
 
     if (loading || !data) {
         return (
-            <div className="d-flex justify-content-center align-items-center vh-100">
+            <div className="d-flex justify-content-center align-items-center min-vh-50 py-5">
                 <div className="spinner-border text-primary" role="status">
                     <span className="visually-hidden">Loading...</span>
                 </div>
             </div>
         );
     }
+
+    const departmentsRaw = data.departments ?? [];
+    const filteredDepartments = departmentsRaw.filter((dept) => {
+        if (pillarFilter !== 'All Pillars') {
+            const pillars = dept.pillars ?? (dept.recentActivities ?? []).map((a: DepartmentActivity) => a.pillar).filter(Boolean);
+            if (!pillars.length || !pillars.includes(pillarFilter)) return false;
+        }
+        if (statusFilter === 'On Track') {
+            const hasOnTrack = (dept.completedCount ?? 0) + (dept.inProgressCount ?? 0) > 0;
+            return hasOnTrack;
+        }
+        if (statusFilter === 'Delayed') return (dept.delayedCount ?? 0) > 0;
+        return true;
+    });
+
+    const roots = departmentsRaw.filter((d) => d.parent_id == null);
+    const childrenByParentId: Record<number, DepartmentDrillDown[]> = {};
+    departmentsRaw.forEach((d) => {
+        if (d.parent_id != null) {
+            if (!childrenByParentId[d.parent_id]) childrenByParentId[d.parent_id] = [];
+            childrenByParentId[d.parent_id].push(d);
+        }
+    });
+    const filteredIds = new Set(filteredDepartments.map((d) => d.id));
+    const rootsToShow = roots.filter(
+        (root) => filteredIds.has(root.id) || (childrenByParentId[root.id] ?? []).some((c) => filteredIds.has(c.id))
+    );
 
     const toggleUnit = (id: number) => {
         setExpandedUnit(expandedUnit === id ? null : id);
@@ -84,11 +115,18 @@ export default function StrategicSummary() {
         return { label: 'Critical', bg: '#fee2e2', color: '#b91c1c' };
     };
 
+    const safeStats = {
+        totalActivities: Number(data.stats?.totalActivities ?? 0),
+        onTrack: Number(data.stats?.onTrack ?? 0),
+        inProgress: Number(data.stats?.inProgress ?? 0),
+        delayed: Number(data.stats?.delayed ?? 0),
+    };
+
     return (
         <div id="page-strategic" className="page-section active-page">
             <div className="alert alert-primary alert-strip alert-dismissible fade show mb-4 d-flex align-items-center gap-2" role="alert" style={{ background: '#eff6ff', borderColor: '#93c5fd', color: '#1d4ed8' }}>
                 <span className="material-symbols-outlined" style={{ fontSize: '20px', color: 'var(--mubs-blue)' }}>info</span>
-                <div>You are viewing a <strong>live snapshot</strong> of the institutional strategic plan. Click any department row to drill down.</div>
+                <div>You are viewing a <strong>live snapshot</strong> of the institutional strategic plan. Expand a faculty or office to see its departments and units with progress.</div>
                 <button type="button" className="btn-close ms-auto" data-bs-dismiss="alert"></button>
             </div>
 
@@ -96,35 +134,35 @@ export default function StrategicSummary() {
             <div className="row g-3 mb-4">
                 <div className="col-6 col-sm-3">
                     <div className="stat-card text-center" style={{ borderLeft: '4px solid var(--mubs-blue)', padding: '1rem', background: '#fff', borderRadius: '12px', boxShadow: '0 2px 4px rgba(0,0,0,0.05)' }}>
-                        <div className="stat-value" style={{ fontSize: '1.8rem', fontWeight: 900 }}>{data.stats.totalActivities}</div>
+                        <div className="stat-value" style={{ fontSize: '1.8rem', fontWeight: 900 }}>{safeStats.totalActivities}</div>
                         <div className="stat-label text-muted small fw-bold text-uppercase">Total Activities</div>
                     </div>
                 </div>
                 <div className="col-6 col-sm-3">
                     <div className="stat-card text-center" style={{ borderLeft: '4px solid #10b981', padding: '1rem', background: '#fff', borderRadius: '12px', boxShadow: '0 2px 4px rgba(0,0,0,0.05)' }}>
-                        <div className="stat-value" style={{ fontSize: '1.8rem', fontWeight: 900, color: '#059669' }}>{data.stats.onTrack}</div>
+                        <div className="stat-value" style={{ fontSize: '1.8rem', fontWeight: 900, color: '#059669' }}>{safeStats.onTrack}</div>
                         <div className="stat-label text-muted small fw-bold text-uppercase">On Track</div>
                     </div>
                 </div>
                 <div className="col-6 col-sm-3">
                     <div className="stat-card text-center" style={{ borderLeft: '4px solid var(--mubs-yellow)', padding: '1rem', background: '#fff', borderRadius: '12px', boxShadow: '0 2px 4px rgba(0,0,0,0.05)' }}>
-                        <div className="stat-value" style={{ fontSize: '1.8rem', fontWeight: 900, color: '#b45309' }}>{data.stats.inProgress}</div>
+                        <div className="stat-value" style={{ fontSize: '1.8rem', fontWeight: 900, color: '#b45309' }}>{safeStats.inProgress}</div>
                         <div className="stat-label text-muted small fw-bold text-uppercase">In Progress</div>
                     </div>
                 </div>
                 <div className="col-6 col-sm-3">
                     <div className="stat-card text-center" style={{ borderLeft: '4px solid var(--mubs-red)', padding: '1rem', background: '#fff', borderRadius: '12px', boxShadow: '0 2px 4px rgba(0,0,0,0.05)' }}>
-                        <div className="stat-value" style={{ fontSize: '1.8rem', fontWeight: 900, color: 'var(--mubs-red)' }}>{data.stats.delayed}</div>
+                        <div className="stat-value" style={{ fontSize: '1.8rem', fontWeight: 900, color: 'var(--mubs-red)' }}>{safeStats.delayed}</div>
                         <div className="stat-label text-muted small fw-bold text-uppercase">Delayed</div>
                     </div>
                 </div>
             </div>
 
-            {/* Drill-down by department */}
+            {/* Faculties & Offices drill-down */}
             <div className="mb-3 d-flex align-items-center justify-content-between flex-wrap gap-2">
                 <h6 className="fw-bold text-dark mb-0 d-flex align-items-center" style={{ fontSize: '1rem' }}>
-                    <span className="material-symbols-outlined me-2 text-primary" style={{ fontSize: '20px' }}>corporate_fare</span>
-                    Institutional Drill-Down — Click to Expand
+                    <span className="material-symbols-outlined me-2 text-primary" style={{ fontSize: '20px' }}>account_tree</span>
+                    Faculties &amp; Offices — Expand to view departments and units
                 </h6>
                 <div className="d-flex gap-2">
                     <select
@@ -134,11 +172,9 @@ export default function StrategicSummary() {
                         onChange={(e) => setPillarFilter(e.target.value)}
                     >
                         <option>All Pillars</option>
-                        <option>Teaching & Learning</option>
-                        <option>Research & Innovation</option>
-                        <option>Governance</option>
-                        <option>Infrastructure</option>
-                        <option>Partnerships</option>
+                        {STRATEGIC_PILLARS_2025_2030.map((p) => (
+                            <option key={p} value={p}>{p}</option>
+                        ))}
                     </select>
                     <select
                         className="form-select form-select-sm"
@@ -153,102 +189,81 @@ export default function StrategicSummary() {
                 </div>
             </div>
 
-            {/* Department rows */}
+            {/* Faculty/Office rows (expand to show departments/units with progress) */}
             <div className="d-flex flex-column gap-3">
-                {data.departments.map((department) => {
-                    const perf = getPerformanceLabel(department.overallProgress);
+                {rootsToShow.length === 0 ? (
+                    <div className="text-center py-5 text-muted">No faculties or offices match the selected filters.</div>
+                ) : rootsToShow.map((root) => {
+                    const children = (childrenByParentId[root.id] ?? []).filter((c) => filteredIds.has(c.id));
+                    const isExpanded = expandedUnit === root.id;
                     return (
-                        <div
-                            key={department.id}
-                            className={`department-drill-row bg-white p-3 rounded-3 shadow-sm border ${expandedUnit === department.id ? 'border-primary' : ''}`}
-                            onClick={() => toggleUnit(department.id)}
-                            style={{ cursor: 'pointer', transition: 'all 0.2s ease' }}
-                        >
-                            <div className="d-flex align-items-center justify-content-between flex-wrap gap-2">
+                        <div key={root.id} className="bg-white rounded-3 shadow-sm border overflow-hidden">
+                            <div
+                                className="p-3 d-flex align-items-center justify-content-between flex-wrap gap-2"
+                                onClick={() => toggleUnit(root.id)}
+                                style={{ cursor: 'pointer', transition: 'all 0.2s ease', borderLeft: isExpanded ? '4px solid var(--mubs-blue)' : '4px solid transparent' }}
+                            >
                                 <div className="d-flex align-items-center gap-3">
-                                    <div style={{ width: '42px', height: '42px', borderRadius: '10px', background: '#f8fafc', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, border: '1px solid #e2e8f0' }}>
-                                        <span className="material-symbols-outlined" style={{ color: 'var(--mubs-blue)' }}>corporate_fare</span>
+                                    <div style={{ width: '42px', height: '42px', borderRadius: '10px', background: '#eff6ff', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, border: '1px solid #bfdbfe' }}>
+                                        <span className="material-symbols-outlined" style={{ color: 'var(--mubs-blue)' }}>account_balance</span>
                                     </div>
                                     <div>
-                                        <div className="fw-bold text-dark" style={{ fontSize: '.92rem' }}>{department.name}</div>
-                                        <div className="text-muted" style={{ fontSize: '.75rem' }}>{department.activitiesCount} activities · {department.head || 'No Department Head Assigned'}</div>
+                                        <div className="fw-bold text-dark" style={{ fontSize: '.95rem' }}>{root.name}</div>
+                                        <div className="text-muted" style={{ fontSize: '.75rem' }}>
+                                            {children.length} department{children.length !== 1 ? 's' : ''} / unit{children.length !== 1 ? 's' : ''}
+                                        </div>
                                     </div>
                                 </div>
-                                <div className="d-flex align-items-center gap-4 flex-wrap">
-                                    <div className="text-center">
-                                        <div className="fw-bold text-dark" style={{ fontSize: '1.1rem' }}>{department.overallProgress}%</div>
-                                        <div style={{ fontSize: '.65rem', color: '#64748b', textTransform: 'uppercase', fontWeight: 700 }}>Progress</div>
-                                    </div>
-                                    <div className="text-center">
-                                        <span className="status-badge" style={{ background: perf.bg, color: perf.color, padding: '4px 10px', borderRadius: '6px', fontWeight: 800, fontSize: '.68rem' }}>{perf.label}</span>
-                                    </div>
-                                    <span className="material-symbols-outlined text-muted" style={{ fontSize: '20px', transition: 'transform 0.2s ease', transform: expandedUnit === department.id ? 'rotate(180deg)' : 'rotate(0deg)' }}>
-                                        expand_more
-                                    </span>
-                                </div>
+                                <span className="material-symbols-outlined text-muted" style={{ fontSize: '22px', transition: 'transform 0.2s ease', transform: isExpanded ? 'rotate(180deg)' : 'rotate(0deg)' }}>
+                                    expand_more
+                                </span>
                             </div>
 
-                            {expandedUnit === department.id && (
-                                <div className="department-drill-detail mt-3 pt-3 border-top border-light">
-                                    <div className="row g-3">
-                                        <div className="col-sm-4">
-                                            <div className="p-3 rounded-3 text-center" style={{ background: '#f8fafc' }}>
-                                                <div className="fw-bold text-dark" style={{ fontSize: '1.1rem' }}>{department.completedCount}</div>
-                                                <div className="text-muted" style={{ fontSize: '.72rem', textTransform: 'uppercase', fontWeight: 700 }}>Completed</div>
-                                            </div>
-                                        </div>
-                                        <div className="col-sm-4">
-                                            <div className="p-3 rounded-3 text-center" style={{ background: '#f8fafc' }}>
-                                                <div className="fw-bold text-dark" style={{ fontSize: '1.1rem' }}>{department.inProgressCount}</div>
-                                                <div className="text-muted" style={{ fontSize: '.72rem', textTransform: 'uppercase', fontWeight: 700 }}>In Progress</div>
-                                            </div>
-                                        </div>
-                                        <div className="col-sm-4">
-                                            <div className="p-3 rounded-3 text-center" style={{ background: '#f8fafc' }}>
-                                                <div className={`fw-bold ${department.delayedCount > 0 ? 'text-danger' : 'text-success'}`} style={{ fontSize: '1.1rem' }}>{department.delayedCount}</div>
-                                                <div className="text-muted" style={{ fontSize: '.72rem', textTransform: 'uppercase', fontWeight: 700 }}>Delayed</div>
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    {department.risks.length > 0 && (
-                                        <div className="mt-3">
-                                            <div className="fw-bold text-danger mb-2 d-flex align-items-center gap-1" style={{ fontSize: '.83rem' }}>
-                                                <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>warning</span> Risk Areas
-                                            </div>
-                                            <div className="d-flex flex-column gap-2">
-                                                {department.risks.map(risk => (
-                                                    <div key={risk.id} className="d-flex align-items-start gap-2 p-2 rounded" style={{ background: '#fff1f2', borderLeft: '3px solid #e31837' }}>
-                                                        <div style={{ fontSize: '.8rem', color: '#450a0a' }}><strong>{risk.title}</strong> — {risk.description || 'No additional details provided.'}</div>
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        </div>
-                                    )}
-
-                                    <div className="mt-3">
-                                        <div className="fw-bold text-dark mb-2" style={{ fontSize: '.83rem' }}>Recent Activities</div>
-                                        <div className="d-flex flex-column gap-2">
-                                            {department.recentActivities.length > 0 ? department.recentActivities.map(act => (
-                                                <div key={act.id} className="d-flex align-items-center gap-3 p-2 rounded-3 hover-bg-light" style={{ transition: 'background 0.2s' }}>
-                                                    <div className="activity-icon" style={{ width: '32px', height: '32px', borderRadius: '8px', background: '#eff6ff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                                        <span className="material-symbols-outlined" style={{ fontSize: '18px', color: 'var(--mubs-blue)' }}>flag</span>
-                                                    </div>
-                                                    <div className="flex-fill">
-                                                        <div className="d-flex justify-content-between align-items-center">
-                                                            <div style={{ fontSize: '.83rem', fontWeight: 600, color: '#0f172a' }}>{act.title}</div>
-                                                            <div className="progress" style={{ width: '80px', height: '4px', borderRadius: '2px' }}>
-                                                                <div className="progress-bar bg-success" style={{ width: `${act.progress}%` }}></div>
+                            {isExpanded && (
+                                <div className="border-top" style={{ background: '#f8fafc' }}>
+                                    {children.length === 0 ? (
+                                        <div className="p-4 text-center text-muted small">No departments or units under this faculty/office match the filters.</div>
+                                    ) : (
+                                        <div className="p-3 pt-2 d-flex flex-column gap-2">
+                                            {children.map((dept) => {
+                                                const progress = Math.max(0, Math.min(100, Number(dept.overallProgress ?? 0)));
+                                                const perf = getPerformanceLabel(progress);
+                                                return (
+                                                    <div
+                                                        key={dept.id}
+                                                        className="d-flex align-items-center gap-3 p-3 rounded-3 bg-white border shadow-sm"
+                                                    >
+                                                        <div style={{ width: '36px', height: '36px', borderRadius: '8px', background: '#f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                                                            <span className="material-symbols-outlined" style={{ color: '#64748b', fontSize: '18px' }}>business</span>
+                                                        </div>
+                                                        <div className="flex-fill min-w-0">
+                                                            <div className="fw-bold text-dark" style={{ fontSize: '.88rem' }}>{dept.name}</div>
+                                                            <div className="d-flex align-items-center gap-2 mt-1">
+                                                                <div className="progress flex-grow-1" style={{ height: '8px', borderRadius: '4px', maxWidth: '200px' }}>
+                                                                    <div
+                                                                        className="progress-bar"
+                                                                        style={{
+                                                                            width: `${progress}%`,
+                                                                            backgroundColor: progress >= 70 ? '#10b981' : progress >= 50 ? '#f59e0b' : '#ef4444',
+                                                                            borderRadius: '4px',
+                                                                        }}
+                                                                    />
+                                                                </div>
+                                                                <span className="fw-bold text-dark" style={{ fontSize: '.85rem', minWidth: '2.5rem' }}>{progress}%</span>
+                                                            </div>
+                                                            <div className="text-muted" style={{ fontSize: '.72rem', marginTop: '2px' }}>
+                                                                {Number(dept.activitiesCount ?? 0)} activities
+                                                                {dept.head ? ` · ${dept.head}` : ''}
                                                             </div>
                                                         </div>
-                                                        <div style={{ fontSize: '.72rem', color: '#64748b' }}>{act.pillar} · {act.progress}% complete · {act.status}</div>
+                                                        <span className="status-badge" style={{ background: perf.bg, color: perf.color, padding: '4px 8px', borderRadius: '6px', fontWeight: 700, fontSize: '.65rem' }}>
+                                                            {perf.label}
+                                                        </span>
                                                     </div>
-                                                </div>
-                                            )) : (
-                                                <div className="text-muted small text-center py-2 italic">No recent activities found for this department.</div>
-                                            )}
+                                                );
+                                            })}
                                         </div>
-                                    </div>
+                                    )}
                                 </div>
                             )}
                         </div>

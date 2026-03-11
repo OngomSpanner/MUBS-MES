@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState } from 'react';
+import { STRATEGIC_PILLARS_2025_2030 } from '@/lib/strategic-plan';
 
 export default function CommitteePropose() {
     const [minutesPreview, setMinutesPreview] = useState(false);
@@ -69,12 +70,9 @@ export default function CommitteePropose() {
                                     <label className="form-label fw-black text-dark small">Strategic Pillar <span className="text-danger">*</span></label>
                                     <select className="form-select" id="pillarSelect">
                                         <option value="">— Select pillar —</option>
-                                        <option>Teaching &amp; Learning</option>
-                                        <option>Research &amp; Innovation</option>
-                                        <option>Infrastructure</option>
-                                        <option>Industry Partnerships</option>
-                                        <option>Governance</option>
-                                        <option>Finance &amp; Resources</option>
+                                        {STRATEGIC_PILLARS_2025_2030.map((p) => (
+                                            <option key={p} value={p}>{p}</option>
+                                        ))}
                                     </select>
                                 </div>
                                 <div className="col-md-6">

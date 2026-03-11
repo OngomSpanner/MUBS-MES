@@ -4,13 +4,18 @@ import { useState, useEffect } from 'react';
 import Layout from '@/components/Layout';
 import { Modal, Button, Form } from 'react-bootstrap';
 import axios from 'axios';
+import { linkify } from '@/lib/linkify';
 
 interface Proposal {
     id: number;
     title: string;
     submitted_by: string;
+    submitted_by_id?: number;
+    committee_position?: string | null;
     department: string;
-    submitted_date: string;
+    department_id?: number;
+    submitted_date: string | null;
+    reviewed_date?: string | null;
     budget: number;
     status: string;
     description?: string;
@@ -19,6 +24,8 @@ interface Proposal {
     pillar_id?: number;
     pillar_title?: string;
     implementation_status?: string;
+    reviewer_notes?: string | null;
+    created_at?: string;
 }
 
 export default function CommitteeView() {
@@ -66,7 +73,8 @@ export default function CommitteeView() {
     const fetchProposals = async () => {
         try {
             const response = await axios.get('/api/committees');
-            setProposals(response.data);
+            const data = response?.data;
+            setProposals(Array.isArray(data) ? data : []);
         } catch (error) {
             console.error('Error fetching proposals:', error);
         } finally {
@@ -96,9 +104,11 @@ export default function CommitteeView() {
         if (!selectedProposal) return;
         setActionLoading(true);
         try {
-            await axios.patch(`/api/committees/${selectedProposal.id}`, { status, reviewer_notes });
+            const res = await axios.patch(`/api/committees/${selectedProposal.id}`, { status, reviewer_notes });
+            const message = (res.data?.message) || (status === 'Approved' ? 'Proposal approved and added to Strategic Activities.' : 'Proposal updated.');
             closeAll();
             fetchProposals();
+            if (message) alert(message);
         } catch (error) {
             console.error('Error updating proposal:', error);
         } finally {
@@ -176,7 +186,8 @@ export default function CommitteeView() {
                                 <th>Activity / Minute Ref</th>
                                 <th>Source Committee</th>
                                 <th>Submitted By</th>
-                                <th>Department</th>
+                                <th>Position at Committee</th>
+                                <th>Unit/Department (implementation)</th>
                                 <th>Date</th>
                                 <th>Status</th>
                                 <th>Actions</th>
@@ -184,9 +195,9 @@ export default function CommitteeView() {
                         </thead>
                         <tbody>
                             {loading ? (
-                                <tr><td colSpan={7} className="text-center py-4">Loading...</td></tr>
+                                <tr><td colSpan={8} className="text-center py-4">Loading...</td></tr>
                             ) : paginatedProposals.length === 0 ? (
-                                <tr><td colSpan={7} className="text-center py-4">No proposals found</td></tr>
+                                <tr><td colSpan={8} className="text-center py-4">No proposals found</td></tr>
                             ) : (
                                 paginatedProposals.map(p => (
                                     <tr key={p.id}>
@@ -198,8 +209,9 @@ export default function CommitteeView() {
                                             <span className="badge bg-light text-dark">{p.committee_type}</span>
                                         </td>
                                         <td>{p.submitted_by}</td>
+                                        <td>{p.committee_position || '—'}</td>
                                         <td>{p.department}</td>
-                                        <td>{p.submitted_date}</td>
+                                        <td>{p.submitted_date ?? '—'}</td>
                                         <td>
                                             <span className={`status-badge ${p.status.toLowerCase().replace(' ', '-')}`}>
                                                 {p.status}
@@ -248,27 +260,47 @@ export default function CommitteeView() {
                         </Modal.Header>
                         <Modal.Body>
                             <h5>{selectedProposal.title}</h5>
-                            <p className="text-muted small">Submitted by {selectedProposal.submitted_by} on {selectedProposal.submitted_date}</p>
+                            <p className="text-muted small">
+                                Submitted by {selectedProposal.submitted_by || (selectedProposal.submitted_by_id != null ? `User #${selectedProposal.submitted_by_id}` : '—')}
+                                {selectedProposal.submitted_date ? ` on ${selectedProposal.submitted_date}` : ''}
+                            </p>
                             <hr />
                             <h6>Description / Rationale</h6>
-                            <p>{selectedProposal.description || 'No description provided.'}</p>
+                            <div className="p-2 bg-light rounded" style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
+                                {linkify(selectedProposal.description) || 'No description provided.'}
+                            </div>
                             <div className="row mt-3">
                                 <div className="col-6 mb-3">
                                     <label className="fw-bold small">Source Committee</label>
-                                    <div>{selectedProposal.committee_type}</div>
+                                    <div>{selectedProposal.committee_type || '—'}</div>
+                                </div>
+                                <div className="col-6 mb-3">
+                                    <label className="fw-bold small">Position at Committee</label>
+                                    <div>{selectedProposal.committee_position || '—'}</div>
                                 </div>
                                 <div className="col-6 mb-3">
                                     <label className="fw-bold small">Minute Reference</label>
-                                    <div>{selectedProposal.minute_reference || 'Not specified'}</div>
+                                    <div style={{ wordBreak: 'break-word' }}>
+                                        {selectedProposal.minute_reference ? linkify(selectedProposal.minute_reference) : '—'}
+                                    </div>
                                 </div>
                                 <div className="col-6 mb-3">
                                     <label className="fw-bold small">Budget</label>
-                                    <div>UGX {selectedProposal.budget.toLocaleString()}</div>
+                                    <div>{selectedProposal.budget != null && selectedProposal.budget !== 0 ? `UGX ${Number(selectedProposal.budget).toLocaleString()}` : '—'}</div>
                                 </div>
                                 <div className="col-6 mb-3">
-                                    <label className="fw-bold small">Department</label>
-                                    <div>{selectedProposal.department}</div>
+                                    <label className="fw-bold small">Unit/Department (implementation)</label>
+                                    <div>{selectedProposal.department || '—'}</div>
                                 </div>
+                                {(selectedProposal.reviewed_date != null || (selectedProposal.reviewer_notes != null && selectedProposal.reviewer_notes !== '')) && (
+                                    <div className="col-12 mb-3">
+                                        <label className="fw-bold small">Review</label>
+                                        <div className="p-2 bg-light rounded" style={{ wordBreak: 'break-word' }}>
+                                            {selectedProposal.reviewed_date != null && <div className="small">Reviewed: {selectedProposal.reviewed_date}</div>}
+                                            {selectedProposal.reviewer_notes != null && selectedProposal.reviewer_notes !== '' && <div className="mt-1">{linkify(selectedProposal.reviewer_notes)}</div>}
+                                        </div>
+                                    </div>
+                                )}
                                 {selectedProposal.pillar_title && (
                                     <div className="col-12 mb-3">
                                         <label className="fw-bold small text-primary">Strategic Goal Alignment</label>
@@ -312,7 +344,7 @@ export default function CommitteeView() {
                         </Modal.Footer>
                     </Modal>
 
-                    <Modal show={showReject} onHide={closeAll} centered>
+                    <Modal show={showReject} onHide={closeAll} centered contentClassName="modal-content-danger">
                         <Modal.Header closeButton className="modal-header-mubs bg-danger">
                             <Modal.Title>Reject Proposal</Modal.Title>
                         </Modal.Header>

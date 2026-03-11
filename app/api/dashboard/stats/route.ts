@@ -23,39 +23,40 @@ export async function GET() {
       query: 'SELECT COUNT(*) as count FROM users WHERE status = "Active"'
     });
 
-    // Get completed activities
+    // strategic_activities.status: enum('pending','in_progress','completed','overdue')
     const completedActivities = await query({
-      query: 'SELECT COUNT(*) as count FROM strategic_activities WHERE status = "Completed"'
+      query: "SELECT COUNT(*) as count FROM strategic_activities WHERE status = 'completed'"
     });
 
-    // Get pending committee proposals
+    // Get pending committee proposals (committee_proposals.status: 'Pending', etc.)
     const pendingProposals = await query({
       query: 'SELECT COUNT(*) as count FROM committee_proposals WHERE status = "Pending"'
     });
 
-    // Get on-track activities
+    // On-track = in_progress (activities being worked on)
     const onTrackActivities = await query({
-      query: 'SELECT COUNT(*) as count FROM strategic_activities WHERE status = "On Track"'
+      query: "SELECT COUNT(*) as count FROM strategic_activities WHERE status = 'in_progress'"
     });
 
-    // Get in-progress activities
     const inProgressActivities = await query({
-      query: 'SELECT COUNT(*) as count FROM strategic_activities WHERE status = "In Progress"'
+      query: "SELECT COUNT(*) as count FROM strategic_activities WHERE status = 'in_progress'"
     });
 
-    // Get delayed activities
+    // Delayed = overdue (strategic_activities.status = 'overdue')
     const delayedActivities = await query({
-      query: 'SELECT COUNT(*) as count FROM strategic_activities WHERE status = "Delayed"'
+      query: "SELECT COUNT(*) as count FROM strategic_activities WHERE status = 'overdue'"
     });
 
-    // Get department performance
+    // Office/Faculty performance: avg strategic_activities.progress per office/faculty (parent_id IS NULL), including all activities under their units
     const departmentPerformance = await query({
       query: `
-        SELECT u.name, AVG(sa.progress) as progress
-        FROM departments u
-        LEFT JOIN strategic_activities sa ON u.id = sa.department_id
-        GROUP BY u.id
-        LIMIT 6
+        SELECT parent.id, parent.name, ROUND(AVG(sa.progress)) AS progress
+        FROM departments parent
+        LEFT JOIN departments child ON child.parent_id = parent.id
+        LEFT JOIN strategic_activities sa ON (sa.department_id = child.id OR sa.department_id = parent.id)
+        WHERE parent.parent_id IS NULL
+        GROUP BY parent.id, parent.name
+        ORDER BY progress DESC, parent.name ASC
       `
     });
 
@@ -113,7 +114,7 @@ export async function GET() {
       },
       departmentPerformance: (departmentPerformance as any[]).map(department => ({
         name: department.name,
-        progress: Math.round(department.progress || 0)
+        progress: Math.min(100, Math.max(0, Number(department.progress) || 0))
       })),
       recentActivities: recentActivities,
       hrAlerts: hrAlerts

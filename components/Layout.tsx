@@ -67,13 +67,19 @@ function LayoutContent({ children, sidebarOpen, setSidebarOpen }: any) {
 export default function Layout({ children }: { children: React.ReactNode }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    try {
+      await fetch('/api/auth/logout', { method: 'POST' });
+    } catch (e) {
+      console.error('Logout API call failed:', e);
+    }
     localStorage.removeItem('token');
     localStorage.removeItem('user');
     sessionStorage.clear();
     document.cookie = 'token=; Path=/; Expires=Thu, 01 Jan 1970 00:00:01 GMT;';
     window.location.href = '/';
   };
+
 
   return (
     <div className="app-shell">
