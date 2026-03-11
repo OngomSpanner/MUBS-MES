@@ -20,7 +20,10 @@ export async function POST(request: Request) {
     if (!token) {
       return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
     }
-    verifyToken(token);
+    const decoded = verifyToken(token);
+    if (!decoded) {
+      return NextResponse.json({ message: 'Invalid token' }, { status: 401 });
+    }
 
     const body = await request.json();
     const { to, subject, reportTitle, format, fileBase64, fileName } = body as {

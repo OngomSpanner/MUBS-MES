@@ -16,34 +16,34 @@ export async function GET() {
         const decoded = verifyToken(token) as any;
         if (!decoded || !decoded.userId) throw new Error('Invalid token');
 
-        // Fetch evaluated reports: evaluated/acknowledged, or draft with evaluation (returned for revision)
+        // Fetch reports that have been evaluated by HOD: any report with an evaluation record for this staff's assignments
         const feedbackRecordsRaw = await query({
             query: `
                 SELECT 
                     sr.id,
-                    sa.title as report_name,
-                    p.title as activity_title,
-                    u.full_name as evaluator_name,
-                    COALESCE(e.evaluation_date, sr.updated_at) as evaluated_at,
-                    sr.status as db_status,
+                    sa.title AS report_name,
+                    p.title AS activity_title,
+                    u.full_name AS evaluator_name,
+                    COALESCE(e.evaluation_date, sr.updated_at) AS evaluated_at,
+                    sr.status AS db_status,
                     e.rating,
-                    e.qualitative_feedback as reviewer_notes
+                    e.qualitative_feedback AS reviewer_notes
                 FROM staff_reports sr
                 JOIN activity_assignments aa ON sr.activity_assignment_id = aa.id
                 JOIN strategic_activities sa ON aa.activity_id = sa.id
                 LEFT JOIN strategic_activities p ON sa.parent_id = p.id
-                LEFT JOIN evaluations e ON e.staff_report_id = sr.id
+                INNER JOIN evaluations e ON e.staff_report_id = sr.id
                 LEFT JOIN users u ON e.evaluated_by = u.id
                 WHERE aa.assigned_to_user_id = ?
-                AND (sr.status IN ('evaluated', 'acknowledged') OR (sr.status = 'draft' AND e.id IS NOT NULL))
-                ORDER BY evaluated_at DESC
+                ORDER BY COALESCE(e.evaluation_date, sr.updated_at) DESC
             `,
             values: [decoded.userId]
         }) as any[];
 
         const feedbackRecords = feedbackRecordsRaw.map(r => {
             const status = (r.db_status === 'evaluated' || r.db_status === 'acknowledged') ? 'Completed' : 'Returned';
-            const score = r.rating ? ratingToScore[r.rating] : null;
+            const ratingKey = r.rating ? String(r.rating).toLowerCase().replace(/\s+/g, '_') : null;
+            const score = ratingKey ? (ratingToScore[ratingKey] ?? null) : null;
             return {
                 ...r,
                 status,

@@ -10,7 +10,10 @@ export async function GET() {
         if (!token) {
             return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
         }
-        verifyToken(token);
+        const decoded = verifyToken(token);
+        if (!decoded) {
+            return NextResponse.json({ message: 'Invalid token' }, { status: 401 });
+        }
 
         // strategic_activities: status enum('pending','in_progress','completed','overdue'), progress int. Only top-level (parent_id IS NULL).
         const summaryStats = await query({

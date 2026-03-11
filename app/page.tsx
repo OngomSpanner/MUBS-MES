@@ -12,6 +12,7 @@ export default function LoginPage() {
   const router = useRouter();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -200,10 +201,10 @@ export default function LoginPage() {
             />
             <label htmlFor="email" className="text-muted">Email address</label>
           </div>
-          <div className="form-floating mb-3">
+          <div className="form-floating mb-3 position-relative">
             <input
-              type="password"
-              className="form-control"
+              type={showPassword ? 'text' : 'password'}
+              className="form-control pe-5"
               id="password"
               placeholder="Password"
               value={password}
@@ -212,6 +213,18 @@ export default function LoginPage() {
               style={{ borderRadius: '10px', border: '1px solid #ced4da' }}
             />
             <label htmlFor="password" className="text-muted">Password</label>
+            <button
+              type="button"
+              className="btn btn-link position-absolute end-0 top-50 translate-middle-y text-muted text-decoration-none p-2 me-1"
+              style={{ zIndex: 5 }}
+              onClick={() => setShowPassword((v) => !v)}
+              aria-label={showPassword ? 'Hide password' : 'Show password'}
+              tabIndex={-1}
+            >
+              <span className="material-symbols-outlined" style={{ fontSize: '22px' }}>
+                {showPassword ? 'visibility_off' : 'visibility'}
+              </span>
+            </button>
           </div>
           <div className="d-flex justify-content-end mb-3 mt-n2">
             <button 

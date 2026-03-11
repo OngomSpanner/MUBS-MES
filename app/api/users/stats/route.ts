@@ -10,7 +10,10 @@ export async function GET() {
         if (!token) {
             return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
         }
-        verifyToken(token);
+        const decoded = verifyToken(token);
+        if (!decoded) {
+            return NextResponse.json({ message: 'Invalid token' }, { status: 401 });
+        }
 
         const rows = await query({
             query: `

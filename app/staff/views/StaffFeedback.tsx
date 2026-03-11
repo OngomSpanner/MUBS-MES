@@ -21,9 +21,16 @@ interface Stats {
     returnedCount: number;
 }
 
+const defaultStats: Stats = {
+    totalEvaluations: 0,
+    averageScore: '0.0',
+    completionRate: 0,
+    returnedCount: 0
+};
+
 export default function StaffFeedback() {
     const [feedbackList, setFeedbackList] = useState<FeedbackItem[]>([]);
-    const [stats, setStats] = useState<Stats | null>(null);
+    const [stats, setStats] = useState<Stats>(defaultStats);
     const [loading, setLoading] = useState(true);
     const [selectedItem, setSelectedItem] = useState<FeedbackItem | null>(null);
 
@@ -31,10 +38,14 @@ export default function StaffFeedback() {
         const fetchFeedback = async () => {
             try {
                 const response = await axios.get('/api/staff/feedback');
-                setFeedbackList(response.data.feedback);
-                setStats(response.data.stats);
+                const feedback = Array.isArray(response.data?.feedback) ? response.data.feedback : [];
+                const statsData = response.data?.stats;
+                setFeedbackList(feedback);
+                setStats(statsData && typeof statsData === 'object' ? statsData : defaultStats);
             } catch (error) {
                 console.error("Failed to fetch feedback", error);
+                setFeedbackList([]);
+                setStats(defaultStats);
             } finally {
                 setLoading(false);
             }
@@ -47,7 +58,7 @@ export default function StaffFeedback() {
         return new Date(dateString).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
     };
 
-    if (loading || !stats) {
+    if (loading) {
         return (
             <div className="d-flex justify-content-center align-items-center vh-100">
                 <div className="spinner-border text-primary" role="status">

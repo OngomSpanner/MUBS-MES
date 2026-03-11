@@ -4,6 +4,11 @@ import jwt from 'jsonwebtoken';
 import nodemailer from 'nodemailer';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'your-super-secret-jwt-key-change-this-123456';
+function ensureJwtSecret() {
+  if (process.env.NODE_ENV === 'production' && (!process.env.JWT_SECRET || process.env.JWT_SECRET === 'your-super-secret-jwt-key-change-this-123456')) {
+    throw new Error('JWT_SECRET must be set in production');
+  }
+}
 
 // Initialize Nodemailer transporter
 const transporter = nodemailer.createTransport({
@@ -18,6 +23,7 @@ const transporter = nodemailer.createTransport({
 
 export async function POST(request: Request) {
   try {
+    ensureJwtSecret();
     const { email } = await request.json();
 
     if (!email) {

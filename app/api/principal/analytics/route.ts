@@ -1,8 +1,20 @@
 import { NextResponse } from 'next/server';
 import { query } from '@/lib/db';
+import { cookies } from 'next/headers';
+import { verifyToken } from '@/lib/auth';
 
 export async function GET() {
     try {
+        const cookieStore = await cookies();
+        const token = cookieStore.get('token')?.value;
+        if (!token) {
+            return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
+        }
+        const decoded = verifyToken(token);
+        if (!decoded) {
+            return NextResponse.json({ message: 'Invalid token' }, { status: 401 });
+        }
+
         const departmentPerformance = await query({
             query: `
                 SELECT d.name as \`label\`, ROUND(IFNULL(AVG(sa.progress), 0)) as \`value\`
