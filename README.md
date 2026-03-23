@@ -10,6 +10,7 @@ The Strategic Planning System (SPS) is a comprehensive web application built to 
 - **Activity Tracking:** Monitor progress on various tasks and activities with status updates, timelines, and detailed notes.
 - **Comprehensive Reporting:** Generate dynamic reports, trends analysis, and export data seamlessly using built-in PDF (jsPDF) and Excel (XLSX) generation tools.
 - **Notifications System:** In-app notifications to keep users informed about important updates, proposal statuses, and system alerts.
+- **Advanced Task Management:** Bulk delete functionality, recurring task intervals, and intuitive modal interfaces for efficient activity handling.
 
 ## Tech Stack
 
