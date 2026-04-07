@@ -1,0 +1,5 @@
+Email,First Name,Surname,Other Names,Employee ID,Staff Category,Contract Terms,Contract Type,Department ID,Role,Account Status
+j.doe@mubs.ac.ug,John,Doe,S,EMP-1001,Administrative,Permanent,Full-time,1,staff,Active
+a.smith@mubs.ac.ug,Alice,Smith,,EMP-1002,Academic,Contract,Full-time,15,hod,Active
+b.brown@mubs.ac.ug,Bob,Brown,L,EMP-1003,Support,Permanent,Part-time,3,staff,Pending
+admin_test@mubs.ac.ug,Admin,Test,,EMP-001,Administrative,Permanent,Full-time,9,system_admin,Active

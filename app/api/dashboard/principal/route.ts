@@ -28,7 +28,7 @@ export async function GET() {
                     (SELECT COUNT(*) FROM departments WHERE is_active = 1) as \`totalUnits\`,
                     (SELECT COUNT(*) FROM users WHERE status = 'Active') as \`activeStaff\`
                 FROM strategic_activities
-                WHERE parent_id IS NULL AND source IS NOT NULL
+                WHERE parent_id IS NULL AND COALESCE(TRIM(source), '') <> ''
             `
     }) as any[];
 
@@ -44,7 +44,7 @@ export async function GET() {
                     d.name as department, 
                     ROUND(IFNULL(AVG(sa.progress), 0)) as progress
                 FROM departments d
-                LEFT JOIN strategic_activities sa ON d.id = sa.department_id AND sa.parent_id IS NULL AND sa.source IS NOT NULL
+                LEFT JOIN strategic_activities sa ON d.id = sa.department_id AND sa.parent_id IS NULL AND COALESCE(TRIM(sa.source), '') <> ''
                 WHERE d.is_active = 1
                 GROUP BY d.id, d.parent_id, d.unit_type, d.name
                 ORDER BY (d.parent_id IS NULL) DESC, d.name ASC
@@ -56,7 +56,7 @@ export async function GET() {
                 SELECT COUNT(*) as compliant FROM (
                     SELECT d.id, ROUND(IFNULL(AVG(sa.progress), 0)) as p
                     FROM departments d
-                    LEFT JOIN strategic_activities sa ON d.id = sa.department_id AND sa.parent_id IS NULL AND sa.source IS NOT NULL
+                    LEFT JOIN strategic_activities sa ON d.id = sa.department_id AND sa.parent_id IS NULL AND COALESCE(TRIM(sa.source), '') <> ''
                     WHERE d.is_active = 1
                     GROUP BY d.id
                     HAVING p >= 75
@@ -79,7 +79,7 @@ export async function GET() {
     const dueThisWeekResult = await query({
       query: `
         SELECT COUNT(*) as c FROM strategic_activities
-        WHERE parent_id IS NULL AND source IS NOT NULL AND status != 'completed'
+        WHERE parent_id IS NULL AND COALESCE(TRIM(source), '') <> '' AND status != 'completed'
         AND end_date IS NOT NULL AND end_date >= CURDATE() AND end_date <= DATE_ADD(CURDATE(), INTERVAL 7 DAY)
       `,
       values: []
@@ -102,7 +102,7 @@ export async function GET() {
                     DATEDIFF(CURDATE(), sa.end_date) as daysPast
                 FROM strategic_activities sa
                 LEFT JOIN departments d ON sa.department_id = d.id
-                WHERE sa.parent_id IS NULL AND sa.source IS NOT NULL
+                WHERE sa.parent_id IS NULL AND COALESCE(TRIM(sa.source), '') <> ''
                 AND (sa.status = 'overdue' OR (sa.end_date IS NOT NULL AND sa.end_date < CURDATE()) OR (sa.status != 'completed' AND sa.end_date IS NOT NULL AND DATEDIFF(sa.end_date, CURDATE()) <= 7))
                 ORDER BY sa.end_date ASC
                 LIMIT 10
@@ -120,7 +120,7 @@ export async function GET() {
                     sa.progress
                 FROM strategic_activities sa
                 LEFT JOIN departments d ON sa.department_id = d.id
-                WHERE sa.parent_id IS NULL AND sa.source IS NOT NULL AND sa.end_date IS NOT NULL AND sa.end_date < CURDATE() AND sa.status != 'completed'
+                WHERE sa.parent_id IS NULL AND COALESCE(TRIM(sa.source), '') <> '' AND sa.end_date IS NOT NULL AND sa.end_date < CURDATE() AND sa.status != 'completed'
                 ORDER BY sa.end_date ASC
                 LIMIT 10
             `

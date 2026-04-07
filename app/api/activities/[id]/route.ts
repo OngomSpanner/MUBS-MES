@@ -3,6 +3,7 @@ import { query } from '@/lib/db';
 import { cookies } from 'next/headers';
 import { verifyToken } from '@/lib/auth';
 import { ensureParentIsStrategicActivity } from '@/lib/strategic-performance-types';
+import { normalizeActivityUnitOfMeasure } from '@/lib/activity-unit-of-measure';
 
 export async function GET(
   request: Request,
@@ -84,6 +85,9 @@ export async function PUT(
     const {
       title,
       strategic_objective,
+      objective_id,
+      standard_id,
+      unit_of_measure,
       description,
       pillar,
       department_id,
@@ -93,9 +97,22 @@ export async function PUT(
       status,
       parent_id,
       progress,
-      start_date,
-      end_date
+      start_date: reqStartDate,
+      end_date: reqEndDate,
+      target_fy25_26,
+      target_fy26_27,
+      target_fy27_28,
+      target_fy28_29,
+      target_fy29_30
     } = body;
+
+    const uom = normalizeActivityUnitOfMeasure(
+      typeof unit_of_measure === 'string' ? unit_of_measure : undefined
+    );
+
+    // Default to the 5-year Uganda Financial span if no dates are provided
+    const start_date = reqStartDate || '2025-07-01';
+    const end_date = reqEndDate || '2030-06-30';
 
     const desc = strategic_objective ?? description ?? '';
     const rawDeptIds = department_ids ?? (department_id != null && department_id !== '' ? [department_id] : []);
@@ -131,37 +148,26 @@ export async function PUT(
     const detailStartIndex = deptIds.length > 1 ? 0 : 1;
     const childDeptIds = deptIds.slice(detailStartIndex);
 
-    const runUpdate = async (useLegacy: boolean) => {
-      const pillarVal = pillarForDb(pillar && String(pillar).trim() ? pillar : null, useLegacy);
+    const runUpdate = async () => {
+      const pillarVal = !pillar || !String(pillar).trim() ? null : pillar;
       const values = [
         title, desc, pillarVal, mainDeptId, target_kpi || null, kpi_target_value || null, dbStatus,
-        newParentId, progress ?? 0, start_date || null, end_date || null, id
+        newParentId, progress ?? 0, start_date || null, end_date || null, objective_id || null, standard_id || null, uom,
+        target_fy25_26 || null, target_fy26_27 || null, target_fy27_28 || null, target_fy28_29 || null, target_fy29_30 || null,
+        id
       ];
 
       try {
         await query({
           query: `
             UPDATE strategic_activities 
-            SET title = ?, description = ?, pillar = ?, department_id = ?, target_kpi = ?, kpi_target_value = ?, status = ?, parent_id = ?, progress = ?, start_date = ?, end_date = ?
+            SET title = ?, description = ?, pillar = ?, department_id = ?, target_kpi = ?, kpi_target_value = ?, status = ?, parent_id = ?, progress = ?, start_date = ?, end_date = ?, objective_id = ?, standard_id = ?, unit_of_measure = ?, target_fy25_26 = ?, target_fy26_27 = ?, target_fy27_28 = ?, target_fy28_29 = ?, target_fy29_30 = ?
             WHERE id = ?
           `,
           values
         });
       } catch (err: any) {
-        const msg = String(err?.message || '');
-        if (err?.code === 'ER_BAD_FIELD_ERROR') {
-          // This path handles DBs where kpi_target_value wasn't migrated but other updates are still allowed
-          await query({
-            query: `
-              UPDATE strategic_activities 
-              SET title = ?, description = ?, pillar = ?, department_id = ?, target_kpi = ?, status = ?, parent_id = ?, progress = ?, start_date = ?, end_date = ?
-              WHERE id = ?
-            `,
-            values: [title, desc, pillarVal, mainDeptId, target_kpi || null, dbStatus, newParentId, progress ?? 0, start_date || null, end_date || null, id]
-          });
-        } else {
-          throw err;
-        }
+        throw err;
       }
 
       // Handle Detailed (child) rows
@@ -175,62 +181,52 @@ export async function PUT(
         if (i < childDeptIds.length) {
           try {
             await query({
-              query: 'UPDATE strategic_activities SET department_id = ?, title = ?, description = ?, pillar = ? WHERE id = ?',
-              values: [childDeptIds[i], title, desc, pillarVal, childIds[i]]
+              query: `UPDATE strategic_activities SET department_id = ?, title = ?, description = ?, pillar = ?, objective_id = ?, standard_id = ?, unit_of_measure = ?, target_kpi = ?, kpi_target_value = ?, target_fy25_26 = ?, target_fy26_27 = ?, target_fy27_28 = ?, target_fy28_29 = ?, target_fy29_30 = ? WHERE id = ?`,
+              values: [
+                childDeptIds[i],
+                title,
+                desc,
+                pillarVal,
+                objective_id || null,
+                standard_id || null,
+                uom,
+                target_kpi || null,
+                kpi_target_value || null,
+                target_fy25_26 || null,
+                target_fy26_27 || null,
+                target_fy27_28 || null,
+                target_fy28_29 || null,
+                target_fy29_30 || null,
+                childIds[i],
+              ],
             });
           } catch (err: any) {
-            if (err?.code === 'ER_BAD_FIELD_ERROR') {
-              await query({
-                query: 'UPDATE strategic_activities SET department_id = ?, title = ?, description = ?, pillar = ? WHERE id = ?',
-                values: [childDeptIds[i], title, desc, pillarVal, childIds[i]]
-              });
-            } else {
-              throw err;
-            }
+             throw err;
           }
         } else {
           await query({ query: 'DELETE FROM strategic_activities WHERE id = ?', values: [childIds[i]] });
         }
       }
       for (let i = childIds.length; i < childDeptIds.length; i++) {
-        const childInsertValues = [title, desc, pillarVal, childDeptIds[i], target_kpi || null, kpi_target_value || null, dbStatus, mainId, start_date || null, end_date || null];
-        const childInsertLegacyValues = [title, desc, pillarVal, childDeptIds[i], target_kpi || null, dbStatus, mainId, start_date || null, end_date || null];
+        const childInsertValues = [title, desc, pillarVal, childDeptIds[i], target_kpi || null, kpi_target_value || null, dbStatus, mainId, start_date || null, end_date || null, objective_id || null, standard_id || null, uom, target_fy25_26 || null, target_fy26_27 || null, target_fy27_28 || null, target_fy28_29 || null, target_fy29_30 || null];
         try {
           await query({
             query: `
-              INSERT INTO strategic_activities (activity_type, task_type, source, title, description, pillar, department_id, target_kpi, kpi_target_value, status, parent_id, progress, start_date, end_date)
-              VALUES ('detailed', 'process', 'strategic_plan', ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?)
+              INSERT INTO strategic_activities (activity_type, task_type, source, title, description, pillar, department_id, target_kpi, kpi_target_value, status, parent_id, progress, start_date, end_date, objective_id, standard_id, unit_of_measure, target_fy25_26, target_fy26_27, target_fy27_28, target_fy28_29, target_fy29_30)
+              VALUES ('detailed', 'process', 'strategic_plan', ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             `,
             values: childInsertValues
           });
         } catch (err: any) {
-          if (err?.code === 'ER_BAD_FIELD_ERROR') {
-            await query({
-              query: `
-                INSERT INTO strategic_activities (activity_type, task_type, source, title, description, pillar, department_id, target_kpi, status, parent_id, progress, start_date, end_date)
-                VALUES ('detailed', 'process', 'strategic_plan', ?, ?, ?, ?, ?, ?, ?, 0, ?, ?)
-              `,
-              values: childInsertLegacyValues
-            });
-          } else {
-            throw err;
-          }
+           throw err;
         }
       }
     };
 
     try {
-      await runUpdate(false);
+      await runUpdate();
     } catch (err: any) {
-      const msg = String(err?.message || '');
-      const isSchemaError =
-        msg.includes("Data truncated for column 'pillar'") ||
-        msg.includes('pillar') && (msg.includes('truncated') || msg.includes('enum'));
-      if (isSchemaError) {
-        await runUpdate(true);
-      } else {
-        throw err;
-      }
+      throw err;
     }
     return NextResponse.json({ message: 'Activity updated successfully' });
   } catch (error: any) {

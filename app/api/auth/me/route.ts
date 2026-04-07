@@ -33,6 +33,21 @@ export async function GET() {
 
         const rolesArray = parseRoles(user.role);
 
+        // Fetch roles from user_roles table to ensure all assigned roles are captured
+        try {
+            const roleRows = await query({
+                query: 'SELECT role FROM user_roles WHERE user_id = ?',
+                values: [user.id]
+            }) as any[];
+            for (const r of roleRows) {
+                if (r.role && !rolesArray.includes(r.role)) {
+                    rolesArray.push(r.role);
+                }
+            }
+        } catch (roleTableErr) {
+            console.error('user_roles table error:', roleTableErr);
+        }
+
         // Committee assignments (for Committee Member role) – empty if table not yet migrated
         let committees: string[] = [];
         try {

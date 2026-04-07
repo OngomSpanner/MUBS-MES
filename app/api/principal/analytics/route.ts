@@ -19,7 +19,7 @@ export async function GET() {
             query: `
                 SELECT d.name as \`label\`, ROUND(IFNULL(AVG(sa.progress), 0)) as \`value\`
                 FROM departments d
-                LEFT JOIN strategic_activities sa ON d.id = sa.department_id AND sa.parent_id IS NULL AND sa.source IS NOT NULL
+                LEFT JOIN strategic_activities sa ON d.id = sa.department_id AND sa.parent_id IS NULL AND COALESCE(TRIM(sa.source), '') <> ''
                 WHERE d.is_active = 1
                 GROUP BY d.id, d.name
                 ORDER BY \`value\` DESC
@@ -35,7 +35,7 @@ export async function GET() {
             query: `
                 SELECT status, COUNT(*) as count
                 FROM strategic_activities
-                WHERE parent_id IS NULL AND source IS NOT NULL
+                WHERE parent_id IS NULL AND COALESCE(TRIM(source), '') <> ''
                 GROUP BY status
             `
         }) as any[];

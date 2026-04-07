@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { query } from '@/lib/db';
 import { cookies } from 'next/headers';
 import { verifyToken } from '@/lib/auth';
+import { normalizeActivityUnitOfMeasure } from '@/lib/activity-unit-of-measure';
 
 // Two-tier flat: Strategic Activity (parent_id IS NULL) = fixed goals; Weekly Task (parent_id set) = sibling tasks under one activity.
 
@@ -25,17 +26,22 @@ export async function GET(request: Request) {
             sa.id, sa.title, sa.description, sa.pillar, sa.department_id, sa.target_kpi,
             sa.start_date, sa.end_date, sa.status, sa.progress, sa.parent_id,
             sa.activity_type, sa.created_by, sa.created_at, sa.actual_value, sa.kpi_target_value,
+            sa.objective_id, sa.standard_id, sa.unit_of_measure,
+            sa.target_fy25_26, sa.target_fy26_27, sa.target_fy27_28, sa.target_fy28_29, sa.target_fy29_30,
             COALESCE(p.title, sa.title) AS display_title,
             COALESCE(p.description, sa.description) AS display_description,
             d.name AS department,
             parent.name AS faculty_office,
             p.title AS parent_title,
+            s.quality_standard AS quality_string,
+            s.output_standard AS output_string,
             CONCAT(IFNULL(DATE_FORMAT(sa.start_date, '%b %Y'), '-'), ' – ', IFNULL(DATE_FORMAT(sa.end_date, '%b %Y'), '-')) AS timeline
           FROM strategic_activities sa
           LEFT JOIN departments d ON sa.department_id = d.id
           LEFT JOIN departments parent ON d.parent_id = parent.id
           LEFT JOIN strategic_activities p ON sa.parent_id = p.id
-          WHERE sa.source IS NOT NULL
+          LEFT JOIN standards s ON sa.standard_id = s.id
+          WHERE COALESCE(TRIM(sa.source), '') <> ''
           ORDER BY sa.created_at DESC, sa.id DESC
           LIMIT 500
         `
@@ -49,17 +55,21 @@ export async function GET(request: Request) {
               sa.id, sa.title, sa.description, sa.pillar, sa.department_id, sa.target_kpi,
               sa.start_date, sa.end_date, sa.status, sa.progress, sa.parent_id,
               sa.activity_type, sa.created_by, sa.created_at, sa.actual_value, sa.kpi_target_value,
+              sa.objective_id, sa.standard_id, sa.unit_of_measure,
               COALESCE(p.title, sa.title) AS display_title,
               COALESCE(p.description, sa.description) AS display_description,
               d.name AS department,
               parent.name AS faculty_office,
               p.title AS parent_title,
+              s.quality_standard AS quality_string,
+              s.output_standard AS output_string,
               CONCAT(IFNULL(DATE_FORMAT(sa.start_date, '%b %Y'), '-'), ' – ', IFNULL(DATE_FORMAT(sa.end_date, '%b %Y'), '-')) AS timeline
             FROM strategic_activities sa
             LEFT JOIN departments d ON sa.department_id = d.id
             LEFT JOIN departments parent ON d.parent_id = parent.id
             LEFT JOIN strategic_activities p ON sa.parent_id = p.id
-            WHERE sa.source IS NOT NULL
+            LEFT JOIN standards s ON sa.standard_id = s.id
+            WHERE COALESCE(TRIM(sa.source), '') <> ''
             ORDER BY sa.created_at DESC, sa.id DESC
             LIMIT 500
           `
@@ -101,8 +111,6 @@ export async function GET(request: Request) {
       for (const deptId of deptIdsToEmit) {
         const department = deptId != null ? (deptIdToName.get(deptId) ?? '-') : (r.department ?? '-');
         
-        // Find the specific assignment row for this department. 
-        // If it's a multi-dept goal, look for the 'detailed' row in 'rows' for this mainId and deptId.
         let individualRow = r;
         if (deptId != null && department_ids.length > 1) {
           const detail = rows.find(row => row.parent_id === mainId && row.department_id === deptId);
@@ -110,7 +118,6 @@ export async function GET(request: Request) {
             individualRow = detail;
           }
         } else if (deptId != null && r.department_id !== deptId) {
-          // Fallback check: if r.department_id is somehow different but deptId is what we're emitting
           const detail = rows.find(row => row.parent_id === mainId && row.department_id === deptId);
           if (detail) individualRow = detail;
         }
@@ -152,20 +159,7 @@ function mapStatusToDb(status: string): string {
   return 'pending';
 }
 
-// Map 2025-2030 pillars to legacy enum for DBs that haven't run strategic_plan_2025_2030 migration
-const PILLAR_LEGACY_MAP: Record<string, string | null> = {
-  'Research, Innovation & Community Engagement': 'Research & Innovation',
-  'Equity & Social Safeguards': 'Governance',
-  'Human Capital & Sustainability': 'Teaching & Learning',
-  'Partnerships & Internationalisation': 'Partnerships',
-};
-const LEGACY_PILLARS = new Set(['Teaching & Learning', 'Research & Innovation', 'Governance', 'Infrastructure', 'Partnerships']);
-
-function pillarForDb(pillar: string | null, useLegacy: boolean): string | null {
-  if (!pillar || !String(pillar).trim()) return null;
-  if (useLegacy) return PILLAR_LEGACY_MAP[pillar] ?? (LEGACY_PILLARS.has(pillar) ? pillar : null);
-  return pillar;
-}
+// Legacy pillar mapping removed as DB column is now VARCHAR(255)
 
 export async function POST(request: Request) {
   try {
@@ -173,6 +167,9 @@ export async function POST(request: Request) {
     const {
       title,
       strategic_objective,
+      objective_id,
+      standard_id,
+      unit_of_measure,
       description,
       pillar,
       department_id,
@@ -181,9 +178,22 @@ export async function POST(request: Request) {
       kpi_target_value,
       status,
       parent_id,
-      start_date,
-      end_date
+      start_date: reqStartDate,
+      end_date: reqEndDate,
+      target_fy25_26,
+      target_fy26_27,
+      target_fy27_28,
+      target_fy28_29,
+      target_fy29_30
     } = body;
+
+    const uom = normalizeActivityUnitOfMeasure(
+      typeof unit_of_measure === 'string' ? unit_of_measure : undefined
+    );
+
+    // Default to the 5-year Financial Years
+    const start_date = reqStartDate || '2025-07-01';
+    const end_date = reqEndDate || '2030-06-30';
 
     const desc = strategic_objective ?? description ?? '';
     const rawDeptIds = department_ids ?? (department_id != null && department_id !== '' ? [department_id] : []);
@@ -200,17 +210,18 @@ export async function POST(request: Request) {
       }
     } catch (_) {}
 
-    const runInsert = async (useLegacy: boolean) => {
-      const pillarVal = pillarForDb(pillar && String(pillar).trim() ? pillar : null, useLegacy);
+    const runInsert = async () => {
+      const pillarVal = pillar && String(pillar).trim() ? pillar : null;
       
       const values = [
-        title, desc, pillarVal, target_kpi || null, kpi_target_value || null, dbStatus, null, start_date || null, end_date || null, createdBy
+        title, desc, pillarVal, target_kpi || null, kpi_target_value || null, dbStatus, null, start_date || null, end_date || null, createdBy, objective_id || null, standard_id || null, uom,
+        target_fy25_26 || null, target_fy26_27 || null, target_fy27_28 || null, target_fy28_29 || null, target_fy29_30 || null
       ];
 
       if (deptIds.length === 0) {
         const queryStr = `INSERT INTO strategic_activities 
-           (activity_type, source, title, description, pillar, department_id, target_kpi, kpi_target_value, status, parent_id, progress, start_date, end_date, created_by)
-           VALUES ('main', 'strategic_plan', ?, ?, ?, NULL, ?, ?, ?, ?, 0, ?, ?, ?)`;
+           (activity_type, source, title, description, pillar, department_id, target_kpi, kpi_target_value, status, parent_id, progress, start_date, end_date, created_by, objective_id, standard_id, unit_of_measure, target_fy25_26, target_fy26_27, target_fy27_28, target_fy28_29, target_fy29_30)
+           VALUES ('main', 'strategic_plan', ?, ?, ?, NULL, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
         
         const result = await query({
           query: queryStr,
@@ -224,14 +235,15 @@ export async function POST(request: Request) {
       const childDeptIds = deptIds.slice(detailStartIndex);
 
       const mainValues = [
-        title, desc, pillarVal, mainDeptId, target_kpi || null, kpi_target_value || null, dbStatus, null, start_date || null, end_date || null, createdBy
+        title, desc, pillarVal, mainDeptId, target_kpi || null, kpi_target_value || null, dbStatus, null, start_date || null, end_date || null, createdBy, objective_id || null, standard_id || null, uom,
+        target_fy25_26 || null, target_fy26_27 || null, target_fy27_28 || null, target_fy28_29 || null, target_fy29_30 || null
       ];
 
       const result = await query({
         query: `
           INSERT INTO strategic_activities 
-          (activity_type, source, title, description, pillar, department_id, target_kpi, kpi_target_value, status, parent_id, progress, start_date, end_date, created_by)
-          VALUES ('main', 'strategic_plan', ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?)
+          (activity_type, source, title, description, pillar, department_id, target_kpi, kpi_target_value, status, parent_id, progress, start_date, end_date, created_by, objective_id, standard_id, unit_of_measure, target_fy25_26, target_fy26_27, target_fy27_28, target_fy28_29, target_fy29_30)
+          VALUES ('main', 'strategic_plan', ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `,
         values: mainValues
       });
@@ -241,33 +253,22 @@ export async function POST(request: Request) {
         await query({
           query: `
             INSERT INTO strategic_activities 
-            (activity_type, source, title, description, pillar, department_id, target_kpi, kpi_target_value, status, parent_id, progress, start_date, end_date, created_by)
-            VALUES ('detailed', 'strategic_plan', ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?)
+            (activity_type, source, title, description, pillar, department_id, target_kpi, kpi_target_value, status, parent_id, progress, start_date, end_date, created_by, objective_id, standard_id, unit_of_measure, target_fy25_26, target_fy26_27, target_fy27_28, target_fy28_29, target_fy29_30)
+            VALUES ('detailed', 'strategic_plan', ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
           `,
-          values: [title, desc, pillarVal, deptId, target_kpi || null, kpi_target_value || null, dbStatus, mainId, start_date || null, end_date || null, createdBy]
+          values: [title, desc, pillarVal, deptId, target_kpi || null, kpi_target_value || null, dbStatus, mainId, start_date || null, end_date || null, createdBy, objective_id || null, standard_id || null, uom, target_fy25_26 || null, target_fy26_27 || null, target_fy27_28 || null, target_fy28_29 || null, target_fy29_30 || null]
         });
       }
       return { id: mainId };
     };
 
     try {
-      const { id } = await runInsert(false);
+      const { id } = await runInsert();
       return NextResponse.json(
         { message: 'Activity created successfully', id },
         { status: 201 }
       );
     } catch (firstErr: any) {
-      const msg = String(firstErr?.message || '');
-      const isSchemaError =
-        msg.includes("Data truncated for column 'pillar'") ||
-        msg.includes('pillar') && (msg.includes('truncated') || msg.includes('enum'));
-      if (isSchemaError) {
-        const { id } = await runInsert(true);
-        return NextResponse.json(
-          { message: 'Activity created successfully', id },
-          { status: 201 }
-        );
-      }
       throw firstErr;
     }
   } catch (error: any) {

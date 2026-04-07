@@ -7,6 +7,7 @@ import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import StatCard from '@/components/StatCard';
 import EvaluationCardGrid from '@/components/Department/EvaluationCardGrid';
+import EvaluateSubmissionModal, { type FeedbackHistoryEntry } from '@/components/Department/EvaluateSubmissionModal';
 
 interface Evaluation {
     id: number;
@@ -38,8 +39,6 @@ export default function DepartmentEvaluations() {
     const [selectedRating, setSelectedRating] = useState<{ [key: number]: 'Complete' | 'Incomplete' | 'Not Done' }>({});
     const [comments, setComments] = useState<{ [key: number]: string }>({});
     const [kpiActualValues, setKpiActualValues] = useState<{ [key: number]: string }>({});
-    const [evidenceOpened, setEvidenceOpened] = useState<{ [key: number]: boolean }>({});
-
     // Modal view states
     const [evaluateModalItem, setEvaluateModalItem] = useState<Evaluation | null>(null);
     const [viewModalItem, setViewModalItem] = useState<Evaluation | null>(null);
@@ -50,6 +49,11 @@ export default function DepartmentEvaluations() {
     const [currentPage, setCurrentPage] = useState(1);
     const [pageSize, setPageSize] = useState(10);
     const [viewMode, setViewMode] = useState<'table' | 'grid'>('table');
+    const [isSubmittingEvaluation, setIsSubmittingEvaluation] = useState(false);
+    const [feedbackHistoryForReview, setFeedbackHistoryForReview] = useState<FeedbackHistoryEntry[]>([]);
+    const [evalError, setEvalError] = useState<string | null>(null);
+    const [evalSuccess, setEvalSuccess] = useState<string | null>(null);
+    const [pageError, setPageError] = useState<string | null>(null);
 
     useEffect(() => {
         fetchData();
@@ -65,6 +69,25 @@ export default function DepartmentEvaluations() {
         }
     }, [evaluateModalItem]);
 
+    useEffect(() => {
+        if (!evaluateModalItem) {
+            setFeedbackHistoryForReview([]);
+            return;
+        }
+        let cancelled = false;
+        axios
+            .get(`/api/department-head/staff-reports/${evaluateModalItem.id}/feedback-events`)
+            .then((res) => {
+                if (!cancelled) setFeedbackHistoryForReview(res.data?.events || []);
+            })
+            .catch(() => {
+                if (!cancelled) setFeedbackHistoryForReview([]);
+            });
+        return () => {
+            cancelled = true;
+        };
+    }, [evaluateModalItem]);
+
     const fetchData = async () => {
         try {
             setLoading(true);
@@ -72,7 +95,7 @@ export default function DepartmentEvaluations() {
             setData(response.data);
         } catch (error: any) {
             console.error('Error fetching department evaluations:', error);
-            setError(error.response?.data?.message || 'Failed to load evaluations. Please try again.');
+            setError(error.response?.data?.message || 'Failed to load submissions. Please try again.');
         } finally {
             setLoading(false);
         }
@@ -84,7 +107,7 @@ export default function DepartmentEvaluations() {
                 <div className="alert alert-danger shadow-sm border-0 d-flex align-items-center gap-3 p-4" role="alert">
                     <span className="material-symbols-outlined fs-2 text-danger">error</span>
                     <div>
-                        <h5 className="alert-heading text-danger fw-bold mb-1">Error Loading Evaluations</h5>
+                        <h5 className="alert-heading text-danger fw-bold mb-1">Error loading submissions</h5>
                         <p className="mb-0 text-dark opacity-75">{error}</p>
                     </div>
                 </div>
@@ -107,6 +130,8 @@ export default function DepartmentEvaluations() {
     };
 
     const handleSubmitEvaluation = async () => {
+        setEvalError(null);
+        setEvalSuccess(null);
         if (!evaluateModalItem) return;
         const id = evaluateModalItem.id;
         const status = selectedRating[id];
@@ -116,15 +141,16 @@ export default function DepartmentEvaluations() {
         const kpiActual = kpiActualValues[id];
 
         if (!status) {
-            alert('Please select a rating: Complete (2 pts), Incomplete (1 pt), or Not Done (0 pts).');
+            setEvalError('Please select a rating: Complete, Incomplete (revision), or Not Done (0 pts).');
             return;
         }
         if (status === 'Incomplete' && (!comment || String(comment).trim() === '')) {
-            alert('Comment is required when marking Incomplete.');
+            setEvalError('Comment is required when marking Incomplete.');
             return;
         }
 
         const score = status === 'Complete' ? 2 : status === 'Incomplete' ? 1 : 0;
+        setIsSubmittingEvaluation(true);
         try {
             const res = await axios.put('/api/department-head/evaluations', {
                 id,
@@ -138,15 +164,34 @@ export default function DepartmentEvaluations() {
                 console.log('Evaluation saved. Task/parent updated in DB:', updated);
             }
 
+            if (status === 'Complete') {
+                const isProcess = item?.task_type !== 'kpi_driver';
+                const delayed = res.data?.delayedHodNoteApplied as boolean | undefined;
+                if (isProcess) {
+                    setEvalSuccess('Review saved. Completion approved; full credit recorded for this process task.');
+                } else if (delayed) {
+                    setEvalSuccess('Review saved. Feedback may include a system note about review timing.');
+                } else {
+                    setEvalSuccess('Review saved successfully.');
+                }
+            } else {
+                setEvalSuccess('Review saved successfully.');
+            }
+
             await fetchData();
-            setEvaluateModalItem(null);
+            setTimeout(() => {
+                setEvaluateModalItem(null);
+                setEvalSuccess(null);
+            }, 1200);
             setSelectedRating(prev => { const next = { ...prev }; delete next[id]; return next; });
             setComments(prev => { const next = { ...prev }; delete next[id]; return next; });
             setKpiActualValues(prev => { const next = { ...prev }; delete next[id]; return next; });
         } catch (error: any) {
             console.error('Error submitting evaluation:', error);
-            const msg = error.response?.data?.message || error.response?.data?.detail || 'Failed to submit evaluation.';
-            alert(msg);
+            const msg = error.response?.data?.message || error.response?.data?.detail || 'Failed to save review.';
+            setEvalError(msg);
+        } finally {
+            setIsSubmittingEvaluation(false);
         }
     };
 
@@ -165,7 +210,11 @@ export default function DepartmentEvaluations() {
         if (isPending || e.status === 'Pending') return '—';
         if (e.score != null && e.score <= 2) {
             if (e.score === 2) return 'Complete';
-            if (e.score === 1) return 'Incomplete';
+            if (e.score === 1) {
+                if (e.status === 'Completed') return 'Complete (1 pt)';
+                return 'Incomplete';
+            }
+            if (e.score === 0 && e.status === 'Completed') return 'Complete (0 pt)';
             return 'Not Done';
         }
         if (e.status === 'Completed') return 'Complete';
@@ -174,22 +223,10 @@ export default function DepartmentEvaluations() {
         return '—';
     };
 
-    const parseEvidenceItems = (attachments?: string | null): { label: string; url: string }[] => {
-        if (!attachments) return [];
-        return attachments
-            .split('|')
-            .map(part => part.trim())
-            .filter(part => part.length > 0)
-            .map(part => {
-                const isUpload = part.startsWith('/uploads/');
-                const label = isUpload ? 'Uploaded file' : 'Evidence link';
-                return { label, url: part };
-            });
-    };
-
     const handleExportExcel = () => {
         if (!data || data.completed.length === 0) {
-            alert("No completed evaluations to export.");
+            setPageError("No completed evaluations to export.");
+            setTimeout(() => setPageError(null), 3000);
             return;
         }
 
@@ -211,7 +248,8 @@ export default function DepartmentEvaluations() {
 
     const handleExportPDF = () => {
         if (!data || data.completed.length === 0) {
-            alert("No completed evaluations to export.");
+            setPageError("No completed evaluations to export.");
+            setTimeout(() => setPageError(null), 3000);
             return;
         }
 
@@ -244,6 +282,13 @@ export default function DepartmentEvaluations() {
 
     return (
         <div id="page-evaluations" className="page-section active-page position-relative">
+            {pageError && (
+                <div className="alert alert-danger shadow-sm border-0 d-flex align-items-center gap-3 p-3 mb-4 animate__animated animate__fadeInDown" role="alert" style={{ borderRadius: '12px', background: '#fef2f2', border: '1px solid #fee2e2' }}>
+                    <span className="material-symbols-outlined text-danger">error</span>
+                    <div className="fw-semibold text-danger">{pageError}</div>
+                    <button type="button" className="btn-close ms-auto" onClick={() => setPageError(null)} style={{ fontSize: '0.75rem' }}></button>
+                </div>
+            )}
             <div className="row g-4 mb-4">
                 <div className="col-12 col-sm-6 col-xl-3">
                     <StatCard
@@ -260,7 +305,7 @@ export default function DepartmentEvaluations() {
                         icon="task_alt"
                         label="Total Completed"
                         value={data.completed.length}
-                        badge="Evaluated"
+                        badge="Reviewed"
                         badgeIcon="done_all"
                         color="green"
                     />
@@ -299,7 +344,7 @@ export default function DepartmentEvaluations() {
                         <div className="modal-header border-bottom-0 pb-0 px-4 pt-4">
                             <h5 className="modal-title fw-bold text-dark d-flex align-items-center gap-2" style={{ fontSize: '1.1rem' }}>
                                 <span className="material-symbols-outlined text-primary" style={{ fontSize: '24px' }}>description</span>
-                                Evaluation Record
+                                Review record
                             </h5>
                             <button type="button" className="btn-close" onClick={() => setViewModalItem(null)}></button>
                         </div>
@@ -370,7 +415,7 @@ export default function DepartmentEvaluations() {
                                             <div className="text-muted fw-bold mt-2" style={{ fontSize: '0.6rem', letterSpacing: '0.5px' }}>RATING</div>
                                             <div className="fw-bold mt-2" style={{ 
                                                 fontSize: '0.8rem',
-                                                color: getRatingLabel(viewModalItem) === 'Complete' ? '#15803d' : (getRatingLabel(viewModalItem) === 'Not Done' ? '#64748b' : '#b45309')
+                                                color: getRatingLabel(viewModalItem).startsWith('Complete') ? '#15803d' : (getRatingLabel(viewModalItem) === 'Not Done' ? '#64748b' : '#b45309')
                                             }}>
                                                 {getRatingLabel(viewModalItem)}
                                             </div>
@@ -393,173 +438,23 @@ export default function DepartmentEvaluations() {
             </div>
 
 
-            {/* Evaluate Modal for Pending evaluations */}
-            <div className={`modal fade ${evaluateModalItem ? 'show d-block' : ''}`} tabIndex={-1} style={{ zIndex: 1050 }}>
-                <div className="modal-dialog modal-dialog-centered">
-                    <div className="modal-content border-0 shadow-lg" style={{ borderRadius: '12px' }}>
-                        {/* Header */}
-                        <div className="modal-header border-bottom-0 pb-0 px-4 pt-4">
-                            <h5 className="modal-title fw-bold text-dark d-flex align-items-center gap-2" style={{ fontSize: '1.1rem' }}>
-                                <span className="material-symbols-outlined text-primary" style={{ fontSize: '24px' }}>rate_review</span>
-                                Evaluate Submission
-                            </h5>
-                            <button type="button" className="btn-close" onClick={() => setEvaluateModalItem(null)}></button>
-                        </div>
-
-                        {evaluateModalItem && (
-                            <div className="modal-body p-4 pt-3">
-                                {/* Submission Info Banner */}
-                                <div className="p-3 rounded-3 mb-4" style={{ background: '#f8fafc', border: '1px solid #e2e8f0' }}>
-                                    <div className="d-flex align-items-start justify-content-between gap-3 flex-wrap">
-                                        <div>
-                                            <div className="fw-bold text-dark mb-2" style={{ fontSize: '1.05rem' }}>
-                                                {evaluateModalItem.report_name}
-                                                <span className="badge ms-2 fw-semibold" style={{ background: '#eff6ff', color: 'var(--mubs-blue)', fontSize: '.75rem', verticalAlign: 'middle' }}>Pending</span>
-                                            </div>
-                                            <div className="text-muted mb-1" style={{ fontSize: '0.85rem' }}>
-                                                <span className="material-symbols-outlined me-2" style={{ fontSize: '16px', verticalAlign: 'middle' }}>category</span>
-                                                {evaluateModalItem.activity_title}
-                                            </div>
-                                            <div className="text-muted" style={{ fontSize: '0.85rem' }}>
-                                                <span className="material-symbols-outlined me-2" style={{ fontSize: '16px', verticalAlign: 'middle' }}>person</span>
-                                                By <strong>{evaluateModalItem.staff_name}</strong>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    {evaluateModalItem.report_summary && (
-                                        <div className="mt-3 pt-3 border-top border-light">
-                                            <div className="fw-semibold text-dark mb-1" style={{ fontSize: '0.8rem' }}>Summary</div>
-                                            <p className="mb-0 text-secondary" style={{ fontSize: '0.9rem', lineHeight: '1.5', whiteSpace: 'pre-wrap' }}>
-                                                {evaluateModalItem.report_summary}
-                                            </p>
-                                        </div>
-                                    )}
-                                </div>
-
-                                {/* Evidence preview (attachments / links) */}
-                                <div className="mb-4">
-                                    <label className="form-label fw-semibold mb-2 d-flex align-items-center gap-2" style={{ fontSize: '0.85rem' }}>
-                                        <span className="material-symbols-outlined text-primary" style={{ fontSize: '18px' }}>attach_file</span>
-                                        Evidence
-                                    </label>
-                                    {parseEvidenceItems(evaluateModalItem.attachments).length === 0 ? (
-                                        <div className="text-muted" style={{ fontSize: '0.85rem' }}>
-                                            No evidence file or link attached for this submission.
-                                        </div>
-                                    ) : (
-                                        <div className="d-flex flex-wrap gap-3">
-                                            {parseEvidenceItems(evaluateModalItem.attachments).map((ev, idx) => (
-                                                <button
-                                                    key={idx}
-                                                    type="button"
-                                                    className="btn btn-outline-primary d-inline-flex align-items-center gap-2 px-3"
-                                                    style={{ borderRadius: '8px', fontSize: '0.85rem' }}
-                                                    onClick={() => {
-                                                        try {
-                                                            window.open(ev.url, '_blank', 'noopener,noreferrer');
-                                                        } catch (e) {
-                                                            console.error('Error opening evidence url', e);
-                                                        }
-                                                        setEvidenceOpened(prev => ({ ...prev, [evaluateModalItem.id]: true }));
-                                                    }}
-                                                >
-                                                    <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>visibility</span>
-                                                    {ev.label}
-                                                </button>
-                                            ))}
-                                        </div>
-                                    )}
-                                </div>
-                                {/* Performance rating: Complete 2 pts, Incomplete 1 pt, Not Done 0 pts */}
-                                <div className="row g-4">
-                                    <div className="col-12">
-                                        <label className="form-label fw-semibold mb-2" style={{ fontSize: '0.85rem' }}>
-                                            Performance rating <span className="text-danger">*</span>
-                                        </label>
-                                        <div className="d-flex gap-3">
-                                            {(['Complete', 'Incomplete', 'Not Done'] as const).map(opt => (
-                                                <div 
-                                                    key={opt}
-                                                    onClick={() => setSelectedRating(prev => ({ ...prev, [evaluateModalItem.id]: opt }))}
-                                                    className="flex-fill text-center p-3 rounded-3 cursor-pointer border shadow-sm"
-                                                    style={{
-                                                        cursor: 'pointer',
-                                                        fontSize: '0.9rem',
-                                                        fontWeight: 'bold',
-                                                        transition: 'all 0.2s',
-                                                        borderColor: selectedRating[evaluateModalItem.id] === opt ? 'var(--mubs-blue)' : '#e2e8f0',
-                                                        background: selectedRating[evaluateModalItem.id] === opt ? 'var(--mubs-blue)' : '#fff',
-                                                        color: selectedRating[evaluateModalItem.id] === opt ? '#fff' : '#475569',
-                                                        borderRadius: '12px'
-                                                    }}
-                                                >
-                                                    {opt === 'Complete' ? 'Complete (2)' : opt === 'Incomplete' ? 'Not Complete (1)' : 'Not Done (0)'}
-                                                </div>
-                                            ))}
-                                        </div>
-                                    </div>
-
-                                    {/* KPI achieved value: Visible for KPI-Driver tasks */}
-                                    {evaluateModalItem.task_type === 'kpi_driver' && (
-                                        <div className="col-12">
-                                            <label className="form-label fw-semibold mb-2 d-flex align-items-center gap-2" style={{ fontSize: '0.85rem' }}>
-                                                <span className="material-symbols-outlined text-primary" style={{ fontSize: '18px' }}>analytics</span>
-                                                Achieved value
-                                            </label>
-                                            <div className="d-flex align-items-center gap-4">
-                                                <input
-                                                    type="number"
-                                                    className="form-control fw-bold border-primary-subtle shadow-sm px-3"
-                                                    min={0}
-                                                    step="any"
-                                                    placeholder="0"
-                                                    value={kpiActualValues[evaluateModalItem.id] ?? ''}
-                                                    onChange={(e) => setKpiActualValues(prev => ({ ...prev, [evaluateModalItem.id]: e.target.value }))}
-                                                    style={{ maxWidth: '120px', borderRadius: '10px', fontSize: '1rem' }}
-                                                />
-                                                {evaluateModalItem.kpi_actual_value != null && (
-                                                    <div className="text-muted border-start ps-3 py-1">
-                                                        <div style={{ fontSize: '.65rem', fontWeight: 'bold' }}>STAFF ENTERED:</div>
-                                                        <div className="text-dark fw-black" style={{ fontSize: '1rem' }}>{evaluateModalItem.kpi_actual_value}</div>
-                                                    </div>
-                                                )}
-                                            </div>
-                                        </div>
-                                    )}
-                                    {/* Comment - required when Incomplete */}
-                                    <div className="col-12">
-                                        <label className="form-label fw-semibold mb-2" style={{ fontSize: '0.85rem' }}>
-                                            Reviewer Feedback {selectedRating[evaluateModalItem.id] === 'Incomplete' && <span className="text-danger">*</span>}
-                                        </label>
-                                        <textarea
-                                            className="form-control shadow-sm"
-                                            rows={3}
-                                            placeholder={selectedRating[evaluateModalItem.id] === 'Incomplete' ? 'Required for Incomplete. Explain why...' : 'Optional feedback...'}
-                                            value={comments[evaluateModalItem.id] || ''}
-                                            onChange={(e) => handleComment(evaluateModalItem.id, e.target.value)}
-                                            style={{ borderRadius: '10px', fontSize: '.9rem', resize: 'none' }}
-                                        ></textarea>
-                                    </div>
-                                </div>
-                            </div>
-                        )}
-
-                        {/* Footer: Submit and Cancel */}
-                        <div className="modal-footer bg-light border-top-0 py-3 px-4 d-flex justify-content-end align-items-center gap-2">
-                            <button
-                                type="button"
-                                className="btn btn-primary fw-bold px-4 py-2 d-flex align-items-center gap-2 shadow-sm"
-                                style={{ borderRadius: '8px', fontSize: '.9rem', background: 'var(--mubs-blue)', borderColor: 'var(--mubs-blue)' }}
-                                onClick={handleSubmitEvaluation}
-                                disabled={!evaluateModalItem || !selectedRating[evaluateModalItem.id]}
-                            >
-                                <span className="material-symbols-outlined" style={{ fontSize: '20px' }}>send</span>
-                                Submit Evaluation
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            </div>
+            <EvaluateSubmissionModal
+                item={evaluateModalItem}
+                open={!!evaluateModalItem}
+                onClose={() => setEvaluateModalItem(null)}
+                formatDate={formatDate}
+                selectedRating={selectedRating}
+                onSelectRating={(id, rating) => setSelectedRating((prev) => ({ ...prev, [id]: rating }))}
+                comments={comments}
+                onCommentChange={handleComment}
+                kpiActualValues={kpiActualValues}
+                onKpiActualChange={(id, value) => setKpiActualValues((prev) => ({ ...prev, [id]: value }))}
+                onSubmit={handleSubmitEvaluation}
+                isSubmitting={isSubmittingEvaluation}
+                feedbackHistory={feedbackHistoryForReview}
+                error={evalError}
+                success={evalSuccess}
+            />
 
             {/* Combined Evaluations Table */}
             {(() => {
@@ -594,7 +489,7 @@ export default function DepartmentEvaluations() {
                         <div className="table-card-header">
                             <h5 className="mb-0 d-flex align-items-center gap-2">
                                 <span className="material-symbols-outlined" style={{ color: 'var(--mubs-blue)' }}>grading</span>
-                                All Evaluations
+                                All submissions
                                 <span className="badge rounded-pill ms-1" style={{ background: '#eff6ff', color: 'var(--mubs-blue)', fontSize: '.75rem', fontWeight: 700 }}>
                                     {filtered.length}
                                 </span>
@@ -741,7 +636,7 @@ export default function DepartmentEvaluations() {
                                                         <td>
                                                             <span className="fw-semibold" style={{
                                                                 fontSize: '.85rem',
-                                                                color: getRatingLabel(e, pending) === 'Complete' ? '#15803d' : getRatingLabel(e, pending) === 'Not Done' ? '#64748b' : '#b45309'
+                                                                color: getRatingLabel(e, pending).startsWith('Complete') ? '#15803d' : getRatingLabel(e, pending) === 'Not Done' ? '#64748b' : '#b45309'
                                                             }}>
                                                                 {getRatingLabel(e, pending)}
                                                             </span>

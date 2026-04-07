@@ -158,43 +158,56 @@ export default function StaffDashboard() {
                 </div>
             </div>
 
-            {/* Quick Actions */}
+            {/* Quick Actions — four tiles: xl 4-across, md 2×2, stacked on xs */}
             <div className="row g-3 mb-4">
-                <div className="col-12 col-md-4">
+                <div className="col-12 col-sm-6 col-xl-3">
                     <Link href="/staff?pg=tasks" className="text-decoration-none h-100">
-                        <div className="quick-action-card p-3 d-flex align-items-center gap-3 bg-white border rounded-4 shadow-sm h-100" style={{ transition: 'all 0.2s', cursor: 'pointer' }} onMouseOver={(e) => { e.currentTarget.style.transform = 'translateY(-4px)'; e.currentTarget.style.boxShadow = '0 12px 24px rgba(0,0,0,0.1)'; }} onMouseOut={(e) => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.05)'; }}>
-                            <div className="icon-box d-flex align-items-center justify-content-center" style={{ width: '52px', height: '52px', borderRadius: '14px', background: 'rgba(0, 86, 150, 0.1)' }}>
-                                <span className="material-symbols-outlined" style={{ color: 'var(--mubs-blue)', fontSize: '24px' }}>add_task</span>
+                        <div className="quick-action-card p-3 d-flex align-items-center gap-2 gap-sm-3 bg-white border rounded-4 shadow-sm h-100" style={{ transition: 'all 0.2s', cursor: 'pointer', minHeight: '92px' }} onMouseOver={(e) => { e.currentTarget.style.transform = 'translateY(-4px)'; e.currentTarget.style.boxShadow = '0 12px 24px rgba(0,0,0,0.1)'; }} onMouseOut={(e) => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.05)'; }}>
+                            <div className="icon-box d-flex align-items-center justify-content-center flex-shrink-0" style={{ width: '48px', height: '48px', borderRadius: '14px', background: 'rgba(0, 86, 150, 0.1)' }}>
+                                <span className="material-symbols-outlined" style={{ color: 'var(--mubs-blue)', fontSize: '22px' }}>add_task</span>
                             </div>
-                            <div>
-                                <div className="fw-black text-dark" style={{ fontSize: '1rem' }}>Submit Report</div>
-                                <div className="text-muted small">Update progress on tasks</div>
+                            <div className="min-w-0">
+                                <div className="fw-black text-dark" style={{ fontSize: '.95rem', lineHeight: 1.25 }}>Submit report</div>
+                                <div className="text-muted small" style={{ fontSize: '.78rem' }}>Update progress on tasks</div>
                             </div>
                         </div>
                     </Link>
                 </div>
-                <div className="col-12 col-md-4">
+                <div className="col-12 col-sm-6 col-xl-3">
                     <Link href="/staff?pg=tasks" className="text-decoration-none h-100">
-                        <div className="quick-action-card p-3 d-flex align-items-center gap-3 bg-white border rounded-4 shadow-sm h-100" style={{ transition: 'all 0.2s', cursor: 'pointer' }} onMouseOver={(e) => { e.currentTarget.style.transform = 'translateY(-4px)'; e.currentTarget.style.boxShadow = '0 12px 24px rgba(0,0,0,0.1)'; }} onMouseOut={(e) => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.05)'; }}>
-                            <div className="icon-box d-flex align-items-center justify-content-center" style={{ width: '52px', height: '52px', borderRadius: '14px', background: 'rgba(16, 185, 129, 0.1)' }}>
-                                <span className="material-symbols-outlined" style={{ color: '#10b981', fontSize: '24px' }}>list_alt</span>
+                        <div className="quick-action-card p-3 d-flex align-items-center gap-2 gap-sm-3 bg-white border rounded-4 shadow-sm h-100" style={{ transition: 'all 0.2s', cursor: 'pointer', minHeight: '92px' }} onMouseOver={(e) => { e.currentTarget.style.transform = 'translateY(-4px)'; e.currentTarget.style.boxShadow = '0 12px 24px rgba(0,0,0,0.1)'; }} onMouseOut={(e) => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.05)'; }}>
+                            <div className="icon-box d-flex align-items-center justify-content-center flex-shrink-0" style={{ width: '48px', height: '48px', borderRadius: '14px', background: 'rgba(16, 185, 129, 0.1)' }}>
+                                <span className="material-symbols-outlined" style={{ color: '#10b981', fontSize: '22px' }}>list_alt</span>
                             </div>
-                            <div>
-                                <div className="fw-black text-dark" style={{ fontSize: '1rem' }}>View My Tasks</div>
-                                <div className="text-muted small">Manage assigned activities</div>
+                            <div className="min-w-0">
+                                <div className="fw-black text-dark" style={{ fontSize: '.95rem', lineHeight: 1.25 }}>View my tasks</div>
+                                <div className="text-muted small" style={{ fontSize: '.78rem' }}>Manage assigned tasks</div>
                             </div>
                         </div>
                     </Link>
                 </div>
-                <div className="col-12 col-md-4">
+                <div className="col-12 col-sm-6 col-xl-3">
+                    <Link href="/staff?pg=submissions" className="text-decoration-none h-100">
+                        <div className="quick-action-card p-3 d-flex align-items-center gap-2 gap-sm-3 bg-white border rounded-4 shadow-sm h-100" style={{ transition: 'all 0.2s', cursor: 'pointer', minHeight: '92px' }} onMouseOver={(e) => { e.currentTarget.style.transform = 'translateY(-4px)'; e.currentTarget.style.boxShadow = '0 12px 24px rgba(0,0,0,0.1)'; }} onMouseOut={(e) => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.05)'; }}>
+                            <div className="icon-box d-flex align-items-center justify-content-center flex-shrink-0" style={{ width: '48px', height: '48px', borderRadius: '14px', background: 'rgba(124, 58, 237, 0.1)' }}>
+                                <span className="material-symbols-outlined" style={{ color: '#7c3aed', fontSize: '22px' }}>mark_chat_read</span>
+                            </div>
+                            <div className="min-w-0">
+                                <div className="fw-black text-dark text-truncate" style={{ fontSize: '.95rem', lineHeight: 1.25, whiteSpace: 'nowrap' }}>Submissions</div>
+                                <div className="text-muted small text-truncate" style={{ fontSize: '.78rem', whiteSpace: 'nowrap' }}>View feedback & history</div>
+                            </div>
+                        </div>
+                    </Link>
+                </div>
+                <div className="col-12 col-sm-6 col-xl-3">
                     <Link href="/staff?pg=notifications" className="text-decoration-none h-100">
-                        <div className="quick-action-card p-3 d-flex align-items-center gap-3 bg-white border rounded-4 shadow-sm h-100" style={{ transition: 'all 0.2s', cursor: 'pointer' }} onMouseOver={(e) => { e.currentTarget.style.transform = 'translateY(-4px)'; e.currentTarget.style.boxShadow = '0 12px 24px rgba(0,0,0,0.1)'; }} onMouseOut={(e) => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.05)'; }}>
-                            <div className="icon-box d-flex align-items-center justify-content-center" style={{ width: '52px', height: '52px', borderRadius: '14px', background: 'rgba(227, 24, 55, 0.1)' }}>
-                                <span className="material-symbols-outlined" style={{ color: 'var(--mubs-red)', fontSize: '24px' }}>event_note</span>
+                        <div className="quick-action-card p-3 d-flex align-items-center gap-2 gap-sm-3 bg-white border rounded-4 shadow-sm h-100" style={{ transition: 'all 0.2s', cursor: 'pointer', minHeight: '92px' }} onMouseOver={(e) => { e.currentTarget.style.transform = 'translateY(-4px)'; e.currentTarget.style.boxShadow = '0 12px 24px rgba(0,0,0,0.1)'; }} onMouseOut={(e) => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.05)'; }}>
+                            <div className="icon-box d-flex align-items-center justify-content-center flex-shrink-0" style={{ width: '48px', height: '48px', borderRadius: '14px', background: 'rgba(227, 24, 55, 0.1)' }}>
+                                <span className="material-symbols-outlined" style={{ color: 'var(--mubs-red)', fontSize: '22px' }}>event_note</span>
                             </div>
-                            <div>
-                                <div className="fw-black text-dark" style={{ fontSize: '1rem' }}>Check Deadlines</div>
-                                <div className="text-muted small">Review upcoming due dates</div>
+                            <div className="min-w-0">
+                                <div className="fw-black text-dark" style={{ fontSize: '.95rem', lineHeight: 1.25 }}>Check deadlines</div>
+                                <div className="text-muted small" style={{ fontSize: '.78rem' }}>Review upcoming due dates</div>
                             </div>
                         </div>
                     </Link>

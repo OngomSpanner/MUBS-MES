@@ -37,8 +37,8 @@ export async function GET() {
                         COALESCE(sa.end_date, p.end_date) as dueDate,
                         u.full_name as assignee_name,
                         aa.assigned_to_user_id as assigned_to,
-                        p.id as activity_id,
-                        p.title as activity_title,
+                        COALESCE(p.id, sa.id) as activity_id,
+                        COALESCE(p.title, '') as activity_title,
                         sa.description,
                         sa.task_type,
                         sa.kpi_target_value,
@@ -66,7 +66,7 @@ export async function GET() {
                         COALESCE(sa.start_date, p.start_date) as startDate,
                         COALESCE(sa.end_date, p.end_date) as endDate,
                         COALESCE(sa.end_date, p.end_date) as dueDate,
-                        u.full_name as assignee_name, aa.assigned_to_user_id as assigned_to, p.id as activity_id, p.title as activity_title, sa.description, sa.frequency, sa.frequency_interval
+                        u.full_name as assignee_name, aa.assigned_to_user_id as assigned_to, COALESCE(p.id, sa.id) as activity_id, COALESCE(p.title, '') as activity_title, sa.description, sa.frequency, sa.frequency_interval
                         FROM strategic_activities sa
                         LEFT JOIN strategic_activities p ON sa.parent_id = p.id
                         LEFT JOIN activity_assignments aa ON aa.activity_id = sa.id
@@ -84,6 +84,54 @@ export async function GET() {
             }
         }
 
+        let processAssignmentsQuery: any[];
+        const processAssignBase = `
+                SELECT 
+                    spa.id,
+                    'process_task' as task_type,
+                    sp.step_name as title,
+                    sa.title as activity_title,
+                    sa.id as activity_id,
+                    u.full_name as assignee_name,
+                    spa.staff_id as assigned_to,
+                    spa.status as db_status,
+                    spa.start_date as startDate,
+                    spa.end_date as endDate,
+                    spa.end_date as dueDate,
+                    spa.commentary as description,
+                    (SELECT sr2.status FROM staff_reports sr2 WHERE sr2.process_assignment_id = spa.id ORDER BY sr2.updated_at DESC LIMIT 1) as latest_report_status,
+                    st.duration_value as duration_value,
+                    st.duration_unit as duration_unit,
+                    __PI_COL__
+                    0 as progress
+                FROM staff_process_assignments spa
+                JOIN standard_processes sp ON spa.standard_process_id = sp.id
+                JOIN standards st ON sp.standard_id = st.id
+                JOIN strategic_activities sa ON spa.activity_id = sa.id
+                JOIN users u ON spa.staff_id = u.id
+                WHERE (sa.department_id IN (${placeholders}))
+            `;
+        try {
+            processAssignmentsQuery = (await query({
+                query: processAssignBase.replace('__PI_COL__', 'st.performance_indicator,\n                    '),
+                values: [...departmentIds],
+            })) as any[];
+        } catch (e: unknown) {
+            const err = e as { code?: string; errno?: number };
+            if (err?.code === 'ER_BAD_FIELD_ERROR' || err?.errno === 1054) {
+                processAssignmentsQuery = (await query({
+                    query: processAssignBase.replace('__PI_COL__', ''),
+                    values: [...departmentIds],
+                })) as any[];
+                processAssignmentsQuery = processAssignmentsQuery.map((row: any) => ({
+                    ...row,
+                    performance_indicator: null,
+                }));
+            } else {
+                throw e;
+            }
+        }
+
         const statusMap: Record<string, string> = {
             'pending': 'Pending',
             'accepted': 'Pending',
@@ -94,6 +142,17 @@ export async function GET() {
             'overdue': 'Delayed'
         };
 
+        // Standard process assignments use these status strings
+        const processStatusMap: Record<string, string> = {
+            pending: 'Pending',
+            in_progress: 'In Progress',
+            submitted: 'Under Review',
+            incomplete: 'Incomplete',
+            not_done: 'Not Done',
+            completed: 'Completed',
+            evaluated: 'Completed',
+        };
+ 
         // Progress and status: same scale as Department Efficiency. Use latest evaluation outcome if present.
         const progressFromReportStatus = (status: string | null): number | null => {
             if (!status) return null;
@@ -112,7 +171,7 @@ export async function GET() {
             return null;
         };
 
-        const mapped = tasksQuery.map((t: any) => {
+        const mappedTasks = tasksQuery.map((t: any) => {
             const derivedProgress = progressFromReportStatus(t.latest_report_status);
             const progress = derivedProgress != null ? derivedProgress : (t.progress != null ? Number(t.progress) : 0);
             const derivedStatus = statusFromReportStatus(t.latest_report_status);
@@ -126,10 +185,38 @@ export async function GET() {
             };
         });
 
-        // One row per task per assignee: progress comes from strategic_activities.progress (updated when HOD marks submission Complete)
-        const seen = new Map<string, typeof mapped[0]>();
-        for (const t of mapped) {
-            const key = `${t.id}-${t.assigned_to ?? 'unassigned'}`;
+        const mappedProcessAssignments = processAssignmentsQuery.map((p: any) => {
+            const hasWindow = p.startDate != null && String(p.startDate).trim() !== '';
+            const derived = statusFromReportStatus(p.latest_report_status);
+            const status =
+                !hasWindow && String(p.db_status || '').toLowerCase() === 'pending'
+                    ? 'Not opened'
+                    : derived ?? processStatusMap[p.db_status] ?? 'Pending';
+            // Do not use 50% for "In Progress" (just opened / staff working)—only for Under Review or HOD evaluation outcomes.
+            const derivedProgress = progressFromReportStatus(p.latest_report_status);
+            const progress =
+                status === 'Completed'
+                    ? 100
+                    : derivedProgress != null
+                      ? derivedProgress
+                      : status === 'Under Review'
+                        ? 50
+                        : 0;
+            return {
+                ...p,
+                status,
+                progress,
+                strategic_activity_id: p.activity_id,
+                tier: 'process_task',
+            };
+        });
+
+        const allTasksCombined = [...mappedTasks, ...mappedProcessAssignments];
+
+        // One row per task per assignee
+        const seen = new Map<string, typeof allTasksCombined[0]>();
+        for (const t of allTasksCombined) {
+            const key = `${t.tier}-${t.id}-${t.assigned_to ?? 'unassigned'}`;
             const existing = seen.get(key);
             if (!existing || t.status === 'Completed' || (t.status === 'Under Review' && existing.status !== 'Completed')) {
                 seen.set(key, t);
@@ -138,7 +225,7 @@ export async function GET() {
         const tasks = Array.from(seen.values());
 
         const kanban = {
-            todo: tasks.filter((t: any) => ['Not Started', 'Pending'].includes(t.status)),
+            todo: tasks.filter((t: any) => ['Not Started', 'Pending', 'Not opened'].includes(t.status)),
             inProgress: tasks.filter((t: any) => ['In Progress', 'On Track', 'Delayed', 'Incomplete', 'Not Done'].includes(t.status)),
             underReview: tasks.filter((t: any) => t.status === 'Under Review'),
             completed: tasks.filter((t: any) => t.status === 'Completed')
@@ -146,7 +233,7 @@ export async function GET() {
 
         // Parent options for HOD: top-level strategic goals or strategy-plan detailed copies in this exactly matched department
         const activitiesQuery = await query({
-            query: `SELECT id, title, kpi_target_value, target_kpi FROM strategic_activities WHERE department_id = ? AND (parent_id IS NULL OR source = 'strategic_plan') AND source IS NOT NULL ORDER BY title`,
+            query: `SELECT id, title, kpi_target_value, target_kpi FROM strategic_activities WHERE department_id = ? AND (parent_id IS NULL OR source = 'strategic_plan') AND COALESCE(TRIM(source), '') <> '' ORDER BY title`,
             values: [departmentIds[0]]
         }) as any[];
 

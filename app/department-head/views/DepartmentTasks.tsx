@@ -1,16 +1,13 @@
 'use client';
 
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, useMemo } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import axios from 'axios';
 import StatCard from '@/components/StatCard';
 import DepartmentTaskCardGrid from '@/components/Department/DepartmentTaskCardGrid';
+import EvaluateSubmissionModal, { parseEvidenceItems, type FeedbackHistoryEntry } from '@/components/Department/EvaluateSubmissionModal';
+import { addDurationToStartDate, formatStandardProcessDuration } from '@/lib/process-duration';
 
-/** task_type: process = Department Internal / Operational; kpi_driver = Strategy Plan */
-const TASK_TYPE_LABELS: Record<string, string> = {
-    process: 'Process Task (Dept Internal)',
-    kpi_driver: 'KPI-Driver Task (Strategy Plan)',
-};
 
 interface Task {
     id: number;
@@ -26,12 +23,16 @@ interface Task {
     strategic_activity_id?: number;
     description?: string;
     reviewer_notes?: string;
-    task_type?: 'process' | 'kpi_driver';
     kpi_target_value?: number | null;
     startDate?: string;
     endDate?: string;
     frequency?: 'once' | 'daily' | 'weekly' | 'monthly';
     frequency_interval?: number;
+    task_type?: string;
+    tier?: string;
+    performance_indicator?: string | null;
+    duration_value?: number | null;
+    duration_unit?: string | null;
 }
 
 interface Evaluation {
@@ -50,15 +51,6 @@ interface Evaluation {
     kpi_actual_value?: number | null;
 }
 
-/** For create form: multiple assignees + optional recurrence */
-type TaskFormState = Partial<Task> & {
-    assigned_to_ids?: number[];
-    startDate?: string;
-    endDate?: string;
-    frequency?: 'once' | 'daily' | 'weekly' | 'monthly';
-    frequency_interval?: number;
-    isFixedFields?: boolean;
-};
 
 interface KanbanData {
     kanban: {
@@ -80,6 +72,36 @@ const toYMD = (date: Date) => {
     const d = String(date.getDate()).padStart(2, '0');
     return `${y}-${m}-${d}`;
 };
+
+function titleCaseWord(word: string) {
+    if (!word) return '';
+    const w = word.toLowerCase();
+    return w.charAt(0).toUpperCase() + w.slice(1);
+}
+
+/** First name for table cell; normalizes DB ALL-CAPS. */
+function staffAssigneeShortLabel(fullName: string | undefined | null, unassignedLabel: string) {
+    const raw = (fullName ?? '').trim();
+    if (!raw) return unassignedLabel;
+    const first = raw.split(/\s+/)[0] ?? '';
+    return titleCaseWord(first);
+}
+
+/** Initials for avatar (uppercase is conventional). */
+function staffAssigneeInitials(fullName: string | undefined | null) {
+    const raw = (fullName ?? '').trim();
+    if (!raw) return '?';
+    return raw
+        .split(/\s+/)
+        .map((part) => (part.charAt(0) || '').toUpperCase())
+        .join('');
+}
+
+function staffAssigneeTitle(fullName: string | undefined | null, unassignedLabel: string) {
+    const raw = (fullName ?? '').trim();
+    if (!raw) return unassignedLabel;
+    return raw.split(/\s+/).map(titleCaseWord).join(' ');
+}
 
 interface DepartmentTasksProps {
     initialActivity?: string;
@@ -108,12 +130,11 @@ export default function DepartmentTasks({ initialActivity, initialAssignee }: De
     const [error, setError] = useState<string | null>(null);
     const [activityFilter, setActivityFilter] = useState(initialActivity || 'All Tasks');
     const [assigneeFilter, setAssigneeFilter] = useState(initialAssignee || 'All Assignees');
+    const [activityIdFilter, setActivityIdFilter] = useState<number | null>(null);
 
     const UNASSIGNED_LABEL = 'Unassigned';
 
     // Modal States
-    const [showTaskModal, setShowTaskModal] = useState(false);
-    const [isSubmitting, setIsSubmitting] = useState(false);
     const [deletingId, setDeletingId] = useState<number | null>(null);
     const [viewMode, setViewMode] = useState<'table' | 'grid' | 'activity'>('activity');
     const [selectedTaskIds, setSelectedTaskIds] = useState<number[]>([]);
@@ -122,6 +143,21 @@ export default function DepartmentTasks({ initialActivity, initialAssignee }: De
     const [showBulkDeleteModal, setShowBulkDeleteModal] = useState(false);
     const [bulkDeleteError, setBulkDeleteError] = useState<string | null>(null);
 
+    const [openProcessTask, setOpenProcessTask] = useState<Task | null>(null);
+    const [openProcessStart, setOpenProcessStart] = useState('');
+    const [openProcessSaving, setOpenProcessSaving] = useState(false);
+    const [feedbackHistoryForReview, setFeedbackHistoryForReview] = useState<FeedbackHistoryEntry[]>([]);
+
+    const [reassignTask, setReassignTask] = useState<Task | null>(null);
+    const [reassignStaffId, setReassignStaffId] = useState<number | ''>('');
+    const [reassignReason, setReassignReason] = useState('');
+    const [reassignSaving, setReassignSaving] = useState(false);
+
+    /** Table view: row opens this modal with full-width action buttons */
+    const [tableDetailsTask, setTableDetailsTask] = useState<Task | null>(null);
+    const [tableDetailsReview, setTableDetailsReview] = useState<Evaluation | null>(null);
+    const [tableDetailsReviewLoading, setTableDetailsReviewLoading] = useState(false);
+
     // Evaluation Modal States
     const [evaluateModalItem, setEvaluateModalItem] = useState<Evaluation | null>(null);
     const [viewModalItem, setViewModalItem] = useState<Evaluation | null>(null);
@@ -129,21 +165,20 @@ export default function DepartmentTasks({ initialActivity, initialAssignee }: De
     const [selectedRating, setSelectedRating] = useState<{ [key: number]: 'Complete' | 'Incomplete' | 'Not Done' }>({});
     const [evaluationComments, setEvaluationComments] = useState<{ [key: number]: string }>({});
     const [kpiActualValues, setKpiActualValues] = useState<{ [key: number]: string }>({});
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    
+    // Message/Alert Modal State
+    const [messageModal, setMessageModal] = useState<{
+        show: boolean;
+        title: string;
+        message: string;
+        type: 'info' | 'error' | 'success' | 'warning';
+    }>({ show: false, title: '', message: '', type: 'info' });
 
     // Pagination
     const [currentPage, setCurrentPage] = useState(1);
     const [pageSize, setPageSize] = useState(10);
 
-    // Form States (assigned_to_ids used when creating; assigned_to when editing)
-    const [taskForm, setTaskForm] = useState<TaskFormState>({
-        assigned_to_ids: [],
-        task_type: 'process',
-        kpi_target_value: null,
-        startDate: toYMD(new Date()),
-        endDate: toYMD(new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)),
-        frequency: 'once',
-        frequency_interval: 1
-    });
     
     useEffect(() => {
         if (evaluateModalItem) {
@@ -158,71 +193,6 @@ export default function DepartmentTasks({ initialActivity, initialAssignee }: De
 
 
 
-
-    /** Parse dueDate (string or Date) to local YYYY-MM-DD; return null if invalid */
-    const parseDueDate = (dueDate: string | undefined | null): string | null => {
-        if (dueDate == null || String(dueDate).trim() === '') return null;
-        const s = String(dueDate).trim();
-        const match = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
-        if (match) return `${match[1]}-${match[2]}-${match[3]}`;
-        const d = new Date(s);
-        if (Number.isNaN(d.getTime())) return null;
-        return toYMD(d);
-    };
-
-
-
-    const generateTaskDate = (form: TaskFormState): string | null => {
-        return form.endDate || null;
-    };
-
-    const generateMultipleDates = (form: TaskFormState): { startDate: string; endDate: string }[] => {
-        if (!form.startDate || !form.endDate) return [];
-        const start = new Date(form.startDate);
-        const end = new Date(form.endDate);
-        const freq = form.frequency || 'once';
-
-        if (freq === 'once') return [{ startDate: toYMD(start), endDate: toYMD(end) }];
-
-        const tasks: { startDate: string; endDate: string }[] = [];
-        if (!start || !end) return tasks;
-        const startDateObj = new Date(start);
-        const endDateObj = new Date(end);
-        if (isNaN(startDateObj.getTime()) || isNaN(endDateObj.getTime()) || startDateObj >= endDateObj) return tasks;
-
-        let current = new Date(start);
-        const interval = form.frequency_interval || 1;
-
-        // Limit to prevent browser hangs
-        let count = 0;
-        while (current < end && count < 100) {
-            const tStart = new Date(current);
-            let tNext = new Date(current);
-
-            if (freq === 'daily') tNext.setDate(tNext.getDate() + interval);
-            else if (freq === 'weekly') tNext.setDate(tNext.getDate() + (interval * 7));
-            else if (freq === 'monthly') tNext.setMonth(tNext.getMonth() + interval);
-            else break;
-
-            let tEnd: Date;
-            if (tNext >= end) {
-                tEnd = new Date(end); // Stretch the final task to the absolute deadline
-            } else {
-                tEnd = new Date(tNext);
-                tEnd.setDate(tEnd.getDate() - 1);
-            }
-
-            tasks.push({
-                startDate: toYMD(tStart),
-                endDate: toYMD(tEnd)
-            });
-
-            if (tNext >= end) break;
-            current = tNext;
-            count++;
-        }
-        return tasks;
-    };
 
     const fetchData = async () => {
         try {
@@ -281,6 +251,7 @@ export default function DepartmentTasks({ initialActivity, initialAssignee }: De
     useEffect(() => {
         const mode = searchParams.get('mode') as 'table' | 'grid' | 'activity' | null;
         const activity = searchParams.get('activity');
+        const activityIdRaw = searchParams.get('activityId');
         const status = searchParams.get('status');
 
         if (mode && ['table', 'grid', 'activity'].includes(mode)) {
@@ -296,6 +267,13 @@ export default function DepartmentTasks({ initialActivity, initialAssignee }: De
             setActivityFilter('All Tasks');
         }
 
+        if (activityIdRaw && String(activityIdRaw).trim() !== '') {
+            const n = parseInt(String(activityIdRaw), 10);
+            setActivityIdFilter(Number.isFinite(n) ? n : null);
+        } else {
+            setActivityIdFilter(null);
+        }
+
         if (status) {
             setStatusFilter(status);
         } else {
@@ -305,6 +283,89 @@ export default function DepartmentTasks({ initialActivity, initialAssignee }: De
         // Always reset to page 1 when any filter/mode changes via URL
         setCurrentPage(1);
     }, [searchParams]);
+
+    useEffect(() => {
+        if (viewMode !== 'table') setTableDetailsTask(null);
+    }, [viewMode]);
+
+    useEffect(() => {
+        if (!tableDetailsTask) {
+            setTableDetailsReview(null);
+            setTableDetailsReviewLoading(false);
+            return;
+        }
+        // Inline review record only (for Completed) — avoids opening a second modal from Process details.
+        if (tableDetailsTask.status !== 'Completed') {
+            setTableDetailsReview(null);
+            setTableDetailsReviewLoading(false);
+            return;
+        }
+        let cancelled = false;
+        setTableDetailsReviewLoading(true);
+        axios
+            .get(`/api/department-head/evaluations?taskId=${tableDetailsTask.id}`)
+            .then((res) => {
+                if (cancelled) return;
+                const completedList = res.data?.completed || [];
+                setTableDetailsReview(completedList.length > 0 ? completedList[0] : null);
+            })
+            .catch(() => {
+                if (cancelled) return;
+                setTableDetailsReview(null);
+            })
+            .finally(() => {
+                if (cancelled) return;
+                setTableDetailsReviewLoading(false);
+            });
+        return () => {
+            cancelled = true;
+        };
+    }, [tableDetailsTask]);
+
+
+    useEffect(() => {
+        if (openProcessTask) {
+            const d = new Date();
+            const y = d.getFullYear();
+            const m = String(d.getMonth() + 1).padStart(2, '0');
+            const day = String(d.getDate()).padStart(2, '0');
+            setOpenProcessStart(`${y}-${m}-${day}`);
+        }
+    }, [openProcessTask]);
+
+    const openProcessComputedDue = useMemo(() => {
+        if (!openProcessTask || !openProcessStart) return '';
+        const dv = openProcessTask.duration_value;
+        const du = openProcessTask.duration_unit;
+        if (dv == null || !String(du || '').trim()) return '';
+        return addDurationToStartDate(openProcessStart, dv, du);
+    }, [openProcessTask, openProcessStart]);
+
+    useEffect(() => {
+        if (!evaluateModalItem) {
+            setFeedbackHistoryForReview([]);
+            return;
+        }
+        let cancelled = false;
+        axios
+            .get(`/api/department-head/staff-reports/${evaluateModalItem.id}/feedback-events`)
+            .then((res) => {
+                if (!cancelled) setFeedbackHistoryForReview(res.data?.events || []);
+            })
+            .catch(() => {
+                if (!cancelled) setFeedbackHistoryForReview([]);
+            });
+        return () => {
+            cancelled = true;
+        };
+    }, [evaluateModalItem]);
+
+    useEffect(() => {
+        if (reassignTask) {
+            setReassignReason('');
+            setReassignStaffId('');
+        }
+    }, [reassignTask]);
 
     // Helper to update URL and trigger navigation
     const navigate = (mode: 'table' | 'grid' | 'activity', activity?: string, status?: string) => {
@@ -337,40 +398,6 @@ export default function DepartmentTasks({ initialActivity, initialAssignee }: De
         }
     };
 
-    useEffect(() => {
-        if (actionParam === 'create' && availableActivities.length > 0 && !hasAutoOpened.current) {
-            hasAutoOpened.current = true;
-            const initialId = initialActivity && availableActivities.length
-                ? availableActivities.find(a => a.title === initialActivity)?.id
-                : undefined;
-            const initEndDate = initialId && availableActivities.find(a => a.id === initialId)?.end_date 
-                ? toYMD(new Date(availableActivities.find(a => a.id === initialId)!.end_date!)) 
-                : toYMD(new Date(Date.now() + 7 * 24 * 60 * 60 * 1000));
-            setTaskForm({
-                title: '',
-                description: '',
-                dueDate: '',
-                status: 'Not Started',
-                activity_id: initialId,
-                assigned_to_ids: [],
-                task_type: 'kpi_driver',
-                kpi_target_value: null,
-                startDate: toYMD(new Date()),
-                endDate: initEndDate,
-                frequency: 'once',
-                frequency_interval: 1,
-                isFixedFields: true
-            });
-            setShowTaskModal(true);
-
-            // Clean up the URL to avoid keeping the 'action' query string active
-            if (typeof window !== 'undefined') {
-                const url = new URL(window.location.href);
-                url.searchParams.delete('action');
-                router.replace(url.pathname + url.search);
-            }
-        }
-    }, [actionParam, availableActivities, initialActivity, router]);
 
 
 
@@ -398,12 +425,17 @@ export default function DepartmentTasks({ initialActivity, initialAssignee }: De
         );
     }
 
-    const DEPT_INTERNAL_LABEL = '— Department internal —';
+    const DEPT_INTERNAL_LABEL = 'Department task';
 
     const normalizeForCompare = (s: string) => (s ?? '').trim().replace(/\s+/g, ' ').toLowerCase();
 
     const filterTasks = (tasks: Task[]): Task[] => {
         return tasks.filter(t => {
+            if (activityIdFilter != null) {
+                const tid = Number((t as any).activity_id);
+                if (!Number.isFinite(tid) || tid !== activityIdFilter) return false;
+            }
+
             const taskActivity = (t.activity_title ?? '').trim();
             const displayActivity = taskActivity === '' ? DEPT_INTERNAL_LABEL : (t.activity_title ?? '');
             const taskAssignee = (t.assignee_name ?? '').trim();
@@ -435,67 +467,61 @@ export default function DepartmentTasks({ initialActivity, initialAssignee }: De
         return date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' });
     };
 
-    const handleOpenCreate = () => {
-        const currentAct = activityFilter !== 'All Tasks' && activityFilter !== 'All Strategic Activities' ? activityFilter : initialActivity;
-        const meta = currentAct ? availableActivities.find(a => a.title === currentAct) : undefined;
-        const initialId = meta?.id;
-        
-        const initEndDate = meta?.end_date 
-            ? toYMD(new Date(meta.end_date)) 
-            : toYMD(new Date(Date.now() + 7 * 24 * 60 * 60 * 1000));
-
-        setTaskForm({
-            title: '',
-            description: '',
-            dueDate: '',
-            status: 'Not Started',
-            activity_id: initialId,
-            assigned_to_ids: [],
-            task_type: initialId ? 'kpi_driver' : 'process',
-            kpi_target_value: null,
-            startDate: toYMD(new Date()),
-            endDate: initEndDate,
-            frequency: 'once',
-            frequency_interval: 1,
-            isFixedFields: !!initialId
-        });
-        setShowTaskModal(true);
+    const formatDateWithYear = (dateStr: string) => {
+        if (!dateStr) return 'TBD';
+        const date = new Date(dateStr);
+        return date.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' });
     };
 
-    const handleOpenEdit = (task: Task) => {
-        let actId = (task as any).strategic_activity_id || task.activity_id || undefined;
-        // If the task is linked to an obsolete global parent activity but the department has a copy of it, auto-select the valid department copy.
-        if (actId && !availableActivities.some(a => a.id === actId)) {
-            const taskTitle = task.activity_title?.trim();
-            const matchingActivity = availableActivities.find(a => a.title?.trim() === taskTitle);
-            if (matchingActivity) {
-                actId = matchingActivity.id;
-            }
-        }
+    const getProcessDueFootnote = (task: Task): string => {
+        if (task.tier !== 'process_task') return '—';
+        if (task.status === 'Not opened' || !task.dueDate) return '—';
+        const ymd = String(task.dueDate).slice(0, 10);
+        const end = new Date(`${ymd}T12:00:00`);
+        if (Number.isNaN(end.getTime())) return formatDate(task.dueDate);
+        const now = new Date();
+        const diff = Math.ceil((end.getTime() - now.getTime()) / 86400000);
+        const dLabel = formatDate(ymd);
+        if (diff < 0) return `${dLabel} · ${Math.abs(diff)}d overdue`;
+        if (diff === 0) return `${dLabel} · Due today`;
+        return `${dLabel} · ${diff}d left`;
+    };
 
-        setTaskForm({
-            ...task,
-            startDate: parseDueDate(task.startDate) || parseDueDate(task.dueDate) || '',
-            endDate: parseDueDate(task.endDate) || parseDueDate(task.dueDate) || '',
-            assigned_to_ids: task.assigned_to ? [task.assigned_to] : [],
-            activity_id: actId,
-            kpi_target_value: task.kpi_target_value || null,
-            task_type: task.task_type || (actId ? 'kpi_driver' : 'process'),
-            frequency: task.frequency || 'once',
-            frequency_interval: task.frequency_interval || 1
-        });
-        setShowTaskModal(true);
+    /** Matches department-head evaluations page for submission timestamps in the evaluate modal. */
+    const formatEvaluationModalDate = (dateStr: string) => {
+        if (!dateStr) return 'TBD';
+        const date = new Date(dateStr);
+        return date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
     };
 
     const handleDeleteTask = async (task: Task) => {
-        if (!window.confirm(`Delete task "${task.title}"? This cannot be undone.`)) return;
+        const isProcess = task.tier === 'process_task';
+        if (isProcess && task.status === 'Completed') {
+            setMessageModal({
+                show: true,
+                title: 'Action not allowed',
+                message: 'This process task is already completed and cannot be unassigned or reassigned.',
+                type: 'warning',
+            });
+            return;
+        }
+        if (!window.confirm(isProcess ? `Unassign process "${task.title}"? This cannot be undone.` : `Delete task "${task.title}"? This cannot be undone.`)) return;
         setDeletingId(task.id);
         try {
-            await axios.delete(`/api/department-head/tasks/${task.id}`);
+            if (isProcess) {
+                await axios.delete(`/api/department-head/process-assignments/${task.id}`);
+            } else {
+                await axios.delete(`/api/department-head/tasks/${task.id}`);
+            }
             await fetchData();
         } catch (err: any) {
-            const msg = err.response?.data?.message || 'This task cannot be deleted (e.g. it may be a strategic goal).';
-            alert(msg);
+            const msg = err.response?.data?.message || 'This task cannot be removed (e.g. it may be a strategic goal).';
+            setMessageModal({
+                show: true,
+                title: 'Cannot remove',
+                message: msg,
+                type: 'error'
+            });
         } finally {
             setDeletingId(null);
         }
@@ -521,7 +547,31 @@ export default function DepartmentTasks({ initialActivity, initialAssignee }: De
         setIsBulkDeleting(true);
         setBulkDeleteError(null);
         try {
-            await Promise.all(selectedTaskIds.map(id => axios.delete(`/api/department-head/tasks/${id}`)));
+            const selectedTasks = selectedTaskIds
+                .map((id) => allTasks.find((x) => x.id === id))
+                .filter(Boolean) as Task[];
+
+            const blockedCompleted = selectedTasks.filter((t) => t.tier === 'process_task' && t.status === 'Completed');
+            if (blockedCompleted.length > 0) {
+                setMessageModal({
+                    show: true,
+                    title: 'Some selections cannot be removed',
+                    message: `Completed process tasks cannot be unassigned. Remove them from selection and try again.`,
+                    type: 'warning',
+                });
+                setIsBulkDeleting(false);
+                return;
+            }
+
+            await Promise.all(
+                selectedTaskIds.map((id) => {
+                    const t = allTasks.find((x) => x.id === id);
+                    if (t?.tier === 'process_task') {
+                        return axios.delete(`/api/department-head/process-assignments/${id}`);
+                    }
+                    return axios.delete(`/api/department-head/tasks/${id}`);
+                })
+            );
             setSelectedTaskIds([]);
             setShowBulkDeleteModal(false);
             await fetchData();
@@ -534,61 +584,92 @@ export default function DepartmentTasks({ initialActivity, initialAssignee }: De
         }
     };
 
-
-    const handleSaveTask = async (e: React.FormEvent) => {
-        e.preventDefault();
-        setIsSubmitting(true);
+    const handleSubmitOpenProcess = async () => {
+        if (!openProcessTask) return;
+        if (!openProcessStart.trim()) {
+            setMessageModal({
+                show: true,
+                title: 'Start date required',
+                message: 'Please set when this process should start.',
+                type: 'warning',
+            });
+            return;
+        }
+        setOpenProcessSaving(true);
         try {
-            if (taskForm.id) {
-                // Map camelCase to snake_case for the API
-                const putPayload = {
-                    ...taskForm,
-                    start_date: taskForm.startDate,
-                    end_date: taskForm.endDate,
-                    activity_id: taskForm.activity_id,
-                    frequency: taskForm.frequency,
-                    frequency_interval: taskForm.frequency_interval
-                };
-                await axios.put('/api/department-head/tasks', putPayload);
-            } else {
-                const occurrenceDates = generateMultipleDates(taskForm);
-                if (occurrenceDates.length === 0) {
-                    alert('Could not compute task dates. Please check Start Date and Duration.');
-                    setIsSubmitting(false);
-                    return;
-                }
-                const payloadBase = {
-                    title: taskForm.title,
-                    parent_id: taskForm.activity_id,
-                    assigned_to_ids: taskForm.assigned_to_ids ?? (taskForm.assigned_to != null ? [taskForm.assigned_to] : []),
-                    description: taskForm.description,
-                    task_type: taskForm.task_type || 'process',
-                    kpi_target_value: taskForm.task_type === 'kpi_driver' ? taskForm.kpi_target_value : null,
-                    start_date: taskForm.startDate,
-                    frequency: taskForm.frequency,
-                    frequency_interval: taskForm.frequency_interval
-                };
-
-                await Promise.all(
-                    occurrenceDates.map((occ) =>
-                        axios.post('/api/department-head/tasks', {
-                            ...payloadBase,
-                            start_date: occ.startDate,
-                            end_date: occ.endDate
-                        })
-                    )
-                );
-            }
-            setShowTaskModal(false);
+            await axios.post(`/api/department-head/process-assignments/${openProcessTask.id}/open`, {
+                start_date: openProcessStart,
+            });
+            setOpenProcessTask(null);
             await fetchData();
-        } catch (error: any) {
-            console.error('Error saving task:', error);
-            const msg = error.response?.data?.message || error.response?.data?.detail || 'Failed to save task. Please try again.';
-            alert(msg);
+            setMessageModal({
+                show: true,
+                title: 'Process opened',
+                message:
+                    'The due date was set from the standard process duration. Staff can work and submit within that window.',
+                type: 'success',
+            });
+        } catch (err: any) {
+            setMessageModal({
+                show: true,
+                title: 'Could not open process',
+                message: err.response?.data?.message || 'Request failed.',
+                type: 'error',
+            });
         } finally {
-            setIsSubmitting(false);
+            setOpenProcessSaving(false);
         }
     };
+
+    const handleSubmitReassign = async () => {
+        if (!reassignTask) return;
+        if (!String(reassignReason).trim()) {
+            setMessageModal({
+                show: true,
+                title: 'Reason required',
+                message: 'Please explain why you are reassigning this process.',
+                type: 'warning',
+            });
+            return;
+        }
+        if (reassignStaffId === '' || reassignStaffId === reassignTask.assigned_to) {
+            setMessageModal({
+                show: true,
+                title: 'Choose another staff member',
+                message: 'Select a different assignee for this process.',
+                type: 'warning',
+            });
+            return;
+        }
+        setReassignSaving(true);
+        try {
+            await axios.post(`/api/department-head/process-assignments/${reassignTask.id}/reassign`, {
+                new_staff_id: reassignStaffId,
+                reason: String(reassignReason).trim(),
+            });
+            setReassignTask(null);
+            setReassignReason('');
+            setReassignStaffId('');
+            await fetchData();
+            setMessageModal({
+                show: true,
+                title: 'Process reassigned',
+                message:
+                    'Assignment updated. Dates were cleared — open the process again when the new assignee should start.',
+                type: 'success',
+            });
+        } catch (err: any) {
+            setMessageModal({
+                show: true,
+                title: 'Reassign failed',
+                message: err.response?.data?.message || 'Request failed.',
+                type: 'error',
+            });
+        } finally {
+            setReassignSaving(false);
+        }
+    };
+
 
     const allTasks = [
         ...data.kanban.todo,
@@ -683,23 +764,126 @@ export default function DepartmentTasks({ initialActivity, initialAssignee }: De
         try {
             setIsEvaluationLoading(true);
             const res = await axios.get(`/api/department-head/evaluations?taskId=${taskId}`);
-            const evals = [...(res.data.pending || []), ...(res.data.completed || [])];
-            if (evals.length > 0) {
-                const latest = evals[0];
-                if (latest.status === 'Pending') {
-                    setEvaluateModalItem(latest);
-                } else {
-                    setViewModalItem(latest);
-                }
+            const pendingList = res.data.pending || [];
+            if (pendingList.length > 0) {
+                setEvaluateModalItem(pendingList[0]);
+                return;
+            }
+            const completedList = res.data.completed || [];
+            if (completedList.length > 0) {
+                setViewModalItem(completedList[0]);
             } else {
-                alert('No evaluation record found for this task.');
+                setMessageModal({
+                    show: true,
+                    title: 'No submission record',
+                    message: 'There is no submission on file for this task yet, or it was updated outside the normal flow.',
+                    type: 'info'
+                });
             }
         } catch (err) {
             console.error('Error fetching evaluation:', err);
-            alert('Failed to load evaluation details.');
+            setMessageModal({
+                show: true,
+                title: 'Fetch Error',
+                message: 'Failed to load evaluation details. Please check your connection and try again.',
+                type: 'error'
+            });
         } finally {
             setIsEvaluationLoading(false);
         }
+    };
+
+    const closeTableProcessDetails = () => setTableDetailsTask(null);
+
+    /** Same rules as grid cards: stacked actions for the table “View details” modal */
+    const renderProcessTaskModalActions = (task: Task) => {
+        const btnBase = 'btn btn-sm d-flex align-items-center justify-content-center gap-1 w-100';
+        const onEval = () => {
+            closeTableProcessDetails();
+            void handleViewEvaluation(task.id);
+        };
+        const onOpen = () => {
+            closeTableProcessDetails();
+            setOpenProcessTask(task);
+        };
+        const onReassign = () => {
+            closeTableProcessDetails();
+            setReassignTask(task);
+        };
+        const onRemove = () => {
+            closeTableProcessDetails();
+            void handleDeleteTask(task);
+        };
+
+        return (
+            <div className="d-flex flex-column gap-2 w-100">
+                {task.status === 'Under Review' ? (
+                    <button
+                        type="button"
+                        className={`${btnBase} btn-primary fw-bold shadow-sm`}
+                        style={{ fontSize: '.85rem', background: 'var(--mubs-blue)', borderColor: 'var(--mubs-blue)' }}
+                        onClick={onEval}
+                    >
+                        <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>
+                            fact_check
+                        </span>
+                        Review submission
+                    </button>
+                ) : (
+                    <>
+                        {task.tier === 'process_task' && task.status === 'Not opened' && (
+                            <button
+                                type="button"
+                                className={`${btnBase} btn-success`}
+                                style={{ fontSize: '.85rem' }}
+                                onClick={onOpen}
+                                title="Set a start date; due date comes from the process duration"
+                            >
+                                <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>
+                                    event_available
+                                </span>
+                                Open process
+                            </button>
+                        )}
+                        {task.tier === 'process_task' &&
+                            task.assigned_to != null &&
+                            !['Completed', 'Under Review'].includes(task.status) && (
+                                <button
+                                    type="button"
+                                    className={`${btnBase} btn-outline-secondary`}
+                                    style={{ fontSize: '.85rem' }}
+                                    onClick={onReassign}
+                                    title="Reassign to another staff member"
+                                >
+                                    <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>
+                                        swap_horiz
+                                    </span>
+                                    Reassign
+                                </button>
+                            )}
+                        {task.status !== 'Completed' && (
+                            <button
+                                type="button"
+                                className={`${btnBase} btn-outline-danger`}
+                                style={{ fontSize: '.85rem' }}
+                                onClick={onRemove}
+                                disabled={deletingId === task.id}
+                                title={task.tier === 'process_task' ? 'Unassign process' : 'Delete task'}
+                            >
+                                {deletingId === task.id ? (
+                                    <span className="spinner-border spinner-border-sm" style={{ width: '14px', height: '14px' }} />
+                                ) : (
+                                    <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>
+                                        person_remove
+                                    </span>
+                                )}
+                                {task.tier === 'process_task' ? 'Unassign' : 'Delete'}
+                            </button>
+                        )}
+                    </>
+                )}
+            </div>
+        );
     };
 
     const handleSubmitEvaluation = async () => {
@@ -711,28 +895,62 @@ export default function DepartmentTasks({ initialActivity, initialAssignee }: De
         const kpiActual = kpiActualValues[id];
 
         if (!status) {
-            alert('Please select a rating: Complete (2 pts), Incomplete (1 pt), or Not Done (0 pts).');
+            setMessageModal({
+                show: true,
+                title: 'Decision required',
+                message: 'Choose approve completion, request revision, or mark not done.',
+                type: 'warning'
+            });
             return;
         }
         if (status === 'Incomplete' && (!comment || String(comment).trim() === '')) {
-            alert('Comment is required when marking Incomplete.');
+            setMessageModal({
+                show: true,
+                title: 'Comment required',
+                message: 'Add feedback explaining what the staff member should revise.',
+                type: 'warning'
+            });
             return;
         }
 
         const score = status === 'Complete' ? 2 : status === 'Incomplete' ? 1 : 0;
         try {
             setIsSubmitting(true);
-            await axios.put('/api/department-head/evaluations', {
+            const res = await axios.put('/api/department-head/evaluations', {
                 id,
                 status,
                 score,
                 reviewer_notes: comment || '',
-                kpi_actual_value: status === 'Complete' && isKpiDriver && kpiActual != null && String(kpiActual).trim() !== '' ? Number(kpiActual) : undefined
+                kpi_actual_value:
+                    status === 'Complete' && isKpiDriver && kpiActual != null && String(kpiActual).trim() !== ''
+                        ? Number(kpiActual)
+                        : undefined,
             });
 
             // Refresh tasks
             await fetchData();
-            
+
+            if (status === 'Complete') {
+                const isProcess = evaluateModalItem.task_type !== 'kpi_driver';
+                const delayed = res.data?.delayedHodNoteApplied as boolean | undefined;
+                if (isProcess) {
+                    setMessageModal({
+                        show: true,
+                        title: 'Review saved',
+                        message: 'Completion approved; full credit recorded for this process task.',
+                        type: 'success',
+                    });
+                } else if (delayed) {
+                    setMessageModal({
+                        show: true,
+                        title: 'Review saved',
+                        message:
+                            'Marked complete. The feedback includes a system note about timing of the review.',
+                        type: 'info',
+                    });
+                }
+            }
+
             // Close modal and reset
             setEvaluateModalItem(null);
             setSelectedRating(prev => { const next = { ...prev }; delete next[id]; return next; });
@@ -740,8 +958,13 @@ export default function DepartmentTasks({ initialActivity, initialAssignee }: De
             setKpiActualValues(prev => { const next = { ...prev }; delete next[id]; return next; });
         } catch (error: any) {
             console.error('Error submitting evaluation:', error);
-            const msg = error.response?.data?.message || 'Failed to submit evaluation.';
-            alert(msg);
+            const msg = error.response?.data?.message || 'Failed to save review.';
+            setMessageModal({
+                show: true,
+                title: 'Could not save',
+                message: msg,
+                type: 'error'
+            });
         } finally {
             setIsSubmitting(false);
         }
@@ -752,26 +975,17 @@ export default function DepartmentTasks({ initialActivity, initialAssignee }: De
         if (e.status === 'Pending') return '—';
         if (e.score != null && e.score <= 2) {
             if (e.score === 2) return 'Complete';
-            if (e.score === 1) return 'Incomplete';
+            if (e.score === 1) {
+                if (e.status === 'Completed') return 'Complete (1 pt)';
+                return 'Incomplete';
+            }
+            if (e.score === 0 && e.status === 'Completed') return 'Complete (0 pt)';
             return 'Not Done';
         }
         if (e.status === 'Completed') return 'Complete';
         if (e.status === 'Not Done') return 'Not Done';
         if (e.status === 'Incomplete' || e.status === 'Returned') return 'Incomplete';
         return '—';
-    };
-
-    const parseEvidenceItems = (attachments?: string | null): { label: string; url: string }[] => {
-        if (!attachments) return [];
-        return attachments
-            .split('|')
-            .map(part => part.trim())
-            .filter(part => part.length > 0)
-            .map(part => {
-                const isUpload = part.startsWith('/uploads/');
-                const label = isUpload ? 'Uploaded file' : 'Evidence link';
-                return { label, url: part };
-            });
     };
 
     // Pagination logic
@@ -786,7 +1000,7 @@ export default function DepartmentTasks({ initialActivity, initialAssignee }: De
                 <div className="col-12 col-sm-6 col-xl-3">
                     <StatCard
                         icon="assignment"
-                        label="Total Tasks"
+                        label="Total Processes"
                         value={getStatusCount('All')}
                         badge="Assigned"
                         badgeIcon="info"
@@ -825,82 +1039,97 @@ export default function DepartmentTasks({ initialActivity, initialAssignee }: De
                 </div>
             </div>
 
-            <div className="table-card shadow-sm">
-                <div className="table-card-header">
+            <div
+                className={`table-card ${viewMode === 'activity' ? 'shadow-sm' : 'p-0 overflow-hidden'}`}
+                style={viewMode === 'activity' ? undefined : { borderRadius: '20px', border: '1px solid #e2e8f0' }}
+            >
+                <div
+                    className={`table-card-header ${viewMode !== 'activity' ? 'd-flex justify-content-between align-items-center p-4' : ''}`}
+                    style={viewMode !== 'activity' ? { background: '#fff', borderBottom: '1px solid #f1f5f9' } : undefined}
+                >
                     <div>
-                        <h5 className="mb-1">
-                            <span className="material-symbols-outlined me-2" style={{ color: 'var(--mubs-blue)' }}>list_alt</span>
-                            {viewMode === 'activity' ? 'Department Tasks' : 'Activity Tasks'}
+                        <h5
+                            className={`d-flex align-items-center gap-2 ${viewMode !== 'activity' ? 'mb-0 fw-bold' : 'mb-1'}`}
+                            style={viewMode !== 'activity' ? { color: 'var(--mubs-navy)' } : undefined}
+                        >
+                            <span className="material-symbols-outlined" style={{ color: 'var(--mubs-blue)' }}>checklist</span>
+                            {viewMode === 'activity' ? 'Assigned Processes' : 'Activity Processes'}
                         </h5>
                         {viewMode !== 'activity' && (
-                            <div className="text-muted small d-flex align-items-center gap-1 ms-4 ps-1">
+                            <div className="text-muted small d-flex align-items-center gap-1 mt-1">
                                 <span className="material-symbols-outlined" style={{ fontSize: '14px' }}>account_tree</span>
                                 {activityFilter}
                             </div>
                         )}
                     </div>
-                    
+
                     <div className="d-flex gap-2 align-items-center flex-nowrap ms-auto">
                         {viewMode !== 'activity' ? (
-                            <>
-                                <select 
-                                    className="form-select form-select-sm fw-bold border shadow-sm bg-light text-secondary" 
-                                    style={{ width: '150px', fontSize: '0.75rem', height: '32px', borderRadius: '8px', cursor: 'pointer' }}
-                                    value={statusFilter}
-                                    onChange={(e) => navigate(viewMode, activityFilter, e.target.value)}
-                                    title="Filter by status"
-                                >
-                                    <option value="All">All Progress ({getStatusCount('All')})</option>
-                                    <option value="Not Completed">Not Completed ({getStatusCount('Not Completed')})</option>
-                                    <option value="In Progress">In Progress ({getStatusCount('In Progress')})</option>
-                                    <option value="Completed">Completed ({getStatusCount('Completed')})</option>
-                                </select>
-
+                            <div className="btn-group border rounded-3 p-1 bg-light shadow-sm" style={{ height: '32px' }}>
                                 <button
-                                    className="btn btn-sm btn-primary d-flex align-items-center gap-2 fw-bold shadow-sm px-3"
-                                    style={{ background: 'var(--mubs-blue)', borderColor: 'var(--mubs-blue)', height: '32px', borderRadius: '8px' }}
-                                    onClick={handleOpenCreate}
+                                    type="button"
+                                    className={`btn btn-sm d-flex align-items-center justify-content-center ${viewMode === 'grid' ? 'btn-primary shadow-sm' : 'btn-light border-0'}`}
+                                    onClick={() => navigate('grid', activityFilter)}
+                                    style={{ borderRadius: '6px', width: '32px', height: '24px', transition: 'all 0.2s', padding: 0 }}
+                                    title="Grid View"
                                 >
-                                    <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>add</span> New Task
+                                    <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>dashboard</span>
                                 </button>
-
-                                <div className="btn-group border rounded-3 p-1 bg-light shadow-sm" style={{ height: '32px' }}>
-                                    <button 
-                                        className={`btn btn-sm d-flex align-items-center justify-content-center ${viewMode === 'grid' ? 'btn-primary shadow-sm' : 'btn-light border-0'}`}
-                                        onClick={() => navigate('grid', activityFilter)}
-                                        style={{ borderRadius: '6px', width: '32px', height: '24px', transition: 'all 0.2s', padding: 0 }}
-                                        title="Grid View"
-                                    >
-                                        <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>dashboard</span>
-                                    </button>
-                                    <button 
-                                        className={`btn btn-sm d-flex align-items-center justify-content-center ${viewMode === 'table' ? 'btn-primary shadow-sm' : 'btn-light border-0'}`}
-                                        onClick={() => navigate('table', activityFilter)}
-                                        style={{ borderRadius: '6px', width: '32px', height: '24px', transition: 'all 0.2s', padding: 0 }}
-                                        title="Table View"
-                                    >
-                                        <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>table_rows</span>
-                                    </button>
-                                </div>
-                            </>
-                        ) : (
-                            <button
-                                className="btn btn-sm btn-primary d-flex align-items-center gap-2 fw-bold shadow-sm px-3"
-                                style={{ background: 'var(--mubs-blue)', borderColor: 'var(--mubs-blue)', height: '32px', borderRadius: '8px' }}
-                                onClick={() => handleOpenCreate()}
-                            >
-                                <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>add</span> New Task
-                            </button>
-                        )}
+                                <button
+                                    type="button"
+                                    className={`btn btn-sm d-flex align-items-center justify-content-center ${viewMode === 'table' ? 'btn-primary shadow-sm' : 'btn-light border-0'}`}
+                                    onClick={() => navigate('table', activityFilter)}
+                                    style={{ borderRadius: '6px', width: '32px', height: '24px', transition: 'all 0.2s', padding: 0 }}
+                                    title="Table View"
+                                >
+                                    <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>table_rows</span>
+                                </button>
+                            </div>
+                        ) : null}
                     </div>
                 </div>
+
+                {viewMode !== 'activity' && (
+                    <div className="d-flex px-4 pt-2 bg-white border-bottom gap-4" style={{ overflowX: 'auto' }}>
+                        {(
+                            [
+                                { value: 'All', label: 'All', badgeBg: '#f1f5f9', badgeColor: '#475569' },
+                                { value: 'Not Completed', label: 'Not completed', badgeBg: '#fef3c7', badgeColor: '#92400e' },
+                                { value: 'In Progress', label: 'In progress', badgeBg: '#dbeafe', badgeColor: '#1d4ed8' },
+                                { value: 'Completed', label: 'Completed', badgeBg: '#dcfce7', badgeColor: '#15803d' },
+                            ] as const
+                        ).map((tab) => (
+                            <button
+                                key={tab.value}
+                                type="button"
+                                className={`pb-2 px-1 fw-bold border-0 bg-transparent position-relative flex-shrink-0 ${statusFilter === tab.value ? 'text-primary' : 'text-muted'}`}
+                                style={{ fontSize: '0.82rem', transition: 'all 0.2s', whiteSpace: 'nowrap' }}
+                                onClick={() => navigate(viewMode, activityFilter, tab.value)}
+                            >
+                                {tab.label}
+                                <span
+                                    className="badge rounded-pill ms-2"
+                                    style={{ background: tab.badgeBg, color: tab.badgeColor, fontSize: '0.65rem' }}
+                                >
+                                    {getStatusCount(tab.value)}
+                                </span>
+                                {statusFilter === tab.value && (
+                                    <div
+                                        className="position-absolute bottom-0 start-0 w-100 bg-primary"
+                                        style={{ height: '3px', borderRadius: '3px 3px 0 0' }}
+                                    />
+                                )}
+                            </button>
+                        ))}
+                    </div>
+                )}
 
                 {/* Bulk Actions Bar */}
                 {selectedTaskIds.length > 0 && (
                     <div className="alert alert-primary d-flex align-items-center justify-content-between p-2 m-3 shadow-sm border" style={{ background: '#f0fdf4', borderColor: '#bbf7d0', color: '#166534' }}>
                         <div className="d-flex align-items-center gap-2 px-2">
                             <span className="material-symbols-outlined rounded-circle" style={{ fontSize: '20px', color: '#166534' }}>check_circle</span>
-                            <span className="fw-bold" style={{ fontSize: '.9rem' }}>{selectedTaskIds.length} tasks selected</span>
+                            <span className="fw-bold" style={{ fontSize: '.9rem' }}>{selectedTaskIds.length} processes selected</span>
                         </div>
                         <div className="d-flex gap-2">
                             <button 
@@ -917,9 +1146,9 @@ export default function DepartmentTasks({ initialActivity, initialAssignee }: De
                                 {isBulkDeleting ? (
                                     <span className="spinner-border spinner-border-sm" style={{ width: '14px', height: '14px' }} />
                                 ) : (
-                                    <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>delete</span>
+                                    <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>person_remove</span>
                                 )}
-                                Delete Selected
+                                Unassign Selected
                             </button>
                         </div>
                     </div>
@@ -956,11 +1185,6 @@ export default function DepartmentTasks({ initialActivity, initialAssignee }: De
                                                     }}>
                                                         {group.title === DEPT_INTERNAL_LABEL ? 'Operational' : (group.pillar || 'Strategic Activity')}
                                                     </span>
-                                                    {group.startDate && group.endDate && (
-                                                        <span className="text-muted" style={{ fontSize: '0.65rem' }}>
-                                                            {formatDate(group.startDate)} — {formatDate(group.endDate)}
-                                                        </span>
-                                                    )}
                                                 </div>
                                                 <h6 className="card-title fw-bold text-dark mb-1" style={{ fontSize: '1rem', display: '-webkit-box', WebkitLineClamp: '2', WebkitBoxOrient: 'vertical', overflow: 'hidden', minHeight: '3rem' }}>
                                                     {group.title}
@@ -999,7 +1223,7 @@ export default function DepartmentTasks({ initialActivity, initialAssignee }: De
                                                     <div className="d-grid flex-grow-1" style={{ gridTemplateColumns: 'repeat(4, 1fr)', gap: '4px' }}>
                                                         <div className="text-center">
                                                             <div className="fw-bold text-dark" style={{ fontSize: '0.9rem' }}>{group.total}</div>
-                                                            <div className="text-muted small" style={{ fontSize: '0.6rem' }}>Total</div>
+                                                            <div className="text-muted small" style={{ fontSize: '0.6rem' }}>Total processes</div>
                                                         </div>
                                                         <div className="text-center">
                                                             <div className="fw-bold text-danger" style={{ fontSize: '0.9rem' }}>{group.todo}</div>
@@ -1038,20 +1262,21 @@ export default function DepartmentTasks({ initialActivity, initialAssignee }: De
                         </div>
                     </div>
                 ) : viewMode === 'grid' ? (
-                    <div className="p-4" style={{ background: '#f8fafc' }}>
+                    <div className="p-4 bg-white">
                         <DepartmentTaskCardGrid 
                             tasks={pagedTasks}
-                            onEdit={handleOpenEdit}
                             onDelete={handleDeleteTask}
                             onViewEvaluation={handleViewEvaluation}
+                            onOpenProcess={(t) => setOpenProcessTask(t)}
+                            onReassignProcess={(t) => setReassignTask(t)}
                             deletingId={deletingId}
                             selectedTaskIds={selectedTaskIds}
                             onToggleTaskSelect={handleToggleTaskSelect}
                         />
                     </div>
                 ) : (
-                    <div className="table-responsive">
-                        <table className="table mb-0 align-middle">
+                    <div className="table-responsive bg-white">
+                        <table className="table mb-0 align-middle department-tasks-processes-table">
                             <thead className="bg-light">
                             <tr>
                                 <th className="ps-4" style={{ width: '40px' }}>
@@ -1065,13 +1290,11 @@ export default function DepartmentTasks({ initialActivity, initialAssignee }: De
                                         />
                                     </div>
                                 </th>
-                                <th>Task Title</th>
+                                <th>Process</th>
+                                <th>Performance indicator</th>
                                 <th>Strategic Activity</th>
-                                <th>Task Type</th>
-                                <th>Assignee</th>
-                                <th>Start Date</th>
-                                <th>End date</th>
-
+                                <th>Staff Assigned</th>
+                                <th>Due</th>
                                 <th>Progress</th>
                                 <th>Status</th>
                                 <th className="pe-4 text-end">Actions</th>
@@ -1080,8 +1303,14 @@ export default function DepartmentTasks({ initialActivity, initialAssignee }: De
                         <tbody key={`tasks-${activityFilter}-${assigneeFilter}-${pagedTasks.length}`}>
                             {pagedTasks.length === 0 ? (
                                 <tr>
-                                    <td colSpan={10} className="text-center py-5 text-muted">
-                                        No tasks found matching your criteria.
+                                    <td colSpan={9} className="text-center py-4 text-muted">
+                                        <span
+                                            className="material-symbols-outlined d-block mb-2 mx-auto"
+                                            style={{ fontSize: '36px', opacity: 0.3 }}
+                                        >
+                                            checklist
+                                        </span>
+                                        No processes found in this section.
                                     </td>
                                 </tr>
                             ) : (
@@ -1094,31 +1323,24 @@ export default function DepartmentTasks({ initialActivity, initialAssignee }: De
                                                     type="checkbox" 
                                                     checked={selectedTaskIds.includes(task.id)}
                                                     onChange={() => handleToggleTaskSelect(task.id)}
+                                                    disabled={task.tier === 'process_task' && task.status === 'Completed'}
                                                     style={{ cursor: 'pointer', borderColor: '#cbd5e1' }}
                                                 />
                                             </div>
                                         </td>
-                                        <td>
-                                            <div className="fw-bold text-dark" style={{ fontSize: '.85rem' }}>{task.title}</div>
-                                            <div className="text-muted small">ID: #{task.id}</div>
+                                        <td className="small text-dark fw-normal" style={{ fontSize: '.8rem', textTransform: 'none' }}>
+                                            {task.title}
                                         </td>
-                                        <td>
-                                            <span className="text-muted" style={{ fontSize: '.8rem' }}>{task.activity_title || DEPT_INTERNAL_LABEL}</span>
+                                        <td
+                                            style={{ fontSize: '.8rem', maxWidth: '200px', textTransform: 'none' }}
+                                            className="text-dark small fw-normal"
+                                        >
+                                            {task.performance_indicator?.trim() ? task.performance_indicator : '—'}
                                         </td>
-                                        <td>
-                                            <span
-                                                className="badge"
-                                                style={{
-                                                    fontSize: '.65rem',
-                                                    fontWeight: 600,
-                                                    background: task.task_type === 'kpi_driver' ? '#dbeafe' : '#f1f5f9',
-                                                    color: task.task_type === 'kpi_driver' ? '#1e40af' : '#475569'
-                                                }}
-                                            >
-                                                {task.task_type === 'kpi_driver' ? 'KPI-Driver Task (Strategy Plan)' : 'Process Task (Dept Internal)'}
-                                            </span>
+                                        <td className="small text-dark fw-normal" style={{ fontSize: '.8rem', textTransform: 'none' }}>
+                                            {task.activity_title || DEPT_INTERNAL_LABEL}
                                         </td>
-                                        <td>
+                                        <td className="text-dark fw-normal" style={{ fontSize: '.8rem', textTransform: 'none' }}>
                                             <div className="d-flex align-items-center gap-2">
                                                 <div className="staff-avatar" style={{
                                                     background: 'var(--mubs-blue)',
@@ -1130,24 +1352,16 @@ export default function DepartmentTasks({ initialActivity, initialAssignee }: De
                                                     alignItems: 'center',
                                                     justifyContent: 'center',
                                                     color: '#fff',
-                                                    fontWeight: 'bold'
-                                                }} title={task.assignee_name || UNASSIGNED_LABEL}>
-                                                    {task.assignee_name?.split(' ').map(n => n[0]).join('') || '?'}
+                                                    fontWeight: 500,
+                                                    textTransform: 'none',
+                                                }} title={staffAssigneeTitle(task.assignee_name, UNASSIGNED_LABEL)}>
+                                                    {staffAssigneeInitials(task.assignee_name)}
                                                 </div>
-                                                <span className="fw-semibold text-dark" style={{ fontSize: '.8rem' }}>{task.assignee_name?.split(' ')[0] || UNASSIGNED_LABEL}</span>
+                                                <span>{staffAssigneeShortLabel(task.assignee_name, UNASSIGNED_LABEL)}</span>
                                             </div>
                                         </td>
-                                        <td className="small" style={{ fontSize: '.8rem' }}>
-                                            <div className="d-flex align-items-center gap-1 text-muted">
-                                                <span className="material-symbols-outlined" style={{ fontSize: '14px' }}>calendar_today</span>
-                                                {formatDate(task.startDate || '')}
-                                            </div>
-                                        </td>
-                                        <td className="small" style={{ fontSize: '.8rem' }}>
-                                            <div className="d-flex align-items-center gap-1 text-muted">
-                                                <span className="material-symbols-outlined" style={{ fontSize: '14px' }}>event</span>
-                                                {formatDate(task.dueDate)}
-                                            </div>
+                                        <td className="small text-dark fw-normal" style={{ fontSize: '.75rem', textTransform: 'none' }}>
+                                            {getProcessDueFootnote(task)}
                                         </td>
 
                                         <td style={{ minWidth: '120px' }}>
@@ -1159,71 +1373,40 @@ export default function DepartmentTasks({ initialActivity, initialAssignee }: De
                                                         borderRadius: '10px'
                                                     }}></div>
                                                 </div>
-                                                <span className="small fw-bold" style={{ fontSize: '.75rem' }}>{task.progress || 0}%</span>
+                                                <span className="small fw-normal text-dark" style={{ fontSize: '.75rem', textTransform: 'none' }}>{task.progress || 0}%</span>
                                             </div>
                                         </td>
-                                        <td>
-                                            <span className="status-badge" style={{
-                                                background: task.status === 'Completed' ? '#dcfce7' : (task.status === 'In Progress' ? '#fef9c3' : (task.status === 'Under Review' ? '#eff6ff' : '#f1f5f9')),
-                                                color: task.status === 'Completed' ? '#15803d' : (task.status === 'In Progress' ? '#a16207' : (task.status === 'Under Review' ? '#1d4ed8' : '#475569')),
-                                                fontSize: '0.7rem',
-                                                padding: '4px 8px',
-                                                borderRadius: '6px',
-                                                fontWeight: '600'
-                                            }}>{task.status}</span>
+                                        <td
+                                            className="small fw-normal"
+                                            style={{
+                                                fontSize: '.8rem',
+                                                textTransform: 'none',
+                                                color:
+                                                    task.status === 'Completed'
+                                                        ? '#15803d'
+                                                        : task.status === 'In Progress'
+                                                          ? '#a16207'
+                                                          : task.status === 'Under Review'
+                                                            ? '#1d4ed8'
+                                                            : task.status === 'Not opened'
+                                                              ? '#9a3412'
+                                                              : '#475569',
+                                            }}
+                                        >
+                                            {task.status}
                                         </td>
                                         <td className="pe-4 text-end">
-                                            <div className="d-flex justify-content-end gap-2">
-                                                {task.status === 'Under Review' ? (
-                                                    <button
-                                                        type="button"
-                                                        className="btn btn-sm btn-primary d-inline-flex align-items-center gap-1 py-1 px-2 fw-bold shadow-sm"
-                                                        style={{ fontSize: '.75rem', background: 'var(--mubs-blue)', borderColor: 'var(--mubs-blue)' }}
-                                                        onClick={() => handleViewEvaluation(task.id)}
-                                                    >
-                                                        <span className="material-symbols-outlined" style={{ fontSize: '14px' }}>rate_review</span>
-                                                        Evaluate
-                                                    </button>
-                                                ) : task.status === 'Completed' ? (
-                                                    <button
-                                                        type="button"
-                                                        className="btn btn-sm btn-light border py-1 px-2 d-inline-flex align-items-center gap-1"
-                                                        style={{ fontSize: '.75rem', color: '#15803d', borderColor: '#86efac' }}
-                                                        onClick={() => handleViewEvaluation(task.id)}
-                                                        title="View evaluation record"
-                                                    >
-                                                        <span className="material-symbols-outlined" style={{ fontSize: '14px' }}>visibility</span>
-                                                        View evaluation
-                                                    </button>
-                                                ) : (
-                                                    <>
-                                                        <button
-                                                            type="button"
-                                                            className="btn btn-sm btn-light bg-opacity-50 py-1 px-2 border d-inline-flex align-items-center gap-1"
-                                                            style={{ fontSize: '.75rem', color: '#64748b' }}
-                                                            onClick={() => handleOpenEdit(task)}
-                                                        >
-                                                            <span className="material-symbols-outlined" style={{ fontSize: '14px' }}>edit</span>
-                                                            Edit
-                                                        </button>
-                                                        <button
-                                                            type="button"
-                                                            className="btn btn-sm btn-outline-danger py-1 px-2 d-inline-flex align-items-center gap-1"
-                                                            style={{ fontSize: '.75rem' }}
-                                                            onClick={() => handleDeleteTask(task)}
-                                                            disabled={deletingId === task.id}
-                                                            title="Delete task"
-                                                        >
-                                                            {deletingId === task.id ? (
-                                                                <span className="spinner-border spinner-border-sm" style={{ width: '14px', height: '14px' }} />
-                                                            ) : (
-                                                                <span className="material-symbols-outlined" style={{ fontSize: '14px' }}>delete</span>
-                                                            )}
-                                                            Delete
-                                                        </button>
-                                                    </>
-                                                )}
-                                            </div>
+                                            <button
+                                                type="button"
+                                                className="btn btn-sm btn-outline-secondary d-inline-flex align-items-center gap-1 py-1 px-2 fw-bold text-nowrap"
+                                                style={{ fontSize: '.75rem', borderRadius: '8px' }}
+                                                onClick={() => setTableDetailsTask(task)}
+                                            >
+                                                <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>
+                                                    visibility
+                                                </span>
+                                                View details
+                                            </button>
                                         </td>
                                     </tr>
                                 ))
@@ -1232,18 +1415,25 @@ export default function DepartmentTasks({ initialActivity, initialAssignee }: De
                         </table>
                     </div>
                 )}
-                {/* Footer: pagination + page count (only show for table/grid) */}
-                {viewMode !== 'activity' && (
-                    <div className="table-card-footer d-flex align-items-center justify-content-between flex-wrap gap-2" style={{ padding: '0.85rem 1.5rem', borderTop: '1px solid #f1f5f9' }}>
-                        <span className="text-muted" style={{ fontSize: '.8rem' }}>
-                            Showing <strong>{pagedTasks.length > 0 ? (safePage - 1) * pageSize + 1 : 0}</strong>–<strong>{Math.min(safePage * pageSize, filteredTasks.length)}</strong> of <strong>{filteredTasks.length}</strong> tasks
-                        </span>
-                        <div className="d-flex align-items-center gap-3">
+                {/* Footer: pagination (table/grid, staff-style; hidden when no rows) */}
+                {viewMode !== 'activity' && filteredTasks.length > 0 && (
+                    <div
+                        className="p-4 border-top d-flex justify-content-between align-items-center flex-wrap gap-3 bg-white"
+                        style={{ borderBottomLeftRadius: '20px', borderBottomRightRadius: '20px' }}
+                    >
+                        <div className="text-muted fw-bold" style={{ fontSize: '0.75rem' }}>
+                            Showing <span className="text-dark">{startIndex + 1}</span> to{' '}
+                            <span className="text-dark">{Math.min(startIndex + pagedTasks.length, filteredTasks.length)}</span> of{' '}
+                            <span className="text-dark">{filteredTasks.length}</span> processes
+                        </div>
+                        <div className="d-flex align-items-center gap-3 flex-wrap">
                             <div className="d-flex align-items-center gap-2">
-                                <span className="text-muted" style={{ fontSize: '.8rem', whiteSpace: 'nowrap' }}>Rows per page:</span>
+                                <span className="text-muted fw-bold" style={{ fontSize: '0.75rem', whiteSpace: 'nowrap' }}>
+                                    Rows per page:
+                                </span>
                                 <select
-                                    className="form-select form-select-sm"
-                                    style={{ width: '70px' }}
+                                    className="form-select form-select-sm border"
+                                    style={{ width: '70px', borderRadius: '8px', fontSize: '0.75rem' }}
                                     value={pageSize}
                                     onChange={(e) => {
                                         setPageSize(Number(e.target.value));
@@ -1256,354 +1446,517 @@ export default function DepartmentTasks({ initialActivity, initialAssignee }: De
                                     <option value="50">50</option>
                                 </select>
                             </div>
-                            <nav className="m-0">
-                                <ul className="pagination pagination-sm mb-0">
-                                    <li className={`page-item ${safePage === 1 ? 'disabled' : ''}`}>
-                                        <button className="page-link border-0" onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))} style={{ backgroundColor: 'transparent', color: safePage === 1 ? '#cbd5e1' : 'var(--mubs-blue)' }}>
-                                            <span className="material-symbols-outlined" style={{ fontSize: '18px', verticalAlign: 'middle' }}>chevron_left</span>
-                                        </button>
-                                    </li>
-                                    {[...Array(totalPages)].map((_, i) => (
-                                        <li key={i + 1} className={`page-item ${safePage === i + 1 ? 'active' : ''}`}>
-                                            <button className="page-link border-0" onClick={() => setCurrentPage(i + 1)} style={{ borderRadius: '4px', margin: '0 2px', backgroundColor: safePage === i + 1 ? 'var(--mubs-blue)' : 'transparent', color: safePage === i + 1 ? '#fff' : '#334155' }}>
-                                                {i + 1}
-                                            </button>
-                                        </li>
-                                    ))}
-                                    <li className={`page-item ${safePage === totalPages ? 'disabled' : ''}`}>
-                                        <button className="page-link border-0" onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))} style={{ backgroundColor: 'transparent', color: safePage === totalPages ? '#cbd5e1' : 'var(--mubs-blue)' }}>
-                                            <span className="material-symbols-outlined" style={{ fontSize: '18px', verticalAlign: 'middle' }}>chevron_right</span>
-                                        </button>
-                                    </li>
-                                </ul>
-                            </nav>
+                            <div className="pagination-controls d-flex gap-2">
+                                <button
+                                    type="button"
+                                    className="btn btn-sm btn-outline-light border text-dark d-flex align-items-center justify-content-center p-0"
+                                    style={{
+                                        width: '32px',
+                                        height: '32px',
+                                        borderRadius: '8px',
+                                        opacity: safePage === 1 ? 0.5 : 1,
+                                    }}
+                                    disabled={safePage === 1}
+                                    onClick={() => {
+                                        setCurrentPage((prev) => Math.max(1, prev - 1));
+                                        window.scrollTo({ top: 0, behavior: 'smooth' });
+                                    }}
+                                >
+                                    <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>
+                                        chevron_left
+                                    </span>
+                                </button>
+                                {[...Array(totalPages)].map((_, i) => (
+                                    <button
+                                        key={i + 1}
+                                        type="button"
+                                        className={`btn btn-sm fw-bold d-flex align-items-center justify-content-center p-0 ${
+                                            safePage === i + 1 ? 'btn-primary shadow-sm' : 'btn-outline-light border text-dark'
+                                        }`}
+                                        style={{
+                                            width: '32px',
+                                            height: '32px',
+                                            borderRadius: '8px',
+                                            fontSize: '0.75rem',
+                                            transition: 'all 0.2s',
+                                        }}
+                                        onClick={() => {
+                                            setCurrentPage(i + 1);
+                                            window.scrollTo({ top: 0, behavior: 'smooth' });
+                                        }}
+                                    >
+                                        {i + 1}
+                                    </button>
+                                ))}
+                                <button
+                                    type="button"
+                                    className="btn btn-sm btn-outline-light border text-dark d-flex align-items-center justify-content-center p-0"
+                                    style={{
+                                        width: '32px',
+                                        height: '32px',
+                                        borderRadius: '8px',
+                                        opacity: safePage === totalPages || totalPages === 0 ? 0.5 : 1,
+                                    }}
+                                    disabled={safePage === totalPages || totalPages === 0}
+                                    onClick={() => {
+                                        setCurrentPage((prev) => Math.min(totalPages, prev + 1));
+                                        window.scrollTo({ top: 0, behavior: 'smooth' });
+                                    }}
+                                >
+                                    <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>
+                                        chevron_right
+                                    </span>
+                                </button>
+                            </div>
                         </div>
                     </div>
                 )}
             </div>
 
-            {/* Create/Edit Task Modal UI */}
-            {showTaskModal && (
-                <div className="modal-backdrop fade show" style={{ zIndex: 1040 }}></div>
+            {tableDetailsTask && (
+                <div
+                    className="modal-backdrop fade show"
+                    style={{ zIndex: 1048, background: 'rgba(15, 23, 42, 0.55)', backdropFilter: 'blur(3px)' }}
+                    onClick={() => setTableDetailsTask(null)}
+                />
             )}
-            <div className={`modal fade ${showTaskModal ? 'show d-block' : ''}`} tabIndex={-1} style={{ zIndex: 1050 }}>
-                <div className="modal-dialog modal-dialog-centered">
+            <div
+                className={`modal fade ${tableDetailsTask ? 'show d-block' : ''}`}
+                tabIndex={-1}
+                style={{ zIndex: 1049 }}
+                aria-hidden={!tableDetailsTask}
+            >
+                <div className="modal-dialog modal-dialog-centered modal-dialog-scrollable" style={{ maxWidth: '440px' }}>
                     <div className="modal-content border-0 shadow-lg" style={{ borderRadius: '12px' }}>
-                        <div className="modal-header border-bottom-0 pb-0 px-4 pt-4">
-                            <h6 className="modal-title fw-bold text-dark d-flex align-items-center gap-2" style={{ fontSize: '1.1rem' }}>
-                                <span className="material-symbols-outlined text-primary" style={{ fontSize: '24px' }}>{taskForm.id ? 'edit_square' : 'add_task'}</span>
-                                {taskForm.id ? 'Edit Task' : 'New Task'}
-                            </h6>
-                            <button type="button" className="btn-close" onClick={() => setShowTaskModal(false)}></button>
-                        </div>
-                        <div className="modal-body p-4">
-                            {taskForm.activity_id && (
-                                <div className="alert alert-info py-3 px-3 mb-4 d-flex align-items-center gap-3 border-0 shadow-sm" style={{ fontSize: '0.85rem', background: '#eef2ff', color: '#3730a3', borderRadius: '12px' }}>
-                                    <div className="bg-white rounded-circle p-1 d-flex align-items-center justify-content-center shadow-sm">
-                                        <span className="material-symbols-outlined text-primary" style={{ fontSize: '18px' }}>account_tree</span>
-                                    </div>
-                                    <div className="flex-grow-1">
-                                        <div className="fw-bold text-uppercase opacity-75 mb-1" style={{ fontSize: '0.65rem', letterSpacing: '0.5px' }}>Strategic Parent Activity</div>
-                                        {(() => {
-                                            const meta = availableActivities.find(a => a.id === taskForm.activity_id);
-                                            return (
-                                                <div className="d-flex flex-column gap-1">
-                                                    <span className="fw-bold text-dark mb-0" style={{ fontSize: '0.9rem', lineHeight: '1.3' }}>{meta?.title}</span>
-                                                    <div className="d-flex align-items-center gap-3 opacity-75" style={{ fontSize: '0.75rem' }}>
-                                                        <div className="d-flex align-items-center gap-1">
-                                                            <span className="material-symbols-outlined" style={{ fontSize: '14px' }}>schema</span>
-                                                            <span>{meta?.pillar || 'Pillar'}</span>
+                        {tableDetailsTask && (
+                            <>
+                                <div className="modal-header border-bottom-0 pb-0 px-4 pt-4">
+                                    <h6 className="modal-title fw-bold text-dark d-flex align-items-center gap-2 mb-0" style={{ fontSize: '1.05rem' }}>
+                                        <span className="material-symbols-outlined text-primary" style={{ fontSize: '24px' }}>
+                                            checklist
+                                        </span>
+                                        Process details
+                                    </h6>
+                                    <button type="button" className="btn-close" onClick={() => setTableDetailsTask(null)} aria-label="Close" />
+                                </div>
+                                <div className="modal-body px-4 pt-2 pb-3">
+                                    <h5 className="fw-bold text-dark mb-3" style={{ fontSize: '1rem', lineHeight: 1.35 }}>
+                                        {tableDetailsTask.title}
+                                    </h5>
+                                    <dl className="row mb-0 small" style={{ fontSize: '0.82rem' }}>
+                                        <dt className="col-5 text-muted text-uppercase fw-bold" style={{ fontSize: '0.65rem', letterSpacing: '0.04em' }}>
+                                            Performance indicator
+                                        </dt>
+                                        <dd className="col-7 mb-2 text-dark" style={{ textTransform: 'none' }}>
+                                            {tableDetailsTask.performance_indicator?.trim() ? tableDetailsTask.performance_indicator : '—'}
+                                        </dd>
+                                        <dt className="col-5 text-muted text-uppercase fw-bold" style={{ fontSize: '0.65rem', letterSpacing: '0.04em' }}>
+                                            Strategic activity
+                                        </dt>
+                                        <dd className="col-7 mb-2 text-dark" style={{ textTransform: 'none' }}>
+                                            {tableDetailsTask.activity_title || DEPT_INTERNAL_LABEL}
+                                        </dd>
+                                        <dt className="col-5 text-muted text-uppercase fw-bold" style={{ fontSize: '0.65rem', letterSpacing: '0.04em' }}>
+                                            Staff assigned
+                                        </dt>
+                                        <dd className="col-7 mb-2 text-dark d-flex align-items-center gap-2" style={{ textTransform: 'none' }}>
+                                            <div
+                                                className="staff-avatar flex-shrink-0"
+                                                style={{
+                                                    background: 'var(--mubs-blue)',
+                                                    width: '28px',
+                                                    height: '28px',
+                                                    fontSize: '.7rem',
+                                                    borderRadius: '8px',
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    justifyContent: 'center',
+                                                    color: '#fff',
+                                                    fontWeight: 500,
+                                                }}
+                                                title={staffAssigneeTitle(tableDetailsTask.assignee_name, UNASSIGNED_LABEL)}
+                                            >
+                                                {staffAssigneeInitials(tableDetailsTask.assignee_name)}
+                                            </div>
+                                            <span>{staffAssigneeTitle(tableDetailsTask.assignee_name, UNASSIGNED_LABEL)}</span>
+                                        </dd>
+                                        {(tableDetailsTask.startDate || tableDetailsTask.endDate) && (
+                                            <>
+                                                <dt className="col-5 text-muted text-uppercase fw-bold" style={{ fontSize: '0.65rem', letterSpacing: '0.04em' }}>
+                                                    Window
+                                                </dt>
+                                                <dd className="col-7 mb-2 text-dark">
+                                                    {formatDate(tableDetailsTask.startDate || '')} — {formatDate(tableDetailsTask.endDate || '')}
+                                                </dd>
+                                            </>
+                                        )}
+                                        <dt className="col-5 text-muted text-uppercase fw-bold" style={{ fontSize: '0.65rem', letterSpacing: '0.04em' }}>
+                                            Due / time left
+                                        </dt>
+                                        <dd className="col-7 mb-2 text-dark">
+                                            {tableDetailsTask.tier === 'process_task'
+                                                ? getProcessDueFootnote(tableDetailsTask)
+                                                : formatDate(tableDetailsTask.dueDate)}
+                                        </dd>
+                                        <dt className="col-5 text-muted text-uppercase fw-bold" style={{ fontSize: '0.65rem', letterSpacing: '0.04em' }}>
+                                            Progress
+                                        </dt>
+                                        <dd className="col-7 mb-2">
+                                            <div className="d-flex align-items-center gap-2">
+                                                <div className="progress flex-grow-1" style={{ height: '6px', borderRadius: '10px' }}>
+                                                    <div
+                                                        className="progress-bar"
+                                                        style={{
+                                                            width: `${tableDetailsTask.progress || 0}%`,
+                                                            background:
+                                                                (tableDetailsTask.progress || 0) > 70
+                                                                    ? '#10b981'
+                                                                    : (tableDetailsTask.progress || 0) > 30
+                                                                      ? '#f59e0b'
+                                                                      : '#3b82f6',
+                                                            borderRadius: '10px',
+                                                        }}
+                                                    />
+                                                </div>
+                                                <span className="text-dark fw-semibold" style={{ fontSize: '0.75rem' }}>
+                                                    {tableDetailsTask.progress || 0}%
+                                                </span>
+                                            </div>
+                                        </dd>
+                                        <dt className="col-5 text-muted text-uppercase fw-bold" style={{ fontSize: '0.65rem', letterSpacing: '0.04em' }}>
+                                            Status
+                                        </dt>
+                                        <dd className="col-7 mb-0">
+                                            <span
+                                                className="fw-semibold"
+                                                style={{
+                                                    fontSize: '0.8rem',
+                                                    color:
+                                                        tableDetailsTask.status === 'Completed'
+                                                            ? '#15803d'
+                                                            : tableDetailsTask.status === 'In Progress'
+                                                              ? '#a16207'
+                                                              : tableDetailsTask.status === 'Under Review'
+                                                                ? '#1d4ed8'
+                                                                : tableDetailsTask.status === 'Not opened'
+                                                                  ? '#9a3412'
+                                                                  : '#475569',
+                                                }}
+                                            >
+                                                {tableDetailsTask.status}
+                                            </span>
+                                        </dd>
+                                    </dl>
+
+                                    {tableDetailsTask.status === 'Completed' && (
+                                        <div className="border-top pt-3 mt-3">
+                                            <p className="text-muted text-uppercase fw-bold mb-2" style={{ fontSize: '0.65rem', letterSpacing: '0.04em' }}>
+                                                Submission & review record
+                                            </p>
+                                            {tableDetailsReviewLoading ? (
+                                                <div className="d-flex align-items-center gap-2 text-muted small">
+                                                    <span className="spinner-border spinner-border-sm" style={{ width: 14, height: 14 }} />
+                                                    Loading review…
+                                                </div>
+                                            ) : !tableDetailsReview ? (
+                                                <div className="text-muted small">
+                                                    No submission/review record found for this process.
+                                                </div>
+                                            ) : (
+                                                <div className="p-3 rounded-3" style={{ background: '#f8fafc', border: '1px solid #e2e8f0' }}>
+                                                    <div className="d-flex align-items-start justify-content-between gap-2">
+                                                        <div className="flex-grow-1">
+                                                            <div className="fw-bold text-dark" style={{ fontSize: '0.9rem' }}>
+                                                                {tableDetailsReview.report_name}
+                                                            </div>
+                                                            <div className="text-muted small" style={{ fontSize: '0.75rem' }}>
+                                                                {tableDetailsReview.submitted_at ? formatEvaluationModalDate(tableDetailsReview.submitted_at) : '—'}
+                                                            </div>
                                                         </div>
-                                                        <div className="d-flex align-items-center gap-1">
-                                                            <span className="material-symbols-outlined" style={{ fontSize: '14px' }}>calendar_today</span>
-                                                            <span>Ends {meta?.end_date ? formatDate(meta.end_date) : 'N/A'}</span>
-                                                        </div>
-                                                        <div className="d-flex align-items-center gap-1">
-                                                            <span className="material-symbols-outlined" style={{ fontSize: '14px' }}>ads_click</span>
-                                                            <span className="fw-bold">KPI Target: {meta?.target_kpi || meta?.kpi_target_value || 'N/A'}</span>
+                                                        <div className="text-end">
+                                                            <div className="text-muted fw-bold" style={{ fontSize: '0.6rem', letterSpacing: '0.05em' }}>
+                                                                DECISION
+                                                            </div>
+                                                            <div className="fw-bold" style={{ fontSize: '0.78rem', color: '#15803d' }}>
+                                                                {getRatingLabel(tableDetailsReview)}
+                                                            </div>
                                                         </div>
                                                     </div>
-                                                </div>
-                                            );
-                                        })()}
-                                    </div>
-                                </div>
-                            )}
-                            <form onSubmit={handleSaveTask} id="taskForm">
-                                <div className="row g-2">
-                                    <div className="col-12">
-                                        <label className="form-label fw-semibold mb-1" style={{ fontSize: '0.75rem' }}>Task Title <span className="text-danger">*</span></label>
-                                        <input type="text" className="form-control form-control-sm" style={{ fontSize: '0.8rem' }} required value={taskForm.title || ''} onChange={(e) => setTaskForm({ ...taskForm, title: e.target.value })} placeholder="E.g. Identify 5 new vendors" />
-                                    </div>
-                                    {!taskForm.isFixedFields && (
-                                        <div className="col-12">
-                                            <label className="form-label fw-semibold mb-1" style={{ fontSize: '0.75rem' }}>Task Type <span className="text-danger">*</span></label>
-                                            <select className="form-select form-select-sm" style={{ fontSize: '0.8rem' }} value={taskForm.task_type || 'process'} onChange={(e) => {
-                                                const type = e.target.value as 'process' | 'kpi_driver';
-                                                setTaskForm({ ...taskForm, task_type: type, kpi_target_value: type === 'kpi_driver' ? taskForm.kpi_target_value : null, activity_id: type === 'process' ? undefined : taskForm.activity_id });
-                                            }}>
-                                                <option value="process">{TASK_TYPE_LABELS.process}</option>
-                                                <option value="kpi_driver">{TASK_TYPE_LABELS.kpi_driver}</option>
-                                            </select>
-                                        </div>
-                                    )}
-                                    {!taskForm.isFixedFields && (
-                                        <div className="col-md-12">
-                                            <label className="form-label fw-semibold mb-1" style={{ fontSize: '0.75rem' }}>
-                                                Parent Strategic Activity {(taskForm.task_type || 'process') === 'kpi_driver' && <span className="text-danger">*</span>}
-                                            </label>
-                                            {(taskForm.task_type || 'process') === 'process' ? (
-                                                <>
-                                                    <input
-                                                        type="text"
-                                                        className="form-control form-control-sm bg-light"
-                                                        value="— None (internal only) —"
-                                                        readOnly
-                                                        disabled
-                                                        style={{ cursor: 'not-allowed', fontSize: '0.75rem' }}
-                                                    />
-                                                    <small className="text-muted d-block mt-1" style={{ fontSize: '0.65rem' }}>Process tasks are departmental and not linked to a strategic activity.</small>
-                                                </>
-                                            ) : (
-                                                <div>
-                                                    <select
-                                                        className="form-select form-select-sm"
-                                                        style={{ fontSize: '0.8rem' }}
-                                                        required
-                                                        value={taskForm.activity_id ?? ''}
-                                                        onChange={(e) => {
-                                                            const actId = e.target.value === '' ? undefined : parseInt(e.target.value);
-                                                            const selectedAct = actId ? availableActivities.find(a => a.id === actId) : undefined;
-                                                            const newEndDate = selectedAct?.end_date ? toYMD(new Date(selectedAct.end_date)) : taskForm.endDate;
-                                                            const newStartDate = selectedAct?.start_date ? toYMD(new Date(selectedAct.start_date)) : taskForm.startDate;
-                                                            setTaskForm({ ...taskForm, activity_id: actId, startDate: newStartDate, endDate: newEndDate });
-                                                        }}
-                                                    >
-                                                        <option value="">— Select Parent Activity —</option>
-                                                        {availableActivities.map(a => <option key={a.id} value={a.id}>{a.title}</option>)}
-                                                    </select>
-                                                    {taskForm.activity_id && taskForm.endDate && (
-                                                        <div className="mt-1">
-                                                            <span className="badge bg-primary-subtle text-primary border border-primary-subtle" style={{ fontSize: '0.65rem' }}>
-                                                                Ends on {new Date(taskForm.endDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
-                                                            </span>
+
+                                                    {tableDetailsReview.report_summary ? (
+                                                        <div className="mt-3 pt-3 border-top border-light">
+                                                            <div className="fw-semibold text-dark mb-1" style={{ fontSize: '0.75rem' }}>
+                                                                Submission summary
+                                                            </div>
+                                                            <div className="text-secondary small" style={{ whiteSpace: 'pre-wrap' }}>
+                                                                {tableDetailsReview.report_summary}
+                                                            </div>
                                                         </div>
-                                                    )}
-                                                    {!taskForm.activity_id && (
-                                                        <small className="text-muted d-block mt-1" style={{ fontSize: '0.65rem' }}>KPI-Driver tasks must be linked to a strategic activity.</small>
-                                                    )}
+                                                    ) : null}
+
+                                                    {parseEvidenceItems(tableDetailsReview.attachments).length > 0 ? (
+                                                        <div className="mt-3 pt-3 border-top border-light">
+                                                            <div className="fw-semibold text-dark mb-2" style={{ fontSize: '0.75rem' }}>
+                                                                Evidence
+                                                            </div>
+                                                            <div className="d-flex flex-wrap gap-2">
+                                                                {parseEvidenceItems(tableDetailsReview.attachments).map((ev, idx) => (
+                                                                    <button
+                                                                        key={idx}
+                                                                        type="button"
+                                                                        className="btn btn-sm btn-outline-primary d-inline-flex align-items-center gap-1"
+                                                                        style={{ borderRadius: 8 }}
+                                                                        onClick={() => {
+                                                                            try {
+                                                                                window.open(ev.url, '_blank', 'noopener,noreferrer');
+                                                                            } catch {}
+                                                                        }}
+                                                                    >
+                                                                        <span className="material-symbols-outlined" style={{ fontSize: 16 }}>
+                                                                            visibility
+                                                                        </span>
+                                                                        {ev.label}
+                                                                    </button>
+                                                                ))}
+                                                            </div>
+                                                        </div>
+                                                    ) : null}
+
+                                                    <div className="mt-3 pt-3 border-top border-light">
+                                                        <div className="fw-semibold text-dark mb-1" style={{ fontSize: '0.75rem' }}>
+                                                            Feedback
+                                                        </div>
+                                                        <div className="text-dark small" style={{ whiteSpace: 'pre-wrap' }}>
+                                                            {tableDetailsReview.reviewer_notes ? tableDetailsReview.reviewer_notes : 'No feedback.'}
+                                                        </div>
+                                                    </div>
                                                 </div>
                                             )}
                                         </div>
                                     )}
 
-                                    <div className="col-12">
-                                        <label className="form-label fw-semibold mb-1" style={{ fontSize: '0.75rem' }}>Assign To</label>
-                                        {taskForm.id ? (
-                                            <select className="form-select form-select-sm" style={{ fontSize: '0.8rem' }} value={taskForm.assigned_to || ''} onChange={(e) => setTaskForm({ ...taskForm, assigned_to: parseInt(e.target.value) || undefined })}>
-                                                <option value="">Unassigned</option>
-                                                {departmentUsers.map(u => (
-                                                    <option key={u.id} value={u.id}>
-                                                        {u.full_name}{u.position ? ` (${u.position})` : ''}
-                                                    </option>
-                                                ))}
-                                            </select>
-                                        ) : (
-                                            <div className="border rounded p-2 bg-light" style={{ maxHeight: '120px', overflowY: 'auto' }}>
-                                                <p className="text-muted mb-1" style={{ fontSize: '0.65rem' }}>Select one or more staff</p>
-                                                {departmentUsers.map(u => {
-                                                    const ids = taskForm.assigned_to_ids || [];
-                                                    const checked = ids.includes(u.id);
-                                                    return (
-                                                        <div key={u.id} className="form-check mb-1">
-                                                            <input
-                                                                className="form-check-input"
-                                                                type="checkbox"
-                                                                id={`assign-${u.id}`}
-                                                                checked={checked}
-                                                                onChange={() => {
-                                                                    const next = checked ? ids.filter((id) => id !== u.id) : [...ids, u.id];
-                                                                    setTaskForm({ ...taskForm, assigned_to_ids: next });
-                                                                }}
-                                                            />
-                                                            <label className="form-check-label" htmlFor={`assign-${u.id}`} style={{ fontSize: '0.75rem' }}>
-                                                                {u.full_name}{u.position ? ` (${u.position})` : ''}
-                                                            </label>
-                                                        </div>
-                                                    );
-                                                })}
-                                                {departmentUsers.length === 0 && <span className="text-muted" style={{ fontSize: '0.7rem' }}>No staff found.</span>}
-                                            </div>
-                                        )}
-                                    </div>
-
-                                    {/* Interval Validation Logic */}
-                                    {(() => {
-                                        const calculateMaxInterval = () => {
-                                            if (!taskForm.startDate || !taskForm.endDate || taskForm.frequency === 'once') return { max: 0, unit: '' };
-                                            const start = new Date(taskForm.startDate);
-                                            const end = new Date(taskForm.endDate);
-                                            const gapDays = (end.getTime() - start.getTime()) / (1000 * 3600 * 24);
-                                            
-                                            let max = 0;
-                                            let unit = '';
-                                            if (taskForm.frequency === 'daily') { max = Math.floor(gapDays); unit = 'days'; }
-                                            else if (taskForm.frequency === 'weekly') { max = Math.floor(gapDays / 7); unit = 'weeks'; }
-                                            else if (taskForm.frequency === 'monthly') { max = Math.floor(gapDays / 28); unit = 'months'; }
-                                            
-                                            return { max: Math.max(1, max), unit };
-                                        };
-
-                                        const { max, unit } = calculateMaxInterval();
-                                        const isIntervalValid = taskForm.frequency === 'once' || (taskForm.frequency_interval || 1) <= max;
-
-                                        return (
-                                            <>
-                                                <div className="col-6">
-                                                    <label className="form-label fw-semibold mb-1" style={{ fontSize: '0.75rem' }}>Start Date <span className="text-danger">*</span></label>
-                                                    <input
-                                                        type="date"
-                                                        className="form-control form-control-sm"
-                                                        style={{ fontSize: '0.8rem' }}
-                                                        required
-                                                        value={taskForm.startDate || ''}
-                                                        onChange={(e) => setTaskForm({ ...taskForm, startDate: e.target.value })}
-                                                    />
-                                                </div>
-                                                <div className={`col-6 ${taskForm.task_type === 'kpi_driver' ? 'd-none' : ''}`}>
-                                                    <label className="form-label fw-semibold mb-1" style={{ fontSize: '0.75rem' }}>End Date <span className="text-danger">*</span></label>
-                                                    <input
-                                                        type="date"
-                                                        className="form-control form-control-sm"
-                                                        style={{ fontSize: '0.8rem' }}
-                                                        required
-                                                        min={taskForm.startDate}
-                                                        value={taskForm.endDate || ''}
-                                                        onChange={(e) => setTaskForm({ ...taskForm, endDate: e.target.value })}
-                                                    />
-                                                </div>
-                                                <div className="col-6">
-                                                    <label className="form-label fw-semibold mb-1" style={{ fontSize: '0.75rem' }}>Frequency</label>
-                                                    <select
-                                                        className="form-select form-select-sm"
-                                                        style={{ fontSize: '0.8rem' }}
-                                                        value={taskForm.frequency || 'once'}
-                                                        onChange={(e) => setTaskForm({ ...taskForm, frequency: e.target.value as any })}
-                                                    >
-                                                        <option value="once">Once</option>
-                                                        <option value="daily">Daily</option>
-                                                        {(() => {
-                                                            const gap = (new Date(taskForm.endDate || '').getTime() - new Date(taskForm.startDate || '').getTime()) / (1000 * 3600 * 24);
-                                                            return (
-                                                                <>
-                                                                    {gap >= 7 && <option value="weekly">Weekly</option>}
-                                                                    {gap >= 28 && <option value="monthly">Monthly</option>}
-                                                                </>
-                                                            );
-                                                        })()}
-                                                    </select>
-                                                </div>
-                                                <div className={`col-6 ${taskForm.frequency === 'once' ? 'd-none' : ''}`}>
-                                                    <label className="form-label fw-semibold mb-1" style={{ fontSize: '0.75rem' }}>Repeat Every (Interval)</label>
-                                                    <div className="input-group input-group-sm">
-                                                        <input
-                                                            type="number"
-                                                            className={`form-control ${!isIntervalValid ? 'is-invalid' : ''}`}
-                                                            min={1}
-                                                            style={{ fontSize: '0.8rem' }}
-                                                            value={taskForm.frequency_interval || 1}
-                                                            onChange={(e) => setTaskForm({ ...taskForm, frequency_interval: parseInt(e.target.value) || 1 })}
-                                                        />
-                                                        <span className="input-group-text bg-light text-muted" style={{ fontSize: '0.7rem' }}>
-                                                            {taskForm.frequency === 'daily' ? 'Days' : taskForm.frequency === 'weekly' ? 'Weeks' : 'Months'}
-                                                        </span>
-                                                    </div>
-                                                </div>
-                                                <div className="col-12 mt-2">
-                                                    <div className={`p-3 rounded-2 border border-dashed ${!isIntervalValid ? 'bg-danger bg-opacity-10 border-danger' : 'bg-light'}`}>
-                                                        {!isIntervalValid ? (
-                                                            <div className="text-danger d-flex align-items-start gap-2">
-                                                                <span className="material-symbols-outlined" style={{ fontSize: '20px' }}>warning</span>
-                                                                <div style={{ fontSize: '0.75rem', lineHeight: '1.4' }}>
-                                                                    The maximum repeat interval is <strong>{max} {unit}</strong>, please enter a repeat interval below <strong>{max + 1} {unit}</strong>.
-                                                                </div>
-                                                            </div>
-                                                        ) : (
-                                                            <>
-                                                                <div className="d-flex align-items-center gap-3 mb-2 pb-2 border-bottom border-light">
-                                                                    <span className="material-symbols-outlined text-muted" style={{ fontSize: '18px' }}>event_available</span>
-                                                                    <span className="fw-medium text-muted" style={{ fontSize: '0.75rem' }}>
-                                                                        Timeline: <span className="text-dark fw-bold">{taskForm.startDate ? new Date(taskForm.startDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' }) : '—'}</span> to <span className="text-dark fw-bold">{taskForm.endDate ? new Date(taskForm.endDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'}</span>
-                                                                    </span>
-                                                                    {taskForm.frequency !== 'once' && (
-                                                                        <span className="badge bg-primary-subtle text-primary border border-primary-subtle ms-auto" style={{ fontSize: '0.7rem' }}>
-                                                                            {generateMultipleDates(taskForm).length} Tasks Total
-                                                                        </span>
-                                                                    )}
-                                                                </div>
-                                                                {taskForm.frequency !== 'once' && (
-                                                                    <div className="row g-2 overflow-auto" style={{ maxHeight: '120px' }}>
-                                                                        {generateMultipleDates(taskForm).map((occ, idx) => (
-                                                                            <div key={idx} className="col-md-6">
-                                                                                <div className="d-flex align-items-center gap-2 p-1 px-2 bg-white rounded border" style={{ fontSize: '0.7rem' }}>
-                                                                                    <span className="fw-bold text-primary">{idx + 1}{idx === 0 ? 'st' : idx === 1 ? 'nd' : idx === 2 ? 'rd' : 'th'}</span>
-                                                                                    <span className="text-muted">task:</span>
-                                                                                    <span className="text-dark fw-medium">{formatDate(occ.startDate)} – {formatDate(occ.endDate)}</span>
-                                                                                </div>
-                                                                            </div>
-                                                                        ))}
-                                                                    </div>
-                                                                )}
-                                                                {taskForm.frequency === 'once' && (
-                                                                    <div className="text-muted small italic" style={{ fontSize: '0.7rem' }}>
-                                                                        A single task instance will be created.
-                                                                    </div>
-                                                                )}
-                                                            </>
-                                                        )}
-                                                    </div>
-                                                </div>
-                                            </>
-                                        );
-                                    })()}
-
-
-                                    <div className="col-12">
-                                        <label className="form-label fw-semibold mb-1" style={{ fontSize: '0.85rem' }}>Instructions</label>
-                                        <textarea className="form-control" style={{ fontSize: '0.9rem' }} rows={3} value={taskForm.description || ''} onChange={(e) => setTaskForm({ ...taskForm, description: e.target.value })} placeholder="Requirements..."></textarea>
-                                    </div>
+                                    {tableDetailsTask.status !== 'Completed' && (
+                                        <div className="border-top pt-3 mt-3">
+                                            <p className="text-muted text-uppercase fw-bold mb-2" style={{ fontSize: '0.65rem', letterSpacing: '0.04em' }}>
+                                                Actions
+                                            </p>
+                                            {renderProcessTaskModalActions(tableDetailsTask)}
+                                        </div>
+                                    )}
                                 </div>
-                            </form>
-                        </div>
-                        <div className="modal-footer bg-light border-top-0 py-3">
-                            {(() => {
-                                const start = new Date(taskForm.startDate || '');
-                                const end = new Date(taskForm.endDate || '');
-                                const gapDays = (end.getTime() - start.getTime()) / (1000 * 3600 * 24);
-                                let max = 0;
-                                if (taskForm.frequency === 'daily') max = Math.floor(gapDays);
-                                else if (taskForm.frequency === 'weekly') max = Math.floor(gapDays / 7);
-                                else if (taskForm.frequency === 'monthly') max = Math.floor(gapDays / 28);
-                                
-                                const isInvalid = taskForm.frequency !== 'once' && (taskForm.frequency_interval || 1) > Math.max(1, max);
-                                
-                                return (
-                                    <button 
-                                        type="submit" 
-                                        form="taskForm" 
-                                        className="btn btn-primary fw-bold px-4 shadow-sm" 
-                                        style={{ background: 'var(--mubs-blue)', borderColor: 'var(--mubs-blue)', borderRadius: '8px' }} 
-                                        disabled={isSubmitting || isInvalid}
-                                    >
-                                        {isSubmitting ? 'Saving...' : 'Save Task'}
-                                    </button>
-                                );
-                            })()}
-                        </div>
+                            </>
+                        )}
                     </div>
                 </div>
             </div>
 
+            {openProcessTask && (
+                <div className="modal-backdrop fade show" style={{ zIndex: 1040 }} onClick={() => !openProcessSaving && setOpenProcessTask(null)} />
+            )}
+            <div
+                className={`modal fade ${openProcessTask ? 'show d-block' : ''}`}
+                tabIndex={-1}
+                style={{ zIndex: 1050 }}
+                aria-hidden={!openProcessTask}
+            >
+                <div className="modal-dialog modal-dialog-centered">
+                    <div className="modal-content border-0 shadow-lg" style={{ borderRadius: '12px' }}>
+                        <div className="modal-header border-bottom-0 pb-0 px-4 pt-4">
+                            <h6 className="modal-title fw-bold text-dark d-flex align-items-center gap-2" style={{ fontSize: '1.1rem' }}>
+                                <span className="material-symbols-outlined text-success" style={{ fontSize: '24px' }}>
+                                    event_available
+                                </span>
+                                Open process
+                            </h6>
+                            <button
+                                type="button"
+                                className="btn-close"
+                                onClick={() => !openProcessSaving && setOpenProcessTask(null)}
+                                disabled={openProcessSaving}
+                            />
+                        </div>
+                        {openProcessTask && (
+                            <div className="modal-body p-4 pt-2">
+                                <div className="p-3 rounded-3 mb-3" style={{ background: '#f8fafc', border: '1px solid #e2e8f0' }}>
+                                    <dl className="row mb-0 small">
+                                        <dt className="col-sm-4 text-muted fw-bold" style={{ fontSize: '0.72rem' }}>
+                                            Process task
+                                        </dt>
+                                        <dd className="col-sm-8 mb-2 text-dark fw-semibold" style={{ fontSize: '0.85rem' }}>
+                                            {openProcessTask.title}
+                                        </dd>
+                                        <dt className="col-sm-4 text-muted fw-bold" style={{ fontSize: '0.72rem' }}>
+                                            Strategic activity
+                                        </dt>
+                                        <dd className="col-sm-8 mb-2 text-dark" style={{ fontSize: '0.82rem' }}>
+                                            {openProcessTask.activity_title || DEPT_INTERNAL_LABEL}
+                                        </dd>
+                                        <dt className="col-sm-4 text-muted fw-bold" style={{ fontSize: '0.72rem' }}>
+                                            Assigned staff
+                                        </dt>
+                                        <dd className="col-sm-8 mb-2 text-dark" style={{ fontSize: '0.82rem' }}>
+                                            {staffAssigneeTitle(openProcessTask.assignee_name, UNASSIGNED_LABEL)}
+                                        </dd>
+                                        {openProcessTask.performance_indicator?.trim() ? (
+                                            <>
+                                                <dt className="col-sm-4 text-muted fw-bold" style={{ fontSize: '0.72rem' }}>
+                                                    Performance indicator
+                                                </dt>
+                                                <dd className="col-sm-8 mb-2 text-secondary" style={{ fontSize: '0.8rem' }}>
+                                                    {openProcessTask.performance_indicator}
+                                                </dd>
+                                            </>
+                                        ) : null}
+                                        <dt className="col-sm-4 text-muted fw-bold" style={{ fontSize: '0.72rem' }}>
+                                            Duration
+                                        </dt>
+                                        <dd className="col-sm-8 mb-0 text-dark" style={{ fontSize: '0.82rem' }}>
+                                            {formatStandardProcessDuration(
+                                                openProcessTask.duration_value ?? null,
+                                                openProcessTask.duration_unit ?? null
+                                            ) || '—'}
+                                        </dd>
+                                    </dl>
+                                </div>
+                                <div className="mb-3">
+                                    <label className="form-label small fw-bold text-muted mb-1">Start date</label>
+                                    <input
+                                        type="date"
+                                        className="form-control form-control-sm"
+                                        value={openProcessStart}
+                                        onChange={(e) => setOpenProcessStart(e.target.value)}
+                                        disabled={openProcessSaving}
+                                    />
+                                </div>
+                                <div className="mb-4 p-2 rounded-2 border bg-light">
+                                    <div className="small text-muted fw-bold mb-1" style={{ fontSize: '0.7rem' }}>
+                                        End date
+                                    </div>
+                                    <div className="fw-semibold text-dark" style={{ fontSize: '0.88rem' }}>
+                                        {openProcessComputedDue
+                                            ? formatDateWithYear(openProcessComputedDue)
+                                            : openProcessTask.duration_value == null ||
+                                                !String(openProcessTask.duration_unit || '').trim()
+                                              ? 'Duration missing on standard — contact admin'
+                                              : '—'}
+                                    </div>
+                                </div>
+                                <div className="d-flex justify-content-end gap-2">
+                                    <button
+                                        type="button"
+                                        className="btn btn-sm btn-light border fw-bold px-3"
+                                        style={{ fontSize: '0.75rem', borderRadius: '8px' }}
+                                        onClick={() => setOpenProcessTask(null)}
+                                        disabled={openProcessSaving}
+                                    >
+                                        Cancel
+                                    </button>
+                                    <button
+                                        type="button"
+                                        className="btn btn-sm btn-success fw-bold px-3 shadow-sm"
+                                        style={{ fontSize: '0.75rem', borderRadius: '8px' }}
+                                        onClick={handleSubmitOpenProcess}
+                                        disabled={openProcessSaving}
+                                    >
+                                        {openProcessSaving ? 'Saving…' : 'Open process'}
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            </div>
+
+            {reassignTask && (
+                <div className="modal-backdrop fade show" style={{ zIndex: 1041 }} onClick={() => !reassignSaving && setReassignTask(null)} />
+            )}
+            <div
+                className={`modal fade ${reassignTask ? 'show d-block' : ''}`}
+                tabIndex={-1}
+                style={{ zIndex: 1051 }}
+                aria-hidden={!reassignTask}
+            >
+                <div className="modal-dialog modal-dialog-centered">
+                    <div className="modal-content border-0 shadow-lg" style={{ borderRadius: '12px' }}>
+                        <div className="modal-header border-bottom-0 pb-0 px-4 pt-4">
+                            <h6 className="modal-title fw-bold text-dark d-flex align-items-center gap-2" style={{ fontSize: '1.1rem' }}>
+                                <span className="material-symbols-outlined text-secondary" style={{ fontSize: '24px' }}>
+                                    swap_horiz
+                                </span>
+                                Reassign process (task)
+                            </h6>
+                            <button
+                                type="button"
+                                className="btn-close"
+                                onClick={() => !reassignSaving && setReassignTask(null)}
+                                disabled={reassignSaving}
+                            />
+                        </div>
+                        {reassignTask && (
+                            <div className="modal-body p-4 pt-2">
+                                <p className="text-muted small mb-3" style={{ fontSize: '0.88rem' }}>
+                                    <strong className="text-dark">{reassignTask.title}</strong>
+                                    <br />
+                                    Current assignee: {reassignTask.assignee_name || UNASSIGNED_LABEL}. Dates will be cleared; open the process again for the new assignee.
+                                </p>
+                                <div className="mb-3">
+                                    <label className="form-label small fw-bold text-muted mb-1">New assignee</label>
+                                    <select
+                                        className="form-select form-select-sm"
+                                        value={reassignStaffId === '' ? '' : String(reassignStaffId)}
+                                        onChange={(e) => {
+                                            const v = e.target.value;
+                                            setReassignStaffId(v === '' ? '' : Number(v));
+                                        }}
+                                        disabled={reassignSaving}
+                                    >
+                                        <option value="">Select staff…</option>
+                                        {departmentUsers
+                                            .filter((u) => u.id !== reassignTask.assigned_to)
+                                            .map((u) => (
+                                                <option key={u.id} value={u.id}>
+                                                    {u.full_name}
+                                                    {u.position ? ` — ${u.position}` : ''}
+                                                </option>
+                                            ))}
+                                    </select>
+                                </div>
+                                <div className="mb-4">
+                                    <label className="form-label small fw-bold text-muted mb-1">Reason (required)</label>
+                                    <textarea
+                                        className="form-control form-control-sm"
+                                        rows={3}
+                                        placeholder="Explain why this process is being reassigned…"
+                                        value={reassignReason}
+                                        onChange={(e) => setReassignReason(e.target.value)}
+                                        disabled={reassignSaving}
+                                    />
+                                </div>
+                                <div className="d-flex justify-content-end gap-2">
+                                    <button
+                                        type="button"
+                                        className="btn btn-sm btn-light border fw-bold px-3"
+                                        style={{ fontSize: '0.75rem', borderRadius: '8px' }}
+                                        onClick={() => setReassignTask(null)}
+                                        disabled={reassignSaving}
+                                    >
+                                        Cancel
+                                    </button>
+                                    <button
+                                        type="button"
+                                        className="btn btn-sm btn-primary fw-bold px-3 shadow-sm"
+                                        style={{ fontSize: '0.75rem', borderRadius: '8px', background: 'var(--mubs-blue)', borderColor: 'var(--mubs-blue)' }}
+                                        onClick={handleSubmitReassign}
+                                        disabled={reassignSaving}
+                                    >
+                                        {reassignSaving ? 'Saving…' : 'Reassign'}
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            </div>
 
             {/* Bulk Delete Confirmation Modal UI */}
             {showBulkDeleteModal && (
@@ -1614,14 +1967,14 @@ export default function DepartmentTasks({ initialActivity, initialAssignee }: De
                     <div className="modal-content border-0 shadow-lg" style={{ borderRadius: '12px' }}>
                         <div className="modal-header border-bottom-0 pb-0 px-4 pt-4">
                             <h6 className="modal-title fw-bold text-dark d-flex align-items-center gap-2" style={{ fontSize: '1.1rem' }}>
-                                <span className="material-symbols-outlined text-danger" style={{ fontSize: '24px' }}>warning</span>
-                                Delete Tasks
+                                <span className="material-symbols-outlined text-danger" style={{ fontSize: '24px' }}>person_remove</span>
+                                Unassign Processes
                             </h6>
                             <button type="button" className="btn-close" onClick={() => setShowBulkDeleteModal(false)}></button>
                         </div>
                         <div className="modal-body p-4 pt-3">
                             <p className="text-muted mb-4" style={{ fontSize: '0.9rem' }}>
-                                Delete <strong>{selectedTaskIds.length}</strong> task{selectedTaskIds.length !== 1 ? 's' : ''}? This cannot be undone.
+                                Remove <strong>{selectedTaskIds.length}</strong> assigned process{selectedTaskIds.length !== 1 ? 'es' : ''}? This will unassign the staff member from the activity.
                             </p>
                             
                             {bulkDeleteError && (
@@ -1636,7 +1989,7 @@ export default function DepartmentTasks({ initialActivity, initialAssignee }: De
                                     Cancel
                                 </button>
                                 <button type="button" className="btn btn-sm btn-danger fw-bold px-3 shadow-sm" style={{ fontSize: '0.75rem', borderRadius: '8px' }} onClick={handleBulkDelete} disabled={isBulkDeleting}>
-                                    {isBulkDeleting ? 'Deleting...' : 'Delete All'}
+                                    {isBulkDeleting ? 'Unassigning...' : 'Unassign All'}
                                 </button>
                             </div>
                         </div>
@@ -1702,10 +2055,6 @@ export default function DepartmentTasks({ initialActivity, initialAssignee }: De
                                         Report Summary
                                     </label>
                                     <div className="p-3 rounded-3" style={{ background: '#f8fafc', border: '1px solid #e2e8f0' }}>
-                                        <div className="d-flex justify-content-between align-items-center mb-2 pb-2 border-bottom border-light">
-                                            <span className="text-muted fw-bold" style={{ fontSize: '0.7rem', letterSpacing: '0.5px' }}>ACHIEVED KPI VALUE</span>
-                                            <span className="badge bg-primary px-3 py-2" style={{ fontSize: '0.9rem', borderRadius: '8px' }}>{viewModalItem.kpi_actual_value ?? 0}</span>
-                                        </div>
                                         <p className="mb-0 text-secondary" style={{ fontSize: '0.9rem', lineHeight: '1.5', whiteSpace: 'pre-wrap' }}>
                                             {viewModalItem.report_summary || 'No summary provided.'}
                                         </p>
@@ -1722,7 +2071,7 @@ export default function DepartmentTasks({ initialActivity, initialAssignee }: De
                                             <div className="text-muted fw-bold mt-2" style={{ fontSize: '0.6rem', letterSpacing: '0.5px' }}>RATING</div>
                                             <div className="fw-bold mt-2" style={{ 
                                                 fontSize: '0.8rem',
-                                                color: getRatingLabel(viewModalItem) === 'Complete' ? '#15803d' : (getRatingLabel(viewModalItem) === 'Not Done' ? '#64748b' : '#b45309')
+                                                color: getRatingLabel(viewModalItem).startsWith('Complete') ? '#15803d' : (getRatingLabel(viewModalItem) === 'Not Done' ? '#64748b' : '#b45309')
                                             }}>
                                                 {getRatingLabel(viewModalItem)}
                                             </div>
@@ -1744,145 +2093,22 @@ export default function DepartmentTasks({ initialActivity, initialAssignee }: De
                 </div>
             </div>
 
-            {/* 2. Evaluate Modal */}
-            <div className={`modal fade ${evaluateModalItem ? 'show d-block' : ''}`} tabIndex={-1} style={{ zIndex: 1070 }}>
-                <div className="modal-dialog modal-dialog-centered">
-                    <div className="modal-content border-0 shadow-lg" style={{ borderRadius: '12px', overflow: 'hidden' }}>
-                        <div className="modal-header border-bottom-0 pb-0 px-4 pt-4">
-                            <h6 className="modal-title fw-bold text-dark d-flex align-items-center gap-2" style={{ fontSize: '1.1rem' }}>
-                                <span className="material-symbols-outlined text-primary" style={{ fontSize: '24px' }}>rate_review</span>
-                                Evaluate Submission
-                            </h6>
-                            <button type="button" className="btn-close" onClick={() => setEvaluateModalItem(null)}></button>
-                        </div>
-                        <div className="modal-body p-4 pt-3">
-                            {evaluateModalItem && (
-                                <>
-                                <div className="p-3 rounded-3 mb-4" style={{ background: '#f8fafc', border: '1px solid #e2e8f0' }}>
-                                    <div className="fw-bold text-dark mb-2" style={{ fontSize: '1.05rem' }}>
-                                        {evaluateModalItem.report_name}
-                                        <span className="badge ms-2 fw-semibold" style={{ background: '#eff6ff', color: 'var(--mubs-blue)', fontSize: '.75rem', verticalAlign: 'middle' }}>Pending</span>
-                                    </div>
-                                    <div className="text-muted mb-1" style={{ fontSize: '0.85rem' }}>
-                                        <span className="material-symbols-outlined me-2" style={{ fontSize: '16px', verticalAlign: 'middle' }}>category</span>
-                                        {evaluateModalItem.activity_title}
-                                    </div>
-                                    <div className="text-muted" style={{ fontSize: '0.85rem' }}>
-                                        <span className="material-symbols-outlined me-2" style={{ fontSize: '16px', verticalAlign: 'middle' }}>person</span>
-                                        {evaluateModalItem.staff_name} &middot; {formatDate(evaluateModalItem.submitted_at)}
-                                    </div>
-                                    {evaluateModalItem.report_summary && (
-                                        <div className="mt-3 pt-3 border-top border-light">
-                                            <div className="fw-semibold text-dark mb-1" style={{ fontSize: '0.8rem' }}>Summary</div>
-                                            <p className="mb-0 text-secondary" style={{ fontSize: '0.9rem', lineHeight: '1.5', whiteSpace: 'pre-wrap' }}>
-                                                {evaluateModalItem.report_summary}
-                                            </p>
-                                        </div>
-                                    )}
-                                </div>
-
-                                <div className="mb-3">
-                                    <label className="form-label fw-semibold mb-1 d-flex align-items-center gap-1" style={{ fontSize: '0.75rem' }}>
-                                        <span className="material-symbols-outlined text-primary" style={{ fontSize: '16px' }}>attach_file</span>
-                                        Evidence
-                                    </label>
-                                    <div className="d-flex flex-wrap gap-2">
-                                        {parseEvidenceItems(evaluateModalItem.attachments).length === 0 ? (
-                                            <span className="text-muted" style={{ fontSize: '0.7rem' }}>No evidence provided</span>
-                                        ) : (
-                                            parseEvidenceItems(evaluateModalItem.attachments).map((ev, idx) => (
-                                                <button key={idx} type="button" className="btn btn-xs btn-outline-primary py-0 px-2 d-flex align-items-center gap-1" style={{ fontSize: '0.65rem' }} onClick={() => window.open(ev.url, '_blank')}>
-                                                    <span className="material-symbols-outlined" style={{ fontSize: '12px' }}>visibility</span>
-                                                    {ev.label}
-                                                </button>
-                                            ))
-                                        )}
-                                    </div>
-                                </div>
-
-                                <div className="row g-2">
-                                    <div className="col-12">
-                                        <label className="form-label fw-semibold mb-1" style={{ fontSize: '0.75rem' }}>Rating <span className="text-danger">*</span></label>
-                                        <div className="d-flex gap-1">
-                                            {(['Complete', 'Incomplete', 'Not Done'] as const).map(opt => (
-                                                <div 
-                                                    key={opt}
-                                                    onClick={() => setSelectedRating(prev => ({ ...prev, [evaluateModalItem.id]: opt }))}
-                                                    className="flex-fill text-center p-1 rounded-2 border"
-                                                    style={{
-                                                        cursor: 'pointer',
-                                                        fontSize: '0.7rem',
-                                                        fontWeight: 'bold',
-                                                        transition: 'all 0.2s',
-                                                        borderColor: selectedRating[evaluateModalItem.id] === opt ? 'var(--mubs-blue)' : '#e2e8f0',
-                                                        background: selectedRating[evaluateModalItem.id] === opt ? 'var(--mubs-blue)' : '#fff',
-                                                        color: selectedRating[evaluateModalItem.id] === opt ? '#fff' : '#475569'
-                                                    }}
-                                                >
-                                                    {opt === 'Complete' ? '2 (Done)' : opt === 'Incomplete' ? '1 (Part)' : '0 (No)'}
-                                                </div>
-                                            ))}
-                                        </div>
-                                    </div>
-
-                                    {/* KPI achieved value: Visible for KPI-Driver tasks */}
-                                    {evaluateModalItem.task_type === 'kpi_driver' && (
-                                        <div className="col-12">
-                                            <label className="form-label fw-semibold mb-1 d-flex align-items-center gap-2" style={{ fontSize: '0.75rem' }}>
-                                                <span className="material-symbols-outlined text-primary" style={{ fontSize: '16px' }}>analytics</span>
-                                                Achieved value
-                                            </label>
-                                            <div className="d-flex align-items-center gap-2">
-                                                <input
-                                                    type="number"
-                                                    className="form-control form-control-sm fw-bold border-primary-subtle shadow-sm"
-                                                    min={0}
-                                                    step="any"
-                                                    placeholder="0"
-                                                    value={kpiActualValues[evaluateModalItem.id] ?? ''}
-                                                    onChange={(e) => setKpiActualValues(prev => ({ ...prev, [evaluateModalItem.id]: e.target.value }))}
-                                                    style={{ maxWidth: '100px', borderRadius: '8px', fontSize: '0.85rem' }}
-                                                />
-                                                {evaluateModalItem.kpi_actual_value != null && (
-                                                    <div className="text-muted border-start ps-2 py-0">
-                                                        <div style={{ fontSize: '0.55rem', fontWeight: 'bold' }}>STAFF:</div>
-                                                        <div className="text-dark fw-black" style={{ fontSize: '0.8rem' }}>{evaluateModalItem.kpi_actual_value}</div>
-                                                    </div>
-                                                )}
-                                            </div>
-                                        </div>
-                                    )}
-
-                                    <div className="col-12">
-                                        <label className="form-label fw-semibold mb-1" style={{ fontSize: '0.75rem' }}>Comment {selectedRating[evaluateModalItem.id] === 'Incomplete' && <span className="text-danger">*</span>}</label>
-                                        <textarea
-                                            className="form-control form-control-sm"
-                                            rows={2}
-                                            placeholder="Feedback..."
-                                            value={evaluationComments[evaluateModalItem.id] || ''}
-                                            onChange={(e) => setEvaluationComments(prev => ({ ...prev, [evaluateModalItem.id]: e.target.value }))}
-                                            style={{ fontSize: '0.8rem' }}
-                                        ></textarea>
-                                    </div>
-                                </div>
-                                </>
-                            )}
-                        </div>
-
-                        <div className="modal-footer bg-light border-top-0 py-2">
-                            <button
-                                type="button"
-                                className="btn btn-sm btn-primary fw-bold px-4 shadow-sm"
-                                style={{ borderRadius: '8px' }}
-                                disabled={isSubmitting || !evaluateModalItem || !selectedRating[evaluateModalItem.id]}
-                                onClick={handleSubmitEvaluation}
-                            >
-                                {isSubmitting ? 'Submitting...' : 'Submit Evaluation'}
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            </div>
+            <EvaluateSubmissionModal
+                item={evaluateModalItem}
+                open={!!evaluateModalItem}
+                onClose={() => !isSubmitting && setEvaluateModalItem(null)}
+                formatDate={formatEvaluationModalDate}
+                selectedRating={selectedRating}
+                onSelectRating={(id, rating) => setSelectedRating((prev) => ({ ...prev, [id]: rating }))}
+                comments={evaluationComments}
+                onCommentChange={(id, comment) => setEvaluationComments((prev) => ({ ...prev, [id]: comment }))}
+                kpiActualValues={kpiActualValues}
+                onKpiActualChange={(id, value) => setKpiActualValues((prev) => ({ ...prev, [id]: value }))}
+                onSubmit={handleSubmitEvaluation}
+                isSubmitting={isSubmitting}
+                zIndex={1070}
+                feedbackHistory={feedbackHistoryForReview}
+            />
 
             {/* Loading Spinner for Evaluation Fetch */}
             {isEvaluationLoading && (
@@ -1892,6 +2118,34 @@ export default function DepartmentTasks({ initialActivity, initialAssignee }: De
                     </div>
                 </div>
             )}
+
+            {/* 4. Message/Alert Modal */}
+            {messageModal.show && (
+                <div className="modal-backdrop fade show" style={{ zIndex: 1100, background: 'rgba(15, 23, 42, 0.4)' }}></div>
+            )}
+            <div className={`modal fade ${messageModal.show ? 'show d-block' : ''}`} tabIndex={-1} style={{ zIndex: 1110 }}>
+                <div className="modal-dialog modal-dialog-centered modal-sm">
+                    <div className="modal-content border-0 shadow-lg text-center" style={{ borderRadius: '16px' }}>
+                        <div className="modal-body p-4">
+                            <div className={`mb-3 d-inline-flex p-3 rounded-circle bg-opacity-10 bg-${messageModal.type === 'error' ? 'danger' : (messageModal.type === 'warning' ? 'warning' : 'primary')}`}>
+                                <span className={`material-symbols-outlined fs-1 text-${messageModal.type === 'error' ? 'danger' : (messageModal.type === 'warning' ? 'warning' : 'primary')}`}>
+                                    {messageModal.type === 'error' ? 'report' : (messageModal.type === 'warning' ? 'warning' : 'info')}
+                                </span>
+                            </div>
+                            <h5 className="fw-bold text-dark mb-2">{messageModal.title}</h5>
+                            <p className="text-secondary small mb-4" style={{ lineHeight: '1.5' }}>{messageModal.message}</p>
+                            <button 
+                                type="button" 
+                                className="btn btn-primary w-100 fw-bold py-2" 
+                                style={{ borderRadius: '10px' }}
+                                onClick={() => setMessageModal({ ...messageModal, show: false })}
+                            >
+                                Got it
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
 
         </div>
     );

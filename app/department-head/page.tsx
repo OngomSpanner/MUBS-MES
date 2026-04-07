@@ -2,6 +2,7 @@ import React from 'react';
 import Layout from '@/components/Layout';
 import DepartmentHeadDashboard from './views/DepartmentHeadDashboard';
 import DepartmentStrategicActivities from './views/DepartmentStrategicActivities';
+import DepartmentalActivities from './views/DepartmentalActivities';
 import DepartmentTasks from './views/DepartmentTasks';
 import DepartmentStaff from './views/DepartmentStaff';
 import DepartmentEvaluations from './views/DepartmentEvaluations';
@@ -20,6 +21,8 @@ export default async function DepartmentHeadPage({ searchParams }: DepartmentHea
         switch (pg) {
             case 'activities':
                 return <DepartmentStrategicActivities />;
+            case 'departmental-activities':
+                return <DepartmentalActivities />;
             case 'tasks':
                 return <DepartmentTasks initialActivity={activityParam} initialAssignee={assigneeParam} />;
             case 'staff':

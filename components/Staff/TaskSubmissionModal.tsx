@@ -13,6 +13,9 @@ interface Task {
   status?: string;
   task_type?: 'process' | 'kpi_driver';
   kpi_target_value?: number | null;
+  assignment_type?: 'legacy' | 'process_task';
+  /** Process task: standards.performance_indicator — not strategic/objective text */
+  instruction?: string | null;
 }
 
 interface TaskSubmissionModalProps {
@@ -30,19 +33,8 @@ export default function TaskSubmissionModal({ show, onHide, task, onSuccess }: T
   const [submitting, setSubmitting] = useState(false);
   const [fetching, setFetching] = useState(false);
   const [kpiActualValue, setKpiActualValue] = useState<string>("");
-
-  const formatDate = (dateString: string) => {
-    if (!dateString) return '';
-    const date = new Date(dateString);
-    return date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
-  };
-
-  const getStatusBadge = (status: string) => {
-    if (status === 'Under Review' || status === 'submitted') return <span className="status-badge" style={{ background: '#eff6ff', color: 'var(--mubs-blue)', fontSize: '0.65rem' }}>Under Review</span>;
-    if (status === 'Completed' || status === 'evaluated') return <span className="status-badge" style={{ background: '#dcfce7', color: '#15803d', fontSize: '0.65rem' }}>Complete</span>;
-    if (status === 'Returned' || status === 'draft') return <span className="status-badge" style={{ background: '#fee2e2', color: '#b91c1c', fontSize: '0.65rem' }}>Returned</span>;
-    return <span className="status-badge bg-light text-dark" style={{ fontSize: '0.65rem' }}>{status}</span>;
-  };
+  const [errorMsg, setErrorMsg] = useState("");
+  const [successMsg, setSuccessMsg] = useState("");
 
   const [submission, setSubmission] = useState<any>(null);
 
@@ -54,6 +46,8 @@ export default function TaskSubmissionModal({ show, onHide, task, onSuccess }: T
       setExistingAttachments([]);
       setSubmission(null);
       setKpiActualValue("");
+      setErrorMsg("");
+      setSuccessMsg("");
       
       const fetchSubmission = async () => {
         setFetching(true);
@@ -87,7 +81,12 @@ export default function TaskSubmissionModal({ show, onHide, task, onSuccess }: T
         }
       };
 
-      if (task.status === "In Progress" || task.status === "Returned" || task.status === "Incomplete") {
+      if (
+        task.status === "In Progress" ||
+        task.status === "Returned" ||
+        task.status === "Incomplete" ||
+        task.status === "Under Review"
+      ) {
           fetchSubmission();
       }
     }
@@ -97,7 +96,7 @@ export default function TaskSubmissionModal({ show, onHide, task, onSuccess }: T
     if (e.target.files && e.target.files.length > 0) {
       const file = e.target.files[0];
       if (file.size > 10 * 1024 * 1024) {
-        alert("File too large. Max 10MB.");
+        setErrorMsg("File too large. Max 10MB.");
         return;
       }
       setAttachedFile(file);
@@ -106,14 +105,18 @@ export default function TaskSubmissionModal({ show, onHide, task, onSuccess }: T
 
   const handleSubmit = async (isDraft: boolean) => {
     if (!task) return;
-    if (!isDraft && !description) {
+    if (!isDraft && !description.trim()) {
+      setErrorMsg("Report Details are required to submit.");
       return;
     }
 
     setSubmitting(true);
+    setErrorMsg("");
+    setSuccessMsg("");
     try {
       const formData = new FormData();
       formData.append("taskId", task.id.toString());
+      formData.append("assignmentType", task.assignment_type || 'legacy');
       formData.append("description", description);
       formData.append("evidenceLink", evidenceLink);
       formData.append("isDraft", isDraft ? "true" : "false");
@@ -123,11 +126,15 @@ export default function TaskSubmissionModal({ show, onHide, task, onSuccess }: T
       }
 
       await axios.post("/api/staff/submissions", formData);
-      // alert(isDraft ? "Draft saved successfully!" : "Report submitted successfully!");
+
+      setSuccessMsg(isDraft ? "Draft saved successfully!" : "Report submitted successfully!");
       
-      onHide();
-      if (onSuccess) onSuccess();
+      setTimeout(() => {
+        onHide();
+        if (onSuccess) onSuccess();
+      }, 1500);
     } catch (err: any) {
+      setErrorMsg(err.response?.data?.detail || err.response?.data?.message || err.message || "An unexpected error occurred.");
       console.error(err.response?.data?.message || err.message);
     } finally {
       setSubmitting(false);
@@ -139,7 +146,7 @@ export default function TaskSubmissionModal({ show, onHide, task, onSuccess }: T
       <Modal.Header closeButton style={{ background: 'linear-gradient(90deg,#eff6ff,#fff)', borderBottom: '1px solid #e2e8f0', padding: '0.75rem 1rem' }}>
         <Modal.Title className="fw-bold text-dark d-flex align-items-center gap-2" style={{ fontSize: '1.05rem' }}>
           <span className="material-symbols-outlined text-primary" style={{ fontSize: '22px' }}>upload_file</span>
-          Submit Task Report
+          Submit Report
         </Modal.Title>
       </Modal.Header>
       <Modal.Body className="p-3">
@@ -150,17 +157,40 @@ export default function TaskSubmissionModal({ show, onHide, task, onSuccess }: T
           </div>
         ) : (
           <div className="row g-3">
-            {/* Task Overview / Instructions */}
+            {errorMsg && (
+                <div className="col-12">
+                    <div className="alert alert-danger d-flex align-items-center gap-2 py-2 px-3 border-0 shadow-sm" style={{ borderRadius: '8px', fontSize: '0.82rem' }}>
+                        <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>error</span>
+                        {errorMsg}
+                    </div>
+                </div>
+            )}
+            {successMsg && (
+                <div className="col-12">
+                    <div className="alert alert-success d-flex align-items-center gap-2 py-2 px-3 border-0 shadow-sm" style={{ borderRadius: '8px', fontSize: '0.82rem' }}>
+                        <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>check_circle</span>
+                        {successMsg}
+                    </div>
+                </div>
+            )}
+
+            {/* Task summary: no strategic activity / pillar / objective text */}
             {task && (
                 <div className="col-12">
                     <div className="p-3 rounded-3" style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderLeft: '4px solid var(--mubs-blue)' }}>
                         <div className="d-flex align-items-center gap-2 mb-2">
-                            <span className="material-symbols-outlined text-primary" style={{ fontSize: '20px' }}>info</span>
-                            <span className="fw-bold text-dark small">Task Instructions & Overview</span>
+                            <span className="material-symbols-outlined text-primary" style={{ fontSize: '20px' }}>assignment</span>
+                            <span className="fw-bold text-dark small">Your task</span>
                         </div>
-                        <h6 className="fw-bold text-dark mb-1" style={{ fontSize: '0.9rem' }}>{task.title}</h6>
-                        <div className="text-muted mb-3" style={{ fontSize: '0.82rem', lineHeight: '1.4' }}>
-                            {task.description || "No specific instructions provided."}
+                        <div className="mb-2">
+                            <div className="text-muted fw-bold" style={{ fontSize: '0.68rem' }}>Task</div>
+                            <div className="fw-semibold text-dark" style={{ fontSize: '0.9rem' }}>{task.title}</div>
+                        </div>
+                        <div className="mb-3">
+                            <div className="text-muted fw-bold" style={{ fontSize: '0.68rem' }}>Instruction</div>
+                            <div className="text-secondary" style={{ fontSize: '0.82rem', lineHeight: '1.45', whiteSpace: 'pre-wrap' }}>
+                                {task.instruction?.trim() ? task.instruction.trim() : '—'}
+                            </div>
                         </div>
                         <div className="d-flex gap-4 flex-wrap">
                             <div className="d-flex align-items-center gap-1 text-muted" style={{ fontSize: '0.75rem' }}>
@@ -169,7 +199,7 @@ export default function TaskSubmissionModal({ show, onHide, task, onSuccess }: T
                             </div>
                             <div className="d-flex align-items-center gap-1 text-muted" style={{ fontSize: '0.75rem' }}>
                                 <span className="material-symbols-outlined" style={{ fontSize: '14px' }}>event_available</span>
-                                <span className="fw-bold">Deadline:</span> {task.dueDate ? new Date(task.dueDate).toLocaleDateString() : 'N/A'}
+                                <span className="fw-bold">End date:</span> {task.dueDate ? new Date(task.dueDate).toLocaleDateString() : 'N/A'}
                             </div>
                         </div>
                     </div>
@@ -210,7 +240,7 @@ export default function TaskSubmissionModal({ show, onHide, task, onSuccess }: T
                 />
               </div>
             )}
-
+            
             <div className="col-12">
               <label className="form-label fw-bold text-dark small d-flex align-items-center gap-2">
                 <span className="material-symbols-outlined" style={{ fontSize: '18px', color: 'var(--mubs-blue)' }}>attach_file</span>
@@ -251,7 +281,7 @@ export default function TaskSubmissionModal({ show, onHide, task, onSuccess }: T
       </Modal.Body>
       <Modal.Footer className="border-0 bg-light p-3 d-flex justify-content-end">
         <Button style={{ background: 'var(--mubs-blue)', borderColor: 'var(--mubs-blue)', borderRadius: '8px' }} className="fw-bold text-white px-4" onClick={() => handleSubmit(false)} disabled={submitting}>
-          {submitting ? 'Submitting...' : (task?.status === 'Returned' || task?.status === 'Incomplete' ? 'Resubmit' : 'Submit for Review')}
+          {submitting ? 'Submitting...' : (task?.status === 'Returned' || task?.status === 'Incomplete' || task?.status === 'Under Review' ? 'Resubmit' : 'Submit for Review')}
         </Button>
       </Modal.Footer>
     </Modal>

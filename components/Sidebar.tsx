@@ -13,14 +13,13 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen, onLogoutClick }: 
   const pathname = usePathname();
   const searchParams = useSearchParams();
 
-  const currentKey = (pathname.startsWith('/admin') || pathname.startsWith('/principal') || pathname.startsWith('/department-head'))
-    ? (searchParams.get('pg') || (pathname.startsWith('/principal') ? 'executive' : 'dashboard'))
+  const currentKey = (pathname.startsWith('/admin') || pathname.startsWith('/principal') || pathname.startsWith('/department-head') || pathname.startsWith('/ambassador'))
+    ? (searchParams.get('pg') || (pathname.startsWith('/principal') ? 'executive' : pathname.startsWith('/ambassador') ? 'dashboard' : 'dashboard'))
     : (pathname.substring(1) || 'dashboard');
 
   const adminMenuItems = [
     { key: 'dashboard', href: '/admin?pg=dashboard', icon: 'dashboard', label: 'Dashboard' },
-    { key: 'strategic', href: '/admin?pg=strategic', icon: 'track_changes', label: 'Strategic Activities' },
-    { key: 'committee', href: '/admin?pg=committee', icon: 'groups', label: 'Committee Activities' },
+    { key: 'strategic', href: '/admin?pg=strategic', icon: 'track_changes', label: 'Standard and Activities' },
     { key: 'tracking', href: '/admin?pg=tracking', icon: 'monitoring', label: 'Activity Tracking' },
     { key: 'users', href: '/admin?pg=users', icon: 'manage_accounts', label: 'User & Role Mgmt' },
     { key: 'reports', href: '/admin?pg=reports', icon: 'bar_chart', label: 'Reports & Monitoring' },
@@ -37,14 +36,20 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen, onLogoutClick }: 
   const departmentHeadMenuItems = [
     { key: 'dashboard', href: '/department-head?pg=dashboard', icon: 'dashboard', label: 'Dashboard' },
     { key: 'activities', href: '/department-head?pg=activities', icon: 'track_changes', label: 'Strategic Activities' },
-    { key: 'tasks', href: '/department-head?pg=tasks', icon: 'task_alt', label: 'Tasks' },
+    { key: 'departmental-activities', href: '/department-head?pg=departmental-activities', icon: 'apartment', label: 'Departmental Activities' },
+    { key: 'tasks', href: '/department-head?pg=tasks', icon: 'checklist', label: 'Processes' },
     { key: 'staff', href: '/department-head?pg=staff', icon: 'group', label: 'Staff & Warnings' },
-    { key: 'evaluations', href: '/department-head?pg=evaluations', icon: 'rate_review', label: 'Evaluations' },
+    { key: 'evaluations', href: '/department-head?pg=evaluations', icon: 'fact_check', label: 'Submissions & reviews' },
+  ];
+  
+  const ambassadorMenuItems = [
+    { key: 'dashboard', href: '/ambassador', icon: 'dashboard', label: 'Faculty Dashboard' },
+    { key: 'reports', href: '/ambassador?pg=reports', icon: 'bar_chart', label: 'Faculty Reports' },
   ];
 
   const staffMenuItems = [
     { key: 'dashboard', href: '/staff?pg=dashboard', icon: 'dashboard', label: 'Dashboard' },
-    { key: 'tasks', href: '/staff?pg=tasks', icon: 'task_alt', label: 'My Tasks' },
+    { key: 'tasks', href: '/staff?pg=tasks', icon: 'checklist', label: 'Tasks' },
     { key: 'notifications', href: '/staff?pg=notifications', icon: 'notifications_active', label: 'Notifications & Deadlines' },
     { key: 'submissions', href: '/staff?pg=submissions', icon: 'history', label: 'Submissions & Feedback' },
   ];
@@ -67,6 +72,8 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen, onLogoutClick }: 
     menuItems = departmentHeadMenuItems;
   } else if (pathname.startsWith('/staff')) {
     menuItems = staffMenuItems;
+  } else if (pathname.startsWith('/ambassador')) {
+    menuItems = ambassadorMenuItems;
   } else if (pathname.startsWith('/comm')) {
     menuItems = commMenuItems;
   }

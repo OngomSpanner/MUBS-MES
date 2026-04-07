@@ -311,54 +311,36 @@ body {
   padding: 1.75rem 2rem;
 }
 
-/* Stat Cards */
+/* Stat Cards (compact — ~half previous vertical footprint) */
 .stat-card {
   background: #fff;
-  border-radius: 12px;
-  padding: 1.25rem 1.4rem;
-  border-left: 5px solid var(--mubs-blue);
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.12);
+  border-radius: 10px;
+  padding: 0.6rem 0.75rem;
+  border-left: 4px solid var(--mubs-blue);
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
   transition: transform 0.2s, box-shadow 0.2s;
   color: #1e293b;
 }
 
 .stat-card:hover {
-  transform: translateY(-3px);
-  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.18);
-}
-
-.stat-icon {
-  width: 44px;
-  height: 44px;
-  border-radius: 10px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.14);
 }
 
 .stat-label {
-  font-size: 0.65rem;
+  font-size: 0.58rem;
   font-weight: 800;
-  letter-spacing: 0.12em;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
   color: #64748b;
+  margin-top: 0.1rem;
 }
 
 .stat-value {
-  font-size: 2rem;
+  font-size: 1.05rem;
   font-weight: 900;
-  line-height: 1.1;
+  line-height: 1.15;
   color: #0f172a;
-}
-
-.stat-badge {
-  font-size: 0.7rem;
-  font-weight: 800;
-  padding: 0.2rem 0.55rem;
-  border-radius: 99px;
-  display: inline-flex;
-  align-items: center;
-  gap: 2px;
 }
 
 /* Table Card */
@@ -396,6 +378,22 @@ body {
   border-bottom: 2px solid #e2e8f0;
 }
 
+/* Admin Strategic — Strategic Plan Activities: readable headers & body (no forced uppercase) */
+.strategic-activities-table th {
+  text-transform: none;
+  letter-spacing: 0.02em;
+  font-weight: 700;
+  font-size: 0.72rem;
+}
+
+/* Department Head — Activity Processes table: readable headers (no forced uppercase on th) */
+.department-tasks-processes-table th {
+  text-transform: none;
+  letter-spacing: 0.02em;
+  font-weight: 700;
+  font-size: 0.72rem;
+}
+
 .table td {
   vertical-align: middle;
   border-bottom: 1px solid #f1f5f9;
@@ -428,6 +426,16 @@ body {
   text-transform: uppercase;
   letter-spacing: 0.06em;
 }
+
+.status-badge.not-started { background: #f1f5f9; color: #475569; }
+.status-badge.in-progress { background: #fef9c3; color: #a16207; }
+.status-badge.completed { background: #dcfce7; color: #15803d; }
+.status-badge.delayed { background: #fee2e2; color: #b91c1c; }
+.status-badge.pending { background: #fef9c3; color: #a16207; }
+.status-badge.approved { background: #dcfce7; color: #15803d; }
+.status-badge.rejected { background: #fee2e2; color: #b91c1c; }
+.status-badge.strategy-reviewed { background: #eff6ff; color: var(--mubs-blue); }
+.status-badge.edit-requested { background: #fff7ed; color: #ea580c; }
 
 .activity-icon {
   width: 36px;
@@ -499,6 +507,18 @@ body {
 
 .modal-header-mubs .btn-close {
   filter: invert(1);
+}
+
+/* Create / Edit Activity: narrower dialog; body scrolls instead of growing past the viewport */
+.modal-create-activity.modal-dialog {
+  max-width: min(40rem, calc(100vw - 1.5rem));
+  margin: 0.75rem auto;
+}
+
+/* Create / Edit Standard: moderate width (quality + output side-by-side on md+); body scrolls */
+.modal-standard-edit.modal-dialog {
+  max-width: min(44rem, calc(100vw - 1.5rem));
+  margin: 0.75rem auto;
 }
 
 /* Modals: stat-card style (all modals match stat card) */
@@ -762,4 +782,10 @@ body {
 @media (max-width: 991px) {
   .kpi-hero-value { font-size: 2.5rem; }
 }
+
+/* --- Standard details modal sizing --- */
+.modal-standard-view .modal-dialog {
+  max-width: 640px;
+}
+
 

@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useState, Suspense } from "react";
+import { useEffect, useState, Suspense, useCallback } from "react";
 import axios from "axios";
 import { useSearchParams } from "next/navigation";
+import { Modal, Button } from "react-bootstrap";
 import StatCard from "@/components/StatCard";
 import TaskSubmissionModal from "@/components/Staff/TaskSubmissionModal";
 import SubmissionDetailModal from "@/components/Staff/SubmissionDetailModal";
@@ -11,7 +12,7 @@ import TaskCardQueue from "@/components/Staff/TaskCardQueue";
 interface Task {
   id: number;
   title: string;
-  description: string;
+  description?: string;
   startDate?: string;
   dueDate: string;
   status: string;
@@ -19,6 +20,11 @@ interface Task {
   daysLeft: number;
   task_type?: 'process' | 'kpi_driver';
   kpi_target_value?: number | null;
+  activity_title?: string;
+  assignment_type?: 'legacy' | 'process_task';
+  unit_name?: string;
+  /** Process task: from standards.performance_indicator */
+  instruction?: string | null;
 }
 
 interface Stats {
@@ -41,8 +47,9 @@ function StaffTasksContent() {
 
   const [showModal, setShowModal] = useState(false);
   const [showViewModal, setShowViewModal] = useState(false);
+  const [showProcessDetails, setShowProcessDetails] = useState(false);
   const [selectedTaskForReport, setSelectedTaskForReport] = useState<Task | null>(null);
-  const [activeTab, setActiveTab] = useState<'overdue' | 'next10' | 'future' | 'review' | 'history'>('overdue');
+  const [activeTab, setActiveTab] = useState<'overdue' | 'active' | 'review' | 'history'>('overdue');
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
 
@@ -67,6 +74,18 @@ function StaffTasksContent() {
     fetchData();
   }, []);
 
+  const handleOpenModal = useCallback((task: Task) => {
+    setSelectedTaskForReport(task);
+    setShowModal(false);
+    setShowViewModal(false);
+    setShowProcessDetails(false);
+    if (task.status === "Completed" || task.status === "Under Review" || task.status === "Incomplete") {
+      setShowViewModal(true);
+    } else {
+      setShowProcessDetails(true);
+    }
+  }, []);
+
   useEffect(() => {
     const taskId = searchParams.get('taskId');
     if (taskId && tasks.length > 0) {
@@ -75,15 +94,26 @@ function StaffTasksContent() {
         handleOpenModal(task);
       }
     }
-  }, [searchParams, tasks]);
+  }, [searchParams, tasks, handleOpenModal]);
 
-  const handleOpenModal = (task: Task) => {
-    setSelectedTaskForReport(task);
-    if (task.status === "Completed" || task.status === "Under Review" || task.status === "Incomplete") {
-      setShowViewModal(true);
-    } else {
-      setShowModal(true);
-    }
+  const formatProcessDetailDate = (dateStr?: string) => {
+    if (!dateStr) return "—";
+    return new Date(dateStr).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
+  };
+
+  const statusBadgeStyle = (status: string) => {
+    const s = (status || '').toLowerCase();
+    if (s === 'completed') return { bg: '#dcfce7', color: '#15803d' };
+    if (s === 'under review') return { bg: '#eff6ff', color: 'var(--mubs-blue)' };
+    if (s === 'in progress') return { bg: '#fef3c7', color: '#92400e' };
+    if (s === 'returned') return { bg: '#ffedd5', color: '#9a3412' };
+    if (s === 'incomplete' || s === 'not done') return { bg: '#fee2e2', color: '#b91c1c' };
+    return { bg: '#f1f5f9', color: '#475569' };
+  };
+
+  const openSubmitFromProcessDetails = () => {
+    setShowProcessDetails(false);
+    setShowModal(true);
   };
 
   const filteredTasks = tasks.filter(t => {
@@ -93,9 +123,8 @@ function StaffTasksContent() {
     const isAction = t.status !== 'Completed' && t.status !== 'Under Review';
     if (!isAction) return false;
 
-    if (activeTab === 'overdue') return t.daysLeft < 2;
-    if (activeTab === 'next10') return t.daysLeft >= 2 && t.daysLeft <= 10;
-    if (activeTab === 'future') return t.daysLeft > 10;
+    if (activeTab === 'overdue') return t.daysLeft < 0;
+    if (activeTab === 'active') return t.daysLeft >= 0;
     return true;
   });
 
@@ -111,16 +140,6 @@ function StaffTasksContent() {
       <tr key={task.id} style={{ background: rowBg }}>
         <td className="ps-4">
           <div className="fw-bold text-dark" style={{ fontSize: ".9rem" }}>{task.title}</div>
-          {task.description && (
-            <div className="text-muted" style={{ fontSize: ".78rem", maxWidth: "380px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-              {task.description}
-            </div>
-          )}
-        </td>
-        <td>
-          <span className="badge" style={{ background: "rgba(0,86,150,0.08)", color: "var(--mubs-blue)", fontSize: ".7rem" }}>
-            {task.type}
-          </span>
         </td>
         <td>
           <span className="status-badge" style={{
@@ -137,17 +156,17 @@ function StaffTasksContent() {
         <td>
           <span style={{ fontSize: ".8rem", color: "#64748b" }}>{task.dueDate ? new Date(task.dueDate).toLocaleDateString() : "TBD"}</span>
         </td>
-        <td>
-          <span style={{ fontSize: ".8rem", fontWeight: 700, color: overdue ? "#b91c1c" : "#64748b" }}>
-            {task.daysLeft < 0 ? `${Math.abs(task.daysLeft)}d late` : `${task.daysLeft}d`}
-          </span>
-        </td>
-        <td className="pe-4 text-end">
-          <button onClick={() => handleOpenModal(task)} className="btn btn-sm btn-outline-primary fw-bold d-inline-flex align-items-center gap-1" style={{ borderRadius: "8px", fontSize: ".8rem" }}>
+        <td className="pe-4 text-end text-nowrap" style={{ width: '1%' }}>
+          <button
+            type="button"
+            onClick={() => handleOpenModal(task)}
+            className="btn btn-sm btn-outline-primary fw-bold d-inline-flex align-items-center gap-1 text-nowrap"
+            style={{ borderRadius: "8px", fontSize: ".8rem", whiteSpace: "nowrap" }}
+          >
             <span className="material-symbols-outlined" style={{ fontSize: "16px" }}>
-              {task.status === "Completed" || task.status === "Under Review" || task.status === "Incomplete" ? "visibility" : "upload_file"}
+              {task.status === "Completed" || task.status === "Under Review" || task.status === "Incomplete" ? "visibility" : "assignment"}
             </span>
-            {task.status === "Completed" || task.status === "Under Review" || task.status === "Incomplete" ? "View Details" : (task.status === "Returned" ? "Resubmit" : "Submit Report")}
+            {task.status === "Completed" || task.status === "Under Review" || task.status === "Incomplete" ? "View Details" : "View process"}
           </button>
         </td>
       </tr>
@@ -181,9 +200,9 @@ function StaffTasksContent() {
         <div className="col-12 col-sm-6 col-xl-3">
           <StatCard
             icon="pending_actions"
-            label="Next 10 Days"
-            value={tasks.filter(t => t.status !== 'Completed' && t.status !== 'Under Review' && t.daysLeft >= 2 && t.daysLeft <= 10).length}
-            badge="Upcoming"
+            label="Active"
+            value={tasks.filter(t => t.status !== 'Completed' && t.status !== 'Under Review' && t.daysLeft >= 0).length}
+            badge="Current"
             badgeIcon="schedule"
             color="yellow"
           />
@@ -192,7 +211,7 @@ function StaffTasksContent() {
           <StatCard
             icon="running_with_errors"
             label="Overdue"
-            value={tasks.filter(t => t.status !== 'Completed' && t.status !== 'Under Review' && t.daysLeft < 2).length}
+            value={tasks.filter(t => t.status !== 'Completed' && t.status !== 'Under Review' && t.daysLeft < 0).length}
             badge="Urgent Action"
             badgeIcon="priority_high"
             color="red"
@@ -214,17 +233,17 @@ function StaffTasksContent() {
       <div className="table-card p-0 overflow-hidden" style={{ borderRadius: '20px', border: '1px solid #e2e8f0' }}>
         <div className="table-card-header d-flex justify-content-between align-items-center p-4" style={{ background: '#fff', borderBottom: '1px solid #f1f5f9' }}>
           <h5 className="mb-0 d-flex align-items-center gap-2 fw-bold" style={{ color: 'var(--mubs-navy)' }}>
-            <span className="material-symbols-outlined" style={{ color: "var(--mubs-blue)" }}>auto_awesome_mosaic</span>
-            All Assigned Tasks
+            <span className="material-symbols-outlined" style={{ color: "var(--mubs-blue)" }}>checklist</span>
+            My Assigned Processes
           </h5>
         </div>
 
         <div className="d-flex px-4 pt-2 bg-white border-bottom gap-4" style={{ overflowX: 'auto' }}>
             {[
-              { id: 'overdue', label: '🚨 Overdue', badgeBg: '#fee2e2', badgeColor: '#b91c1c', count: tasks.filter(t => t.status !== 'Completed' && t.status !== 'Under Review' && t.daysLeft < 2).length },
-              { id: 'next10', label: '📅 Next 10 Days', badgeBg: '#fef3c7', badgeColor: '#92400e', count: tasks.filter(t => t.status !== 'Completed' && t.status !== 'Under Review' && t.daysLeft >= 2 && t.daysLeft <= 10).length },
+              { id: 'overdue', label: '🚨 Overdue', badgeBg: '#fee2e2', badgeColor: '#b91c1c', count: tasks.filter(t => t.status !== 'Completed' && t.status !== 'Under Review' && t.daysLeft < 0).length },
+              { id: 'active', label: '📅 Active', badgeBg: '#fef3c7', badgeColor: '#92400e', count: tasks.filter(t => t.status !== 'Completed' && t.status !== 'Under Review' && t.daysLeft >= 0).length },
               { id: 'review', label: 'Under Review', badgeBg: '#eff6ff', badgeColor: 'var(--mubs-blue)', count: tasks.filter(t => t.status === 'Under Review').length },
-              { id: 'history', label: 'History', badgeBg: '#dcfce7', badgeColor: '#15803d', count: tasks.filter(t => t.status === 'Completed').length },
+              { id: 'history', label: 'Completed', badgeBg: '#dcfce7', badgeColor: '#15803d', count: tasks.filter(t => t.status === 'Completed').length },
             ].map(tab => (
               <button
                 key={tab.id}
@@ -237,66 +256,30 @@ function StaffTasksContent() {
                 {activeTab === tab.id && <div className="position-absolute bottom-0 start-0 w-100 bg-primary" style={{ height: '3px', borderRadius: '3px 3px 0 0' }}></div>}
               </button>
             ))}
-
-            <button
-              className={`pb-2 px-1 fw-bold border-0 bg-transparent position-relative flex-shrink-0 d-flex align-items-center gap-1 ${activeTab === 'future' ? 'text-primary' : 'text-muted'}`}
-              style={{ fontSize: '0.82rem', transition: 'all 0.2s', whiteSpace: 'nowrap', opacity: 0.7 }}
-              onClick={() => setActiveTab('future')}
-            >
-              <span className="material-symbols-outlined" style={{ fontSize: '14px' }}>lock</span>
-              🔜 Future
-              {activeTab === 'future' && <div className="position-absolute bottom-0 start-0 w-100 bg-secondary" style={{ height: '3px', borderRadius: '3px 3px 0 0' }}></div>}
-            </button>
           </div>
 
         <div className="table-responsive">
         <table className="table mb-0 align-middle">
             <thead className="bg-light">
               <tr>
-                <th className="ps-4">Task</th>
-                <th>Type</th>
-
+                <th className="ps-4">Process</th>
                 <th>Status</th>
                 <th>Start Date</th>
                 <th>Due Date</th>
-                <th>Days Left</th>
-                <th className="pe-4 text-end">Action</th>
+                <th className="pe-4 text-end text-nowrap" style={{ width: '1%' }}>Action</th>
               </tr>
             </thead>
             <tbody>
-              {activeTab === 'future' ? (
+              {currentTasks.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="p-0">
-                    <div className="position-relative" style={{ minHeight: '280px', overflow: 'hidden' }}>
-                      {/* Blurred ghost rows */}
-                      <div style={{ filter: 'blur(4px)', pointerEvents: 'none', userSelect: 'none', opacity: 0.5 }}>
-                        {tasks.filter(t => t.status !== 'Completed' && t.status !== 'Under Review' && t.daysLeft > 10).slice(0, 4).map(task => renderTaskRow(task))}
-                      </div>
-                      {/* Lock overlay */}
-                      <div className="position-absolute top-0 start-0 w-100 h-100 d-flex flex-column align-items-center justify-content-center" style={{ background: 'rgba(248,250,252,0.75)', backdropFilter: 'blur(2px)' }}>
-                        <div className="text-center p-4">
-                          <div className="mb-3" style={{ width: '56px', height: '56px', borderRadius: '50%', background: '#f1f5f9', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
-                            <span className="material-symbols-outlined" style={{ fontSize: '28px', color: '#64748b' }}>lock</span>
-                          </div>
-                          <h6 className="fw-black text-dark mb-1">Future Tasks Locked</h6>
-                          <p className="text-muted mb-0" style={{ fontSize: '0.82rem', maxWidth: '300px', margin: '0 auto' }}>
-                            These tasks will automatically appear in the <strong>Next 10 Days</strong> tab as their deadlines approach. Stay focused on what&apos;s due soon!
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                  </td>
-                </tr>
-              ) : currentTasks.length === 0 ? (
-                <tr>
-                  <td colSpan={7} className="text-center py-4 text-muted">
+                  <td colSpan={5} className="text-center py-4 text-muted">
                     <span
                       className="material-symbols-outlined d-block mb-2"
                       style={{ fontSize: "36px", opacity: 0.3 }}
                     >
-                      task_alt
+                      checklist
                     </span>
-                    No tasks found in this section.
+                    No processes found in this section.
                   </td>
                 </tr>
               ) : (
@@ -307,10 +290,10 @@ function StaffTasksContent() {
         </div>
 
         {/* Pagination Controls */}
-        {filteredTasks.length > 0 && activeTab !== 'future' && (
+        {filteredTasks.length > 0 && (
           <div className="p-4 border-top d-flex justify-content-between align-items-center bg-white" style={{ borderBottomLeftRadius: '20px', borderBottomRightRadius: '20px' }}>
             <div className="text-muted fw-bold" style={{ fontSize: '0.75rem' }}>
-              Showing <span className="text-dark">{indexOfFirstItem + 1}</span> to <span className="text-dark">{Math.min(indexOfLastItem, filteredTasks.length)}</span> of <span className="text-dark">{filteredTasks.length}</span> tasks
+              Showing <span className="text-dark">{indexOfFirstItem + 1}</span> to <span className="text-dark">{Math.min(indexOfLastItem, filteredTasks.length)}</span> of <span className="text-dark">{filteredTasks.length}</span> processes
             </div>
             <div className="pagination-controls d-flex gap-2">
               <button 
@@ -345,6 +328,90 @@ function StaffTasksContent() {
           </div>
         )}
       </div>
+
+      <Modal
+        show={showProcessDetails && !!selectedTaskForReport}
+        onHide={() => setShowProcessDetails(false)}
+        centered
+        backdrop="static"
+        size="lg"
+      >
+        <Modal.Header closeButton style={{ background: "#f8fafc", borderBottom: "1px solid #e2e8f0" }}>
+          <Modal.Title className="fw-bold text-dark d-flex align-items-center gap-2" style={{ fontSize: "0.98rem" }}>
+            <span className="material-symbols-outlined text-primary" style={{ fontSize: "22px" }}>description</span>
+            Task details
+          </Modal.Title>
+        </Modal.Header>
+        <Modal.Body className="p-3">
+          {selectedTaskForReport && (
+            <div className="text-dark" style={{ fontSize: "0.88rem" }}>
+              <div className="d-flex justify-content-between align-items-start gap-3">
+                <div className="flex-grow-1">
+                  <div className="fw-semibold" style={{ fontSize: "1.0rem", lineHeight: 1.25 }}>
+                    {selectedTaskForReport.title}
+                  </div>
+                  <div className="text-muted" style={{ fontSize: "0.78rem", marginTop: 2 }}>
+                    {selectedTaskForReport.activity_title?.trim() ? selectedTaskForReport.activity_title : "Department task"}
+                    {selectedTaskForReport.unit_name?.trim() ? ` · ${selectedTaskForReport.unit_name}` : ""}
+                  </div>
+                </div>
+                <span
+                  className="badge rounded-pill"
+                  style={{
+                    background: statusBadgeStyle(selectedTaskForReport.status).bg,
+                    color: statusBadgeStyle(selectedTaskForReport.status).color,
+                    fontSize: "0.72rem",
+                    padding: "6px 10px",
+                    whiteSpace: "nowrap",
+                    border: "1px solid rgba(2,6,23,0.06)"
+                  }}
+                >
+                  {selectedTaskForReport.status}
+                </span>
+              </div>
+
+              <div className="mt-3 p-3 rounded-3" style={{ background: "#ffffff", border: "1px solid #e2e8f0" }}>
+                <div className="text-muted fw-bold mb-1" style={{ fontSize: "0.7rem" }}>
+                  Instruction / notes
+                </div>
+                <div className="text-secondary" style={{ whiteSpace: "pre-wrap", fontSize: "0.86rem", lineHeight: 1.45 }}>
+                  {(
+                    selectedTaskForReport.instruction?.trim() ||
+                    selectedTaskForReport.description?.trim() ||
+                    "—"
+                  )}
+                </div>
+              </div>
+
+              <div className="row g-2 mt-2">
+                <div className="col-6">
+                  <div className="p-2 rounded-3" style={{ background: "#f8fafc", border: "1px solid #e2e8f0" }}>
+                    <div className="text-muted fw-bold" style={{ fontSize: "0.7rem" }}>Start</div>
+                    <div className="fw-semibold" style={{ fontSize: "0.85rem" }}>{formatProcessDetailDate(selectedTaskForReport.startDate)}</div>
+                  </div>
+                </div>
+                <div className="col-6">
+                  <div className="p-2 rounded-3" style={{ background: "#f8fafc", border: "1px solid #e2e8f0" }}>
+                    <div className="text-muted fw-bold" style={{ fontSize: "0.7rem" }}>Due</div>
+                    <div className="fw-semibold" style={{ fontSize: "0.85rem" }}>{formatProcessDetailDate(selectedTaskForReport.dueDate)}</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+        </Modal.Body>
+        <Modal.Footer className="border-0 pt-0 px-3 pb-3 justify-content-end">
+          <Button
+            variant="primary"
+            className="fw-bold d-inline-flex align-items-center gap-2"
+            style={{ borderRadius: "10px", padding: "10px 14px" }}
+            onClick={openSubmitFromProcessDetails}
+          >
+            <span className="material-symbols-outlined" style={{ fontSize: "18px" }}>upload_file</span>
+            {selectedTaskForReport?.status === "Returned" ? "Resubmit report" : "Submit report"}
+          </Button>
+        </Modal.Footer>
+      </Modal>
 
       <TaskSubmissionModal
         key={`submit-${selectedTaskForReport?.id}`}

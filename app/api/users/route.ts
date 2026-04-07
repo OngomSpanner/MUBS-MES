@@ -21,7 +21,7 @@ export async function GET(request: Request) {
     const search = searchParams.get('search');
 
     let sql = `
-      SELECT u.id, u.full_name, u.email, u.role, u.status, u.department_id,
+      SELECT u.id, u.full_name, u.email, u.role, u.status, u.department_id, u.managed_unit_id,
              d.name AS department,
              DATE_FORMAT(u.created_at, '%d %b %Y') as created_date
       FROM users u
@@ -64,11 +64,17 @@ export async function POST(request: Request) {
     const assignedBy = decoded?.userId ?? null;
 
     const body = await request.json();
-    const { full_name, email, password, role, department_id, committee_types } = body;
+    const { 
+      full_name, email, password, role, department_id, managed_unit_id, committee_types,
+      first_name, surname, other_names, employee_id, contract_terms, contract_type, staff_category,
+      position, contract_start, contract_end
+    } = body;
 
-    if (!full_name || !email || !role) {
+    const finalFullName = full_name || `${first_name || ''} ${surname || ''}`.trim();
+
+    if (!finalFullName || !email || !role) {
       return NextResponse.json(
-        { message: 'Full name, email and at least one role are required' },
+        { message: 'Name (Full or First/Surname), email and at least one role are required' },
         { status: 400 }
       );
     }
@@ -93,13 +99,15 @@ export async function POST(request: Request) {
 
     // Normalize role values for user_roles.role enum (snake_case: hod, unit_head, strategy_manager, etc.)
     const roleList = roleStr.split(',').map((r: string) => r.trim()).filter(Boolean);
+    const managedUnitId = managed_unit_id != null && managed_unit_id !== '' ? Number(managed_unit_id) : null;
+
     const roleListNormalized = roleList.map((r: string) => {
       const lower = r.toLowerCase().replace(/\s+/g, '_');
       const map: Record<string, string> = {
         'system_administrator': 'system_admin', 'strategy_manager': 'strategy_manager',
         'committee_member': 'committee_member', 'principal': 'principal',
         'department_head': 'department_head', 'unit_head': 'unit_head', 'hod': 'hod',
-        'staff': 'staff', 'viewer': 'viewer'
+        'staff': 'staff', 'viewer': 'viewer', 'ambassador': 'ambassador'
       };
       return map[lower] || lower;
     });
@@ -107,16 +115,36 @@ export async function POST(request: Request) {
     let newUserId: number;
     try {
       const result = await query({
-        query: 'INSERT INTO users (full_name, email, password_hash, role, department_id, status, must_change_password) VALUES (?, ?, ?, ?, ?, ?, 1)',
-        values: [full_name, email, hashedPassword, roleStr, departmentId, 'Active']
+        query: `INSERT INTO users (
+                   full_name, email, password_hash, role, department_id, managed_unit_id, 
+                   status, must_change_password, first_name, surname, other_names, 
+                   employee_id, contract_terms, contract_type, staff_category,
+                   position, contract_start, contract_end
+                 ) VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        values: [
+          finalFullName, email, hashedPassword, roleStr, departmentId, managedUnitId, 
+          'Active', first_name || null, surname || null, other_names || null, 
+          employee_id || null, contract_terms || null, contract_type || null, staff_category || null,
+          position || null, contract_start || null, contract_end || null
+        ]
       });
       newUserId = (result as any).insertId;
     } catch (insertError: any) {
       const msg = (insertError?.message || String(insertError)).toLowerCase();
       if (msg.includes('must_change_password') || msg.includes('unknown column')) {
         const result = await query({
-          query: 'INSERT INTO users (full_name, email, password_hash, role, department_id, status) VALUES (?, ?, ?, ?, ?, ?)',
-          values: [full_name, email, hashedPassword, roleStr, departmentId, 'Active']
+          query: `INSERT INTO users (
+                     full_name, email, password_hash, role, department_id, managed_unit_id, 
+                     status, first_name, surname, other_names, 
+                     employee_id, contract_terms, contract_type, staff_category,
+                     position, contract_start, contract_end
+                   ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          values: [
+            finalFullName, email, hashedPassword, roleStr, departmentId, managedUnitId, 
+            'Active', first_name || null, surname || null, other_names || null, 
+            employee_id || null, contract_terms || null, contract_type || null, staff_category || null,
+            position || null, contract_start || null, contract_end || null
+          ]
         });
         newUserId = (result as any).insertId;
       } else {

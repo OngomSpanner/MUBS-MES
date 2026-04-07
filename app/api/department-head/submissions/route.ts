@@ -29,8 +29,8 @@ export async function GET() {
                 SELECT 
                     sr.id,
                     sr.achievements as description,
-                    sa.title as report_name,
-                    p.title as activity_title,
+                    COALESCE(sa.title, sp.step_name) as report_name,
+                    COALESCE(p.title, psa_sa.title) as activity_title,
                     u.full_name as staff_name,
                     sr.updated_at as submitted_at,
                     sr.status as db_status,
@@ -39,16 +39,19 @@ export async function GET() {
                     e.qualitative_feedback as reviewer_notes,
                     e.rating
                 FROM staff_reports sr
-                JOIN activity_assignments aa ON sr.activity_assignment_id = aa.id
-                JOIN strategic_activities sa ON aa.activity_id = sa.id
+                LEFT JOIN activity_assignments aa ON sr.activity_assignment_id = aa.id
+                LEFT JOIN strategic_activities sa ON aa.activity_id = sa.id
                 LEFT JOIN strategic_activities p ON sa.parent_id = p.id
-                JOIN users u ON aa.assigned_to_user_id = u.id
+                LEFT JOIN staff_process_assignments spa ON sr.process_assignment_id = spa.id
+                LEFT JOIN standard_processes sp ON spa.standard_process_id = sp.id
+                LEFT JOIN strategic_activities psa_sa ON spa.activity_id = psa_sa.id
+                JOIN users u ON COALESCE(aa.assigned_to_user_id, spa.staff_id) = u.id
                 LEFT JOIN evaluations e ON e.staff_report_id = sr.id
-                WHERE (sa.department_id IN (${placeholders}) OR p.department_id IN (${placeholders}))
+                WHERE (sa.department_id IN (${placeholders}) OR p.department_id IN (${placeholders}) OR psa_sa.department_id IN (${placeholders}))
                 AND (sr.status IN ('submitted', 'evaluated') OR (sr.status = 'draft' AND e.id IS NOT NULL))
                 ORDER BY sr.updated_at DESC
             `,
-            values: [...departmentIds, ...departmentIds]
+            values: [...departmentIds, ...departmentIds, ...departmentIds]
         }) as any[];
 
         const statusMap: Record<string, string> = {

@@ -8,6 +8,7 @@ export type UserRole =
   | 'HOD'
   | 'Staff'
   | 'Viewer'
+  | 'Ambassador'
   | (string & {});
 
 export function parseRoles(roleField: unknown): string[] {
@@ -40,14 +41,16 @@ export function pickDefaultActiveRole(roles: string[]): string {
   if (normalized.includes('HOD')) return 'HOD';
   if (normalized.includes('Staff')) return 'Staff';
   if (normalized.includes('Viewer')) return 'Viewer';
+  if (normalized.includes('Ambassador')) return 'Ambassador';
   return 'Staff';
 }
 
-export function dashboardPathForRole(role: string | undefined): '/admin' | '/comm' | '/principal' | '/department-head' | '/staff' {
+export function dashboardPathForRole(role: string | undefined): '/admin' | '/comm' | '/principal' | '/department-head' | '/ambassador' | '/staff' {
   if (role === 'System Administrator' || role === 'Strategy Manager') return '/admin';
   if (role === 'Committee Member') return '/comm';
   if (role === 'Principal') return '/principal';
   if (role === 'Department Head' || role === 'Unit Head' || role === 'HOD') return '/department-head';
+  if (role === 'Ambassador') return '/ambassador';
   return '/staff';
 }
 
@@ -62,6 +65,7 @@ const CANONICAL_ROLES = [
   'HOD',
   'Staff',
   'Viewer',
+  'Ambassador',
 ] as const;
 
 /** Map snake_case (from DB) to canonical form. */
@@ -75,6 +79,7 @@ const SNAKE_TO_CANONICAL: Record<string, string> = {
   hod: 'HOD',
   staff: 'Staff',
   viewer: 'Viewer',
+  ambassador: 'Ambassador',
 };
 
 /**
@@ -114,5 +119,14 @@ export function formatRoleForDisplay(role: string | undefined): string {
   const canonical = normalizeRoleForCookie(role);
   if (canonical === 'HOD') return 'Head of Department';
   return canonical;
+}
+
+/** Who may create/update/delete strategic standard templates (admin Strategic page). */
+export function canManageStrategicStandards(role: string | undefined | null): boolean {
+  if (role == null || typeof role !== 'string' || !role.trim()) return false;
+  const canonical = normalizeRoleForCookie(role);
+  if (canonical === 'System Administrator' || canonical === 'Strategy Manager') return true;
+  const t = role.trim().toLowerCase();
+  return t === 'admin';
 }
 

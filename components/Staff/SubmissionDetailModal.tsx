@@ -47,6 +47,7 @@ export default function SubmissionDetailModal({ show, onHide, submission: propSu
     const getStatusBadge = (status: string) => {
         if (status === 'Under Review' || status === 'submitted') return <span className="status-badge" style={{ background: '#eff6ff', color: 'var(--mubs-blue)', fontSize: '0.65rem' }}>Under Review</span>;
         if (status === 'Completed' || status === 'evaluated' || status === 'Complete') return <span className="status-badge" style={{ background: '#dcfce7', color: '#15803d', fontSize: '0.65rem' }}>Complete</span>;
+        if (status === 'Incomplete') return <span className="status-badge" style={{ background: '#fef3c7', color: '#b45309', fontSize: '0.65rem' }}>Incomplete</span>;
         if (status === 'Returned' || status === 'draft') return <span className="status-badge" style={{ background: '#fee2e2', color: '#b91c1c', fontSize: '0.65rem' }}>Returned</span>;
         return <span className="status-badge bg-light text-dark" style={{ fontSize: '0.65rem' }}>{status}</span>;
     };
@@ -120,16 +121,39 @@ export default function SubmissionDetailModal({ show, onHide, submission: propSu
                         )}
 
                         {/* Evaluation Section */}
-                        {(submission.status === 'Completed' || submission.status === 'Returned' || submission.status === 'Incomplete' || submission.status === 'Complete') && (
+                        {(submission.status === 'Completed' || submission.status === 'Returned' || submission.status === 'Incomplete' || submission.status === 'Complete' || submission.status === 'Not Done') && (
                             <div className="evaluation-section mt-4 pt-3 border-top">
-                                <div className="p-3 rounded-3" style={{
-                                    background: (submission.status === 'Completed' || submission.status === 'Complete') ? '#f0fdf4' : '#fff1f2',
-                                    borderLeft: `4px solid ${(submission.status === 'Completed' || submission.status === 'Complete') ? '#22c55e' : '#ef4444'}`
-                                }}>
+                                <div
+                                    className="p-3 rounded-3"
+                                    style={{
+                                        background:
+                                            submission.status === 'Completed' || submission.status === 'Complete'
+                                                ? '#f0fdf4'
+                                                : submission.status === 'Incomplete'
+                                                  ? '#fffbeb'
+                                                  : '#fff1f2',
+                                        borderLeft: `4px solid ${
+                                            submission.status === 'Completed' || submission.status === 'Complete'
+                                                ? '#22c55e'
+                                                : submission.status === 'Incomplete'
+                                                  ? '#f59e0b'
+                                                  : '#ef4444'
+                                        }`,
+                                    }}
+                                >
                                     <div className="fw-bold text-dark mb-1 d-flex align-items-center gap-2" style={{ fontSize: '0.8rem' }}>
                                         <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>feedback</span>
                                         Supervisor Evaluation
                                     </div>
+                                    {(submission.evaluated_by_name || '').trim() ? (
+                                        <div className="text-muted small mb-2" style={{ fontSize: '0.8rem' }}>
+                                            <span className="fw-semibold text-dark">Evaluated by:</span>{' '}
+                                            {String(submission.evaluated_by_name).trim()}
+                                            {submission.evaluation_date
+                                                ? ` · ${formatDate(submission.evaluation_date)}`
+                                                : ''}
+                                        </div>
+                                    ) : null}
                                     <p className="mb-0 text-dark small" style={{ lineHeight: '1.4', fontStyle: 'italic' }}>
                                         {submission.reviewer_notes ? `"${submission.reviewer_notes}"` : 'No comments provided.'}
                                     </p>
@@ -141,8 +165,10 @@ export default function SubmissionDetailModal({ show, onHide, submission: propSu
                     <div className="text-center py-4 text-muted">No submission found for this task.</div>
                 )}
             </Modal.Body>
-            <Modal.Footer className="border-0 bg-light p-3 d-flex justify-content-between">
-                {(submission?.status === 'Returned') ? (
+            <Modal.Footer className="border-0 bg-light p-3 d-flex justify-content-between flex-wrap gap-2">
+                {(submission?.status === 'Returned' ||
+                    submission?.status === 'Incomplete' ||
+                    submission?.status === 'Under Review') ? (
                     <Button variant="warning" className="fw-bold shadow-sm d-flex align-items-center gap-2" style={{ borderRadius: '8px', color: '#854d0e' }}
                         onClick={() => {
                             if (onRevise) {
@@ -152,7 +178,7 @@ export default function SubmissionDetailModal({ show, onHide, submission: propSu
                             }
                         }}>
                         <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>edit</span>
-                        Resubmit
+                        {submission?.status === 'Under Review' ? 'Submit an update' : 'Resubmit'}
                     </Button>
                 ) : <div></div>}
 

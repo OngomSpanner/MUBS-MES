@@ -132,23 +132,22 @@ export default function ReportsView() {
         }
     };
 
-    useEffect(() => {
-        if (activeTab === 'trends') {
-            fetchStrategicOverview();
-        }
-    }, [activeTab]);
-
-    const getScoreBadge = (score: string) => {
+    const getScoreBadge = (score: string): { bg: string; color: string } => {
         const styles: { [key: string]: { bg: string; color: string } } = {
             'Excellent': { bg: '#dcfce7', color: '#15803d' },
             'Good': { bg: '#fef9c3', color: '#a16207' },
             'Fair': { bg: '#fde8d8', color: '#c2410c' },
             'Poor': { bg: '#fee2e2', color: '#b91c1c' }
         };
-        return styles[score] || { bg: '#f1f5f9', color: '#475569' };
+        return styles[score as keyof typeof styles] || { bg: '#f1f5f9', color: '#475569' };
     };
 
-    // ── Export helpers ─────────────────────────────────────────────
+    useEffect(() => {
+        if (activeTab === 'trends') {
+            fetchStrategicOverview();
+        }
+    }, [activeTab]);
+
     const exportExcel = (dataset: 'departments' | 'staff', filename: string) => {
         const rows = dataset === 'departments'
             ? filteredUnitSummaries.map(u => ({
@@ -433,9 +432,6 @@ export default function ReportsView() {
                     {reportCards.map((card, index) => (
                         <div className="col-12 col-md-6 col-xl-3" key={index}>
                             <div className="stat-card" style={{ borderLeftColor: card.color, cursor: 'pointer' }}>
-                                <div className="stat-icon mb-3" style={{ background: '#eff6ff' }}>
-                                    <span className="material-symbols-outlined" style={{ color: card.color }}>{card.icon}</span>
-                                </div>
                                 <div className="stat-label">Report Type</div>
                                 <div className="fw-bold text-dark" style={{ fontSize: '1rem', marginTop: '4px' }}>{card.title}</div>
                                 <div className="text-muted mt-1" style={{ fontSize: '.75rem' }}>{card.description}</div>

@@ -16,8 +16,12 @@ interface SubmissionItem {
     description: string;
     reviewer_notes: string;
     task_description?: string;
+    instruction?: string | null;
     start_date?: string;
     end_date?: string;
+    evaluated_by_name?: string | null;
+    evaluation_date?: string | null;
+    assignment_type?: 'legacy' | 'process_task';
 }
 
 interface Stats {
@@ -109,13 +113,14 @@ export default function StaffSubmissions() {
                     setShowSubModal(false);
                     setSelectedItem(null);
                 }}
-                task={selectedItem ? { 
-                    id: selectedItem.task_id, 
-                    title: selectedItem.report_name, 
+                task={selectedItem ? {
+                    id: selectedItem.task_id,
+                    title: selectedItem.report_name,
                     status: selectedItem.status,
-                    description: selectedItem.task_description,
+                    instruction: selectedItem.instruction ?? null,
                     startDate: selectedItem.start_date,
-                    dueDate: selectedItem.end_date
+                    dueDate: selectedItem.end_date,
+                    assignment_type: selectedItem.assignment_type ?? 'legacy',
                 } : null}
                 onSuccess={() => {
                     setShowSubModal(false);
@@ -183,7 +188,6 @@ export default function StaffSubmissions() {
                             <tr>
                                 <th className="ps-4">Report / Task Name</th>
                                 <th>Submitted Date</th>
-                                <th>Reported Progress</th>
                                 <th>Status</th>
                                 <th className="pe-4 text-end">Actions</th>
                             </tr>
@@ -191,7 +195,7 @@ export default function StaffSubmissions() {
                         <tbody>
                             {filteredSubmissions.length === 0 ? (
                                 <tr>
-                                    <td colSpan={5} className="text-center py-5 text-muted">
+                                    <td colSpan={4} className="text-center py-5 text-muted">
                                         <span className="material-symbols-outlined d-block mb-2 text-secondary" style={{ fontSize: '32px' }}>inbox</span>
                                         No submissions found matching this status.
                                     </td>
@@ -203,14 +207,6 @@ export default function StaffSubmissions() {
                                             <div className="fw-bold text-dark" style={{ fontSize: '.85rem' }}>{item.report_name}</div>
                                         </td>
                                         <td style={{ fontSize: '.8rem', color: '#64748b' }}>{formatDate(item.submitted_at)}</td>
-                                        <td>
-                                            <div className="d-flex align-items-center gap-2">
-                                                <div className="progress flex-fill" style={{ height: '6px' }}>
-                                                    <div className="progress-bar bg-primary" style={{ width: `${item.progress || 0}%` }}></div>
-                                                </div>
-                                                <span className="fw-bold text-muted" style={{ fontSize: '.7rem' }}>{item.progress || 0}%</span>
-                                            </div>
-                                        </td>
                                          <td>{getStatusBadge(item.status)}</td>
                                         <td className="pe-4 text-end">
                                             <div className="d-flex gap-2 justify-content-end">

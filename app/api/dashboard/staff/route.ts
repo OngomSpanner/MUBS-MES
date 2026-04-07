@@ -5,8 +5,6 @@ import { verifyToken } from '@/lib/auth';
 
 export const dynamic = 'force-dynamic';
 
-const ratingToScore: Record<string, number> = { excellent: 5, good: 4, satisfactory: 3, needs_improvement: 2, poor: 1 };
-
 function formatRelative(dateStr: string): string {
     const d = new Date(dateStr);
     const now = new Date();
@@ -19,6 +17,52 @@ function formatRelative(dateStr: string): string {
     return d.toLocaleDateString();
 }
 
+const statusMap: Record<string, string> = {
+    pending: 'Pending',
+    accepted: 'Pending',
+    in_progress: 'In Progress',
+    submitted: 'Under Review',
+    evaluated: 'Completed',
+    completed: 'Completed',
+    overdue: 'Delayed',
+    returned: 'Returned',
+    incomplete: 'Incomplete',
+    not_done: 'Not Done',
+    draft_definition: 'Action Required',
+};
+
+function statusFromReportStatus(status: string | null): string | null {
+    if (!status) return null;
+    const s = (status + '').toLowerCase();
+    if (s === 'evaluated' || s === 'completed') return 'Completed';
+    if (s === 'incomplete') return 'Incomplete';
+    if (s === 'not_done') return 'Not Done';
+    if (s === 'returned') return 'Returned';
+    return null;
+}
+
+type RawTaskRow = {
+    id: number;
+    title: string;
+    description?: string | null;
+    instruction?: string | null;
+    dueDate: string | null;
+    db_status: string;
+    latest_report_status?: string | null;
+    progress?: number | null;
+    assignment_type: 'legacy' | 'process_task';
+};
+
+function enhanceTaskRows(rows: RawTaskRow[]) {
+    return rows.map((task) => {
+        const derivedStatus = statusFromReportStatus(task.latest_report_status ?? null);
+        const status = derivedStatus ?? statusMap[String(task.db_status || '').toLowerCase()] ?? 'Not Started';
+        const referenceDate = new Date(task.dueDate || new Date());
+        const daysLeft = Math.ceil((referenceDate.getTime() - new Date().getTime()) / (1000 * 3600 * 24));
+        return { ...task, status, daysLeft };
+    });
+}
+
 export async function GET() {
     try {
         const cookieStore = await cookies();
@@ -29,7 +73,6 @@ export async function GET() {
         if (!decoded || !decoded.userId) throw new Error('Invalid token');
         const userId = decoded.userId;
 
-        // 0. Staff user info for welcome message (name, department)
         const userRows = await query({
             query: `
                 SELECT u.full_name, u.position, d.name as department_name
@@ -37,68 +80,111 @@ export async function GET() {
                 LEFT JOIN departments d ON d.id = u.department_id
                 WHERE u.id = ?
             `,
-            values: [userId]
+            values: [userId],
         }) as any[];
         const staffUser = userRows?.[0];
         const fullName = staffUser?.full_name?.trim() || 'Staff';
         const position = staffUser?.position?.trim() || null;
         const departmentName = staffUser?.department_name?.trim() || null;
 
-        // 1. Task stats from assigned activities only
-        const taskStats = await query({
+        const legacyRows = (await query({
             query: `
                 SELECT 
-                    COUNT(*) as total,
-                    SUM(CASE WHEN aa.status IN ('completed','evaluated') OR (aa.status = 'submitted' AND sa.progress >= 100) THEN 1 ELSE 0 END) as completed,
-                    SUM(CASE WHEN aa.status IN ('in_progress','accepted','pending') AND (aa.end_date >= CURDATE()) THEN 1 ELSE 0 END) as inProgress,
-                    SUM(CASE WHEN aa.end_date < CURDATE() AND aa.status NOT IN ('completed') THEN 1 ELSE 0 END) as overdue
-                FROM activity_assignments aa
-                JOIN strategic_activities sa ON aa.activity_id = sa.id
-                WHERE aa.assigned_to_user_id = ?
-            `,
-            values: [userId]
-        }) as any[];
-
-        const stats = {
-            assigned: Number(taskStats[0]?.total || 0),
-            overdue: Number(taskStats[0]?.overdue || 0),
-            inProgress: Number(taskStats[0]?.inProgress || 0),
-            completed: Number(taskStats[0]?.completed || 0)
-        };
-
-        // 2. Upcoming deadlines (assigned tasks not completed)
-        const deadlinesRaw = await query({
-            query: `
-                SELECT 
-                    sa.id,
+                    aa.id,
                     sa.title,
                     sa.description,
-                    aa.end_date as dueDate,
+                    NULL as instruction,
+                    COALESCE(aa.end_date, sa.end_date) as dueDate,
                     aa.status as db_status,
+                    (SELECT sr2.status FROM staff_reports sr2 WHERE sr2.activity_assignment_id = aa.id ORDER BY sr2.updated_at DESC LIMIT 1) as latest_report_status,
                     sa.progress,
-                    DATEDIFF(aa.end_date, CURDATE()) as daysLeft
+                    'legacy' as assignment_type
                 FROM activity_assignments aa
                 JOIN strategic_activities sa ON aa.activity_id = sa.id
                 WHERE aa.assigned_to_user_id = ?
-                AND aa.status NOT IN ('completed')
-                ORDER BY aa.end_date ASC
-                LIMIT 10
             `,
-            values: [userId]
-        }) as any[];
+            values: [userId],
+        })) as RawTaskRow[];
 
-        const deadlines = deadlinesRaw.map((d: any) => ({
-            id: d.id,
-            title: d.title,
-            description: d.description || '',
-            dueDate: d.dueDate,
-            status: d.daysLeft < 0 ? 'Delayed' : (d.db_status === 'submitted' ? 'Under Review' : 'In Progress'),
-            progress: Number(d.progress || 0),
-            daysLeft: Number(d.daysLeft)
-        }));
+        const processAssignBase = `
+                SELECT 
+                    spa.id,
+                    sp.step_name as title,
+                    sa.description as description,
+                    __PI_COL__
+                    spa.end_date as dueDate,
+                    spa.status as db_status,
+                    (SELECT sr2.status FROM staff_reports sr2 WHERE sr2.process_assignment_id = spa.id ORDER BY sr2.updated_at DESC LIMIT 1) as latest_report_status,
+                    0 as progress,
+                    'process_task' as assignment_type
+                FROM staff_process_assignments spa
+                JOIN standard_processes sp ON spa.standard_process_id = sp.id
+                JOIN standards st ON sp.standard_id = st.id
+                JOIN strategic_activities sa ON spa.activity_id = sa.id
+                WHERE spa.staff_id = ? AND spa.start_date IS NOT NULL
+            `;
+        let processRows: RawTaskRow[];
+        try {
+            processRows = (await query({
+                query: processAssignBase.replace('__PI_COL__', 'st.performance_indicator as instruction,\n                    '),
+                values: [userId],
+            })) as RawTaskRow[];
+        } catch (e: unknown) {
+            const err = e as { code?: string; errno?: number };
+            if (err?.code === 'ER_BAD_FIELD_ERROR' || err?.errno === 1054) {
+                processRows = (await query({
+                    query: processAssignBase.replace('__PI_COL__', ''),
+                    values: [userId],
+                })) as RawTaskRow[];
+                processRows = processRows.map((r) => ({ ...r, instruction: null }));
+            } else {
+                throw e;
+            }
+        }
 
-        // 3. Recent feedback (evaluated reports for this user)
-        const feedbackRaw = await query({
+        const enhancedTasks = enhanceTaskRows([...legacyRows, ...processRows]);
+
+        const stats = {
+            assigned: enhancedTasks.length,
+            overdue: enhancedTasks.filter(
+                (t) => t.daysLeft < 0 && t.status !== 'Completed' && t.status !== 'Under Review'
+            ).length,
+            inProgress: enhancedTasks.filter((t) => t.status === 'In Progress').length,
+            completed: enhancedTasks.filter((t) => t.status === 'Completed').length,
+        };
+
+        const deadlines = enhancedTasks
+            .filter((t) => t.status !== 'Completed')
+            .sort((a, b) => {
+                const dateA = new Date(a.dueDate || '9999-12-31').getTime();
+                const dateB = new Date(b.dueDate || '9999-12-31').getTime();
+                return dateA - dateB;
+            })
+            .slice(0, 10)
+            .map((t) => {
+                const displayStatus =
+                    t.daysLeft < 0 ? 'Delayed' : t.status === 'Under Review' ? 'Under Review' : 'In Progress';
+                const progress =
+                    t.assignment_type === 'process_task'
+                        ? t.status === 'Completed'
+                            ? 100
+                            : t.status === 'Under Review'
+                              ? 50
+                              : 0
+                        : Number(t.progress || 0);
+                return {
+                    id: t.id,
+                    title: t.title,
+                    description: (t.description || t.instruction || '').toString(),
+                    dueDate: t.dueDate,
+                    status: displayStatus,
+                    progress,
+                    daysLeft: t.daysLeft,
+                    assignment_type: t.assignment_type,
+                };
+            });
+
+        const feedbackLegacy = (await query({
             query: `
                 SELECT 
                     sr.id,
@@ -113,19 +199,45 @@ export async function GET() {
                 LEFT JOIN evaluations e ON e.staff_report_id = sr.id
                 WHERE aa.assigned_to_user_id = ?
                 AND (sr.status IN ('evaluated', 'acknowledged') OR (sr.status = 'draft' AND e.id IS NOT NULL))
-                ORDER BY evaluated_at DESC
-                LIMIT 5
             `,
-            values: [userId]
-        }) as any[];
+            values: [userId],
+        })) as any[];
 
-        const feedback = feedbackRaw.map((f: any) => {
-            const status = f.db_status === 'evaluated' || f.db_status === 'acknowledged' ? 'Completed' : 'Returned';
+        const feedbackProcess = (await query({
+            query: `
+                SELECT 
+                    sr.id,
+                    CONCAT(sa.title, ' — ', sp.step_name) as report_name,
+                    COALESCE(e.evaluation_date, sr.updated_at) as evaluated_at,
+                    sr.status as db_status,
+                    e.rating,
+                    e.qualitative_feedback
+                FROM staff_reports sr
+                JOIN staff_process_assignments spa ON sr.process_assignment_id = spa.id
+                JOIN strategic_activities sa ON spa.activity_id = sa.id
+                JOIN standard_processes sp ON spa.standard_process_id = sp.id
+                LEFT JOIN evaluations e ON e.staff_report_id = sr.id
+                WHERE spa.staff_id = ?
+                AND (sr.status IN ('evaluated', 'acknowledged') OR (sr.status = 'draft' AND e.id IS NOT NULL))
+            `,
+            values: [userId],
+        })) as any[];
+
+        const feedbackCombined = [...feedbackLegacy, ...feedbackProcess]
+            .sort(
+                (a, b) =>
+                    new Date(b.evaluated_at).getTime() - new Date(a.evaluated_at).getTime()
+            )
+            .slice(0, 5);
+
+        const feedback = feedbackCombined.map((f: any) => {
+            const status =
+                f.db_status === 'evaluated' || f.db_status === 'acknowledged' ? 'Completed' : 'Returned';
             return {
                 id: f.id,
                 task: f.report_name,
                 status,
-                date: formatRelative(f.evaluated_at)
+                date: formatRelative(f.evaluated_at),
             };
         });
 
@@ -133,7 +245,7 @@ export async function GET() {
             user: { fullName, position, departmentName },
             stats,
             deadlines,
-            feedback
+            feedback,
         });
     } catch (error: any) {
         console.error('Staff Dashboard API Error:', error);

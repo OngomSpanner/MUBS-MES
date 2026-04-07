@@ -21,9 +21,16 @@ function LayoutContent({ children, sidebarOpen, setSidebarOpen }: any) {
 
   const getPageTitle = () => {
     const key = getPageKey();
+    if (key === 'strategic' && pathname.startsWith('/admin')) {
+      return 'Standard and Activities';
+    }
+    if (key === 'strategic' && pathname.startsWith('/principal')) {
+      return 'Strategic Summary';
+    }
     const pageTitles: { [key: string]: string } = {
       'dashboard': 'Dashboard Overview',
       'strategic': 'Strategic Activities',
+      'standards': 'Standards & Objectives',
       'committee': 'Committee Reports',
       'tracking': 'Budget Tracking',
       'users': 'User Management',

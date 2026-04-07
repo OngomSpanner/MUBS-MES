@@ -22,6 +22,7 @@ export async function GET() {
                     sa.id as activity_id,
                     sa.title,
                     sa.description,
+                    NULL as instruction,
                     COALESCE(sa.start_date, p.start_date) as startDate,
                     COALESCE(sa.end_date, p.end_date) as dueDate,
                     aa.status as db_status,
@@ -31,14 +32,47 @@ export async function GET() {
                     sa.task_type,
                     sa.kpi_target_value,
                     sa.frequency,
+                    p.title as activity_title,
                     p.status as parent_status,
-                    d.name as unit_name
+                    d.name as unit_name,
+                    'legacy' as assignment_type
                 FROM activity_assignments aa
                 JOIN strategic_activities sa ON aa.activity_id = sa.id
                 LEFT JOIN strategic_activities p ON sa.parent_id = p.id
                 LEFT JOIN departments d ON sa.department_id = d.id
                 WHERE aa.assigned_to_user_id = ?
-                ORDER BY aa.end_date ASC
+            `,
+            values: [decoded.userId]
+        }) as any[];
+
+        // Fetch process (standard_process) assignments
+        const processAssignmentsQuery = await query({
+            query: `
+                SELECT 
+                    spa.id,
+                    sa.id as activity_id,
+                    sp.step_name as title,
+                    sa.description as description,
+                    st.performance_indicator as instruction,
+                    spa.start_date as startDate,
+                    spa.end_date as dueDate,
+                    spa.status as db_status,
+                    (SELECT sr2.status FROM staff_reports sr2 WHERE sr2.process_assignment_id = spa.id ORDER BY sr2.updated_at DESC LIMIT 1) as latest_report_status,
+                    0 as progress,
+                    NULL as parent_id,
+                    'process' as task_type,
+                    NULL as kpi_target_value,
+                    'once' as frequency,
+                    sa.title as activity_title,
+                    'Strategic Plan' as parent_status,
+                    d.name as unit_name,
+                    'process_task' as assignment_type
+                FROM staff_process_assignments spa
+                JOIN standard_processes sp ON spa.standard_process_id = sp.id
+                JOIN standards st ON sp.standard_id = st.id
+                JOIN strategic_activities sa ON spa.activity_id = sa.id
+                LEFT JOIN departments d ON sa.department_id = d.id
+                WHERE spa.staff_id = ? AND spa.start_date IS NOT NULL
             `,
             values: [decoded.userId]
         }) as any[];
@@ -53,7 +87,8 @@ export async function GET() {
             'overdue': 'Delayed',
             'returned': 'Returned',
             'incomplete': 'Incomplete',
-            'not_done': 'Not Done'
+            'not_done': 'Not Done',
+            'draft_definition': 'Action Required'
         };
 
         const statusFromReportStatus = (status: string | null): string | null => {
@@ -73,17 +108,31 @@ export async function GET() {
             'monthly': 'Monthly Task'
         };
 
-        // Two-tier flat: tasks with parent_id are Weekly Tasks under a Strategic Activity.
-        const enhancedTasks = tasksQuery.map((task: any) => {
+        const allTasks = [...tasksQuery, ...processAssignmentsQuery];
+
+        // Sort by dueDate
+        allTasks.sort((a, b) => {
+            const dateA = new Date(a.dueDate || '9999-12-31').getTime();
+            const dateB = new Date(b.dueDate || '9999-12-31').getTime();
+            return dateA - dateB;
+        });
+
+        // Timeline / days-left: always from this assignment's due date (process window or activity end),
+        // not the strategic-plan fiscal year — so Notifications & Deadlines matches assigned work only.
+        const enhancedTasks = allTasks.map((task: any) => {
             const derivedStatus = statusFromReportStatus(task.latest_report_status);
             const status = derivedStatus ?? statusMap[task.db_status] ?? 'Not Started';
+
+            const isProcessTask = task.assignment_type === 'process_task';
+            const referenceDate = new Date(task.dueDate || new Date());
+            const daysLeft = Math.ceil((referenceDate.getTime() - new Date().getTime()) / (1000 * 3600 * 24));
 
             return {
                 ...task,
                 status,
-                type: frequencyMap[task.frequency] || (task.parent_id ? 'Weekly Task' : 'Once'),
-                tier: task.parent_id ? 'weekly_task' : null,
-                daysLeft: Math.ceil((new Date(task.dueDate || new Date()).getTime() - new Date().getTime()) / (1000 * 3600 * 24)),
+                type: isProcessTask ? 'Process' : (frequencyMap[task.frequency] || (task.parent_id ? 'Weekly Task' : 'Once')),
+                tier: task.parent_id ? 'weekly_task' : (isProcessTask ? 'process_task' : null),
+                daysLeft,
                 unit_name: task.unit_name || 'N/A'
             };
         });
@@ -91,7 +140,7 @@ export async function GET() {
         // Aggregated stats
         const stats = {
             assigned: enhancedTasks.length,
-            overdue: enhancedTasks.filter((t: any) => t.daysLeft < 0 && t.status !== 'Completed').length,
+            overdue: enhancedTasks.filter((t: any) => t.daysLeft < 0 && t.status !== 'Completed' && t.status !== 'Under Review').length,
             inProgress: enhancedTasks.filter((t: any) => t.status === 'In Progress').length,
             completed: enhancedTasks.filter((t: any) => t.status === 'Completed').length
         };

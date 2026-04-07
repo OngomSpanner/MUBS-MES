@@ -3,6 +3,24 @@ import { query } from '@/lib/db';
 import { cookies } from 'next/headers';
 import { verifyToken } from '@/lib/auth';
 import { getVisibleDepartmentIds, inPlaceholders } from '@/lib/department-head';
+import {
+    computeCompleteEvaluationMetrics,
+    mergeEvaluationFeedback,
+    ratingForCompleteMetrics,
+} from '@/lib/evaluation-scoring';
+
+async function appendSubmissionFeedbackLog(staffReportId: number, authorUserId: number, body: string) {
+    const text = String(body || '').trim();
+    if (!text) return;
+    try {
+        await query({
+            query: `INSERT INTO submission_feedback_events (staff_report_id, author_user_id, body) VALUES (?, ?, ?)`,
+            values: [staffReportId, authorUserId, text],
+        });
+    } catch {
+        /* submission_feedback_events optional until migration */
+    }
+}
 
 export async function GET(req: Request) {
     try {
@@ -23,64 +41,50 @@ export async function GET(req: Request) {
         const searchParams = new URL(req.url).searchParams;
         const taskId = searchParams.get('taskId');
 
-        let evaluationsQuery: any[];
-        try {
-            evaluationsQuery = await query({
-                query: `
-                    SELECT 
-                        sr.id,
-                        sa.title as report_name,
-                        p.title as activity_title,
-                        u.full_name as staff_name,
-                        sr.updated_at as submitted_at,
-                        sr.status as db_status,
-                        sr.progress_percentage as progress,
-                        sr.achievements as report_summary,
-                        sr.attachments,
-                        e.score,
-                        e.metrics_achieved,
-                        e.metrics_target,
-                        e.qualitative_feedback as reviewer_notes,
-                        e.rating,
-                        sa.task_type,
-                        sr.kpi_actual_value
-                    FROM staff_reports sr
-                    JOIN activity_assignments aa ON sr.activity_assignment_id = aa.id
-                    JOIN strategic_activities sa ON aa.activity_id = sa.id
-                    LEFT JOIN strategic_activities p ON sa.parent_id = p.id
-                    JOIN users u ON aa.assigned_to_user_id = u.id
-                    LEFT JOIN evaluations e ON e.staff_report_id = sr.id
-                    WHERE (sa.department_id IN (${placeholders}) OR p.department_id IN (${placeholders}))
-                    AND (sr.status IN ('submitted', 'evaluated', 'incomplete', 'not_done') OR (sr.status = 'draft' AND e.id IS NOT NULL))
-                    ${taskId ? 'AND sa.id = ?' : ''}
-                    ORDER BY sr.updated_at DESC
-                `,
-                values: [...departmentIds, ...departmentIds, ...(taskId ? [taskId] : [])]
-            }) as any[];
-        } catch (err: any) {
-            if (err?.message?.includes('task_type') || err?.message?.includes('kpi_actual_value') || err?.message?.includes('incomplete') || err?.message?.includes('not_done') || err?.code === 'ER_BAD_FIELD_ERROR' || err?.code === 'ER_TRUNCATED_WRONG_VALUE_FOR_FIELD') {
-                evaluationsQuery = await query({
-                    query: `
-                        SELECT sr.id, sa.title as report_name, p.title as activity_title, u.full_name as staff_name, sr.updated_at as submitted_at,
-                        sr.status as db_status, sr.progress_percentage as progress, sr.achievements as report_summary, sr.attachments,
-                        e.score, e.qualitative_feedback as reviewer_notes, e.rating
-                        FROM staff_reports sr
-                        JOIN activity_assignments aa ON sr.activity_assignment_id = aa.id
-                        JOIN strategic_activities sa ON aa.activity_id = sa.id
-                        LEFT JOIN strategic_activities p ON sa.parent_id = p.id
-                        JOIN users u ON aa.assigned_to_user_id = u.id
-                        LEFT JOIN evaluations e ON e.staff_report_id = sr.id
-                        WHERE (sa.department_id IN (${placeholders}) OR p.department_id IN (${placeholders}))
-                        AND (sr.status IN ('submitted', 'evaluated') OR (sr.status = 'draft' AND e.id IS NOT NULL))
-                        ORDER BY sr.updated_at DESC
-                    `,
-                    values: [...departmentIds, ...departmentIds]
-                }) as any[];
-                evaluationsQuery = evaluationsQuery.map((e: any) => ({ ...e, task_type: 'process', kpi_actual_value: null }));
-            } else {
-                throw err;
-            }
-        }
+        const evaluationsQuery = await query({
+            query: `
+                SELECT 
+                    sr.id,
+                    COALESCE(sa.title, sp.step_name) as report_name,
+                    COALESCE(p.title, psa_sa.title) as activity_title,
+                    u.full_name as staff_name,
+                    sr.updated_at as submitted_at,
+                    sr.status as db_status,
+                    sr.progress_percentage as progress,
+                    sr.achievements as report_summary,
+                    sr.attachments,
+                    e.score,
+                    e.metrics_achieved,
+                    e.metrics_target,
+                    e.qualitative_feedback as reviewer_notes,
+                    e.rating,
+                    COALESCE(sa.task_type, 'process') as task_type,
+                    sr.kpi_actual_value
+                FROM staff_reports sr
+                LEFT JOIN activity_assignments aa ON sr.activity_assignment_id = aa.id
+                LEFT JOIN strategic_activities sa ON aa.activity_id = sa.id
+                LEFT JOIN strategic_activities p ON sa.parent_id = p.id
+                LEFT JOIN staff_process_assignments spa ON sr.process_assignment_id = spa.id
+                LEFT JOIN standard_processes sp ON spa.standard_process_id = sp.id
+                LEFT JOIN strategic_activities psa_sa ON spa.activity_id = psa_sa.id
+                JOIN users u ON COALESCE(aa.assigned_to_user_id, spa.staff_id) = u.id
+                LEFT JOIN evaluations e ON e.staff_report_id = sr.id
+                WHERE (sa.department_id IN (${placeholders}) OR p.department_id IN (${placeholders}) OR psa_sa.department_id IN (${placeholders}))
+                AND (sr.status IN ('submitted', 'evaluated', 'incomplete', 'not_done') OR (sr.status = 'draft' AND e.id IS NOT NULL))
+                ${
+                    taskId
+                        ? 'AND (sa.id = ? OR psa_sa.id = ? OR spa.id = ? OR aa.id = ?)'
+                        : ''
+                }
+                ORDER BY sr.updated_at DESC
+            `,
+            values: [
+                ...departmentIds,
+                ...departmentIds,
+                ...departmentIds,
+                ...(taskId ? [taskId, taskId, taskId, taskId] : []),
+            ]
+        }) as any[];
 
         // Progress in list: same scale as Department Efficiency — use evaluation outcome when evaluated, else staff-reported progress_percentage
         const progressFromDbStatus = (dbStatus: string | null): number | null => {
@@ -132,12 +136,6 @@ const ratingFromScore = (score: number): 'poor' | 'needs_improvement' | 'satisfa
     return 'excellent';
 };
 
-const ratingFromScore02 = (score: number): 'poor' | 'needs_improvement' | 'excellent' => {
-    if (score <= 0) return 'poor';
-    if (score <= 1) return 'needs_improvement';
-    return 'excellent';
-};
-
 export async function PUT(req: Request) {
     try {
         const cookieStore = await cookies();
@@ -167,8 +165,9 @@ export async function PUT(req: Request) {
         // Performance scale: Complete = 2 pts, Incomplete = 1 pt, Not Done = 0 pts
         const validScores = [0, 1, 2];
         const scoreNum = score != null ? Number(score) : null;
-        if (status === 'Complete' && (scoreNum !== 2)) {
-            return NextResponse.json({ message: 'Complete must be submitted with 2 points.' }, { status: 400 });
+        // Complete: client sends score 2 as "approve" intent; actual points (1 or 2) are computed from dates.
+        if (status === 'Complete' && scoreNum !== 2) {
+            return NextResponse.json({ message: 'Complete must be submitted as a full approval (2 pt intent).' }, { status: 400 });
         }
         if (status === 'Incomplete' && (scoreNum !== 1)) {
             return NextResponse.json({ message: 'Incomplete must be submitted with 1 point.' }, { status: 400 });
@@ -179,6 +178,10 @@ export async function PUT(req: Request) {
         if (!validScores.includes(scoreNum as number)) {
             return NextResponse.json({ message: 'Score must be 0, 1, or 2 (Not Done, Incomplete, Complete).' }, { status: 400 });
         }
+
+        let appliedCompleteScore: number | undefined;
+        let delayedHodNoteApplied = false;
+
         if ((status === 'Incomplete' || legacyReturned) && (!reviewer_notes || String(reviewer_notes).trim() === '')) {
             return NextResponse.json({ message: 'Comment is required when marking Incomplete.' }, { status: 400 });
         }
@@ -186,13 +189,19 @@ export async function PUT(req: Request) {
         const placeholders = inPlaceholders(departmentIds.length);
         const reportCheck = await query({
             query: `
-                SELECT sr.id, sr.activity_assignment_id as activity_assignment_id,
-                    aa.activity_id as task_id, sa.id as sa_id, sa.task_type, sa.parent_id as strategic_activity_id
+                SELECT sr.id, sr.activity_assignment_id, sr.process_assignment_id,
+                    COALESCE(aa.activity_id, spa.activity_id) as task_id, 
+                    COALESCE(sa.id, psa_sa.id) as sa_id, 
+                    COALESCE(sa.task_type, 'process') as task_type, 
+                    COALESCE(sa.parent_id, psa_sa.parent_id) as strategic_activity_id,
+                    COALESCE(sr.submitted_at, sr.updated_at) as staff_submitted_at,
+                    COALESCE(aa.end_date, spa.end_date) as assignment_end_date
                 FROM staff_reports sr
-                JOIN activity_assignments aa ON sr.activity_assignment_id = aa.id
-                JOIN strategic_activities sa ON aa.activity_id = sa.id
-                LEFT JOIN strategic_activities p ON sa.parent_id = p.id
-                WHERE sr.id = ? AND (sa.department_id IN (${placeholders}) OR p.department_id IN (${placeholders}))
+                LEFT JOIN activity_assignments aa ON sr.activity_assignment_id = aa.id
+                LEFT JOIN strategic_activities sa ON aa.activity_id = sa.id
+                LEFT JOIN staff_process_assignments spa ON sr.process_assignment_id = spa.id
+                LEFT JOIN strategic_activities psa_sa ON spa.activity_id = psa_sa.id
+                WHERE sr.id = ? AND (sa.department_id IN (${placeholders}) OR psa_sa.department_id IN (${placeholders}))
             `,
             values: [staffReportId, ...departmentIds, ...departmentIds]
         }) as any[];
@@ -202,10 +211,10 @@ export async function PUT(req: Request) {
 
         const row = reportCheck[0];
         const taskType = row.task_type;
-        // Task id: same as activity_id for the assignment; used to update strategic_activities.progress (shown on Department Tasks)
         const taskId = Number(row.task_id ?? row.sa_id ?? 0) || null;
         const parentId = row.strategic_activity_id;
         const assignmentId = row.activity_assignment_id;
+        const processAssignmentId = row.process_assignment_id;
         // When HOD marks Complete, task progress is set to 100% for Department Tasks display
         const taskProgressWhenComplete = 100;
         const isKpiDriver = taskType === 'kpi_driver';
@@ -247,18 +256,24 @@ export async function PUT(req: Request) {
                     values: [staffReportId, userId, notes, ratingInc]
                 });
             }
-            // Task progress = 50% (1/2 points) so Department Tasks matches Department Efficiency card
-            const updateTaskId = await resolveTaskId();
-            if (updateTaskId) {
+            await appendSubmissionFeedbackLog(staffReportId, userId, notes);
+
+            // Update assignment status for Incomplete
+            if (assignmentId) {
                 await query({
-                    query: 'UPDATE strategic_activities SET progress = 50, status = ? WHERE id = ?',
-                    values: ['in_progress', updateTaskId]
+                    query: 'UPDATE activity_assignments SET status = ? WHERE id = ?',
+                    values: ['incomplete', assignmentId]
                 });
             }
-            return NextResponse.json({ message: 'Marked as Incomplete. Staff can see your comment and resubmit.' });
+            if (processAssignmentId) {
+                await query({
+                    query: 'UPDATE staff_process_assignments SET status = ? WHERE id = ?',
+                    values: ['incomplete', processAssignmentId]
+                });
+            }
         }
 
-        if (status === 'Not Done') {
+        else if (status === 'Not Done') {
             await query({
                 query: 'UPDATE staff_reports SET status = ? WHERE id = ?',
                 values: ['not_done', staffReportId]
@@ -277,104 +292,156 @@ export async function PUT(req: Request) {
                 await query({
                     query: `INSERT INTO evaluations (staff_report_id, evaluated_by, qualitative_feedback, metrics_achieved, metrics_target, rating, created_at) VALUES (?, ?, ?, 0, 2, ?, CURRENT_TIMESTAMP)`,
                     values: [staffReportId, userId, reviewer_notes || '', ratingNot]
-                }); // metrics_achieved=0, metrics_target=2
-            }
-            // Task progress = 0% (0/2 points) so Department Tasks matches Department Efficiency card
-            const updateTaskId = await resolveTaskId();
-            if (updateTaskId) {
-                await query({
-                    query: 'UPDATE strategic_activities SET progress = 0, status = ? WHERE id = ?',
-                    values: ['in_progress', updateTaskId]
                 });
             }
-            return NextResponse.json({ message: 'Marked as Not Done.' });
+            await appendSubmissionFeedbackLog(staffReportId, userId, reviewer_notes || '');
+            // Update assignment status for Not Done
+            if (assignmentId) {
+                await query({
+                    query: 'UPDATE activity_assignments SET status = ? WHERE id = ?',
+                    values: ['not_done', assignmentId]
+                });
+            }
+            if (processAssignmentId) {
+                await query({
+                    query: 'UPDATE staff_process_assignments SET status = ? WHERE id = ?',
+                    values: ['not_done', processAssignmentId]
+                });
+            }
+        }
+        else if (status === 'Complete') {
+            // Complete path: set staff_reports.status = 'evaluated', store kpi_actual_value if KPI-Driver, update parent Strategic Activity actuals
+            const kpiActualNum = isKpiDriver && kpi_actual_value != null && kpi_actual_value !== '' ? Number(kpi_actual_value) : null;
+            if (kpiActualNum != null && !Number.isNaN(kpiActualNum) && parentId != null) {
+                await query({
+                    query: 'UPDATE staff_reports SET status = ?, kpi_actual_value = ? WHERE id = ?',
+                    values: ['evaluated', kpiActualNum, staffReportId]
+                });
+                await query({
+                    query: 'UPDATE strategic_activities SET actual_value = COALESCE(actual_value, 0) + ? WHERE id = ?',
+                    values: [kpiActualNum, parentId]
+                });
+            } else {
+                await query({
+                    query: 'UPDATE staff_reports SET status = ? WHERE id = ?',
+                    values: ['evaluated', staffReportId]
+                });
+            }
+
+            let metricsAchieved: 0 | 1 | 2;
+            let appendNote: string | null;
+            if (processAssignmentId) {
+                metricsAchieved = 2;
+                appendNote = null;
+            } else {
+                const computed = computeCompleteEvaluationMetrics({
+                    assignmentEnd: row.assignment_end_date,
+                    staffSubmittedAt: row.staff_submitted_at,
+                });
+                metricsAchieved = computed.metricsAchieved;
+                appendNote = computed.appendNote;
+            }
+            appliedCompleteScore = metricsAchieved;
+            delayedHodNoteApplied = Boolean(appendNote);
+            const qualitativeMerged = mergeEvaluationFeedback(reviewer_notes || '', appendNote);
+            const rating = ratingForCompleteMetrics(metricsAchieved);
+            const metricsTarget = 2;
+
+            const existingEval = await query({
+                query: 'SELECT id FROM evaluations WHERE staff_report_id = ?',
+                values: [staffReportId]
+            }) as any[];
+
+            if (existingEval.length > 0) {
+                await query({
+                    query: `
+                        UPDATE evaluations SET evaluated_by = ?, evaluation_date = CURRENT_TIMESTAMP,
+                        qualitative_feedback = ?, metrics_achieved = ?, metrics_target = ?, rating = ?
+                        WHERE staff_report_id = ?
+                    `,
+                    values: [userId, qualitativeMerged, metricsAchieved, metricsTarget, rating, staffReportId]
+                });
+            } else {
+                await query({
+                    query: `
+                        INSERT INTO evaluations (staff_report_id, evaluated_by, qualitative_feedback, metrics_achieved, metrics_target, rating, created_at)
+                        VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+                    `,
+                    values: [staffReportId, userId, qualitativeMerged, metricsAchieved, metricsTarget, rating]
+                });
+            }
+            await appendSubmissionFeedbackLog(staffReportId, userId, reviewer_notes || '');
+
+            // Update assignment status for Complete
+            if (assignmentId) {
+                await query({
+                    query: 'UPDATE activity_assignments SET status = ? WHERE id = ?',
+                    values: ['evaluated', assignmentId]
+                });
+            }
+            if (processAssignmentId) {
+                await query({
+                    query: 'UPDATE staff_process_assignments SET status = ? WHERE id = ?',
+                    values: ['evaluated', processAssignmentId]
+                });
+            }
         }
 
-        // Complete: set staff_reports.status = 'evaluated', store kpi_actual_value if KPI-Driver, update parent Strategic Activity actuals
-        const kpiActualNum = isKpiDriver && kpi_actual_value != null && kpi_actual_value !== '' ? Number(kpi_actual_value) : null;
-        if (kpiActualNum != null && !Number.isNaN(kpiActualNum) && parentId != null) {
-            await query({
-                query: 'UPDATE staff_reports SET status = ?, kpi_actual_value = ? WHERE id = ?',
-                values: ['evaluated', kpiActualNum, staffReportId]
-            });
-            await query({
-                query: 'UPDATE strategic_activities SET actual_value = COALESCE(actual_value, 0) + ? WHERE id = ?',
-                values: [kpiActualNum, parentId]
-            });
-        } else {
-            await query({
-                query: 'UPDATE staff_reports SET status = ? WHERE id = ?',
-                values: ['evaluated', staffReportId]
-            });
-        }
-
-        const rating = ratingFromScore02(Number(score)); // 2 -> excellent, 1 -> needs_improvement, 0 -> poor
-        const metricsAchieved = Number(score); // 0, 1, or 2
-        const metricsTarget = 2;
-        // status here is 'Complete'
-
-        const existingEval = await query({
-            query: 'SELECT id FROM evaluations WHERE staff_report_id = ?',
-            values: [staffReportId]
-        }) as any[];
-
-        if (existingEval.length > 0) {
-            await query({
-                query: `
-                    UPDATE evaluations SET evaluated_by = ?, evaluation_date = CURRENT_TIMESTAMP,
-                    qualitative_feedback = ?, metrics_achieved = ?, metrics_target = ?, rating = ?
-                    WHERE staff_report_id = ?
-                `,
-                values: [userId, reviewer_notes || '', metricsAchieved, metricsTarget, rating, staffReportId]
-            });
-        } else {
-            await query({
-                query: `
-                    INSERT INTO evaluations (staff_report_id, evaluated_by, qualitative_feedback, metrics_achieved, metrics_target, rating, created_at)
-                    VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
-                `,
-                values: [staffReportId, userId, reviewer_notes || '', metricsAchieved, metricsTarget, rating]
-            });
-        }
-
-        // Update task (strategic_activity row) so it shows completed in Department Tasks and Activities.
-        // If the assignment points to a parent (main activity), update the department's child task so Activities "completed_tasks" count is correct.
+        // Recalculate and update the task/activity progress (strategic_activities.progress)
         const updateTaskId = await resolveTaskId();
         let taskIdToUpdate: number | null = updateTaskId;
         let parentIdForRecalc = parentId;
 
-        if (updateTaskId) {
+        if (processAssignmentId) {
+            // Standard process assignment: recalculate based on assignments.
+            const assignments = await query({
+                query: 'SELECT status FROM staff_process_assignments WHERE activity_id = ?',
+                values: [taskId]
+            }) as any[];
+            const total = assignments.length || 1;
+            const points = assignments.reduce((acc: number, cur: any) => {
+                if (cur.status === 'evaluated') return acc + 100;
+                if (cur.status === 'incomplete') return acc + 50;
+                return acc;
+            }, 0);
+            const currentProgress = Math.round(points / total);
+            const currentStatus = currentProgress === 100 ? 'completed' : 'in_progress';
+
+            if (taskId) {
+                await query({
+                    query: 'UPDATE strategic_activities SET progress = ?, status = ? WHERE id = ?',
+                    values: [currentProgress, currentStatus, taskId]
+                });
+            }
+            parentIdForRecalc = row.strategic_activity_id;
+        } else if (updateTaskId) {
+            // Fixed outcome for standard tasks
+            const taskProgress = status === 'Complete' ? 100 : (status === 'Incomplete' ? 50 : 0);
+            const taskStatus = status === 'Complete' ? 'completed' : 'in_progress';
+            
             const rowCheck = await query({
                 query: 'SELECT id, parent_id, department_id, title, description, pillar, target_kpi, start_date, end_date, created_by FROM strategic_activities WHERE id = ?',
                 values: [updateTaskId]
             }) as any[];
             const isParentRow = rowCheck[0]?.parent_id == null;
+
             if (isParentRow) {
-                // If it's a parent row, check if it's shared (multi-dept) or just single-dept.
-                // We determine if it's shared by checking if ANY other row has this as its parent_id.
-                const otherDepts = await query({
-                    query: 'SELECT id FROM strategic_activities WHERE parent_id = ? AND department_id NOT IN (' + placeholders + ')',
-                    values: [updateTaskId, ...departmentIds]
-                }) as any[];
-                
+                // Shared activity logic: update/create department child
                 const childInDept = await query({
                     query: `SELECT id FROM strategic_activities WHERE parent_id = ? AND department_id IN (${placeholders}) ORDER BY id LIMIT 1`,
                     values: [updateTaskId, ...departmentIds]
                 }) as any[];
-                
                 let childId = childInDept[0]?.id ? Number(childInDept[0].id) : null;
-                
-                // If it's a shared goal (other depts exist or main row has different dept)
-                // and we don't have a child row for OUR dept yet, CREATE one.
-                if (!childId && (otherDepts.length > 0 || (rowCheck[0].department_id != null && !departmentIds.includes(rowCheck[0].department_id)))) {
+
+                if (!childId && (rowCheck[0].department_id != null && !departmentIds.includes(rowCheck[0].department_id))) {
                     const r = rowCheck[0];
                     const insertResult = await query({
                         query: `
                             INSERT INTO strategic_activities 
                             (activity_type, task_type, source, title, description, pillar, department_id, target_kpi, status, parent_id, progress, start_date, end_date, created_by)
-                            VALUES ('detailed', 'process', 'strategic_plan', ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?)
+                            VALUES ('detailed', 'process', 'strategic_plan', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                         `,
-                        values: [r.title, r.description, r.pillar, departmentIds[0], r.target_kpi, 'pending', updateTaskId, r.start_date, r.end_date, r.created_by]
+                        values: [r.title, r.description, r.pillar, departmentIds[0], r.target_kpi, taskStatus, updateTaskId, taskProgress, r.start_date, r.end_date, r.created_by]
                     }) as any;
                     childId = insertResult.insertId;
                 }
@@ -384,27 +451,16 @@ export async function PUT(req: Request) {
                     parentIdForRecalc = updateTaskId;
                 }
             }
-        }
 
-        if (taskIdToUpdate) {
-            const taskResult = await query({
-                query: 'UPDATE strategic_activities SET progress = ?, status = ? WHERE id = ?',
-                values: [taskProgressWhenComplete, 'completed', taskIdToUpdate]
-            }) as any;
-            if (taskResult?.affectedRows !== undefined && taskResult.affectedRows === 0) {
-                console.warn('Evaluations PUT: task update matched 0 rows', { taskIdToUpdate });
+            if (taskIdToUpdate) {
+                await query({
+                    query: 'UPDATE strategic_activities SET progress = ?, status = ? WHERE id = ?',
+                    values: [taskProgress, taskStatus, taskIdToUpdate]
+                });
             }
-        } else {
-            console.warn('Evaluations PUT: no taskId to update', { taskId, assignmentId, row: { task_id: row.task_id, sa_id: row.sa_id } });
-        }
-        if (assignmentId) {
-            await query({
-                query: 'UPDATE activity_assignments SET status = ? WHERE id = ?',
-                values: ['evaluated', assignmentId]
-            });
         }
 
-        // Recalculate parent strategic activity so Activities page and Strategy Manager show correct progress
+        // Final step: Recalculate parent goal progress so Activity page correctly reflects child unit completions
         let parentProgress = 0;
         let parentUpdated = false;
         if (parentIdForRecalc) {
@@ -412,35 +468,38 @@ export async function PUT(req: Request) {
                 query: `
                     SELECT 
                         COUNT(*) as total,
-                        COALESCE(SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END), 0) as completed
+                        COALESCE(SUM(progress), 0) as total_progress
                     FROM strategic_activities
                     WHERE parent_id = ?
                 `,
                 values: [parentIdForRecalc]
             }) as any[];
-            const total = Number(childCounts[0]?.total ?? 0);
-            const completed = Number(childCounts[0]?.completed ?? 0);
-            parentProgress = total > 0 ? Math.round((completed / total) * 100) : 0;
+            const totalRec = Number(childCounts[0]?.total ?? 0);
+            const sumProgress = Number(childCounts[0]?.total_progress ?? 0);
+            parentProgress = totalRec > 0 ? Math.round(sumProgress / totalRec) : 0;
             const parentStatus = parentProgress === 100 ? 'completed' : 'in_progress';
             const parentResult = await query({
                 query: 'UPDATE strategic_activities SET progress = ?, status = ? WHERE id = ?',
                 values: [parentProgress, parentStatus, parentIdForRecalc]
             }) as any;
             parentUpdated = parentResult?.affectedRows > 0;
-            if (parentResult?.affectedRows === 0) {
-                console.warn('Evaluations PUT: parent update matched 0 rows', { parentIdForRecalc });
-            }
         }
 
         return NextResponse.json({
             message: 'Evaluation submitted successfully',
-            updated: { taskId: taskIdToUpdate ?? updateTaskId ?? null, parentId: parentIdForRecalc ?? null, parentProgress, parentUpdated }
+            updated: { taskId: taskIdToUpdate ?? updateTaskId ?? null, parentId: parentIdForRecalc ?? null, parentProgress, parentUpdated },
+            appliedCompleteScore,
+            delayedHodNoteApplied,
         });
     } catch (error: any) {
-        console.error('Department Evaluations PUT Error:', error);
+        if (error.message === 'Unauthorized' || error.message === 'Invalid token') {
+            console.log('Department Evaluations PUT: Unauthorized access attempt (session expired)');
+        } else {
+            console.error('Department Evaluations PUT Error:', error);
+        }
         return NextResponse.json(
             { message: error.message || 'Error submitting evaluation', detail: error.message },
-            { status: error.message === 'Unauthorized' ? 401 : 500 }
+            { status: (error.message === 'Unauthorized' || error.message === 'Invalid token') ? 401 : 500 }
         );
     }
 }

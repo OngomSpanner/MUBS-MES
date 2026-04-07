@@ -26,9 +26,9 @@ export default function TaskCardQueue({ tasks, onAction }: TaskCardQueueProps) {
     return (
       <div className="text-center py-5 bg-white rounded-4 border border-dashed">
         <span className="material-symbols-outlined text-muted mb-2" style={{ fontSize: '48px', opacity: 0.3 }}>
-          auto_awesome_mosaic
+          checklist
         </span>
-        <p className="text-muted">Your queue is empty. Great job!</p>
+        <p className="text-muted">Your process queue is empty. Great job!</p>
       </div>
     );
   }

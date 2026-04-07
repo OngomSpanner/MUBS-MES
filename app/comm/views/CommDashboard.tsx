@@ -115,10 +115,6 @@ export default function CommDashboard() {
             <div className="row g-4 mb-4">
                 <div className="col-12 col-sm-6 col-xl-3">
                     <div className="stat-card" style={{ borderLeftColor: '#7c3aed' }}>
-                        <div className="d-flex justify-content-between align-items-start mb-3">
-                            <div className="stat-icon" style={{ background: '#f5f3ff' }}><span className="material-symbols-outlined" style={{ color: '#7c3aed' }}>list_alt</span></div>
-                            <span className="stat-badge" style={{ background: '#f5f3ff', color: '#7c3aed' }}>This Year</span>
-                        </div>
                         <div className="stat-label">Total Proposals</div>
                         <div className="stat-value">{loading ? '…' : total}</div>
                         <div className="stat-sub">Across committees</div>
@@ -126,10 +122,6 @@ export default function CommDashboard() {
                 </div>
                 <div className="col-12 col-sm-6 col-xl-3">
                     <div className="stat-card" style={{ borderLeftColor: 'var(--mubs-yellow)' }}>
-                        <div className="d-flex justify-content-between align-items-start mb-3">
-                            <div className="stat-icon" style={{ background: '#fffbeb' }}><span className="material-symbols-outlined" style={{ color: '#b45309' }}>pending_actions</span></div>
-                            <span className="stat-badge" style={{ background: '#fffbeb', color: '#b45309' }}>Awaiting</span>
-                        </div>
                         <div className="stat-label">Pending Review</div>
                         <div className="stat-value">{loading ? '…' : pending}</div>
                         <div className="stat-sub">Sent to Admin &amp; Principal</div>
@@ -137,10 +129,6 @@ export default function CommDashboard() {
                 </div>
                 <div className="col-12 col-sm-6 col-xl-3">
                     <div className="stat-card" style={{ borderLeftColor: '#10b981' }}>
-                        <div className="d-flex justify-content-between align-items-start mb-3">
-                            <div className="stat-icon" style={{ background: '#ecfdf5' }}><span className="material-symbols-outlined" style={{ color: '#059669' }}>check_circle</span></div>
-                            <span className="stat-badge" style={{ background: '#ecfdf5', color: '#059669' }}><span className="material-symbols-outlined" style={{ fontSize: '13px' }}>trending_up</span></span>
-                        </div>
                         <div className="stat-label">Approved</div>
                         <div className="stat-value">{loading ? '…' : approved}</div>
                         <div className="stat-sub">Departments assigned &amp; active</div>
@@ -148,10 +136,6 @@ export default function CommDashboard() {
                 </div>
                 <div className="col-12 col-sm-6 col-xl-3">
                     <div className="stat-card" style={{ borderLeftColor: 'var(--mubs-red)' }}>
-                        <div className="d-flex justify-content-between align-items-start mb-3">
-                            <div className="stat-icon" style={{ background: '#fff1f2' }}><span className="material-symbols-outlined" style={{ color: 'var(--mubs-red)' }}>cancel</span></div>
-                            <span className="stat-badge" style={{ background: '#fff1f2', color: 'var(--mubs-red)' }}>Review</span>
-                        </div>
                         <div className="stat-label">Rejected</div>
                         <div className="stat-value">{loading ? '…' : rejected}</div>
                         <div className="stat-sub">Feedback provided</div>

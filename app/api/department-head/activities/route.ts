@@ -3,6 +3,7 @@ import { query } from '@/lib/db';
 import { cookies } from 'next/headers';
 import { verifyToken } from '@/lib/auth';
 import { getVisibleDepartmentIds, inPlaceholders } from '@/lib/department-head';
+import { sqlTopStrategicMain } from '@/lib/strategic-activity-sql';
 
 export const dynamic = 'force-dynamic';
 
@@ -33,12 +34,24 @@ export async function GET() {
                 SELECT 
                     sa.*,
                     u.name as unit_name,
+                    st.performance_indicator as standard_indicator,
                     (SELECT COUNT(*) FROM strategic_activities c WHERE c.parent_id = sa.id AND c.department_id IN (${placeholders})) as total_tasks,
                     (SELECT COUNT(*) FROM strategic_activities c WHERE c.parent_id = sa.id AND c.department_id IN (${placeholders}) AND c.status = 'completed') as completed_tasks,
+                    COALESCE((
+                        SELECT COUNT(*) FROM standard_processes sp
+                        WHERE sp.standard_id = sa.standard_id
+                    ), 0) AS process_tasks_total,
+                    COALESCE((
+                        SELECT COUNT(DISTINCT spa.standard_process_id)
+                        FROM staff_process_assignments spa
+                        WHERE spa.activity_id = sa.id
+                          AND LOWER(TRIM(spa.status)) IN ('evaluated', 'completed')
+                    ), 0) AS process_tasks_done,
                     NULL as parent_title
                 FROM strategic_activities sa
                 LEFT JOIN departments u ON sa.department_id = u.id
-                WHERE sa.parent_id IS NULL AND sa.department_id IN (${placeholders}) AND sa.source IS NOT NULL
+                LEFT JOIN standards st ON sa.standard_id = st.id
+                WHERE ${sqlTopStrategicMain('sa')} AND sa.department_id IN (${placeholders})
                 ORDER BY sa.end_date ASC
             `,
             values: [...departmentIds, ...departmentIds, ...departmentIds]
@@ -52,12 +65,24 @@ export async function GET() {
                     SELECT 
                         sa.*,
                         u.name as unit_name,
+                        st.performance_indicator as standard_indicator,
                         (SELECT COUNT(*) FROM strategic_activities c WHERE c.department_id = sa.department_id AND (c.parent_id = sa.id OR c.parent_id = sa.parent_id)) as total_tasks,
                         (SELECT COUNT(*) FROM strategic_activities c WHERE c.department_id = sa.department_id AND (c.parent_id = sa.id OR c.parent_id = sa.parent_id) AND c.status = 'completed') as completed_tasks,
+                        COALESCE((
+                            SELECT COUNT(*) FROM standard_processes sp
+                            WHERE sp.standard_id = sa.standard_id
+                        ), 0) AS process_tasks_total,
+                        COALESCE((
+                            SELECT COUNT(DISTINCT spa.standard_process_id)
+                            FROM staff_process_assignments spa
+                            WHERE spa.activity_id = sa.id
+                              AND LOWER(TRIM(spa.status)) IN ('evaluated', 'completed')
+                        ), 0) AS process_tasks_done,
                         p.title as parent_title
                     FROM strategic_activities sa
                     LEFT JOIN departments u ON sa.department_id = u.id
                     LEFT JOIN strategic_activities p ON sa.parent_id = p.id
+                    LEFT JOIN standards st ON sa.standard_id = st.id
                     WHERE sa.department_id IN (${placeholders}) AND sa.parent_id IS NOT NULL
                     AND COALESCE(sa.source, '') = 'strategic_plan'
                     ORDER BY sa.end_date ASC
@@ -99,6 +124,7 @@ export async function GET() {
 
             return {
                 ...a,
+                target_kpi: a.target_kpi || a.standard_indicator,
                 progress,
                 status
             };

@@ -31,7 +31,7 @@ export async function GET() {
           END) AS delayed_count
         FROM departments d
         LEFT JOIN strategic_activities sa ON d.id = sa.department_id 
-          AND sa.source IS NOT NULL
+          AND COALESCE(TRIM(sa.source), '') <> ''
           AND (
             sa.activity_type = 'detailed' 
             OR 
@@ -72,7 +72,7 @@ export async function GET() {
         FROM strategic_activities sa
         LEFT JOIN departments d ON sa.department_id = d.id
         WHERE d.id IS NOT NULL 
-          AND sa.source IS NOT NULL
+          AND COALESCE(TRIM(sa.source), '') <> ''
           AND (
             sa.activity_type = 'detailed' 
             OR 
@@ -113,7 +113,7 @@ export async function GET() {
         FROM strategic_activities sa
         LEFT JOIN departments d ON sa.department_id = d.id
         WHERE d.id IS NOT NULL
-          AND sa.source IS NOT NULL
+          AND COALESCE(TRIM(sa.source), '') <> ''
           AND (
             sa.activity_type = 'detailed' 
             OR 
@@ -157,7 +157,7 @@ export async function GET() {
             THEN 1 ELSE 0
           END) AS atRisk
         FROM strategic_activities
-        WHERE parent_id IS NULL AND source IS NOT NULL
+        WHERE parent_id IS NULL AND COALESCE(TRIM(source), '') <> ''
       `
     })) as any[];
 

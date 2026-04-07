@@ -12,9 +12,12 @@ const ASSIGNABLE_ROLES = [
   'committee_member',
   'hod',
   'unit_head',
+  'department_head',
   'staff',
   'principal',
-  'system_admin'
+  'system_admin',
+  'ambassador',
+  'viewer'
 ] as const;
 
 export async function GET() {

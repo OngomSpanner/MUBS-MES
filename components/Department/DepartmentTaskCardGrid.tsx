@@ -16,27 +16,29 @@ interface Task {
     activity_id?: number;
     description?: string;
     reviewer_notes?: string;
-    task_type?: 'process' | 'kpi_driver';
     kpi_target_value?: number | null;
     startDate?: string;
     endDate?: string;
+    tier?: string;
+    performance_indicator?: string | null;
 }
 
 interface DepartmentTaskCardGridProps {
     tasks: Task[];
-    onEdit: (task: Task) => void;
     onDelete: (task: Task) => void;
     onViewEvaluation: (taskId: number) => void;
+    onOpenProcess?: (task: Task) => void;
+    onReassignProcess?: (task: Task) => void;
     deletingId: number | null;
     selectedTaskIds: number[];
     onToggleTaskSelect: (taskId: number) => void;
 }
 
-const DEPT_INTERNAL_LABEL = '— Department internal —';
+const DEPT_INTERNAL_LABEL = 'Department task';
 const UNASSIGNED_LABEL = 'Unassigned';
 
 const DepartmentTaskCardGrid: React.FC<DepartmentTaskCardGridProps> = ({ 
-    tasks, onEdit, onDelete, onViewEvaluation, deletingId, selectedTaskIds, onToggleTaskSelect 
+    tasks, onDelete, onViewEvaluation, onOpenProcess, onReassignProcess, deletingId, selectedTaskIds, onToggleTaskSelect 
 }) => {
     const router = useRouter();
 
@@ -47,22 +49,38 @@ const DepartmentTaskCardGrid: React.FC<DepartmentTaskCardGridProps> = ({
         return date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' });
     };
 
+    const processDueLine = (task: Task): string | null => {
+        if (task.tier !== 'process_task') return null;
+        if (task.status === 'Not opened' || !task.dueDate) return null;
+        const ymd = String(task.dueDate).slice(0, 10);
+        const end = new Date(`${ymd}T12:00:00`);
+        if (Number.isNaN(end.getTime())) return null;
+        const now = new Date();
+        const diff = Math.ceil((end.getTime() - now.getTime()) / 86400000);
+        if (diff < 0) return `${Math.abs(diff)}d overdue`;
+        if (diff === 0) return 'Due today';
+        return `${diff}d left`;
+    };
+
     const getStatusStyle = (status: string) => {
         if (status === 'Completed') return { bg: '#dcfce7', color: '#15803d' };
         if (status === 'In Progress') return { bg: '#fef9c3', color: '#a16207' };
         if (status === 'Under Review') return { bg: '#eff6ff', color: '#1d4ed8' };
+        if (status === 'Not opened') return { bg: '#ffedd5', color: '#9a3412' };
         return { bg: '#f1f5f9', color: '#475569' };
     };
 
     return (
         <div className="row g-4">
             {tasks.map((task) => {
+                const dueHint = processDueLine(task);
                 const statusStyle = getStatusStyle(task.status);
                 const progressColor = (task.progress || 0) > 70 ? '#10b981' : ((task.progress || 0) > 30 ? '#f59e0b' : '#3b82f6');
                 const assigneeName = task.assignee_name?.split(' ')[0] || UNASSIGNED_LABEL;
                 const initials = task.assignee_name?.split(' ').map(n => n[0]).join('') || '?';
 
                 const isSelected = selectedTaskIds.includes(task.id);
+                const lockCompletedProcess = task.tier === 'process_task' && task.status === 'Completed';
 
                 return (
                     <div key={`grid-${task.id}`} className="col-12 col-md-6 col-xxl-4 position-relative">
@@ -84,21 +102,12 @@ const DepartmentTaskCardGrid: React.FC<DepartmentTaskCardGridProps> = ({
                                         style={{ width: '1.2rem', height: '1.2rem', cursor: 'pointer' }}
                                         checked={isSelected}
                                         onChange={() => onToggleTaskSelect(task.id)}
+                                        disabled={lockCompletedProcess}
                                     />
                                 </div>
                             </div>
                             <div className="d-flex justify-content-between align-items-start mb-3 pe-4">
                                 <div>
-                                    <span 
-                                        className="badge mb-2" 
-                                        style={{ 
-                                            fontSize: '.65rem', fontWeight: 600, 
-                                            background: task.task_type === 'kpi_driver' ? '#dbeafe' : '#f1f5f9', 
-                                            color: task.task_type === 'kpi_driver' ? '#1e40af' : '#475569' 
-                                        }}
-                                    >
-                                        {task.task_type === 'kpi_driver' ? 'KPI-Driver Task (Strategy)' : 'Process Task (Internal)'}
-                                    </span>
                                     <h6 className="fw-bold text-dark mb-1" style={{ wordBreak: 'break-word' }}>{task.title}</h6>
                                     <div className="text-muted d-flex align-items-center gap-1" style={{ fontSize: '0.75rem' }}>
                                         <span className="material-symbols-outlined" style={{ fontSize: '14px' }}>category</span>
@@ -106,6 +115,12 @@ const DepartmentTaskCardGrid: React.FC<DepartmentTaskCardGridProps> = ({
                                             {task.activity_title || DEPT_INTERNAL_LABEL}
                                         </span>
                                     </div>
+                                    {task.tier === 'process_task' && task.performance_indicator?.trim() ? (
+                                        <div className="text-muted small mt-2" style={{ fontSize: '0.72rem', lineHeight: 1.35 }}>
+                                            <span className="fw-semibold text-secondary">Performance indicator:</span>{' '}
+                                            {task.performance_indicator}
+                                        </div>
+                                    ) : null}
                                 </div>
                                 <span className="status-badge px-2 py-1 rounded-pill" style={{ background: statusStyle.bg, color: statusStyle.color, fontSize: '0.65rem', fontWeight: '700', whiteSpace: 'nowrap' }}>
                                     {task.status}
@@ -127,9 +142,16 @@ const DepartmentTaskCardGrid: React.FC<DepartmentTaskCardGridProps> = ({
                                         </span>
                                     </div>
                                     <div className="vr" style={{ opacity: 0.2 }}></div>
-                                    <div className="d-flex align-items-center gap-1 text-muted small" style={{ fontSize: '.8rem' }}>
-                                        <span className="material-symbols-outlined" style={{ fontSize: '14px' }}>event</span>
-                                        {formatDate(task.dueDate)}
+                                    <div className="d-flex flex-column gap-0 text-muted small" style={{ fontSize: '.8rem' }}>
+                                        <div className="d-flex align-items-center gap-1">
+                                            <span className="material-symbols-outlined" style={{ fontSize: '14px' }}>event</span>
+                                            Due {formatDate(task.dueDate)}
+                                        </div>
+                                        {dueHint ? (
+                                            <div className="fw-semibold text-dark" style={{ fontSize: '0.72rem' }}>
+                                                {dueHint}
+                                            </div>
+                                        ) : null}
                                     </div>
                                 </div>
 
@@ -148,55 +170,66 @@ const DepartmentTaskCardGrid: React.FC<DepartmentTaskCardGridProps> = ({
                                 </div>
                             </div>
 
-                            <div className="d-flex justify-content-end gap-2 mt-auto pt-3 border-top">
-                                {task.status === 'Under Review' ? (
-                                    <button
-                                        type="button"
-                                        className="btn btn-sm w-100 d-inline-flex justify-content-center align-items-center gap-1 py-2 fw-bold shadow-sm text-white"
-                                        style={{ fontSize: '.75rem', background: 'var(--mubs-blue)', borderRadius: '8px' }}
-                                        onClick={() => onViewEvaluation(task.id)}
-                                    >
-                                        <span className="material-symbols-outlined" style={{ fontSize: '14px' }}>rate_review</span>
-                                        Evaluate
-                                    </button>
-                                ) : task.status === 'Completed' ? (
-                                    <button
-                                        type="button"
-                                        className="btn btn-sm w-100 bg-success bg-opacity-10 border py-2 d-inline-flex justify-content-center align-items-center gap-1"
-                                        style={{ fontSize: '.75rem', color: '#15803d', borderColor: '#86efac', borderRadius: '8px', fontWeight: 'bold' }}
-                                        onClick={() => onViewEvaluation(task.id)}
-                                    >
-                                        <span className="material-symbols-outlined" style={{ fontSize: '14px' }}>visibility</span>
-                                        View evaluation
-                                    </button>
-                                ) : (
-                                    <>
+                            {task.status !== 'Completed' && (
+                                <div className="d-flex flex-wrap justify-content-end gap-2 mt-auto pt-3 border-top">
+                                    {task.status === 'Under Review' ? (
                                         <button
                                             type="button"
-                                            className="btn btn-sm btn-light bg-opacity-50 py-2 border d-inline-flex flex-fill justify-content-center align-items-center gap-1"
-                                            style={{ fontSize: '.75rem', color: '#64748b', borderRadius: '8px', fontWeight: 'bold' }}
-                                            onClick={() => onEdit(task)}
+                                            className="btn btn-sm flex-grow-1 d-inline-flex justify-content-center align-items-center gap-1 py-2 fw-bold shadow-sm text-white"
+                                            style={{ fontSize: '.75rem', background: 'var(--mubs-blue)', borderRadius: '8px', minWidth: '120px' }}
+                                            onClick={() => onViewEvaluation(task.id)}
                                         >
-                                            <span className="material-symbols-outlined" style={{ fontSize: '14px' }}>edit</span>
-                                            Edit
+                                            <span className="material-symbols-outlined" style={{ fontSize: '14px' }}>fact_check</span>
+                                            Review submission
                                         </button>
-                                        <button
-                                            type="button"
-                                            className="btn btn-sm btn-outline-danger py-2 d-inline-flex flex-fill justify-content-center align-items-center gap-1"
-                                            style={{ fontSize: '.75rem', borderRadius: '8px', fontWeight: 'bold' }}
-                                            onClick={() => onDelete(task)}
-                                            disabled={deletingId === task.id}
-                                        >
-                                            {deletingId === task.id ? (
-                                                <span className="spinner-border spinner-border-sm" style={{ width: '14px', height: '14px' }} />
-                                            ) : (
-                                                <span className="material-symbols-outlined" style={{ fontSize: '14px' }}>delete</span>
+                                    ) : (
+                                        <>
+                                            {task.tier === 'process_task' && task.status === 'Not opened' && onOpenProcess && (
+                                                <button
+                                                    type="button"
+                                                    className="btn btn-sm btn-success py-2 d-inline-flex justify-content-center align-items-center gap-1"
+                                                    style={{ fontSize: '.75rem', borderRadius: '8px', fontWeight: 'bold', minWidth: '100px' }}
+                                                    onClick={() => onOpenProcess(task)}
+                                                >
+                                                    <span className="material-symbols-outlined" style={{ fontSize: '14px' }}>event_available</span>
+                                                    Open
+                                                </button>
                                             )}
-                                            Delete
-                                        </button>
-                                    </>
-                                )}
-                            </div>
+                                            {task.tier === 'process_task' &&
+                                                task.assigned_to != null &&
+                                                !['Completed', 'Under Review'].includes(task.status) &&
+                                                onReassignProcess && (
+                                                    <button
+                                                        type="button"
+                                                        className="btn btn-sm btn-outline-secondary py-2 d-inline-flex justify-content-center align-items-center gap-1"
+                                                        style={{ fontSize: '.75rem', borderRadius: '8px', fontWeight: 'bold', minWidth: '100px' }}
+                                                        onClick={() => onReassignProcess(task)}
+                                                    >
+                                                        <span className="material-symbols-outlined" style={{ fontSize: '14px' }}>swap_horiz</span>
+                                                        Reassign
+                                                    </button>
+                                                )}
+                                            {task.status !== 'Completed' && (
+                                                <button
+                                                    type="button"
+                                                    className="btn btn-sm btn-outline-danger py-2 d-inline-flex justify-content-center align-items-center gap-1"
+                                                    style={{ fontSize: '.75rem', borderRadius: '8px', fontWeight: 'bold', minWidth: '100px' }}
+                                                    onClick={() => onDelete(task)}
+                                                    disabled={deletingId === task.id}
+                                                    title={task.tier === 'process_task' ? 'Unassign process' : 'Delete task'}
+                                                >
+                                                    {deletingId === task.id ? (
+                                                        <span className="spinner-border spinner-border-sm" style={{ width: '14px', height: '14px' }} />
+                                                    ) : (
+                                                        <span className="material-symbols-outlined" style={{ fontSize: '14px' }}>person_remove</span>
+                                                    )}
+                                                    {task.tier === 'process_task' ? 'Unassign' : 'Delete'}
+                                                </button>
+                                            )}
+                                        </>
+                                    )}
+                                </div>
+                            )}
                         </div>
                     </div>
                 );

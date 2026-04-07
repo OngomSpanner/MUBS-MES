@@ -1,0 +1,121 @@
+﻿ALL TABLES:
+  activity_assignments
+  activity_tracking
+  committee_proposals
+  departments
+  evaluations
+  notifications
+  staff_process_assignments
+  staff_reports
+  standard_processes
+  standards
+  strategic_activities
+  strategic_activity_departments
+  system_logs
+  user_committee_assignments
+  user_roles
+  users
+
+strategic_activities:
+  id | int | NULL:NO | Key:PRI
+  activity_type | enum('main','detailed') | NULL:NO | Key:
+  task_type | enum('process','kpi_driver') | NULL:NO | Key:
+  frequency | enum('once','daily','weekly','monthly') | NULL:YES | Key:
+  source | enum('strategic_plan','council_minutes','tmc_minutes','academic_board','other_duty') | NULL:YES | Key:
+  main_activity_id | int | NULL:YES | Key:MUL
+  parent_id | int | NULL:YES | Key:MUL
+  title | varchar(200) | NULL:NO | Key:
+  description | text | NULL:YES | Key:
+  pillar | varchar(255) | NULL:YES | Key:
+  department_id | int | NULL:YES | Key:MUL
+  target_kpi | varchar(200) | NULL:YES | Key:
+  kpi_target_value | decimal(15,2) | NULL:YES | Key:
+  duration_number | int | NULL:YES | Key:
+  duration_unit | enum('days','weeks','months') | NULL:YES | Key:
+  frequency_interval | int | NULL:YES | Key:
+  reporting_count | int | NULL:YES | Key:
+  completion_criteria | text | NULL:YES | Key:
+  start_date | date | NULL:YES | Key:
+  end_date | date | NULL:YES | Key:
+  status | enum('pending','in_progress','completed','overdue') | NULL:YES | Key:
+  progress | int | NULL:YES | Key:
+  actual_value | decimal(15,2) | NULL:YES | Key:
+  created_by | int | NULL:YES | Key:MUL
+  created_at | timestamp | NULL:YES | Key:
+  updated_at | timestamp | NULL:YES | Key:
+  meeting_reference | varchar(100) | NULL:YES | Key:
+  committee_suggestion_unit_id | int | NULL:YES | Key:
+  objective_id | int | NULL:YES | Key:MUL
+  standard_id | int | NULL:YES | Key:MUL
+  unit_of_measure | varchar(50) | NULL:YES | Key:
+
+standards:
+  id | int | NULL:NO | Key:PRI
+  title | varchar(255) | NULL:NO | Key:
+  quality_standard | text | NULL:YES | Key:
+  output_standard | text | NULL:YES | Key:
+  target | text | NULL:YES | Key:
+  created_at | timestamp | NULL:YES | Key:
+
+standard_processes:
+  id | int | NULL:NO | Key:PRI
+  standard_id | int | NULL:NO | Key:MUL
+  step_name | text | NULL:NO | Key:
+  step_order | int | NULL:YES | Key:
+  created_at | timestamp | NULL:YES | Key:
+
+departments:
+  id | int | NULL:NO | Key:PRI
+  name | varchar(100) | NULL:NO | Key:
+  code | varchar(20) | NULL:NO | Key:UNI
+  unit_type | enum('faculty','office','department','unit') | NULL:YES | Key:
+  parent_id | int | NULL:YES | Key:MUL
+  hod_id | int | NULL:YES | Key:MUL
+  is_active | tinyint(1) | NULL:YES | Key:
+  description | text | NULL:YES | Key:
+  created_at | timestamp | NULL:YES | Key:
+
+users:
+  id | int | NULL:NO | Key:PRI
+  employee_id | varchar(50) | NULL:YES | Key:UNI
+  full_name | varchar(100) | NULL:NO | Key:
+  email | varchar(100) | NULL:NO | Key:UNI
+  password_hash | varchar(255) | NULL:NO | Key:
+  role | varchar(100) | NULL:NO | Key:
+  department_id | int | NULL:YES | Key:MUL
+  managed_unit_id | int | NULL:YES | Key:
+  position | varchar(200) | NULL:YES | Key:
+  status | enum('Active','Suspended','Pending') | NULL:YES | Key:
+  contract_end_date | date | NULL:YES | Key:
+  employment_status | enum('active','on_leave','expired','terminated') | NULL:YES | Key:
+  contract_start_date | date | NULL:YES | Key:
+  leave_status | enum('On Duty','On Leave','Sick Leave','Annual Leave') | NULL:YES | Key:
+  created_at | timestamp | NULL:YES | Key:
+  updated_at | timestamp | NULL:YES | Key:
+  must_change_password | tinyint(1) | NULL:NO | Key:
+
+staff_process_assignments:
+  id | int | NULL:NO | Key:PRI
+  activity_id | int | NULL:NO | Key:MUL
+  standard_process_id | int | NULL:NO | Key:MUL
+  staff_id | int | NULL:NO | Key:MUL
+  status | varchar(50) | NULL:YES | Key:
+  actual_value | decimal(10,2) | NULL:YES | Key:
+  commentary | text | NULL:YES | Key:
+  start_date | date | NULL:YES | Key:
+  end_date | date | NULL:YES | Key:
+  created_at | timestamp | NULL:YES | Key:
+
+activity_assignments:
+  id | int | NULL:NO | Key:PRI
+  activity_id | int | NULL:NO | Key:MUL
+  assigned_to_user_id | int | NULL:NO | Key:MUL
+  assigned_by | int | NULL:NO | Key:MUL
+  assigned_at | timestamp | NULL:YES | Key:
+  start_date | date | NULL:YES | Key:
+  end_date | date | NULL:YES | Key:
+  weight_percentage | decimal(5,2) | NULL:YES | Key:
+  status | enum('pending','accepted','in_progress','submitted','completed','overdue') | NULL:YES | Key:MUL
+  is_flagged | tinyint(1) | NULL:YES | Key:MUL
+  flag_reason | text | NULL:YES | Key:
+  created_at | timestamp | NULL:YES | Key:

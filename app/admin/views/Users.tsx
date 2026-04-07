@@ -14,6 +14,7 @@ interface User {
     email: string;
     role: string;
     department_id: number | null;
+    managed_unit_id: number | null;
     department: string;
     status: string;
     created_date: string;
@@ -38,8 +39,26 @@ export default function UsersView() {
     // Edit modal state
     const [selectedUser, setSelectedUser] = useState<User | null>(null);
     const [showEditModal, setShowEditModal] = useState(false);
-    const [editForm, setEditForm] = useState({ full_name: '', email: '', role: '', department_id: '' as string | number, committee_types: [] as string[] });
+    const [editForm, setEditForm] = useState({ 
+        first_name: '', 
+        surname: '', 
+        other_names: '', 
+        email: '', 
+        role: '', 
+        department_id: '' as string | number, 
+        managed_unit_id: '' as string | number, 
+        committee_types: [] as string[],
+        employee_id: '',
+        contract_terms: 'Permanent',
+        contract_type: 'Full-time',
+        staff_category: 'Administrative',
+        position: '',
+        contract_start: '',
+        contract_end: '',
+        status: 'Active'
+    });
     const [departments, setDepartments] = useState<{ id: number; name: string }[]>([]);
+    const [faculties, setFaculties] = useState<{ id: number; name: string }[]>([]);
     const [saving, setSaving] = useState(false);
 
     // Delete modal state
@@ -49,10 +68,22 @@ export default function UsersView() {
 
     // Pagination
     const [currentPage, setCurrentPage] = useState(1);
+    const [activeSubTab, setActiveSubTab] = useState<'users' | 'departments'>('users');
     const PAGE_SIZE = 10;
 
+    // Department Management State
+    const [departmentsList, setDepartmentsList] = useState<any[]>([]);
+    const [deptSearchTerm, setDeptSearchTerm] = useState('');
+    const [deptsLoading, setDeptsLoading] = useState(false);
+    const [showDeptModal, setShowDeptModal] = useState(false);
+    const [selectedDept, setSelectedDept] = useState<any | null>(null);
+    const [deptFilter, setDeptFilter] = useState<'all' | 'units' | 'parents'>('units'); // Default to units as before but allow toggle
+    const [deptForm, setDeptForm] = useState({ name: '', code: '', unit_type: 'department', parent_id: '' as string | number, description: '', is_active: 1 });
+    const [showDeleteDeptModal, setShowDeleteDeptModal] = useState(false);
+    const [deptToDelete, setDeptToDelete] = useState<any | null>(null);
+
     // Reset page when filters change
-    useEffect(() => { setCurrentPage(1); }, [searchTerm, roleFilter]);
+    useEffect(() => { setCurrentPage(1); }, [searchTerm, roleFilter, activeSubTab, deptSearchTerm]);
 
     useEffect(() => { fetchUsers(); }, [searchTerm, roleFilter]);
     useEffect(() => { fetchStats(); }, []);
@@ -72,14 +103,36 @@ export default function UsersView() {
     useEffect(() => {
         const loadDepartments = async () => {
             try {
-                const { data } = await axios.get('/api/departments?units_only=true');
-                setDepartments(Array.isArray(data) ? data : []);
+                const [deptRes, facRes] = await Promise.all([
+                    axios.get('/api/departments?units_only=true'),
+                    axios.get('/api/departments?parents_only=true')
+                ]);
+                setDepartments(Array.isArray(deptRes.data) ? deptRes.data : []);
+                setFaculties(Array.isArray(facRes.data) ? facRes.data : []);
             } catch (e) {
                 console.error('Error loading departments', e);
             }
         };
         loadDepartments();
     }, []);
+
+    const fetchDepartmentsList = async () => {
+        setDeptsLoading(true);
+        try {
+            const response = await axios.get('/api/departments');
+            setDepartmentsList(response.data);
+        } catch (error) {
+            console.error('Error fetching departments list:', error);
+        } finally {
+            setDeptsLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        if (activeSubTab === 'departments') {
+            fetchDepartmentsList();
+        }
+    }, [activeSubTab]);
 
     const fetchStats = async () => {
         try {
@@ -109,19 +162,41 @@ export default function UsersView() {
         try {
             const { data } = await axios.get(`/api/users/${user.id}`);
             setEditForm({
-                full_name: data.full_name ?? user.full_name,
-                email: data.email ?? user.email,
-                role: data.role ?? user.role,
+                first_name: data.first_name || '',
+                surname: data.surname || '',
+                other_names: data.other_names || '',
+                email: data.email || user.email,
+                role: data.role || user.role,
                 department_id: data.department_id != null ? data.department_id : '',
+                managed_unit_id: data.managed_unit_id != null ? data.managed_unit_id : '',
                 committee_types: Array.isArray(data.committees) ? data.committees : [],
+                employee_id: data.employee_id || '',
+                contract_terms: data.contract_terms || 'Permanent',
+                contract_type: data.contract_type || 'Full-time',
+                staff_category: data.staff_category || 'Administrative',
+                position: data.position || '',
+                contract_start: data.contract_start || '',
+                contract_end: data.contract_end || '',
+                status: data.status || user.status
             });
         } catch {
             setEditForm({
-                full_name: user.full_name,
+                first_name: '',
+                surname: '',
+                other_names: '',
                 email: user.email,
                 role: user.role,
                 department_id: user.department_id != null ? user.department_id : '',
+                managed_unit_id: user.managed_unit_id != null ? user.managed_unit_id : '',
                 committee_types: [],
+                employee_id: '',
+                contract_terms: 'Permanent',
+                contract_type: 'Full-time',
+                staff_category: 'Administrative',
+                position: '',
+                contract_start: '',
+                contract_end: '',
+                status: user.status
             });
         }
         setShowEditModal(true);
@@ -132,11 +207,22 @@ export default function UsersView() {
         setSaving(true);
         try {
             const payload = {
-                full_name: editForm.full_name.trim(),
+                first_name: editForm.first_name.trim(),
+                surname: editForm.surname.trim(),
+                other_names: editForm.other_names.trim(),
                 email: editForm.email.trim(),
                 role: editForm.role,
                 department_id: editForm.department_id === '' ? null : Number(editForm.department_id),
+                managed_unit_id: editForm.managed_unit_id === '' ? null : Number(editForm.managed_unit_id),
                 committee_types: editForm.committee_types,
+                employee_id: editForm.employee_id,
+                contract_terms: editForm.contract_terms,
+                contract_type: editForm.contract_type,
+                staff_category: editForm.staff_category,
+                position: editForm.position,
+                contract_start: editForm.contract_start,
+                contract_end: editForm.contract_end,
+                status: editForm.status
             };
             await axios.put(`/api/users/${selectedUser.id}`, payload);
             setShowEditModal(false);
@@ -177,6 +263,52 @@ export default function UsersView() {
         }
     };
 
+    const handleDeptSave = async () => {
+        setSaving(true);
+        try {
+            const payload = {
+                ...deptForm,
+                parent_id: deptForm.parent_id === '' ? null : Number(deptForm.parent_id)
+            };
+            if (selectedDept) {
+                await axios.put(`/api/departments/${selectedDept.id}`, payload);
+            } else {
+                await axios.post('/api/departments', payload);
+            }
+            setShowDeptModal(false);
+            fetchDepartmentsList();
+            // Also reload parent list for dropdowns
+            const [deptRes, facRes] = await Promise.all([
+                axios.get('/api/departments?units_only=true'),
+                axios.get('/api/departments?parents_only=true')
+            ]);
+            setDepartments(Array.isArray(deptRes.data) ? deptRes.data : []);
+            setFaculties(Array.isArray(facRes.data) ? facRes.data : []);
+        } catch (error: any) {
+            console.error('Error saving department:', error);
+            const msg = error.response?.data?.error || error.response?.data?.message || 'Failed to save department.';
+            alert(msg);
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    const handleDeleteDept = async () => {
+        if (!deptToDelete) return;
+        setDeleting(true);
+        try {
+            await axios.delete(`/api/departments/${deptToDelete.id}`);
+            setShowDeleteDeptModal(false);
+            setDeptToDelete(null);
+            fetchDepartmentsList();
+        } catch (error) {
+            console.error('Error deleting department:', error);
+            alert('Failed to delete department.');
+        } finally {
+            setDeleting(false);
+        }
+    };
+
     const getStatusBadge = (status: string) => {
         const styles: { [key: string]: { bg: string; color: string } } = {
             'Active': { bg: '#dcfce7', color: '#15803d' },
@@ -194,7 +326,8 @@ export default function UsersView() {
             'Unit Head': { bg: '#f0f9ff', color: '#0369a1' },
             'HOD': { bg: '#f0f9ff', color: '#0369a1' },
             'Committee Member': { bg: '#f5f3ff', color: '#6d28d9' },
-            'Staff': { bg: '#eff6ff', color: 'var(--mubs-blue)' }
+            'Staff': { bg: '#eff6ff', color: 'var(--mubs-blue)' },
+            'Ambassador': { bg: '#fff7ed', color: '#ea580c' }
         };
         return styles[role] || { bg: '#f1f5f9', color: '#475569' };
     };
@@ -203,7 +336,8 @@ export default function UsersView() {
         role === 'System Administrator' ? 'shield' :
             role === 'Strategy Manager' ? 'manage_accounts' :
                 role === 'Department Head' || role === 'Unit Head' || role === 'HOD' ? 'corporate_fare' :
-                    role === 'Committee Member' ? 'groups' : 'assignment_ind';
+                    role === 'Committee Member' ? 'groups' : 
+                        role === 'Ambassador' ? 'verified_user' : 'assignment_ind';
 
     // Client-side pagination
     const totalPages = Math.max(1, Math.ceil(users.length / PAGE_SIZE));
@@ -215,44 +349,47 @@ export default function UsersView() {
             <div className="row g-4 mb-4">
                 <div className="col-sm-4 col-xl-4">
                     <div className="stat-card" style={{ borderLeftColor: 'var(--mubs-blue)' }}>
-                        <div className="d-flex justify-content-between align-items-start mb-3">
-                            <div className="stat-icon" style={{ background: '#eff6ff' }}>
-                                <span className="material-symbols-outlined" style={{ color: 'var(--mubs-blue)' }}>group</span>
-                            </div>
-                            <span className="stat-badge" style={{ background: '#eff6ff', color: 'var(--mubs-blue)' }}>Total</span>
-                        </div>
                         <div className="stat-label">System Users</div>
                         <div className="stat-value">{stats.total}</div>
                     </div>
                 </div>
                 <div className="col-sm-4 col-xl-4">
                     <div className="stat-card" style={{ borderLeftColor: '#10b981' }}>
-                        <div className="d-flex justify-content-between align-items-start mb-3">
-                            <div className="stat-icon" style={{ background: '#ecfdf5' }}>
-                                <span className="material-symbols-outlined" style={{ color: '#059669' }}>verified_user</span>
-                            </div>
-                            <span className="stat-badge" style={{ background: '#ecfdf5', color: '#059669' }}>Active</span>
-                        </div>
                         <div className="stat-label">Active Accounts</div>
                         <div className="stat-value">{stats.active}</div>
                     </div>
                 </div>
                 <div className="col-sm-4 col-xl-4">
                     <div className="stat-card" style={{ borderLeftColor: 'var(--mubs-yellow)' }}>
-                        <div className="d-flex justify-content-between align-items-start mb-3">
-                            <div className="stat-icon" style={{ background: '#fffbeb' }}>
-                                <span className="material-symbols-outlined" style={{ color: '#b45309' }}>admin_panel_settings</span>
-                            </div>
-                            <span className="stat-badge" style={{ background: '#fffbeb', color: '#b45309' }}>Roles</span>
-                        </div>
                         <div className="stat-label">Defined Roles</div>
                         <div className="stat-value">{stats.definedRoles}</div>
                     </div>
                 </div>
             </div>
 
-            {/* Users Table */}
-            <div className="table-card">
+            {/* Sub-Tabs Selector */}
+            <div className="d-flex mb-4 gap-2 border-bottom pb-2">
+                <button 
+                    className={`btn btn-sm ${activeSubTab === 'users' ? 'btn-primary' : 'btn-light'}`}
+                    onClick={() => setActiveSubTab('users')}
+                    style={{ borderRadius: '8px', fontWeight: '600' }}
+                >
+                    <span className="material-symbols-outlined me-1" style={{ fontSize: '18px', verticalAlign: 'middle' }}>group</span>
+                    All Users
+                </button>
+                <button 
+                    className={`btn btn-sm ${activeSubTab === 'departments' ? 'btn-primary' : 'btn-light'}`}
+                    onClick={() => setActiveSubTab('departments')}
+                    style={{ borderRadius: '8px', fontWeight: '600' }}
+                >
+                    <span className="material-symbols-outlined me-1" style={{ fontSize: '18px', verticalAlign: 'middle' }}>corporate_fare</span>
+                    Departments & Units
+                </button>
+            </div>
+
+            {activeSubTab === 'users' ? (
+                /* Users Table */
+                <div className="table-card">
                 <div className="table-card-header">
                     <h5>
                         <span className="material-symbols-outlined me-2" style={{ color: 'var(--mubs-blue)' }}>manage_accounts</span>
@@ -378,7 +515,7 @@ export default function UsersView() {
                 </div>
                 <div className="table-card-footer">
                     <span className="footer-label">
-                        Showing {users.length === 0 ? 0 : (currentPage - 1) * PAGE_SIZE + 1}–{Math.min(currentPage * PAGE_SIZE, users.length)} of {stats.total} users
+                        Showing {users.length === 0 ? 0 : (currentPage - 1) * PAGE_SIZE + 1}–{Math.min(currentPage * PAGE_SIZE, users.length)} of {users.length} users
                     </span>
                     <div className="d-flex gap-1">
                         <button className="page-btn" disabled={currentPage === 1} onClick={() => setCurrentPage(p => p - 1)}>‹</button>
@@ -393,6 +530,164 @@ export default function UsersView() {
                     </div>
                 </div>
             </div>
+            ) : (
+                /* Departments Management Table */
+                <div className="table-card">
+                    <div className="table-card-header">
+                        <h5>
+                            <span className="material-symbols-outlined me-2" style={{ color: 'var(--mubs-blue)' }}>corporate_fare</span>
+                            Departments & Units
+                        </h5>
+                        <div className="d-flex gap-2 flex-wrap">
+                            <div className="input-group input-group-sm" style={{ width: '200px' }}>
+                                <span className="input-group-text bg-white border-end-0">
+                                    <span className="material-symbols-outlined" style={{ fontSize: '16px', color: '#64748b' }}>search</span>
+                                </span>
+                                <input
+                                    type="text"
+                                    className="form-control border-start-0"
+                                    placeholder="Search..."
+                                    value={deptSearchTerm}
+                                    onChange={(e) => setDeptSearchTerm(e.target.value)}
+                                />
+                            </div>
+                            <select 
+                                className="form-select form-select-sm" 
+                                style={{ width: '150px' }}
+                                value={deptFilter}
+                                onChange={(e) => setDeptFilter(e.target.value as any)}
+                            >
+                                <option value="all">Show All</option>
+                                <option value="units">Sub-Units Only</option>
+                                <option value="parents">Faculties Only</option>
+                            </select>
+                            <button className="btn btn-sm create-btn" onClick={() => {
+                                setSelectedDept(null);
+                                setDeptForm({ name: '', code: '', unit_type: 'department', parent_id: '', description: '', is_active: 1 });
+                                setShowDeptModal(true);
+                            }}>
+                                <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>add_business</span>
+                                New Dept/Unit
+                            </button>
+                        </div>
+                    </div>
+                    <div className="table-responsive">
+                        <table className="table mb-0">
+                            <thead>
+                                <tr>
+                                    <th>Department/Unit</th>
+                                    <th>Office/Faculty</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {deptsLoading ? (
+                                    <tr>
+                                        <td colSpan={3} className="text-center py-4">
+                                            <div className="spinner-border text-primary" role="status">
+                                                <span className="visually-hidden">Loading...</span>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                ) : departmentsList.filter(d => {
+                                    const matchesSearch = d.name.toLowerCase().includes(deptSearchTerm.toLowerCase()) || 
+                                                          d.code.toLowerCase().includes(deptSearchTerm.toLowerCase());
+                                    const matchesFilter = deptFilter === 'all' ? true : 
+                                                         (deptFilter === 'units' ? d.parent_id !== null : d.parent_id === null);
+                                    return matchesSearch && matchesFilter;
+                                }).length === 0 ? (
+                                    <tr>
+                                        <td colSpan={3} className="text-center py-4 text-muted">No entries found</td>
+                                    </tr>
+                                ) : (
+                                    departmentsList
+                                        .filter(d => {
+                                            const matchesSearch = d.name.toLowerCase().includes(deptSearchTerm.toLowerCase()) || 
+                                                                  d.code.toLowerCase().includes(deptSearchTerm.toLowerCase());
+                                            const matchesFilter = deptFilter === 'all' ? true : 
+                                                                 (deptFilter === 'units' ? d.parent_id !== null : d.parent_id === null);
+                                            return matchesSearch && matchesFilter;
+                                        })
+                                        .slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE)
+                                        .map((d) => (
+                                            <tr key={d.id}>
+                                                <td>
+                                                    <div className="d-flex flex-column">
+                                                        <div className="fw-bold text-dark">{d.name}</div>
+                                                        <div className="d-flex gap-1 mt-1">
+                                                            <span className={`badge ${d.parent_id ? 'bg-info' : 'bg-primary'} text-white`} style={{ fontSize: '10px', textTransform: 'capitalize' }}>
+                                                                {d.unit_type}
+                                                            </span>
+                                                            {!d.is_active && <span className="badge bg-secondary text-white" style={{ fontSize: '10px' }}>Inactive</span>}
+                                                        </div>
+                                                    </div>
+                                                </td>
+                                                <td className="text-muted">{d.parent_name || d.name}</td>
+                                                <td>
+                                                    <div className="d-flex gap-1">
+                                                        <button 
+                                                            className="btn btn-xs btn-outline-primary py-0 px-2"
+                                                            onClick={() => {
+                                                                setSelectedDept(d);
+                                                                setDeptForm({
+                                                                    name: d.name,
+                                                                    code: d.code,
+                                                                    unit_type: d.unit_type,
+                                                                    parent_id: d.parent_id || '',
+                                                                    description: d.description || '',
+                                                                    is_active: d.is_active ?? 1
+                                                                });
+                                                                setShowDeptModal(true);
+                                                            }}
+                                                        >
+                                                            <span className="material-symbols-outlined" style={{ fontSize: '14px' }}>edit</span>
+                                                        </button>
+                                                        <button 
+                                                            className="btn btn-xs btn-outline-danger py-0 px-2"
+                                                            onClick={() => {
+                                                                setDeptToDelete(d);
+                                                                setShowDeleteDeptModal(true);
+                                                            }}
+                                                        >
+                                                            <span className="material-symbols-outlined" style={{ fontSize: '14px' }}>delete</span>
+                                                        </button>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        ))
+                                )}
+                            </tbody>
+                        </table>
+                    </div>
+                    <div className="table-card-footer">
+                        <span className="footer-label">
+                            Showing {Math.min((currentPage-1)*PAGE_SIZE + 1, departmentsList.filter(d => {
+                                const matchesFilter = deptFilter === 'all' ? true : (deptFilter === 'units' ? d.parent_id !== null : d.parent_id === null);
+                                return matchesFilter && (d.name.toLowerCase().includes(deptSearchTerm.toLowerCase()) || d.code.toLowerCase().includes(deptSearchTerm.toLowerCase()));
+                            }).length)}–{Math.min(currentPage*PAGE_SIZE, departmentsList.filter(d => {
+                                const matchesFilter = deptFilter === 'all' ? true : (deptFilter === 'units' ? d.parent_id !== null : d.parent_id === null);
+                                return matchesFilter && (d.name.toLowerCase().includes(deptSearchTerm.toLowerCase()) || d.code.toLowerCase().includes(deptSearchTerm.toLowerCase()));
+                            }).length)} of {departmentsList.filter(d => {
+                                const matchesFilter = deptFilter === 'all' ? true : (deptFilter === 'units' ? d.parent_id !== null : d.parent_id === null);
+                                return matchesFilter && (d.name.toLowerCase().includes(deptSearchTerm.toLowerCase()) || d.code.toLowerCase().includes(deptSearchTerm.toLowerCase()));
+                            }).length} entries
+                        </span>
+                        <div className="d-flex gap-1">
+                            <button className="page-btn" disabled={currentPage === 1} onClick={() => setCurrentPage(p => p - 1)}>‹</button>
+                            {Array.from({ length: Math.ceil(departmentsList.filter(d => {
+                                const matchesFilter = deptFilter === 'all' ? true : (deptFilter === 'units' ? d.parent_id !== null : d.parent_id === null);
+                                return matchesFilter && (d.name.toLowerCase().includes(deptSearchTerm.toLowerCase()) || d.code.toLowerCase().includes(deptSearchTerm.toLowerCase()));
+                            }).length / PAGE_SIZE) }, (_, i) => i + 1).map(pg => (
+                                <button key={pg} className={`page-btn ${pg === currentPage ? 'active' : ''}`} onClick={() => setCurrentPage(pg)}>{pg}</button>
+                            ))}
+                            <button className="page-btn" disabled={currentPage === Math.ceil(departmentsList.filter(d => {
+                                const matchesFilter = deptFilter === 'all' ? true : (deptFilter === 'units' ? d.parent_id !== null : d.parent_id === null);
+                                return matchesFilter && (d.name.toLowerCase().includes(deptSearchTerm.toLowerCase()) || d.code.toLowerCase().includes(deptSearchTerm.toLowerCase()));
+                            }).length / PAGE_SIZE)} onClick={() => setCurrentPage(p => p + 1)}>›</button>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* Edit User Modal */}
             <Modal show={showEditModal} onHide={() => setShowEditModal(false)} centered backdrop="static" keyboard={false} size="lg">
@@ -402,41 +697,152 @@ export default function UsersView() {
                         Edit User
                     </Modal.Title>
                 </Modal.Header>
-                <Modal.Body>
+                <Modal.Body style={{ maxHeight: '70vh', overflowY: 'auto' }}>
                     <div className="row g-3">
-                        <div className="col-12">
-                            <Form.Label className="fw-bold small">Full Name</Form.Label>
+                        <div className="col-md-4">
+                            <Form.Label className="fw-bold small">First Name</Form.Label>
                             <Form.Control
-                                value={editForm.full_name}
-                                onChange={e => setEditForm({ ...editForm, full_name: e.target.value })}
+                                type="text"
+                                value={editForm.first_name}
+                                onChange={(e) => setEditForm({ ...editForm, first_name: e.target.value })}
+                                required
                             />
                         </div>
-                        <div className="col-12">
+                        <div className="col-md-4">
+                            <Form.Label className="fw-bold small">Surname</Form.Label>
+                            <Form.Control
+                                type="text"
+                                value={editForm.surname}
+                                onChange={(e) => setEditForm({ ...editForm, surname: e.target.value })}
+                                required
+                            />
+                        </div>
+                        <div className="col-md-4">
+                            <Form.Label className="fw-bold small">Other Names</Form.Label>
+                            <Form.Control
+                                type="text"
+                                value={editForm.other_names}
+                                onChange={(e) => setEditForm({ ...editForm, other_names: e.target.value })}
+                            />
+                        </div>
+                        <div className="col-md-6">
                             <Form.Label className="fw-bold small">Email Address</Form.Label>
                             <Form.Control
                                 type="email"
                                 value={editForm.email}
-                                onChange={e => setEditForm({ ...editForm, email: e.target.value })}
+                                onChange={(e) => setEditForm({ ...editForm, email: e.target.value })}
+                                required
                             />
                         </div>
+                        <div className="col-md-6">
+                            <Form.Label className="fw-bold small">Employee ID</Form.Label>
+                            <Form.Control
+                                type="text"
+                                value={editForm.employee_id}
+                                onChange={(e) => setEditForm({ ...editForm, employee_id: e.target.value })}
+                            />
+                        </div>
+
+                        <div className="col-12 py-1">
+                            <hr className="my-1 opacity-25" />
+                            <div className="fw-bold small text-primary mb-2">Employment & Contract Details</div>
+                        </div>
+
+                        <div className="col-md-4">
+                            <Form.Label className="fw-bold small">Staff Category</Form.Label>
+                            <Form.Select
+                                value={editForm.staff_category}
+                                onChange={(e) => setEditForm({ ...editForm, staff_category: e.target.value })}
+                            >
+                                <option value="Administrative">Administrative</option>
+                                <option value="Support">Support</option>
+                            </Form.Select>
+                        </div>
+
+                        <div className="col-md-8">
+                            <Form.Label className="fw-bold small">Official Position</Form.Label>
+                            <Form.Control
+                                type="text"
+                                placeholder="e.g. SENIOR LECTURER"
+                                value={editForm.position}
+                                onChange={(e) => setEditForm({ ...editForm, position: e.target.value })}
+                            />
+                        </div>
+
+                        <div className="col-md-6">
+                            <Form.Label className="fw-bold small">Contract Start Date</Form.Label>
+                            <Form.Control
+                                type="date"
+                                value={editForm.contract_start}
+                                onChange={(e) => setEditForm({ ...editForm, contract_start: e.target.value })}
+                            />
+                        </div>
+
+                        <div className="col-md-6">
+                            <Form.Label className="fw-bold small">Contract End Date</Form.Label>
+                            <Form.Control
+                                type="date"
+                                value={editForm.contract_end}
+                                onChange={(e) => setEditForm({ ...editForm, contract_end: e.target.value })}
+                            />
+                        </div>
+
+                        <div className="col-md-4">
+                            <Form.Label className="fw-bold small">Contract Terms</Form.Label>
+                            <Form.Select
+                                value={editForm.contract_terms}
+                                onChange={(e) => setEditForm({ ...editForm, contract_terms: e.target.value })}
+                            >
+                                <option value="Permanent">Permanent</option>
+                                <option value="Contract">Contract</option>
+                            </Form.Select>
+                        </div>
+                        <div className="col-md-4">
+                            <Form.Label className="fw-bold small">Contract Type</Form.Label>
+                            <Form.Select
+                                value={editForm.contract_type}
+                                onChange={(e) => setEditForm({ ...editForm, contract_type: e.target.value })}
+                            >
+                                <option value="Full-time">Full-time</option>
+                                <option value="Part-time">Part-time</option>
+                            </Form.Select>
+                        </div>
+
+                        <div className="col-md-6">
+                            <Form.Label className="fw-bold small">Account Status</Form.Label>
+                            <Form.Select
+                                value={editForm.status}
+                                onChange={(e) => setEditForm({ ...editForm, status: e.target.value })}
+                            >
+                                <option value="Active">Active</option>
+                                <option value="Pending">Pending</option>
+                                <option value="Suspended">Suspended</option>
+                            </Form.Select>
+                        </div>
+
+                        <div className="col-12 py-1">
+                            <hr className="my-1 opacity-25" />
+                            <div className="fw-bold small text-primary mb-2">Roles & Assignments</div>
+                        </div>
+
                         <div className="col-12">
-                            <Form.Label className="fw-bold small">Roles (Select all that apply)</Form.Label>
+                            <Form.Label className="fw-bold small">Assign Roles (Select all that apply)</Form.Label>
                             <div className="d-flex flex-wrap gap-2 p-2 border rounded bg-light">
                                 {rolesList.map((r) => {
                                     const displayName = formatRoleForDisplay(r);
+                                    const roleList = editForm.role.split(',').map((x: string) => x.trim()).filter(Boolean);
                                     return (
                                         <div key={r} className="form-check">
                                             <input
                                                 type="checkbox"
                                                 className="form-check-input"
                                                 id={`edit-role-${r}`}
-                                                checked={editForm.role.split(',').map((x: string) => x.trim()).includes(r)}
+                                                checked={roleList.includes(r)}
                                                 onChange={e => {
-                                                    const roles = editForm.role.split(',').map((x: string) => x.trim()).filter(Boolean);
                                                     const newRoles = e.target.checked
-                                                        ? [...roles, r]
-                                                        : roles.filter((x: string) => x !== r);
-                                                    setEditForm({ ...editForm, role: newRoles.join(', ') });
+                                                        ? [...roleList, r]
+                                                        : roleList.filter((x: string) => x !== r);
+                                                    setEditForm({ ...editForm, role: newRoles.join(',') });
                                                 }}
                                             />
                                             <label className="form-check-label small" htmlFor={`edit-role-${r}`}>{displayName}</label>
@@ -457,6 +863,22 @@ export default function UsersView() {
                                 ))}
                             </Form.Select>
                         </div>
+                        {editForm.role && editForm.role.split(',').map((r: string) => r.trim()).filter(Boolean).includes('ambassador') && (
+                            <div className="col-12">
+                                <Form.Label className="fw-bold small text-primary">Managed Faculty/Office Oversight</Form.Label>
+                                <Form.Select
+                                    value={editForm.managed_unit_id === '' ? '' : String(editForm.managed_unit_id)}
+                                    onChange={e => setEditForm({ ...editForm, managed_unit_id: e.target.value === '' ? '' : Number(e.target.value) })}
+                                    className="border-primary"
+                                >
+                                    <option value="">Select faculty/office to oversee</option>
+                                    {faculties.map((f) => (
+                                        <option key={f.id} value={f.id}>{f.name}</option>
+                                    ))}
+                                </Form.Select>
+                                <Form.Text className="text-primary small">This user will have ambassador oversight for the selected unit.</Form.Text>
+                            </div>
+                        )}
                         {editForm.role && editForm.role.split(',').map((r: string) => r.trim()).filter(Boolean).some((r: string) => r === 'committee_member' || formatRoleForDisplay(r) === 'Committee Member') && (
                             <div className="col-12">
                                 <Form.Label className="fw-bold small">Committees</Form.Label>
@@ -488,7 +910,7 @@ export default function UsersView() {
                     <Button
                         style={{ background: 'var(--mubs-blue)', borderColor: 'var(--mubs-blue)' }}
                         className="fw-bold text-white"
-                        disabled={saving || !editForm.full_name.trim()}
+                        disabled={saving || !editForm.first_name.trim() || !editForm.surname.trim()}
                         onClick={handleEditSave}
                     >
                         <span className="material-symbols-outlined me-1" style={{ fontSize: '16px' }}>save</span>
@@ -506,7 +928,7 @@ export default function UsersView() {
                     </Modal.Title>
                 </Modal.Header>
                 <Modal.Body>
-                    <p>Are you sure you want to delete the user <strong>{userToDelete?.full_name}</strong>?</p>
+                    <p>Are you sure you want to delete the user <strong>{selectedUser?.full_name}</strong>?</p>
                     <p className="text-muted small mb-0">This action cannot be undone and will remove all their roles and access from the system.</p>
                 </Modal.Body>
                 <Modal.Footer>
@@ -528,6 +950,110 @@ export default function UsersView() {
                 onHide={() => setShowCreateModal(false)}
                 onUserCreated={() => { fetchUsers(); fetchStats(); }}
             />
+
+            {/* Create/Edit Department Modal */}
+            <Modal show={showDeptModal} onHide={() => setShowDeptModal(false)} centered backdrop="static" size="lg">
+                <Modal.Header closeButton className="modal-header-mubs">
+                    <Modal.Title className="fw-bold d-flex align-items-center gap-2">
+                        <span className="material-symbols-outlined">add_business</span>
+                        {selectedDept ? 'Edit Department/Unit' : 'New Department/Unit'}
+                    </Modal.Title>
+                </Modal.Header>
+                <Modal.Body>
+                    <div className="row g-3">
+                        <div className="col-md-8">
+                            <Form.Label className="fw-bold small">Department Name</Form.Label>
+                            <Form.Control 
+                                value={deptForm.name}
+                                onChange={e => setDeptForm({...deptForm, name: e.target.value})}
+                                placeholder="e.g. Department of Accounting"
+                            />
+                        </div>
+                        <div className="col-md-4">
+                            <Form.Label className="fw-bold small">Code</Form.Label>
+                            <Form.Control 
+                                value={deptForm.code}
+                                onChange={e => setDeptForm({...deptForm, code: e.target.value})}
+                                placeholder="e.g. ACC"
+                            />
+                        </div>
+                        <div className="col-md-6">
+                            <Form.Label className="fw-bold small">Unit Type</Form.Label>
+                            <Form.Select 
+                                value={deptForm.unit_type}
+                                onChange={e => setDeptForm({...deptForm, unit_type: e.target.value})}
+                            >
+                                <option value="faculty">Faculty</option>
+                                <option value="office">Office</option>
+                                <option value="department">Department</option>
+                                <option value="unit">Unit</option>
+                            </Form.Select>
+                        </div>
+                        <div className="col-md-6">
+                            <Form.Label className="fw-bold small">Parent Office/Faculty</Form.Label>
+                            <Form.Select 
+                                value={deptForm.parent_id}
+                                onChange={e => setDeptForm({...deptForm, parent_id: e.target.value})}
+                            >
+                                <option value="">(Self-Parented / Principal Unit)</option>
+                                {faculties.map(f => (
+                                    <option key={f.id} value={f.id}>{f.name}</option>
+                                ))}
+                            </Form.Select>
+                        </div>
+                        <div className="col-12">
+                            <Form.Label className="fw-bold small">Description (Optional)</Form.Label>
+                            <Form.Control 
+                                as="textarea" 
+                                rows={3}
+                                value={deptForm.description}
+                                onChange={e => setDeptForm({...deptForm, description: e.target.value})}
+                            />
+                        </div>
+                        <div className="col-12 mt-2">
+                            <Form.Check 
+                                type="switch"
+                                id="dept-active-switch"
+                                label={deptForm.is_active ? 'Active' : 'Inactive'}
+                                checked={deptForm.is_active === 1}
+                                onChange={e => setDeptForm({...deptForm, is_active: e.target.checked ? 1 : 0})}
+                            />
+                        </div>
+                    </div>
+                </Modal.Body>
+                <Modal.Footer>
+                    <Button variant="light" onClick={() => setShowDeptModal(false)}>Cancel</Button>
+                    <Button 
+                        style={{ background: 'var(--mubs-blue)', borderColor: 'var(--mubs-blue)' }}
+                        disabled={saving || !deptForm.name || !deptForm.code}
+                        onClick={handleDeptSave}
+                    >
+                        {saving ? 'Saving...' : 'Save Department'}
+                    </Button>
+                </Modal.Footer>
+            </Modal>
+
+            {/* Delete Department Confirmation Modal */}
+            <Modal show={showDeleteDeptModal} onHide={() => !deleting && setShowDeleteDeptModal(false)} centered backdrop="static">
+                <Modal.Header closeButton className="modal-header-mubs">
+                    <Modal.Title className="fw-bold d-flex align-items-center gap-2 text-danger">
+                        <span className="material-symbols-outlined">warning</span>
+                        Confirm Deletion
+                    </Modal.Title>
+                </Modal.Header>
+                <Modal.Body>
+                    <p>Are you sure you want to delete <strong>{deptToDelete?.name}</strong>?</p>
+                    <p className="text-muted small mb-0">
+                        This will remove the department. Users assigned to this department will have their department assignment cleared.
+                    </p>
+                </Modal.Body>
+                <Modal.Footer>
+                    <Button variant="light" onClick={() => setShowDeleteDeptModal(false)} disabled={deleting}>Cancel</Button>
+                    <Button variant="danger" disabled={deleting} onClick={handleDeleteDept}>
+                        {deleting ? 'Deleting...' : 'Delete Department'}
+                    </Button>
+                </Modal.Footer>
+            </Modal>
         </Layout>
     );
 }

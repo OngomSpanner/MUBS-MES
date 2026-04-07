@@ -3,7 +3,6 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import axios from 'axios';
-import StatCard from '@/components/StatCard';
 
 type PerformancePeriod = 'week' | 'month' | 'quarter';
 
@@ -17,6 +16,12 @@ interface DepartmentHeadData {
         pendingSubmissions: number;
         hrAlerts: number;
     };
+    departmentalStats?: {
+        total: number;
+        onTrack: number;
+        inProgress: number;
+        delayed: number;
+    };
     hrWarnings: Array<{
         full_name: string;
         role: string;
@@ -25,6 +30,12 @@ interface DepartmentHeadData {
         daysRemaining: number | null;
     }>;
     activityProgress: Array<{
+        title: string;
+        status: string;
+        progress: number;
+        end_date: string;
+    }>;
+    departmentalProgress?: Array<{
         title: string;
         status: string;
         progress: number;
@@ -109,7 +120,16 @@ export default function DepartmentHeadDashboard() {
         );
     }
 
-    const { stats, hrWarnings, activityProgress, recentSubmissions, noDepartment, departmentName } = data;
+    const {
+        stats,
+        hrWarnings,
+        activityProgress,
+        departmentalProgress = [],
+        departmentalStats = { total: 0, onTrack: 0, inProgress: 0, delayed: 0 },
+        recentSubmissions,
+        noDepartment,
+        departmentName,
+    } = data;
 
     if (noDepartment) {
         return (
@@ -253,63 +273,154 @@ export default function DepartmentHeadDashboard() {
                 </div>
             )}
 
-            {/* Stat cards */}
-            <div className="row g-4 mb-4">
-                <div className="col-12 col-sm-6 col-xl-3">
-                    <StatCard
-                        icon="assignment"
-                        label="Strategic Activities"
-                        value={stats.totalActivities}
-                        badge="Assigned"
-                        badgeIcon="verified"
-                        color="blue"
-                    />
-                </div>
-
-                <div className="col-12 col-sm-6 col-xl-3">
-                    <StatCard
-                        icon="task_alt"
-                        label="Tasks Created"
-                        value={stats.totalTasks}
-                        badge="+3"
-                        badgeIcon="trending_up"
-                        color="green"
-                    />
-                </div>
-
-                <div className="col-12 col-sm-6 col-xl-3">
-                    <StatCard
-                        icon="inbox"
-                        label="Pending Submissions"
-                        value={stats.pendingSubmissions}
-                        badge="Pending"
-                        badgeIcon="schedule"
-                        color="yellow"
-                    />
-                </div>
-
-                <div className="col-12 col-sm-6 col-xl-3">
-                    <StatCard
-                        icon="warning"
-                        label="HR Warnings"
-                        value={stats.hrAlerts}
-                        badge="HR"
-                        badgeIcon="person_alert"
-                        color="red"
-                    />
-                </div>
-            </div>
-
             <div className="row g-4">
+                {/* Quick Actions — premium tiles (like Staff dashboard) */}
+                <div className="col-12">
+                    <div className="row g-3 mb-1">
+                        <div className="col-12 col-sm-6 col-xl-3">
+                            <button
+                                type="button"
+                                className="text-decoration-none h-100 w-100 border-0 bg-transparent p-0"
+                                onClick={() => router.push('/department-head?pg=activities')}
+                            >
+                                <div
+                                    className="quick-action-card p-3 d-flex align-items-center gap-2 gap-sm-3 bg-white border rounded-4 shadow-sm h-100"
+                                    style={{ transition: 'all 0.2s', cursor: 'pointer', minHeight: '92px', textAlign: 'left' }}
+                                    onMouseOver={(e) => {
+                                        e.currentTarget.style.transform = 'translateY(-4px)';
+                                        e.currentTarget.style.boxShadow = '0 12px 24px rgba(0,0,0,0.1)';
+                                    }}
+                                    onMouseOut={(e) => {
+                                        e.currentTarget.style.transform = 'translateY(0)';
+                                        e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.05)';
+                                    }}
+                                >
+                                    <div
+                                        className="icon-box d-flex align-items-center justify-content-center flex-shrink-0"
+                                        style={{ width: '48px', height: '48px', borderRadius: '14px', background: 'rgba(0, 86, 150, 0.1)' }}
+                                    >
+                                        <span className="material-symbols-outlined" style={{ color: 'var(--mubs-blue)', fontSize: '22px' }}>track_changes</span>
+                                    </div>
+                                    <div className="min-w-0">
+                                        <div className="fw-black text-dark" style={{ fontSize: '.95rem', lineHeight: 1.25 }}>Strategic activities</div>
+                                        <div className="text-muted small" style={{ fontSize: '.78rem' }}>Strategic Plan activities</div>
+                                    </div>
+                                </div>
+                            </button>
+                        </div>
+
+                        <div className="col-12 col-sm-6 col-xl-3">
+                            <button
+                                type="button"
+                                className="text-decoration-none h-100 w-100 border-0 bg-transparent p-0"
+                                onClick={() => router.push('/department-head?pg=tasks')}
+                            >
+                                <div
+                                    className="quick-action-card p-3 d-flex align-items-center gap-2 gap-sm-3 bg-white border rounded-4 shadow-sm h-100"
+                                    style={{ transition: 'all 0.2s', cursor: 'pointer', minHeight: '92px', textAlign: 'left' }}
+                                    onMouseOver={(e) => {
+                                        e.currentTarget.style.transform = 'translateY(-4px)';
+                                        e.currentTarget.style.boxShadow = '0 12px 24px rgba(0,0,0,0.1)';
+                                    }}
+                                    onMouseOut={(e) => {
+                                        e.currentTarget.style.transform = 'translateY(0)';
+                                        e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.05)';
+                                    }}
+                                >
+                                    <div
+                                        className="icon-box d-flex align-items-center justify-content-center flex-shrink-0"
+                                        style={{ width: '48px', height: '48px', borderRadius: '14px', background: 'rgba(16, 185, 129, 0.1)' }}
+                                    >
+                                        <span className="material-symbols-outlined" style={{ color: '#10b981', fontSize: '22px' }}>assignment_turned_in</span>
+                                    </div>
+                                    <div className="min-w-0">
+                                        <div className="fw-black text-dark" style={{ fontSize: '.95rem', lineHeight: 1.25 }}>Department tasks</div>
+                                        <div className="text-muted small" style={{ fontSize: '.78rem' }}>Task Assigned within Department</div>
+                                    </div>
+                                </div>
+                            </button>
+                        </div>
+
+                        <div className="col-12 col-sm-6 col-xl-3">
+                            <button
+                                type="button"
+                                className="text-decoration-none h-100 w-100 border-0 bg-transparent p-0"
+                                onClick={() => router.push('/department-head?pg=evaluations')}
+                            >
+                                <div
+                                    className="quick-action-card p-3 d-flex align-items-center gap-2 gap-sm-3 bg-white border rounded-4 shadow-sm h-100"
+                                    style={{ transition: 'all 0.2s', cursor: 'pointer', minHeight: '92px', textAlign: 'left' }}
+                                    onMouseOver={(e) => {
+                                        e.currentTarget.style.transform = 'translateY(-4px)';
+                                        e.currentTarget.style.boxShadow = '0 12px 24px rgba(0,0,0,0.1)';
+                                    }}
+                                    onMouseOut={(e) => {
+                                        e.currentTarget.style.transform = 'translateY(0)';
+                                        e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.05)';
+                                    }}
+                                >
+                                    <div
+                                        className="icon-box d-flex align-items-center justify-content-center flex-shrink-0"
+                                        style={{ width: '48px', height: '48px', borderRadius: '14px', background: 'rgba(124, 58, 237, 0.1)' }}
+                                    >
+                                        <span className="material-symbols-outlined" style={{ color: '#7c3aed', fontSize: '22px' }}>rate_review</span>
+                                    </div>
+                                    <div className="min-w-0">
+                                        <div className="fw-black text-dark text-truncate" style={{ fontSize: '.95rem', lineHeight: 1.25, whiteSpace: 'nowrap' }}>Submissions & reviews</div>
+                                        <div className="text-muted small text-truncate" style={{ fontSize: '.78rem', whiteSpace: 'nowrap' }}>
+                                            Pending: {stats.pendingSubmissions}
+                                        </div>
+                                    </div>
+                                </div>
+                            </button>
+                        </div>
+
+                        <div className="col-12 col-sm-6 col-xl-3">
+                            <button
+                                type="button"
+                                className="text-decoration-none h-100 w-100 border-0 bg-transparent p-0"
+                                onClick={() => router.push('/department-head?pg=staff')}
+                            >
+                                <div
+                                    className="quick-action-card p-3 d-flex align-items-center gap-2 gap-sm-3 bg-white border rounded-4 shadow-sm h-100"
+                                    style={{ transition: 'all 0.2s', cursor: 'pointer', minHeight: '92px', textAlign: 'left' }}
+                                    onMouseOver={(e) => {
+                                        e.currentTarget.style.transform = 'translateY(-4px)';
+                                        e.currentTarget.style.boxShadow = '0 12px 24px rgba(0,0,0,0.1)';
+                                    }}
+                                    onMouseOut={(e) => {
+                                        e.currentTarget.style.transform = 'translateY(0)';
+                                        e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.05)';
+                                    }}
+                                >
+                                    <div
+                                        className="icon-box d-flex align-items-center justify-content-center flex-shrink-0"
+                                        style={{ width: '48px', height: '48px', borderRadius: '14px', background: 'rgba(227, 24, 55, 0.1)' }}
+                                    >
+                                        <span className="material-symbols-outlined" style={{ color: 'var(--mubs-red)', fontSize: '22px' }}>warning</span>
+                                    </div>
+                                    <div className="min-w-0">
+                                        <div className="fw-black text-dark" style={{ fontSize: '.95rem', lineHeight: 1.25 }}>System warnings</div>
+                                        <div className="text-muted small" style={{ fontSize: '.78rem' }}>Active: {stats.hrAlerts}</div>
+                                    </div>
+                                </div>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
                 {/* Department progress */}
                 <div className="col-12 col-lg-8">
                     <div className="table-card mb-4">
-                        <div className="table-card-header">
-                            <h5>
-                                <span className="material-symbols-outlined me-2" style={{ color: 'var(--mubs-blue)' }}>analytics</span>
-                                Department Activity Progress
-                            </h5>
-                            <button className="btn btn-sm btn-outline-secondary" onClick={() => router.push('/department-head?pg=activities')}>View All</button>
+                        <div className="table-card-header flex-wrap gap-2">
+                            <div>
+                                <h5 className="mb-0">
+                                    <span className="material-symbols-outlined me-2" style={{ color: 'var(--mubs-blue)' }}>analytics</span>
+                                    Strategic activity progress
+                                </h5>
+                                <div className="text-muted small mt-1">Activities assigned from the institutional strategic plan</div>
+                            </div>
+                            <button className="btn btn-sm btn-outline-secondary" onClick={() => router.push('/department-head?pg=activities')}>View all</button>
                         </div>
                         <div className="table-responsive">
                             <table className="table mb-0">
@@ -340,8 +451,16 @@ export default function DepartmentHeadDashboard() {
                                             </td>
                                             <td>
                                                 <span className="status-badge" style={{
-                                                    background: act.status === 'On Track' ? '#dcfce7' : (act.status === 'In Progress' ? '#fef9c3' : '#fee2e2'),
-                                                    color: act.status === 'On Track' ? '#15803d' : (act.status === 'In Progress' ? '#a16207' : '#b91c1c')
+                                                    background:
+                                                        act.status === 'On Track' ? '#dcfce7'
+                                                        : act.status === 'In Progress' ? '#fef9c3'
+                                                        : act.status === 'Delayed' ? '#fee2e2'
+                                                        : '#f1f5f9',
+                                                    color:
+                                                        act.status === 'On Track' ? '#15803d'
+                                                        : act.status === 'In Progress' ? '#a16207'
+                                                        : act.status === 'Delayed' ? '#b91c1c'
+                                                        : '#475569'
                                                 }}>{act.status}</span>
                                             </td>
                                             <td style={{ minWidth: '120px' }}>
@@ -360,122 +479,129 @@ export default function DepartmentHeadDashboard() {
                         </div>
                     </div>
 
-                    {/* Recent submissions quick */}
-                    <div className="table-card">
-                        <div className="table-card-header">
-                            <h5>
-                                <span className="material-symbols-outlined me-2" style={{ color: 'var(--mubs-blue)' }}>inbox</span>
-                                Recent Submissions
-                            </h5>
-                            <button className="btn btn-sm btn-outline-secondary" onClick={() => router.push('/department-head?pg=submissions')}>View All</button>
+                    <div className="table-card mb-4">
+                        <div className="table-card-header flex-wrap gap-2">
+                            <div>
+                                <h5 className="mb-0">
+                                    <span className="material-symbols-outlined me-2" style={{ color: 'var(--mubs-navy)' }}>apartment</span>
+                                    Department tasks
+                                </h5>
+                                <div className="text-muted small mt-1">Operational tasks not linked to the strategic plan</div>
+                            </div>
+                            <button className="btn btn-sm btn-outline-secondary" onClick={() => router.push('/department-head?pg=departmental-activities')}>View all</button>
                         </div>
                         <div className="table-responsive">
                             <table className="table mb-0">
                                 <thead>
                                     <tr>
-                                        <th>Staff</th>
-                                        <th>Report / Task</th>
-                                        <th>Submitted</th>
+                                        <th>Task / activity</th>
                                         <th>Status</th>
-                                        <th></th>
+                                        <th>Progress</th>
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {recentSubmissions.map((sub, index) => (
-                                        <tr key={index}>
-                                            <td>
-                                                <div className="d-flex align-items-center gap-2">
-                                                    <div className="staff-avatar" style={{ background: index % 3 === 0 ? '#7c3aed' : (index % 3 === 1 ? '#059669' : '#b45309') }}>
-                                                        {sub.staff.split(' ').map(n => n[0]).join('')}
-                                                    </div>
-                                                    <span className="fw-bold text-dark" style={{ fontSize: '.83rem' }}>{sub.staff}</span>
-                                                </div>
-                                            </td>
-                                            <td style={{ fontSize: '.83rem' }}>{sub.task}</td>
-                                            <td style={{ fontSize: '.8rem', color: '#64748b' }}>{sub.date}</td>
-                                            <td>
-                                                <span className="status-badge" style={{
-                                                    background: sub.status === 'Reviewed' ? '#dcfce7' : '#fef9c3',
-                                                    color: sub.status === 'Reviewed' ? '#15803d' : '#a16207'
-                                                }}>{sub.status}</span>
-                                            </td>
-                                            <td>
-                                                <button type="button" className="btn btn-xs btn-primary py-0 px-2 fw-bold" style={{ fontSize: '.75rem', background: 'var(--mubs-blue)' }} onClick={() => router.push(sub.status === 'Reviewed' ? '/department-head?pg=evaluations' : '/department-head?pg=submissions')}>
-                                                    <span className="material-symbols-outlined" style={{ fontSize: '14px' }}>{sub.status === 'Reviewed' ? 'visibility' : 'rate_review'}</span>
-                                                    {sub.status === 'Reviewed' ? ' View' : ' Review'}
-                                                </button>
-                                            </td>
+                                    {departmentalProgress.length === 0 ? (
+                                        <tr>
+                                            <td colSpan={3} className="text-center text-muted py-4 small">No departmental tasks yet.</td>
                                         </tr>
-                                    ))}
+                                    ) : (
+                                        departmentalProgress.map((act, index) => (
+                                            <tr key={`dept-${index}`}>
+                                                <td>
+                                                    <div className="d-flex align-items-center gap-2">
+                                                        <div className="activity-icon">
+                                                            <span className="material-symbols-outlined">apartment</span>
+                                                        </div>
+                                                        <div>
+                                                            <div className="fw-bold text-dark text-truncate" style={{ fontSize: '.85rem', maxWidth: '250px' }}>{act.title}</div>
+                                                            <div className="text-muted" style={{ fontSize: '.72rem' }}>Due {act.end_date ? new Date(act.end_date).toLocaleDateString() : 'TBD'}</div>
+                                                        </div>
+                                                    </div>
+                                                </td>
+                                                <td>
+                                                    <span className="status-badge" style={{
+                                                        background:
+                                                            act.status === 'On Track' ? '#dcfce7'
+                                                            : act.status === 'In Progress' ? '#fef9c3'
+                                                            : act.status === 'Delayed' ? '#fee2e2'
+                                                            : '#f1f5f9',
+                                                        color:
+                                                            act.status === 'On Track' ? '#15803d'
+                                                            : act.status === 'In Progress' ? '#a16207'
+                                                            : act.status === 'Delayed' ? '#b91c1c'
+                                                            : '#475569'
+                                                    }}>{act.status}</span>
+                                                </td>
+                                                <td style={{ minWidth: '120px' }}>
+                                                    <div className="progress-bar-custom">
+                                                        <div className="progress-bar-fill" style={{
+                                                            width: `${act.progress}%`,
+                                                            background: act.progress >= 75 ? '#10b981' : (act.progress >= 40 ? '#005696' : '#e31837')
+                                                        }}></div>
+                                                    </div>
+                                                    <span style={{ fontSize: '.72rem', color: '#64748b' }}>{act.progress}%</span>
+                                                </td>
+                                            </tr>
+                                        ))
+                                    )}
                                 </tbody>
                             </table>
                         </div>
                     </div>
+
                 </div>
 
                 {/* Right column */}
                 <div className="col-12 col-lg-4 d-flex flex-column gap-4">
-                    {/* HR Warnings */}
+                    {/* Recent Submissions (sidebar / compact) */}
                     <div className="table-card">
                         <div className="table-card-header">
-                            <h5>
-                                <span className="material-symbols-outlined me-2" style={{ color: 'var(--mubs-red)' }}>warning</span>
-                                System Warnings
+                            <h5 className="mb-0">
+                                <span className="material-symbols-outlined me-2" style={{ color: 'var(--mubs-blue)' }}>inbox</span>
+                                Recent Submissions
                             </h5>
-                            <span className="badge bg-danger">{hrWarnings.length} Active</span>
+                            <button className="btn btn-sm btn-outline-secondary" onClick={() => router.push('/department-head?pg=evaluations')}>View All</button>
                         </div>
                         <div className="p-3">
-                            {hrWarnings.map((warn, index) => (
-                                <div key={index} className="warn-card" style={{ background: warn.leave_status !== 'On Duty' ? '#fff1f2' : '#fffbeb' }}>
-                                    <div className="warn-icon" style={{ background: warn.leave_status !== 'On Duty' ? '#fee2e2' : '#fef3c7' }}>
-                                        <span className="material-symbols-outlined" style={{ color: warn.leave_status !== 'On Duty' ? '#e31837' : '#b45309' }}>
-                                            {warn.leave_status !== 'On Duty' ? 'person_off' : 'badge'}
-                                        </span>
-                                    </div>
-                                    <div>
-                                        <div className="warn-title">{warn.full_name} — {warn.leave_status !== 'On Duty' ? warn.leave_status : 'Contract Expiring'}</div>
-                                        <div className="warn-meta">
-                                            {warn.leave_status !== 'On Duty' ? `Staff is currently on ${warn.leave_status.toLowerCase()}.` :
-                                                `Contract ends ${warn.contract_end_date ? new Date(warn.contract_end_date).toLocaleDateString() : 'soon'}. ${warn.daysRemaining} days remaining.`}
+                            {recentSubmissions.length === 0 ? (
+                                <div className="text-muted small text-center py-3">No submissions yet.</div>
+                            ) : (
+                                <div className="d-flex flex-column gap-2">
+                                    {recentSubmissions.slice(0, 6).map((sub, index) => (
+                                        <div key={index} className="p-3 rounded-4 border bg-white" style={{ borderColor: 'rgba(0,0,0,0.06)' }}>
+                                            <div className="d-flex align-items-start justify-content-between gap-2">
+                                                <div className="min-w-0">
+                                                    <div className="fw-bold text-dark text-truncate" style={{ fontSize: '.85rem' }}>{sub.staff}</div>
+                                                    <div className="text-muted text-truncate" style={{ fontSize: '.78rem' }}>{sub.task}</div>
+                                                </div>
+                                                <span
+                                                    className="badge"
+                                                    style={{
+                                                        background: sub.status === 'Reviewed' ? '#dcfce7' : '#fef9c3',
+                                                        color: sub.status === 'Reviewed' ? '#15803d' : '#a16207',
+                                                        fontSize: '.72rem',
+                                                        whiteSpace: 'nowrap'
+                                                    }}
+                                                >
+                                                    {sub.status}
+                                                </span>
+                                            </div>
+                                            <div className="d-flex align-items-center justify-content-between mt-2">
+                                                <div style={{ fontSize: '.72rem', color: '#64748b' }}>{sub.date}</div>
+                                                <button
+                                                    type="button"
+                                                    className="btn btn-xs btn-primary py-0 px-2 fw-bold"
+                                                    style={{ fontSize: '.75rem', background: 'var(--mubs-blue)' }}
+                                                    onClick={() => router.push(sub.status === 'Reviewed' ? '/department-head?pg=evaluations' : '/department-head?pg=submissions')}
+                                                >
+                                                    <span className="material-symbols-outlined" style={{ fontSize: '14px' }}>{sub.status === 'Reviewed' ? 'visibility' : 'rate_review'}</span>
+                                                    {sub.status === 'Reviewed' ? ' View' : ' Review'}
+                                                </button>
+                                            </div>
                                         </div>
-                                        <button className="btn btn-xs btn-outline-secondary mt-1 py-0 px-2 fw-bold" style={{ fontSize: '.72rem' }}>Details</button>
-                                    </div>
+                                    ))}
                                 </div>
-                            ))}
-                        </div>
-                    </div>
-
-                    {/* Quick actions */}
-                    <div className="table-card">
-                        <div className="table-card-header">
-                            <h5>
-                                <span className="material-symbols-outlined me-2" style={{ color: 'var(--mubs-blue)' }}>bolt</span>
-                                Quick Actions
-                            </h5>
-                        </div>
-                        <div className="p-3 d-flex flex-column gap-2">
-                            <button type="button" className="btn btn-outline-primary fw-bold text-start d-flex align-items-center gap-2" onClick={() => router.push('/department-head?pg=tasks')}>
-                                <span className="material-symbols-outlined" style={{ fontSize: '18px', color: 'var(--mubs-blue)' }}>add_task</span>
-                                Create Sub-Activity / Task
-                            </button>
-                            <button type="button" className="btn btn-outline-primary fw-bold text-start d-flex align-items-center gap-2" onClick={() => router.push('/department-head?pg=tasks')}>
-                                <span className="material-symbols-outlined" style={{ fontSize: '18px', color: 'var(--mubs-blue)' }}>assignment_ind</span>
-                                Assign Task to Staff
-                            </button>
-                            <button type="button" className="btn btn-outline-warning fw-bold text-start d-flex align-items-center gap-2 text-dark" onClick={() => router.push('/department-head?pg=submissions')}>
-                                <span className="material-symbols-outlined" style={{ fontSize: '18px', color: '#b45309' }}>inbox</span>
-                                Review Submissions
-                                <span className="badge bg-warning text-dark ms-auto">{stats.pendingSubmissions}</span>
-                            </button>
-                            <button type="button" className="btn btn-outline-danger fw-bold text-start d-flex align-items-center gap-2" onClick={() => router.push('/department-head?pg=staff')}>
-                                <span className="material-symbols-outlined" style={{ fontSize: '18px', color: 'var(--mubs-red)' }}>warning</span>
-                                View HR Warnings
-                                <span className="badge bg-danger ms-auto">{stats.hrAlerts}</span>
-                            </button>
-                            <button type="button" className="btn btn-outline-success fw-bold text-start d-flex align-items-center gap-2" onClick={() => router.push('/department-head?pg=evaluations')}>
-                                <span className="material-symbols-outlined" style={{ fontSize: '18px', color: '#059669' }}>rate_review</span>
-                                Evaluate Staff Reports
-                            </button>
+                            )}
                         </div>
                     </div>
                 </div>

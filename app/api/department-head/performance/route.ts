@@ -3,10 +3,19 @@ import { cookies } from 'next/headers';
 import { query } from '@/lib/db';
 import { verifyToken } from '@/lib/auth';
 import { getVisibleDepartmentIds, inPlaceholders } from '@/lib/department-head';
+import { sqlTopStrategicMain } from '@/lib/strategic-activity-sql';
 
 export const dynamic = 'force-dynamic';
 
 type Period = 'week' | 'month' | 'quarter';
+
+/** Same strategic-activity scope as `/api/dashboard/department-head` and `/api/department-head/activities`. */
+function activityVisibilitySql(): string {
+  return `(
+                  (${sqlTopStrategicMain('sa')})
+                  OR (sa.parent_id IS NOT NULL AND COALESCE(sa.source, '') = 'strategic_plan')
+                )`;
+}
 
 function getPeriodBounds(period: Period): { start: Date; buckets: { key: string; label: string }[] } {
     const now = new Date();
@@ -72,25 +81,42 @@ export async function GET(req: Request) {
         }
 
         const placeholders = inPlaceholders(departmentIds.length);
+        const vis = activityVisibilitySql();
         let rows: { db_status: string; eval_date: string; staff_id: number; staff_name: string }[] = [];
         try {
             const q = await query({
                 query: `
-                    SELECT 
-                        sr.status as db_status,
-                        DATE(COALESCE(e.evaluation_date, sr.updated_at)) as eval_date,
-                        aa.assigned_to_user_id as staff_id,
-                        u.full_name as staff_name
-                    FROM staff_reports sr
-                    JOIN activity_assignments aa ON sr.activity_assignment_id = aa.id
-                    JOIN strategic_activities sa ON aa.activity_id = sa.id
-                    LEFT JOIN strategic_activities p ON sa.parent_id = p.id
-                    LEFT JOIN evaluations e ON e.staff_report_id = sr.id
-                    LEFT JOIN users u ON u.id = aa.assigned_to_user_id
-                    WHERE (sa.department_id IN (${placeholders}) OR p.department_id IN (${placeholders}))
-                    AND sr.status IN ('evaluated', 'incomplete', 'not_done')
+                    SELECT db_status, eval_date, staff_id, staff_name FROM (
+                        SELECT 
+                            sr.status as db_status,
+                            DATE(COALESCE(e.evaluation_date, sr.updated_at)) as eval_date,
+                            aa.assigned_to_user_id as staff_id,
+                            u.full_name as staff_name
+                        FROM staff_reports sr
+                        INNER JOIN activity_assignments aa ON sr.activity_assignment_id = aa.id
+                        INNER JOIN strategic_activities sa ON aa.activity_id = sa.id
+                        LEFT JOIN evaluations e ON e.staff_report_id = sr.id
+                        LEFT JOIN users u ON u.id = aa.assigned_to_user_id
+                        WHERE sa.department_id IN (${placeholders})
+                          AND ${vis}
+                          AND sr.status IN ('evaluated', 'incomplete', 'not_done')
+                        UNION ALL
+                        SELECT 
+                            sr.status as db_status,
+                            DATE(COALESCE(e.evaluation_date, sr.updated_at)) as eval_date,
+                            spa.staff_id as staff_id,
+                            u.full_name as staff_name
+                        FROM staff_reports sr
+                        INNER JOIN staff_process_assignments spa ON sr.process_assignment_id = spa.id
+                        INNER JOIN strategic_activities sa ON spa.activity_id = sa.id
+                        LEFT JOIN evaluations e ON e.staff_report_id = sr.id
+                        LEFT JOIN users u ON u.id = spa.staff_id
+                        WHERE sa.department_id IN (${placeholders})
+                          AND ${vis}
+                          AND sr.status IN ('evaluated', 'incomplete', 'not_done')
+                    ) perf_rows
                 `,
-                values: [...departmentIds, ...departmentIds]
+                values: [...departmentIds, ...departmentIds],
             }) as any[];
             rows = q;
         } catch (e: any) {

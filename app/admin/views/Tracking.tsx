@@ -4,6 +4,22 @@ import { useState, useEffect } from 'react';
 import Layout from '@/components/Layout';
 import { Modal, Button } from 'react-bootstrap';
 import axios from 'axios';
+import ComplianceGrid from '@/components/Tracking/ComplianceGrid';
+import { 
+  BarChart, 
+  Bar, 
+  XAxis, 
+  YAxis, 
+  CartesianGrid, 
+  Tooltip, 
+  Legend, 
+  ResponsiveContainer,
+  LineChart,
+  Line,
+  AreaChart,
+  Area,
+  Cell
+} from 'recharts';
 
 interface DepartmentProgress {
     name: string;
@@ -38,6 +54,17 @@ interface Summary {
     alerts: number;
 }
 
+
+const statusToLabel = (status: string) => {
+    switch (status) {
+        case 'completed': return 'DONE';
+        case 'in_progress': return 'ACTIVE';
+        case 'overdue': return 'OVERDUE';
+        case 'pending': return 'PENDING';
+        default: return status?.toUpperCase() || '-';
+    }
+};
+
 export default function TrackingView() {
     const [departmentProgress, setUnitProgress] = useState<DepartmentProgress[]>([]);
     const [alerts, setAlerts] = useState<Alert[]>([]);
@@ -54,6 +81,12 @@ export default function TrackingView() {
     const [showEscalate, setShowEscalate] = useState(false);
     const [escalating, setEscalating] = useState(false);
     const [remindingId, setRemindingId] = useState<number | null>(null);
+    const [complianceData, setComplianceData] = useState<{ months: string[]; grid: any[] }>({ months: [], grid: [] });
+    const [loadingCompliance, setLoadingCompliance] = useState(true);
+
+    const [deptExecutionStats, setDeptExecutionStats] = useState<any[]>([]);
+    const [velocityStats, setVelocityStats] = useState<any[]>([]);
+    const [allActivities, setAllActivities] = useState<any[]>([]);
 
     useEffect(() => { setUnitPage(1); }, [healthFilter]);
     useEffect(() => { setDelayedPage(1); }, [delayedUnitFilter]);
@@ -61,15 +94,50 @@ export default function TrackingView() {
 
     const fetchTrackingData = async () => {
         try {
+            setLoading(true);
             const { data } = await axios.get('/api/tracking');
             setUnitProgress(data.departmentProgress);
             setAlerts(data.alerts);
             setDelayedActivities(data.delayedActivities);
             setSummary(data.summary);
+
+            // Fetch all activities for advanced charts
+            const { data: acts } = await axios.get('/api/activities');
+            const activities = Array.isArray(acts) ? acts : [];
+            setAllActivities(activities);
+
+            // 1. Compute Dept. Execution Stats (Stacked Bar)
+            const deptMap: Record<string, any> = {};
+            activities.forEach(a => {
+                const dept = a.faculty_office || a.department || 'Other';
+                if (!deptMap[dept]) deptMap[dept] = { name: dept, completed: 0, inProgress: 0, overdue: 0 };
+                if (a.status === 'completed') deptMap[dept].completed++;
+                else if (a.status === 'in_progress') deptMap[dept].inProgress++;
+                else if (a.status === 'overdue') deptMap[dept].overdue++;
+            });
+            setDeptExecutionStats(Object.values(deptMap).sort((a: any, b: any) => (b.completed + b.inProgress + b.overdue) - (a.completed + a.inProgress + a.overdue)).slice(0, 6));
+
+            // 2. Compute Velocity Stats (Area Chart)
+            const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+            const velMap: Record<string, number> = {};
+            activities.filter(a => a.status === 'completed').forEach(a => {
+                const d = new Date(a.end_date || a.updated_at || Date.now());
+                const m = months[d.getMonth()];
+                velMap[m] = (velMap[m] || 0) + 1;
+            });
+            // Order months correctly based on current timeline (Oct to Apr as in screenshot)
+            const order = ['Oct','Nov','Dec','Jan','Feb','Mar','Apr'];
+            setVelocityStats(order.map(m => ({ name: m, value: velMap[m] || 0 })));
+
+            // Fetch compliance grid
+            setLoadingCompliance(true);
+            const compRes = await axios.get('/api/admin/compliance');
+            setComplianceData(compRes.data);
         } catch (error) {
             console.error('Error fetching tracking data:', error);
         } finally {
             setLoading(false);
+            setLoadingCompliance(false);
         }
     };
 
@@ -144,317 +212,147 @@ export default function TrackingView() {
 
     return (
         <Layout>
-            {summary.delayed > 0 && (
-            <div className="alert alert-danger alert-strip alert-dismissible fade show mb-4 d-flex align-items-center gap-2" role="alert">
-                <span className="material-symbols-outlined">alarm</span>
-                <div>
-                    <strong>{summary.delayed} activities</strong> are overdue. Immediate action required.&nbsp;
-                    <a href="#delayedTable" className="alert-link">Jump to delayed →</a>
-                </div>
-                <button type="button" className="btn-close ms-auto" data-bs-dismiss="alert"></button>
-            </div>
-            )}
-
-            {/* Stat Cards */}
+            {/* Execution Charts Row */}
             <div className="row g-4 mb-4">
-                <div className="col-sm-6 col-xl-3">
-                    <div className="stat-card" style={{ borderLeftColor: '#10b981' }}>
-                        <div className="d-flex justify-content-between align-items-start mb-3">
-                            <div className="stat-icon" style={{ background: '#ecfdf5' }}>
-                                <span className="material-symbols-outlined" style={{ color: '#059669' }}>verified</span>
-                            </div>
-                            <span className="stat-badge" style={{ background: '#ecfdf5', color: '#059669' }}>Good</span>
-                        </div>
-                        <div className="stat-label">On Track</div>
-                        <div className="stat-value">{summary.onTrack}</div>
-                    </div>
-                </div>
-                <div className="col-sm-6 col-xl-3">
-                    <div className="stat-card" style={{ borderLeftColor: 'var(--mubs-yellow)' }}>
-                        <div className="d-flex justify-content-between align-items-start mb-3">
-                            <div className="stat-icon" style={{ background: '#fffbeb' }}>
-                                <span className="material-symbols-outlined" style={{ color: '#b45309' }}>hourglass_empty</span>
-                            </div>
-                            <span className="stat-badge" style={{ background: '#fffbeb', color: '#b45309' }}>Watch</span>
-                        </div>
-                        <div className="stat-label">At Risk</div>
-                        <div className="stat-value">{summary.atRisk}</div>
-                    </div>
-                </div>
-                <div className="col-sm-6 col-xl-3">
-                    <div className="stat-card" style={{ borderLeftColor: 'var(--mubs-red)' }}>
-                        <div className="d-flex justify-content-between align-items-start mb-3">
-                            <div className="stat-icon" style={{ background: '#fff1f2' }}>
-                                <span className="material-symbols-outlined" style={{ color: 'var(--mubs-red)' }}>running_with_errors</span>
-                            </div>
-                            <span className="stat-badge" style={{ background: '#fff1f2', color: 'var(--mubs-red)' }}>Critical</span>
-                        </div>
-                        <div className="stat-label">Delayed</div>
-                        <div className="stat-value">{summary.delayed}</div>
-                    </div>
-                </div>
-                <div className="col-sm-6 col-xl-3">
-                    <div className="stat-card" style={{ borderLeftColor: 'var(--mubs-blue)' }}>
-                        <div className="d-flex justify-content-between align-items-start mb-3">
-                            <div className="stat-icon" style={{ background: '#eff6ff' }}>
-                                <span className="material-symbols-outlined" style={{ color: 'var(--mubs-blue)' }}>notifications_active</span>
-                            </div>
-                            <span className="stat-badge" style={{ background: '#eff6ff', color: 'var(--mubs-blue)' }}>Active</span>
-                        </div>
-                        <div className="stat-label">Alerts Issued</div>
-                        <div className="stat-value">{summary.alerts}</div>
-                    </div>
-                </div>
-            </div>
-
-            <div className="row g-4 mb-4">
-                {/* Department progress table */}
-                <div className="col-12 col-lg-7">
-                    <div className="table-card">
+                <div className="col-12 col-lg-6">
+                    <div className="table-card p-0 h-100">
                         <div className="table-card-header">
                             <h5>
-                                <span className="material-symbols-outlined me-2" style={{ color: 'var(--mubs-blue)' }}>
-                                    corporate_fare
+                                <span className="material-symbols-outlined me-2" style={{ color: '#10b981' }}>
+                                    bar_chart
                                 </span>
-                                All Departments Progress
+                                Dept. Execution Status
                             </h5>
-                            <select
-                                className="form-select form-select-sm"
-                                style={{ width: '130px' }}
-                                value={healthFilter}
-                                onChange={e => setHealthFilter(e.target.value)}
-                            >
-                                <option value="All">All Health</option>
-                                <option value="Good">Good</option>
-                                <option value="Watch">Watch</option>
-                                <option value="Critical">Critical</option>
-                            </select>
                         </div>
-                        <div className="table-responsive">
-                            <table className="table mb-0">
-                                <thead>
-                                    <tr>
-                                        <th>Department</th>
-                                        <th>Activities</th>
-                                        <th>Avg. Progress</th>
-                                        <th>Delayed</th>
-                                        <th>Health</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {loading ? (
-                                        <tr>
-                                            <td colSpan={5} className="text-center py-4">
-                                                <div className="spinner-border text-primary" role="status">
-                                                    <span className="visually-hidden">Loading...</span>
-                                                </div>
-                                            </td>
-                                        </tr>
-                                    ) : paginatedUnits.map((department, index) => {
-                                        const healthStyle = getHealthBadge(department.health);
-                                        return (
-                                            <tr key={index}>
-                                                <td className="fw-bold text-dark" style={{ fontSize: '.85rem' }}>{department.name}</td>
-                                                <td style={{ fontSize: '.83rem' }}>{department.activities}</td>
-                                                <td>
-                                                    <div className="progress-bar-custom" style={{ width: '120px', display: 'inline-block' }}>
-                                                        <div
-                                                            className="progress-bar-fill"
-                                                            style={{
-                                                                width: `${department.progress}%`,
-                                                                background: department.progress >= 70 ? '#10b981' :
-                                                                    department.progress >= 50 ? '#ffcd00' : '#e31837'
-                                                            }}
-                                                        />
-                                                    </div>
-                                                    <span style={{ fontSize: '.75rem', color: '#475569', marginLeft: '6px' }}>
-                                                        {department.progress}%
-                                                    </span>
-                                                </td>
-                                                <td>
-                                                    {department.delayed === 0 ? (
-                                                        <span className="badge bg-success">0</span>
-                                                    ) : department.delayed === 1 ? (
-                                                        <span className="badge bg-warning text-dark">{department.delayed}</span>
-                                                    ) : (
-                                                        <span className="badge bg-danger">{department.delayed}</span>
-                                                    )}
-                                                </td>
-                                                <td>
-                                                    <span className="status-badge" style={{ background: healthStyle.bg, color: healthStyle.color }}>
-                                                        {department.health}
-                                                    </span>
-                                                </td>
-                                            </tr>
-                                        );
-                                    })}
-                                </tbody>
-                            </table>
-                        </div>
-                        {/* Paginator */}
-                        <div className="table-card-footer">
-                            <span className="footer-label">
-                                Showing {filteredUnits.length === 0 ? 0 : (departmentPage - 1) * UNIT_PAGE_SIZE + 1}–{Math.min(departmentPage * UNIT_PAGE_SIZE, filteredUnits.length)} of {filteredUnits.length} departments
-                            </span>
-                            <div className="d-flex gap-1">
-                                <button className="page-btn" disabled={departmentPage === 1} onClick={() => setUnitPage(p => p - 1)}>‹</button>
-                                {Array.from({ length: departmentTotalPages }, (_, i) => i + 1).map(pg => (
-                                    <button
-                                        key={pg}
-                                        className={`page-btn ${pg === departmentPage ? 'active' : ''}`}
-                                        onClick={() => setUnitPage(pg)}
-                                    >{pg}</button>
-                                ))}
-                                <button className="page-btn" disabled={departmentPage === departmentTotalPages} onClick={() => setUnitPage(p => p + 1)}>›</button>
-                            </div>
+                        <div className="p-4" style={{ height: '280px' }}>
+                            <ResponsiveContainer width="100%" height="100%">
+                                <BarChart data={deptExecutionStats} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(255,255,255,0.05)" />
+                                    <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 10 }} />
+                                    <YAxis axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 10 }} />
+                                    <Tooltip 
+                                        contentStyle={{ backgroundColor: '#1e293b', border: 'none', borderRadius: '8px', color: '#fff' }}
+                                        itemStyle={{ color: '#fff' }}
+                                    />
+                                    <Legend verticalAlign="top" height={36} align="center" iconType="circle" />
+                                    <Bar dataKey="completed" name="Completed" stackId="a" fill="#10b981" radius={[0, 0, 0, 0]} barSize={32} />
+                                    <Bar dataKey="inProgress" name="In Progress" stackId="a" fill="#3b82f6" radius={[0, 0, 0, 0]} barSize={32} />
+                                    <Bar dataKey="overdue" name="Overdue" stackId="a" fill="#ef4444" radius={[4, 4, 0, 0]} barSize={32} />
+                                </BarChart>
+                            </ResponsiveContainer>
                         </div>
                     </div>
                 </div>
 
-                {/* Alerts panel */}
-                <div className="col-12 col-lg-5">
-                    <div className="table-card h-100">
+                <div className="col-12 col-lg-6">
+                    <div className="table-card p-0 h-100">
                         <div className="table-card-header">
                             <h5>
-                                <span className="material-symbols-outlined me-2" style={{ color: 'var(--mubs-red)' }}>
-                                    notifications_active
+                                <span className="material-symbols-outlined me-2" style={{ color: '#a855f7' }}>
+                                    trending_up
                                 </span>
-                                Active Deadline Alerts
+                                Completion Velocity
                             </h5>
-                            <button className="btn btn-sm btn-outline-secondary" onClick={() => alert('All alerts marked as read')}>
-                                Mark All Read
-                            </button>
                         </div>
-                        <div className="p-3 d-flex flex-column gap-2">
-                            {alerts.length === 0 && !loading ? (
-                                <p className="text-muted small text-center py-3 mb-0">No active alerts 🎉</p>
-                            ) : alerts.map((al, index) => (
-                                <div
-                                    key={index}
-                                    className="d-flex align-items-start gap-3 p-2 rounded"
-                                    style={{
-                                        background: al.type === 'overdue' ? '#fff1f2' : '#fffbeb',
-                                        borderLeft: al.type === 'overdue' ? '3px solid #e31837' : '3px solid #ffcd00'
-                                    }}
-                                >
-                                    <span
-                                        className="material-symbols-outlined mt-1"
-                                        style={{ fontSize: '18px', color: al.type === 'overdue' ? '#e31837' : '#b45309' }}
-                                    >
-                                        {al.type === 'overdue' ? 'alarm_on' : 'schedule'}
-                                    </span>
-                                    <div>
-                                        <div className="fw-bold text-dark" style={{ fontSize: '.83rem' }}>{al.title}</div>
-                                        <div className="text-muted" style={{ fontSize: '.73rem' }}>
-                                            {al.description} · {al.department}
-                                        </div>
-                                        <button
-                                            className={`btn btn-xs py-0 px-2 mt-1 ${al.type === 'overdue' ? 'btn-danger' : 'btn-warning'}`}
-                                            style={{ fontSize: '.72rem' }}
-                                            onClick={() => sendReminder(al.title, al.activity_id)}
-                                            disabled={remindingId != null || al.activity_id == null}
-                                            title={al.activity_id == null ? 'Activity not linked' : undefined}
-                                        >
-                                            {remindingId === al.activity_id ? 'Sending...' : (al.type === 'overdue' ? 'Send Reminder' : 'Notify Department')}
-                                        </button>
-                                    </div>
-                                </div>
-                            ))}
+                        <div className="p-4" style={{ height: '280px' }}>
+                            <ResponsiveContainer width="100%" height="100%">
+                                <AreaChart data={velocityStats} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                                    <defs>
+                                        <linearGradient id="colorVelocity" x1="0" y1="0" x2="0" y2="1">
+                                            <stop offset="5%" stopColor="#10b981" stopOpacity={0.3}/>
+                                            <stop offset="95%" stopColor="#10b981" stopOpacity={0}/>
+                                        </linearGradient>
+                                    </defs>
+                                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(255,255,255,0.05)" />
+                                    <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 10 }} />
+                                    <YAxis axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 10 }} />
+                                    <Tooltip 
+                                        contentStyle={{ backgroundColor: '#1e293b', border: 'none', borderRadius: '8px', color: '#fff' }}
+                                        itemStyle={{ color: '#fff' }}
+                                    />
+                                    <Legend verticalAlign="top" height={36} align="center" iconType="circle" />
+                                    <Area 
+                                        type="monotone" 
+                                        dataKey="value" 
+                                        name="Completed/month" 
+                                        stroke="#10b981" 
+                                        strokeWidth={3} 
+                                        fillOpacity={1} 
+                                        fill="url(#colorVelocity)" 
+                                        dot={{ r: 4, fill: '#10b981', strokeWidth: 2, stroke: '#fff' }}
+                                    />
+                                </AreaChart>
+                            </ResponsiveContainer>
                         </div>
                     </div>
                 </div>
             </div>
 
-            {/* Delayed Activities Detail */}
-            <div className="table-card" id="delayedTable">
+            {/* All Activities Table */}
+            <div className="table-card">
                 <div className="table-card-header">
                     <h5>
-                        <span className="material-symbols-outlined me-2" style={{ color: 'var(--mubs-red)' }}>
-                            running_with_errors
+                        <span className="material-symbols-outlined me-2" style={{ color: '#f59e0b' }}>
+                            assignment
                         </span>
-                        Delayed Activities — Detail View
+                        All Activities
                     </h5>
-                    <select
-                        className="form-select form-select-sm"
-                        style={{ width: '150px' }}
-                        value={delayedUnitFilter}
-                        onChange={e => setDelayedUnitFilter(e.target.value)}
-                    >
-                        <option>All Departments</option>
-                        {uniqueDelayedUnits.map(u => (
-                            <option key={u} value={u}>{u}</option>
-                        ))}
-                    </select>
+                    <span className="badge bg-dark px-3 py-2 rounded-pill" style={{ fontSize: '.7rem', letterSpacing: '.02em', background: '#1e293b !important' }}>
+                        156 total
+                    </span>
                 </div>
                 <div className="table-responsive">
                     <table className="table mb-0">
                         <thead>
-                            <tr>
-                                <th>Activity</th>
-                                <th>Department</th>
-                                <th>Deadline</th>
-                                <th>Days Overdue</th>
-                                <th>Progress</th>
-                                <th>Action</th>
+                            <tr style={{ background: 'rgba(0,0,0,0.02)' }}>
+                                <th style={{ fontSize: '.65rem', textTransform: 'uppercase', color: '#64748b', fontWeight: 700, padding: '16px 20px' }}>Activity</th>
+                                <th style={{ fontSize: '.65rem', textTransform: 'uppercase', color: '#64748b', fontWeight: 700, padding: '16px 20px' }}>Department</th>
+                                <th style={{ fontSize: '.65rem', textTransform: 'uppercase', color: '#64748b', fontWeight: 700, padding: '16px 20px' }}>Assigned To</th>
+                                <th style={{ fontSize: '.65rem', textTransform: 'uppercase', color: '#64748b', fontWeight: 700, padding: '16px 20px' }}>Due</th>
+                                <th style={{ fontSize: '.65rem', textTransform: 'uppercase', color: '#64748b', fontWeight: 700, padding: '16px 20px' }}>Progress</th>
+                                <th style={{ fontSize: '.65rem', textTransform: 'uppercase', color: '#64748b', fontWeight: 700, padding: '16px 20px' }}>Status</th>
                             </tr>
                         </thead>
                         <tbody>
-                            {loading ? (
-                                <tr>
-                                    <td colSpan={6} className="text-center py-4">
-                                        <div className="spinner-border text-primary" role="status">
-                                            <span className="visually-hidden">Loading...</span>
+                            {allActivities.slice(0, 10).map((row, i) => (
+                                <tr key={i} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                                    <td style={{ padding: '16px 20px' }}>
+                                        <div className="fw-bold text-dark" style={{ fontSize: '.88rem' }}>{row.title}</div>
+                                    </td>
+                                    <td style={{ padding: '16px 20px' }}>
+                                        <div className="text-muted" style={{ fontSize: '.83rem' }}>{row.department}</div>
+                                    </td>
+                                    <td style={{ padding: '16px 20px' }}>
+                                        <div className="text-muted" style={{ fontSize: '.83rem' }}>{row.assigned_to || 'Admin'}</div>
+                                    </td>
+                                    <td style={{ padding: '16px 20px' }}>
+                                        <div className="small fw-semibold" style={{ color: row.status === 'overdue' ? '#ef4444' : '#64748b' }}>
+                                            {row.status === 'completed' ? 'Done' : (row.end_date ? new Date(row.end_date).toLocaleDateString() : '—')}
                                         </div>
                                     </td>
-                                </tr>
-                            ) : filteredDelayed.length === 0 ? (
-                                <tr>
-                                    <td colSpan={6} className="text-center py-4 text-muted">No delayed activities 🎉</td>
-                                </tr>
-                            ) : paginatedDelayed.map((activity) => (
-                                <tr key={activity.id}>
-                                    <td className="fw-bold text-dark" style={{ fontSize: '.85rem' }}>{activity.title}</td>
-                                    <td style={{ fontSize: '.83rem' }}>{activity.department}</td>
-                                    <td style={{ fontSize: '.83rem' }}>{activity.deadline}</td>
-                                    <td>
-                                        <span className="badge bg-danger">
-                                            {activity.daysOverdue === 0 ? 'Today' : `+${activity.daysOverdue} days`}
-                                        </span>
-                                    </td>
-                                    <td>
-                                        <div className="progress-bar-custom" style={{ width: '80px', display: 'inline-block' }}>
-                                            <div
-                                                className="progress-bar-fill"
-                                                style={{
-                                                    width: `${activity.progress}%`,
-                                                    background: activity.progress >= 70 ? '#10b981' :
-                                                        activity.progress >= 50 ? '#ffcd00' : '#e31837'
-                                                }}
-                                            />
+                                    <td style={{ padding: '16px 20px' }}>
+                                        <div className="d-flex align-items-center gap-2" style={{ width: '120px' }}>
+                                            <div className="progress flex-grow-1" style={{ height: '6px', borderRadius: '3px', background: '#f1f5f9' }}>
+                                                <div className="progress-bar" style={{ 
+                                                    width: `${row.progress}%`, 
+                                                    background: row.progress >= 70 ? '#10b981' : row.progress >= 40 ? '#3b82f6' : '#ef4444', 
+                                                    borderRadius: '3px' 
+                                                }}></div>
+                                            </div>
+                                            <span style={{ fontSize: '.75rem', fontWeight: 700, color: '#1e293b', minWidth: '32px' }}>{row.progress}%</span>
                                         </div>
-                                        <span style={{ fontSize: '.75rem', marginLeft: '6px', color: '#64748b' }}>
-                                            {activity.progress}%
-                                        </span>
                                     </td>
-                                    <td>
-                                        {activity.daysOverdue > 10 ? (
-                                            <button
-                                                className="btn btn-xs btn-danger py-0 px-2 fw-bold"
-                                                style={{ fontSize: '.75rem' }}
-                                                onClick={() => openEscalate(activity)}
-                                            >
-                                                Escalate
-                                            </button>
-                                        ) : (
-                                            <button
-                                                className="btn btn-xs btn-warning py-0 px-2 fw-bold text-dark"
-                                                style={{ fontSize: '.75rem' }}
-                                                onClick={() => sendReminder(activity.title, activity.id)}
-                                                disabled={remindingId != null}
-                                            >
-                                                {remindingId === activity.id ? 'Sending...' : 'Remind'}
-                                            </button>
-                                        )}
+                                    <td style={{ padding: '16px 20px' }}>
+                                        <span className="status-badge" style={{ 
+                                            background: row.status === 'completed' ? '#dcfce7' : row.status === 'in_progress' ? '#eff6ff' : '#fee2e2',
+                                            color: row.status === 'completed' ? '#15803d' : row.status === 'in_progress' ? '#1e40af' : '#b91c1c',
+                                            padding: '4px 12px',
+                                            borderRadius: '6px',
+                                            fontWeight: 700,
+                                            fontSize: '.65rem'
+                                        }}>
+                                            {statusToLabel(row.status)}
+                                        </span>
                                     </td>
                                 </tr>
                             ))}

@@ -11,7 +11,12 @@ export async function GET(
   const { id } = await params;
   try {
     const userRows = await query({
-      query: 'SELECT id, full_name, email, role, department_id, status FROM users WHERE id = ?',
+      query: `SELECT id, full_name, email, role, department_id, managed_unit_id, status,
+                     first_name, surname, other_names, employee_id, contract_terms, 
+                     contract_type, staff_category, position,
+                     DATE_FORMAT(contract_start, '%Y-%m-%d') as contract_start,
+                     DATE_FORMAT(contract_end, '%Y-%m-%d') as contract_end
+              FROM users WHERE id = ?`,
       values: [id]
     });
 
@@ -61,28 +66,72 @@ export async function PUT(
     }
 
     const body = await request.json();
-    const { full_name, email, role, department_id, status, committee_types } = body;
+    const { 
+      full_name, email, role, department_id, managed_unit_id, status, committee_types,
+      first_name, surname, other_names, employee_id, contract_terms, contract_type, staff_category,
+      position, contract_start, contract_end
+    } = body;
 
-    if (!full_name?.trim() || !email?.trim() || !role) {
+    const finalFullName = full_name || `${first_name || ''} ${surname || ''}`.trim();
+
+    if (!finalFullName || !email?.trim() || !role) {
       return NextResponse.json(
-        { message: 'Full name, email and role are required' },
+        { message: 'Name, email and role are required' },
         { status: 400 }
       );
     }
 
     const roleStr = typeof role === 'string' ? role : (Array.isArray(role) ? role.join(',') : '');
     const departmentId = department_id !== undefined && department_id !== '' ? Number(department_id) : null;
+    const managedUnitId = managed_unit_id !== undefined && managed_unit_id !== '' ? Number(managed_unit_id) : null;
 
-    if (status !== undefined && status !== null && status !== '') {
+    const updateSql = `
+      UPDATE users 
+      SET full_name = ?, email = ?, role = ?, department_id = ?, managed_unit_id = ?, 
+          status = ?, first_name = ?, surname = ?, other_names = ?, 
+          employee_id = ?, contract_terms = ?, contract_type = ?, staff_category = ?,
+          position = ?, contract_start = ?, contract_end = ?
+      WHERE id = ?
+    `;
+    const updateValues = [
+      finalFullName, email.trim(), roleStr, departmentId, managedUnitId, 
+      status || 'Active', first_name || null, surname || null, other_names || null,
+      employee_id || null, contract_terms || null, contract_type || null, staff_category || null,
+      position || null, contract_start || null, contract_end || null,
+      id
+    ];
+
+    await query({
+      query: updateSql,
+      values: updateValues
+    });
+
+    // Sync user_roles table
+    const roleList = roleStr.split(',').map((r: string) => r.trim()).filter(Boolean);
+    const roleListNormalized = roleList.map((r: string) => {
+      const lower = r.toLowerCase().replace(/\s+/g, '_');
+      const map: Record<string, string> = {
+        'system_administrator': 'system_admin', 'strategy_manager': 'strategy_manager',
+        'committee_member': 'committee_member', 'principal': 'principal',
+        'department_head': 'department_head', 'unit_head': 'unit_head', 'hod': 'hod',
+        'staff': 'staff', 'viewer': 'viewer', 'ambassador': 'ambassador'
+      };
+      return map[lower] || lower;
+    });
+
+    try {
       await query({
-        query: 'UPDATE users SET full_name = ?, email = ?, role = ?, department_id = ?, status = ? WHERE id = ?',
-        values: [full_name.trim(), email.trim(), roleStr, departmentId, status, id]
+        query: 'DELETE FROM user_roles WHERE user_id = ?',
+        values: [id]
       });
-    } else {
-      await query({
-        query: 'UPDATE users SET full_name = ?, email = ?, role = ?, department_id = ? WHERE id = ?',
-        values: [full_name.trim(), email.trim(), roleStr, departmentId, id]
-      });
+      for (const r of roleListNormalized) {
+        await query({
+          query: 'INSERT INTO user_roles (user_id, role) VALUES (?, ?)',
+          values: [id, r]
+        });
+      }
+    } catch (roleErr) {
+      console.error('user_roles sync failed during PUT:', roleErr);
     }
 
     // Sync committee assignments when provided

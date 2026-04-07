@@ -134,9 +134,10 @@ const EvaluationCardGrid: React.FC<EvaluationCardGridProps> = ({ evaluations, on
                                         className="btn btn-primary btn-sm fw-bold d-flex align-items-center gap-1 px-4 py-2 shadow-sm"
                                         style={{ borderRadius: '10px', fontSize: '0.75rem', background: 'var(--mubs-blue)' }}
                                         onClick={() => onEvaluate(e)}
+                                        title="Review this submission"
                                     >
-                                        <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>rate_review</span>
-                                        Evaluate
+                                        <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>fact_check</span>
+                                        Review
                                     </button>
                                 ) : (
                                     <button
@@ -145,7 +146,7 @@ const EvaluationCardGrid: React.FC<EvaluationCardGridProps> = ({ evaluations, on
                                         onClick={() => onView(e)}
                                     >
                                         <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>visibility</span>
-                                        View Record
+                                        View record
                                     </button>
                                 )}
                             </div>

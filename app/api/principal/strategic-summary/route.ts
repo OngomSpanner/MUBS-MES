@@ -26,7 +26,7 @@ export async function GET() {
                     COALESCE(SUM(CASE WHEN status IN ('in_progress', 'pending') THEN 1 ELSE 0 END), 0) as \`inProgress\`,
                     COALESCE(SUM(CASE WHEN status = 'overdue' OR (end_date IS NOT NULL AND end_date < CURDATE() AND status != 'completed') THEN 1 ELSE 0 END), 0) as \`delayed\`
                 FROM strategic_activities
-                WHERE parent_id IS NULL AND source IS NOT NULL
+                WHERE parent_id IS NULL AND COALESCE(TRIM(source), '') <> ''
             `
             })) as any[];
         } catch (e: any) {
@@ -53,7 +53,7 @@ export async function GET() {
                     COALESCE(SUM(CASE WHEN sa.status IN ('in_progress', 'pending') THEN 1 ELSE 0 END), 0) as inProgressCount,
                     COALESCE(SUM(CASE WHEN sa.status = 'overdue' OR (sa.end_date IS NOT NULL AND sa.end_date < CURDATE() AND sa.status != 'completed') THEN 1 ELSE 0 END), 0) as delayedCount
                 FROM departments d
-                LEFT JOIN strategic_activities sa ON d.id = sa.department_id AND sa.parent_id IS NULL AND sa.source IS NOT NULL
+                LEFT JOIN strategic_activities sa ON d.id = sa.department_id AND sa.parent_id IS NULL AND COALESCE(TRIM(sa.source), '') <> ''
                 WHERE d.is_active = 1
                 GROUP BY d.id, d.parent_id, d.unit_type, d.name, d.hod_id
                 ORDER BY (d.parent_id IS NULL) DESC, d.name ASC
@@ -74,7 +74,7 @@ export async function GET() {
                 SELECT sa.id, sa.title, sa.department_id, sa.progress, sa.pillar,
                     CASE sa.status WHEN 'completed' THEN 'On Track' WHEN 'in_progress' THEN 'In Progress' WHEN 'overdue' THEN 'Delayed' ELSE 'Pending' END as status
                 FROM strategic_activities sa
-                WHERE sa.parent_id IS NULL AND sa.source IS NOT NULL
+                WHERE sa.parent_id IS NULL AND COALESCE(TRIM(sa.source), '') <> ''
                 ORDER BY sa.department_id, sa.updated_at DESC
             `
             })) as any[];
@@ -93,7 +93,7 @@ export async function GET() {
                 SELECT sa.id, sa.title, sa.department_id, sa.description, sa.end_date,
                     DATEDIFF(sa.end_date, CURDATE()) as daysLeft
                 FROM strategic_activities sa
-                WHERE sa.parent_id IS NULL AND sa.source IS NOT NULL
+                WHERE sa.parent_id IS NULL AND COALESCE(TRIM(sa.source), '') <> ''
                 AND sa.status != 'completed'
                 AND (sa.status = 'overdue' OR (sa.end_date IS NOT NULL AND sa.end_date < CURDATE()))
             `
@@ -125,7 +125,7 @@ export async function GET() {
                 query: `
                 SELECT department_id, pillar
                 FROM strategic_activities
-                WHERE parent_id IS NULL AND pillar IS NOT NULL AND department_id IS NOT NULL AND source IS NOT NULL
+                WHERE parent_id IS NULL AND pillar IS NOT NULL AND department_id IS NOT NULL AND COALESCE(TRIM(source), '') <> ''
                 GROUP BY department_id, pillar
             `
             })) as any[];
@@ -163,7 +163,7 @@ export async function GET() {
                     COALESCE(SUM(CASE WHEN sa.status IN ('in_progress', 'pending') THEN 1 ELSE 0 END), 0) as inProgress,
                     COALESCE(SUM(CASE WHEN sa.status = 'overdue' OR (sa.end_date IS NOT NULL AND sa.end_date < CURDATE() AND sa.status != 'completed') THEN 1 ELSE 0 END), 0) as delayed
                 FROM strategic_activities sa
-                WHERE sa.parent_id IS NULL AND sa.source IS NOT NULL
+                WHERE sa.parent_id IS NULL AND COALESCE(TRIM(sa.source), '') <> ''
                 GROUP BY sa.pillar
                 ORDER BY avgProgress DESC, totalActivities DESC
             `

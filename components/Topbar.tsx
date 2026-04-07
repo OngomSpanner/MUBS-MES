@@ -69,7 +69,7 @@ export default function Topbar({ pageTitle, toggleSidebar }: TopbarProps) {
           <span className="material-symbols-outlined">menu</span>
         </button>
         <nav className="breadcrumb-nav d-flex align-items-center text-white-50">
-          <span>Home</span>
+          <span>{activeRole ? formatRoleForDisplay(activeRole) : 'Portal'}</span>
           <span className="material-symbols-outlined" style={{ fontSize: '14px', color: '#93c5fd', margin: '0 .3rem' }}>
             chevron_right
           </span>
@@ -124,7 +124,7 @@ export default function Topbar({ pageTitle, toggleSidebar }: TopbarProps) {
               <li><hr className="dropdown-divider" /></li>
               <li><h6 className="dropdown-header text-muted small pb-1">Switch Role</h6></li>
               {roles.map(role => (
-                role !== activeRole ? (
+                normalizeRoleForCookie(role) !== activeRole ? (
                   <li key={role}>
                     <button
                       className="dropdown-item d-flex align-items-center justify-content-between"

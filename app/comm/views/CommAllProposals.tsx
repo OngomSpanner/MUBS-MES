@@ -57,10 +57,10 @@ export default function CommAllProposals({ showOnlyMine }: CommAllProposalsProps
     return (
         <div className="content-area-comm">
             <div className="row g-3 mb-4">
-                <div className="col-6 col-sm-3"><div className="stat-card text-center" style={{ borderLeftColor: '#7c3aed', padding: '.9rem' }}><div className="stat-value" style={{ fontSize: '1.8rem', color: '#7c3aed' }}>{loading ? '…' : total}</div><div className="stat-label">Total</div></div></div>
-                <div className="col-6 col-sm-3"><div className="stat-card text-center" style={{ borderLeftColor: 'var(--mubs-yellow)', padding: '.9rem' }}><div className="stat-value" style={{ fontSize: '1.8rem', color: '#b45309' }}>{loading ? '…' : pendingCount}</div><div className="stat-label">Pending</div></div></div>
-                <div className="col-6 col-sm-3"><div className="stat-card text-center" style={{ borderLeftColor: '#10b981', padding: '.9rem' }}><div className="stat-value" style={{ fontSize: '1.8rem', color: '#059669' }}>{loading ? '…' : approvedCount}</div><div className="stat-label">Approved</div></div></div>
-                <div className="col-6 col-sm-3"><div className="stat-card text-center" style={{ borderLeftColor: 'var(--mubs-red)', padding: '.9rem' }}><div className="stat-value" style={{ fontSize: '1.8rem', color: 'var(--mubs-red)' }}>{loading ? '…' : rejectedCount}</div><div className="stat-label">Rejected</div></div></div>
+                <div className="col-6 col-sm-3"><div className="stat-card text-center" style={{ borderLeftColor: '#7c3aed', padding: '.45rem .5rem' }}><div className="stat-value" style={{ fontSize: '1.05rem', color: '#7c3aed' }}>{loading ? '…' : total}</div><div className="stat-label">Total</div></div></div>
+                <div className="col-6 col-sm-3"><div className="stat-card text-center" style={{ borderLeftColor: 'var(--mubs-yellow)', padding: '.45rem .5rem' }}><div className="stat-value" style={{ fontSize: '1.05rem', color: '#b45309' }}>{loading ? '…' : pendingCount}</div><div className="stat-label">Pending</div></div></div>
+                <div className="col-6 col-sm-3"><div className="stat-card text-center" style={{ borderLeftColor: '#10b981', padding: '.45rem .5rem' }}><div className="stat-value" style={{ fontSize: '1.05rem', color: '#059669' }}>{loading ? '…' : approvedCount}</div><div className="stat-label">Approved</div></div></div>
+                <div className="col-6 col-sm-3"><div className="stat-card text-center" style={{ borderLeftColor: 'var(--mubs-red)', padding: '.45rem .5rem' }}><div className="stat-value" style={{ fontSize: '1.05rem', color: 'var(--mubs-red)' }}>{loading ? '…' : rejectedCount}</div><div className="stat-label">Rejected</div></div></div>
             </div>
 
             <div className="table-card">

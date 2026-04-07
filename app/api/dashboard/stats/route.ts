@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { query } from '@/lib/db';
 import { cookies } from 'next/headers';
 import { verifyToken } from '@/lib/auth';
+import { SQL_TOP_STRATEGIC_MAIN_NO_ALIAS } from '@/lib/strategic-activity-sql';
 
 export async function GET() {
   try {
@@ -15,8 +16,8 @@ export async function GET() {
       return NextResponse.json({ message: 'Invalid token' }, { status: 401 });
     }
 
-    // Main strategic activities only (parent_id IS NULL and source IS NOT NULL); excludes HOD-created tasks
-    const mainOnly = 'WHERE parent_id IS NULL AND source IS NOT NULL';
+    // Main strategic activities only; excludes departmental tasks (empty source). MySQL: '' satisfies IS NOT NULL.
+    const mainOnly = `WHERE ${SQL_TOP_STRATEGIC_MAIN_NO_ALIAS}`;
 
     // Get total activities (main/strategic goals only)
     const totalActivities = await query({
@@ -68,7 +69,7 @@ export async function GET() {
         SELECT parent.id, parent.name, ROUND(AVG(sa.progress)) AS progress
         FROM departments parent
         LEFT JOIN departments child ON child.parent_id = parent.id
-        LEFT JOIN strategic_activities sa ON (sa.department_id = child.id OR sa.department_id = parent.id) AND sa.parent_id IS NULL AND sa.source IS NOT NULL
+        LEFT JOIN strategic_activities sa ON (sa.department_id = child.id OR sa.department_id = parent.id) AND sa.parent_id IS NULL AND COALESCE(TRIM(sa.source), '') <> ''
         WHERE parent.parent_id IS NULL
         GROUP BY parent.id, parent.name
         ORDER BY progress DESC, parent.name ASC

@@ -9,6 +9,7 @@ function dashboardPathForRole(activeRole: string | undefined) {
     if (r === 'principal') return '/principal';
     if (r === 'department head' || r === 'unit head' || r === 'hod') return '/department-head';
     if (r === 'staff' || r === 'viewer') return '/staff';
+    if (r === 'ambassador') return '/ambassador';
     return null;
 }
 
@@ -29,7 +30,8 @@ export function middleware(request: NextRequest) {
         '/comm': ['Committee Member'],
         '/principal': ['Principal'],
         '/department-head': ['Department Head', 'Unit Head', 'HOD'],
-        '/staff': ['Staff', 'Viewer'] // Fallbacks
+        '/staff': ['Staff', 'Viewer'], // Fallbacks
+        '/ambassador': ['Ambassador']
     };
 
     // Find if current path requires a specific role

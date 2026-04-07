@@ -32,12 +32,30 @@ export async function GET() {
                     u.full_name,
                     u.email,
                     u.position,
-                    u.leave_status,
-                    u.contract_end_date,
-                    (SELECT COUNT(*) FROM activity_assignments WHERE assigned_to_user_id = u.id AND status NOT IN ('completed')) as active_tasks
+                    COALESCE(u.leave_status, 'On Duty') AS leave_status,
+                    COALESCE(u.contract_end_date, u.contract_end) AS contract_end_date,
+                    u.employee_id,
+                    u.employment_status,
+                    u.contract_type,
+                    u.staff_category,
+                    u.contract_start_date,
+                    u.status AS account_status,
+                    (
+                        (
+                            SELECT COUNT(*) FROM activity_assignments aa_cnt
+                            WHERE aa_cnt.assigned_to_user_id = u.id
+                            AND LOWER(TRIM(COALESCE(aa_cnt.status, ''))) NOT IN ('completed', 'evaluated', 'not_done')
+                        )
+                        + (
+                            SELECT COUNT(*) FROM staff_process_assignments spa_cnt
+                            WHERE spa_cnt.staff_id = u.id
+                            AND LOWER(TRIM(COALESCE(spa_cnt.status, ''))) NOT IN ('evaluated', 'completed', 'not_done')
+                        )
+                    ) AS active_tasks
                 FROM users u
                 WHERE u.department_id IN (${placeholders})
                 AND u.role NOT LIKE '%Admin%' AND u.role NOT LIKE '%Principal%'
+                ORDER BY u.full_name ASC
             `,
             values: [...departmentIds]
         }) as any[];

@@ -117,7 +117,6 @@ export default function StaffSubmitReport() {
                         </div>
                         <div className="p-4">
                             <div className="row g-3">
-
                                 {/* Task select */}
                                 <div className="col-12">
                                     <label className="form-label fw-black text-dark small">Select Task <span className="text-danger">*</span></label>
@@ -176,14 +175,19 @@ export default function StaffSubmitReport() {
                                     <textarea
                                         className="form-control"
                                         rows={5}
-                                        placeholder="Describe what was done, what remains, any challenges encountered...&#10;&#10;e.g. Installed and configured 2 of 4 network switches in Lab A. Encountered IP conflict issue — resolved by reassigning VLAN. Lab B configuration pending hardware delivery on 22 Apr."
+                                        placeholder="Describe what was done, what remains, any challenges encountered..."
                                         value={description}
                                         onChange={(e) => setDescription(e.target.value)}
                                         disabled={loadingSubmit}
                                     ></textarea>
-                                                              {/* File upload zone */}
+                                </div>
+
+                                {/* File upload zone */}
                                 <div className="col-12">
-                                    <label className="form-label fw-black text-dark small d-flex align-items-center gap-2"><span className="material-symbols-outlined" style={{ fontSize: '18px', color: 'var(--mubs-blue)' }}>attach_file</span>Attach Supporting File</label>
+                                    <label className="form-label fw-black text-dark small d-flex align-items-center gap-2">
+                                        <span className="material-symbols-outlined" style={{ fontSize: '18px', color: 'var(--mubs-blue)' }}>attach_file</span>
+                                        Attach Supporting File
+                                    </label>
                                     <div className="upload-zone position-relative">
                                         <input
                                             type="file"
@@ -208,28 +212,29 @@ export default function StaffSubmitReport() {
                                     )}
                                 </div>
 
-                                {/* Link section moved below file */}
+                                {/* Link section */}
                                 <div className="col-12">
-                                    <label className="form-label fw-black text-dark small d-flex align-items-center gap-2"><span className="material-symbols-outlined" style={{ fontSize: '18px', color: 'var(--mubs-blue)' }}>link</span>Download link (Google Drive, SharePoint, etc.)</label>
+                                    <label className="form-label fw-black text-dark small d-flex align-items-center gap-2">
+                                        <span className="material-symbols-outlined" style={{ fontSize: '18px', color: 'var(--mubs-blue)' }}>link</span>
+                                        Download link (Google Drive, SharePoint, etc.)
+                                    </label>
                                     <div className="input-group">
                                         <span className="input-group-text bg-white"><span className="material-symbols-outlined" style={{ fontSize: '18px', color: '#94a3b8' }}>insert_link</span></span>
                                         <input
                                             type="url"
                                             className="form-control"
-                                            id="evidenceLinkInput"
                                             placeholder="https://drive.google.com/file/..."
                                             value={evidenceLink}
                                             onChange={(e) => setEvidenceLink(e.target.value)}
                                             disabled={loadingSubmit}
                                         />
-                                        <button className="btn btn-outline-secondary fw-bold" type="button" onClick={() => evidenceLink ? window.open(evidenceLink, '_blank') : alert('Please enter a link first.')}>Preview</button>
                                     </div>
-                                </div>       </div>
+                                </div>
 
-                                <div className="col-12 d-flex gap-3 flex-wrap mt-1">
+                                <div className="col-12 d-flex gap-3 flex-wrap mt-2">
                                     <button
-                                        className="btn fw-bold text-white px-4 py-2 d-flex align-items-center justify-content-center"
-                                        style={{ background: 'var(--mubs-blue)' }}
+                                        className="btn fw-bold text-white px-4 py-2 d-flex align-items-center justify-content-center shadow-sm"
+                                        style={{ background: 'var(--mubs-blue)', borderRadius: '8px' }}
                                         onClick={() => handleSubmit(false)}
                                         disabled={loadingSubmit}
                                     >
@@ -237,7 +242,8 @@ export default function StaffSubmitReport() {
                                         {loadingSubmit ? 'Submitting...' : 'Submit for Review'}
                                     </button>
                                     <button
-                                        className="btn btn-outline-secondary fw-bold d-flex align-items-center justify-content-center"
+                                        className="btn btn-outline-secondary fw-bold d-flex align-items-center justify-content-center shadow-sm"
+                                        style={{ borderRadius: '8px' }}
                                         onClick={() => handleSubmit(true)}
                                         disabled={loadingSubmit}
                                     >
@@ -249,7 +255,6 @@ export default function StaffSubmitReport() {
                         </div>
                     </div>
                 </div>
-
             </div>
         </div>
     );
