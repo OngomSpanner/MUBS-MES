@@ -9,10 +9,11 @@ interface SubmissionDetailModalProps {
     onHide: () => void;
     submission?: any;
     taskId?: number;
+    assignmentType?: 'legacy' | 'process_task' | 'process_subtask';
     onRevise?: (submission: any) => void;
 }
 
-export default function SubmissionDetailModal({ show, onHide, submission: propSubmission, taskId, onRevise }: SubmissionDetailModalProps) {
+export default function SubmissionDetailModal({ show, onHide, submission: propSubmission, taskId, assignmentType, onRevise }: SubmissionDetailModalProps) {
     const [submission, setSubmission] = useState<any>(propSubmission || null);
     const [loading, setLoading] = useState(false);
 
@@ -23,8 +24,10 @@ export default function SubmissionDetailModal({ show, onHide, submission: propSu
                 try {
                     const res = await axios.get("/api/staff/submissions");
                     const all = res.data.submissions || [];
-                    // Only match by task_id specifically when we come from the Task list
-                    const found = all.find((s: any) => s.task_id === taskId); 
+                    const found =
+                        assignmentType === 'process_subtask'
+                            ? all.find((s: any) => Number(s.process_subtask_id) === Number(taskId))
+                            : all.find((s: any) => Number(s.task_id) === Number(taskId));
                     setSubmission(found);
                 } catch (err) {
                     console.error("Error fetching submission:", err);
@@ -36,7 +39,7 @@ export default function SubmissionDetailModal({ show, onHide, submission: propSu
         } else if (show && propSubmission) {
             setSubmission(propSubmission);
         }
-    }, [show, propSubmission, taskId]);
+    }, [show, propSubmission, taskId, assignmentType]);
 
     const formatDate = (dateString: string) => {
         if (!dateString) return '';
@@ -174,7 +177,8 @@ export default function SubmissionDetailModal({ show, onHide, submission: propSu
                             if (onRevise) {
                                 onRevise(submission);
                             } else {
-                                window.location.href = `/staff?pg=tasks&taskId=${submission.task_id || taskId}`;
+                                const id = submission.process_subtask_id || submission.task_id || taskId;
+                                window.location.href = `/staff?pg=tasks&taskId=${id}`;
                             }
                         }}>
                         <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>edit</span>

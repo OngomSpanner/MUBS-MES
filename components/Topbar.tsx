@@ -79,18 +79,6 @@ export default function Topbar({ pageTitle, toggleSidebar }: TopbarProps) {
 
       <div className="d-flex align-items-center gap-3">
 
-        <a
-          href="/mubs%20strategic%20plan%20template.pdf"
-          download="mubs-strategic-plan-template.pdf"
-          className="btn btn-sm d-flex align-items-center gap-1 text-white border border-white border-opacity-50 rounded-pill px-3 py-1"
-          style={{ fontSize: '.8rem' }}
-          title="Download Strategic Plan manual"
-        >
-          <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>download</span>
-          <span className="d-none d-md-inline">Download Strategic Plan manual</span>
-        </a>
-
-        <div className="vr bg-white-50 mx-1 d-none d-sm-block" style={{ opacity: '.2', height: '28px' }}></div>
 
         <button className="avatar-btn" data-bs-toggle="dropdown">
           <div className="text-end d-none d-sm-block">

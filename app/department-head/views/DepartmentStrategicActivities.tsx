@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import axios from 'axios';
 import StatCard from '@/components/StatCard';
@@ -41,6 +41,18 @@ interface ActivityData {
     };
 }
 
+function processAssignmentCoversTask(a: {
+    staff_id: number | null;
+    staff_name: string | null;
+    subtasks?: Array<{ assigned_to: number }>;
+}): boolean {
+    const direct =
+        (a.staff_id != null && Number(a.staff_id) > 0) || String(a.staff_name ?? '').trim() !== '';
+    if (direct) return true;
+    const subs = Array.isArray(a.subtasks) ? a.subtasks : [];
+    return subs.length > 0 && subs.every((s) => s.assigned_to != null && Number(s.assigned_to) > 0);
+}
+
 export default function DepartmentStrategicActivities() {
     const router = useRouter();
     const searchParams = useSearchParams();
@@ -71,10 +83,17 @@ export default function DepartmentStrategicActivities() {
     type Assignment = {
         id: number;
         standard_process_id: number;
-        staff_id: number;
+        staff_id: number | null;
         status: string;
-        staff_name: string;
+        staff_name: string | null;
         start_date?: string | null;
+        subtasks?: Array<{
+            id: number;
+            title: string;
+            assigned_to: number;
+            assigned_to_name: string;
+            status: string;
+        }>;
     };
     const [processTasks, setProcessTasks] = useState<ProcessTask[]>([]);
     const [processAssignments, setProcessAssignments] = useState<Assignment[]>([]);
@@ -84,12 +103,18 @@ export default function DepartmentStrategicActivities() {
     const [showStaffSearchResults, setShowStaffSearchResults] = useState(false);
     const [staffPositionAddAll, setStaffPositionAddAll] = useState<string>('');
     const [assignSaving, setAssignSaving] = useState(false);
+    const [assignBreakdownEnabled, setAssignBreakdownEnabled] = useState(false);
+    const [assignSubtasks, setAssignSubtasks] = useState<Array<{ title: string; assigned_to: number | '' }>>([]);
     const [showAssignModal, setShowAssignModal] = useState(false);
+    const [assignmentsLoaded, setAssignmentsLoaded] = useState(false);
+    const [processCatalogLoaded, setProcessCatalogLoaded] = useState(false);
+    const [showAssignmentsRequiredDialog, setShowAssignmentsRequiredDialog] = useState(false);
+    const detailLoadGen = useRef(0);
 
     const normalizeForCompare = (s?: string | null) =>
         String(s ?? '').replace(/\s+/g, ' ').trim().toLowerCase();
 
-    const fetchProcessTasks = async (standardId: number) => {
+    const fetchProcessTasks = async (standardId: number, loadGen?: number) => {
         try {
             const res = await axios.get(`/api/standards`);
             const standard = (res.data as any[]).find((s: any) => s.id === standardId);
@@ -111,25 +136,72 @@ export default function DepartmentStrategicActivities() {
             );
         } catch {
             setProcessTasks([]);
+        } finally {
+            if (loadGen == null || loadGen === detailLoadGen.current) {
+                setProcessCatalogLoaded(true);
+            }
         }
     };
 
-    const fetchProcessAssignments = async (activityId: number) => {
+    const fetchProcessAssignments = async (activityId: number, loadGen?: number) => {
         try {
             const res = await axios.get('/api/department-head/process-assignments');
             setProcessAssignments((res.data as any[]).filter((a: any) => a.activity_id === activityId));
-        } catch { setProcessAssignments([]); }
+        } catch {
+            setProcessAssignments([]);
+        } finally {
+            if (loadGen == null || loadGen === detailLoadGen.current) {
+                setAssignmentsLoaded(true);
+            }
+        }
     };
+
+    const processDataReady = assignmentsLoaded && processCatalogLoaded;
+
+    const canViewProcesses = useMemo(() => {
+        if (!selectedActivity || !processDataReady) return false;
+        if (!selectedActivity.standard_id || processTasks.length === 0) return true;
+        for (const t of processTasks) {
+            const ok = processAssignments.some(
+                (a) => a.standard_process_id === t.id && processAssignmentCoversTask(a)
+            );
+            if (!ok) return false;
+        }
+        return true;
+    }, [selectedActivity, processDataReady, processTasks, processAssignments]);
+
+    useEffect(() => {
+        if (processDataReady && canViewProcesses) setShowAssignmentsRequiredDialog(false);
+    }, [processDataReady, canViewProcesses]);
 
     const handleAssignTask = async () => {
         if (!assigningTask || assignStaffIds.length === 0 || !selectedActivity) return;
         setAssignSaving(true);
         try {
-            const { data, status } = await axios.post('/api/department-head/process-assignments', {
+            const payload: any = {
                 activity_id: selectedActivity.id,
                 standard_process_id: assigningTask.id,
                 staff_ids: assignStaffIds,
-            });
+            };
+
+            if (assignBreakdownEnabled) {
+                const cleaned = assignSubtasks
+                    .map((s) => ({
+                        title: (s.title || '').trim(),
+                        assigned_to: s.assigned_to === '' ? null : Number(s.assigned_to),
+                    }))
+                    .filter((s) => s.title && s.assigned_to != null);
+
+                if (cleaned.length === 0) {
+                    alert('Add at least one sub-task with an assignee.');
+                    return;
+                }
+
+                payload.breakdown = { subtasks: cleaned };
+                // For breakdown mode we create a container assignment; staff_ids is only used for UI validation.
+            }
+
+            const { data, status } = await axios.post('/api/department-head/process-assignments', payload);
             await fetchProcessAssignments(selectedActivity.id);
             const created = Number(data?.created) || 0;
             const skippedDup = Number(data?.skippedDuplicate) || 0;
@@ -143,6 +215,8 @@ export default function DepartmentStrategicActivities() {
             setShowAssignModal(false);
             setAssignStaffIds([]);
             setStaffSearchTerm('');
+            setAssignBreakdownEnabled(false);
+            setAssignSubtasks([]);
             setAssigningTask(null);
         } catch (e: any) {
             alert(e.response?.data?.message || 'Could not save assignment');
@@ -184,14 +258,15 @@ export default function DepartmentStrategicActivities() {
     const staffSearchResults = (() => {
         const q = staffSearchTerm.trim().toLowerCase();
         const pool = departmentUsers.filter((u) => !assignStaffIds.includes(u.id));
-        if (q === '') return [];
-        return pool
-            .filter((u) => {
-                const name = (u.full_name || '').toLowerCase();
-                const pos = (u.position || '').toLowerCase();
-                return name.includes(q) || pos.includes(q);
-            })
-            .slice(0, 10);
+        const matches =
+            q === ''
+                ? pool
+                : pool.filter((u) => {
+                      const name = (u.full_name || '').toLowerCase();
+                      const pos = (u.position || '').toLowerCase();
+                      return name.includes(q) || pos.includes(q);
+                  });
+        return matches.slice(0, 10);
     })();
 
     const addStaffToAssign = (id: number) => {
@@ -487,10 +562,19 @@ export default function DepartmentStrategicActivities() {
                                                 onClick={() => {
                                                     setSelectedActivity(a);
                                                     setShowViewModal(true);
+                                                    setShowAssignmentsRequiredDialog(false);
+                                                    detailLoadGen.current += 1;
+                                                    const gen = detailLoadGen.current;
+                                                    setAssignmentsLoaded(false);
+                                                    setProcessCatalogLoaded(false);
                                                     setProcessTasks([]);
                                                     setProcessAssignments([]);
-                                                    fetchProcessAssignments(a.id);
-                                                    if (a.standard_id) fetchProcessTasks(a.standard_id);
+                                                    void fetchProcessAssignments(a.id, gen);
+                                                    if (a.standard_id) {
+                                                        void fetchProcessTasks(a.standard_id, gen);
+                                                    } else {
+                                                        setProcessCatalogLoaded(true);
+                                                    }
                                                 }}
                                             >
                                                 <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>visibility</span>
@@ -519,7 +603,14 @@ export default function DepartmentStrategicActivities() {
                                     <span className="material-symbols-outlined text-primary" style={{ fontSize: '24px' }}>visibility</span>
                                     Activity Details
                                 </h5>
-                                <button type="button" className="btn-close" onClick={() => setShowViewModal(false)}></button>
+                                <button
+                                    type="button"
+                                    className="btn-close"
+                                    onClick={() => {
+                                        setShowViewModal(false);
+                                        setShowAssignmentsRequiredDialog(false);
+                                    }}
+                                ></button>
                             </div>
                             <div className="modal-body p-4 pt-3">
                                 <div className="row g-4">
@@ -587,10 +678,21 @@ export default function DepartmentStrategicActivities() {
                                                         const t = String(a.status ?? '').toLowerCase().trim();
                                                         return t === 'evaluated' || t === 'completed';
                                                     };
+                                                    const subtaskIsTerminal = (st: { status?: string | null }) => {
+                                                        const t = String(st?.status ?? '').toLowerCase().trim();
+                                                        return t === 'evaluated' || t === 'completed';
+                                                    };
+                                                    const containerAssignmentFullyDone = (a: Assignment) => {
+                                                        const hasStaff = String(a.staff_name ?? '').trim() !== '';
+                                                        if (hasStaff) return assignmentIsTerminal(a);
+                                                        const subs = Array.isArray((a as any).subtasks) ? (a as any).subtasks : [];
+                                                        if (subs.length === 0) return assignmentIsTerminal(a);
+                                                        return subs.every(subtaskIsTerminal);
+                                                    };
                                                     const hideAssign =
                                                         taskAssignments.length > 0 &&
                                                         (taskAssignments.some(assignmentIsOpen) ||
-                                                            taskAssignments.some(assignmentIsTerminal));
+                                                            taskAssignments.some(containerAssignmentFullyDone));
                                                     return (
                                                         <div key={task.id} className="p-2 rounded border" style={{ background: '#f8fafc', fontSize: '0.82rem' }}>
                                                             <div className="d-flex align-items-start justify-content-between gap-2">
@@ -619,7 +721,14 @@ export default function DepartmentStrategicActivities() {
                                                             {taskAssignments.length > 0 && (
                                                                 <div className="mt-2 d-flex flex-wrap gap-1">
                                                                     {taskAssignments.map(sa => {
-                                                                        const isDone = assignmentIsTerminal(sa);
+                                                                        const hasStaff = String(sa.staff_name ?? '').trim() !== '';
+                                                                        const subtasks = Array.isArray((sa as any).subtasks) ? (sa as any).subtasks : [];
+                                                                        // Container: completion = all sub-tasks done (not parent spa.status alone).
+                                                                        const isDone = hasStaff
+                                                                            ? assignmentIsTerminal(sa)
+                                                                            : subtasks.length > 0
+                                                                              ? subtasks.every(subtaskIsTerminal)
+                                                                              : assignmentIsTerminal(sa);
                                                                         return (
                                                                             <span key={sa.id} className="badge d-inline-flex align-items-center gap-1" 
                                                                                 style={{ 
@@ -630,16 +739,46 @@ export default function DepartmentStrategicActivities() {
                                                                                 }}
                                                                             >
                                                                                 <span className="material-symbols-outlined" style={{ fontSize: '12px' }}>{isDone ? 'check_circle' : 'person'}</span>
-                                                                                {isDone ? `Task completed by ${sa.staff_name}` : sa.staff_name}
+                                                                                {hasStaff ? (isDone ? `Task completed by ${sa.staff_name}` : sa.staff_name) : (isDone ? 'All sub-tasks completed' : 'Sub-tasks assigned')}
                                                                                 {!isDone && (
                                                                                     <>
                                                                                         <span className="ms-1 text-muted" style={{ fontSize: '0.65rem' }}>({sa.status})</span>
-                                                                                        <button type="button" className="btn-close p-0 ms-1" style={{ fontSize: '7px', opacity: 0.6 }} onClick={() => handleRemoveAssignment(sa.id)} />
+                                                                                        {/* Only allow removing direct staff assignment; container is managed via subtasks */}
+                                                                                        {hasStaff ? (
+                                                                                            <button
+                                                                                                type="button"
+                                                                                                className="btn-close p-0 ms-1"
+                                                                                                style={{ fontSize: '7px', opacity: 0.6 }}
+                                                                                                onClick={() => handleRemoveAssignment(sa.id)}
+                                                                                            />
+                                                                                        ) : null}
                                                                                     </>
                                                                                 )}
                                                                             </span>
                                                                         );
                                                                     })}
+                                                                    {/* Show subtask assignees under container assignment(s) */}
+                                                                    {taskAssignments
+                                                                        .filter((a) => String(a.staff_name ?? '').trim() === '')
+                                                                        .flatMap((a) => (Array.isArray((a as any).subtasks) ? (a as any).subtasks : []))
+                                                                        .map((st: any) => (
+                                                                            <span
+                                                                                key={`st-${st.id}`}
+                                                                                className="badge d-inline-flex align-items-center gap-1"
+                                                                                style={{
+                                                                                    background: '#fff7ed',
+                                                                                    color: '#9a3412',
+                                                                                    fontSize: '0.7rem',
+                                                                                    fontWeight: 500,
+                                                                                }}
+                                                                            >
+                                                                                <span className="material-symbols-outlined" style={{ fontSize: '12px' }}>subdirectory_arrow_right</span>
+                                                                                {st.assigned_to_name}
+                                                                                <span className="ms-1 text-muted" style={{ fontSize: '0.65rem' }}>
+                                                                                    ({st.status})
+                                                                                </span>
+                                                                            </span>
+                                                                        ))}
                                                                 </div>
                                                             )}
                                                         </div>
@@ -652,16 +791,91 @@ export default function DepartmentStrategicActivities() {
                             </div>
                             <div className="modal-footer border-top-0 p-4 pt-0 d-flex justify-content-end gap-3">
                                 <button
+                                    type="button"
                                     className="btn btn-outline-secondary d-flex align-items-center gap-2 px-4 shadow-sm"
                                     style={{ borderRadius: '8px', fontSize: '0.85rem', fontWeight: 'bold' }}
+                                    title={
+                                        !processDataReady
+                                            ? 'Loading process tasks and assignments…'
+                                            : !canViewProcesses
+                                              ? 'Assign every process task before opening Processes'
+                                              : undefined
+                                    }
+                                    disabled={!processDataReady}
                                     onClick={() => {
+                                        if (!processDataReady) return;
+                                        if (!canViewProcesses) {
+                                            setShowAssignmentsRequiredDialog(true);
+                                            return;
+                                        }
                                         setShowViewModal(false);
+                                        setShowAssignmentsRequiredDialog(false);
                                         const queryTitle = selectedActivity.parent_title || selectedActivity.title;
                                         router.push(`/department-head?pg=tasks&activity=${encodeURIComponent(queryTitle)}`);
                                     }}
                                 >
                                     <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>list</span>
                                     View processes
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {showAssignmentsRequiredDialog && (
+                <div
+                    className="modal fade show d-block"
+                    tabIndex={-1}
+                    role="dialog"
+                    aria-modal="true"
+                    aria-labelledby="hod-assignments-required-title"
+                    style={{
+                        backgroundColor: 'rgba(15, 23, 42, 0.55)',
+                        zIndex: 1080,
+                        backdropFilter: 'blur(2px)',
+                    }}
+                    onClick={() => setShowAssignmentsRequiredDialog(false)}
+                >
+                    <div
+                        className="modal-dialog modal-dialog-centered modal-sm"
+                        role="document"
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <div className="modal-content border-0 shadow-lg" style={{ borderRadius: '14px', overflow: 'hidden' }}>
+                            <div className="modal-body p-4 text-center">
+                                <div
+                                    className="d-inline-flex align-items-center justify-content-center rounded-circle mb-3"
+                                    style={{
+                                        width: 48,
+                                        height: 48,
+                                        background: '#fff7ed',
+                                        color: '#c2410c',
+                                    }}
+                                >
+                                    <span className="material-symbols-outlined" style={{ fontSize: '28px' }}>
+                                        assignment_late
+                                    </span>
+                                </div>
+                                <h2
+                                    id="hod-assignments-required-title"
+                                    className="h6 fw-bold text-dark mb-2"
+                                    style={{ fontSize: '1rem' }}
+                                >
+                                    Assignments required
+                                </h2>
+                                <p className="text-secondary mb-0" style={{ fontSize: '0.9rem', lineHeight: 1.5 }}>
+                                    Complete all task assignments before proceeding.
+                                </p>
+                            </div>
+                            <div className="modal-footer border-0 justify-content-center pt-0 pb-4 px-4">
+                                <button
+                                    type="button"
+                                    className="btn btn-primary px-4 fw-semibold"
+                                    style={{ borderRadius: '8px', minWidth: '120px' }}
+                                    onClick={() => setShowAssignmentsRequiredDialog(false)}
+                                >
+                                    OK
                                 </button>
                             </div>
                         </div>
@@ -720,6 +934,113 @@ export default function DepartmentStrategicActivities() {
                                             </div>
                                         </div>
                                     </div>
+                                </div>
+
+                                <div className="mb-3 p-3 rounded-3 border" style={{ background: '#ffffff' }}>
+                                    <div className="d-flex align-items-start justify-content-between gap-2">
+                                        <div>
+                                            <div className="fw-bold text-dark" style={{ fontSize: '.9rem' }}>Break down into sub-tasks (optional)</div>
+                                        </div>
+                                        <div className="form-check form-switch m-0">
+                                            <input
+                                                className="form-check-input"
+                                                type="checkbox"
+                                                role="switch"
+                                                checked={assignBreakdownEnabled}
+                                                onChange={(e) => {
+                                                    const on = e.target.checked;
+                                                    setAssignBreakdownEnabled(on);
+                                                    if (on && assignSubtasks.length === 0) {
+                                                        // Default: one subtask per selected staff, editable
+                                                        const initial = assignStaffIds.map((sid) => ({
+                                                            assigned_to: sid,
+                                                            title: `${assigningTask.taskName} — ${departmentUsers.find((u) => u.id === sid)?.full_name ?? 'Sub-task'}`,
+                                                        }));
+                                                        setAssignSubtasks(initial);
+                                                    }
+                                                }}
+                                            />
+                                        </div>
+                                    </div>
+
+                                    {assignBreakdownEnabled && (
+                                        <div className="mt-3 d-flex flex-column gap-2">
+                                            {assignSubtasks.map((st, idx) => (
+                                                <div key={idx} className="d-flex flex-wrap gap-2 align-items-center">
+                                                    <input
+                                                        className="form-control form-control-sm"
+                                                        style={{ flex: 1, minWidth: 220 }}
+                                                        value={st.title}
+                                                        placeholder={`Sub-task #${idx + 1} title`}
+                                                        onChange={(e) => {
+                                                            const arr = [...assignSubtasks];
+                                                            arr[idx] = { ...arr[idx], title: e.target.value };
+                                                            setAssignSubtasks(arr);
+                                                        }}
+                                                        disabled={assignSaving}
+                                                    />
+                                                    <select
+                                                        className="form-select form-select-sm"
+                                                        style={{ width: 220 }}
+                                                        value={st.assigned_to === '' ? '' : String(st.assigned_to)}
+                                                        onChange={(e) => {
+                                                            const v = e.target.value;
+                                                            const arr = [...assignSubtasks];
+                                                            arr[idx] = { ...arr[idx], assigned_to: v === '' ? '' : Number(v) };
+                                                            setAssignSubtasks(arr);
+                                                        }}
+                                                        disabled={assignSaving}
+                                                    >
+                                                        <option value="">Assign to…</option>
+                                                        {assignStaffIds.map((sid) => {
+                                                            const u = departmentUsers.find((x) => x.id === sid);
+                                                            return (
+                                                                <option key={sid} value={sid}>
+                                                                    {u?.full_name || `Staff #${sid}`}
+                                                                </option>
+                                                            );
+                                                        })}
+                                                    </select>
+                                                    <button
+                                                        type="button"
+                                                        className="btn btn-sm btn-outline-danger"
+                                                        style={{ fontSize: '.75rem' }}
+                                                        onClick={() => setAssignSubtasks(assignSubtasks.filter((_, i) => i !== idx))}
+                                                        disabled={assignSaving}
+                                                        title="Remove sub-task"
+                                                    >
+                                                        ×
+                                                    </button>
+                                                </div>
+                                            ))}
+                                            <div className="d-flex justify-content-between align-items-center">
+                                                <button
+                                                    type="button"
+                                                    className="btn btn-sm btn-outline-primary"
+                                                    style={{ fontSize: '.75rem' }}
+                                                    onClick={() => setAssignSubtasks([...assignSubtasks, { title: '', assigned_to: '' }])}
+                                                    disabled={assignSaving}
+                                                >
+                                                    + Add sub-task
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    className="btn btn-sm btn-outline-secondary"
+                                                    style={{ fontSize: '.75rem' }}
+                                                    onClick={() => {
+                                                        const auto = assignStaffIds.map((sid) => ({
+                                                            assigned_to: sid,
+                                                            title: `${assigningTask.taskName} — ${departmentUsers.find((u) => u.id === sid)?.full_name ?? 'Sub-task'}`,
+                                                        }));
+                                                        setAssignSubtasks(auto);
+                                                    }}
+                                                    disabled={assignSaving || assignStaffIds.length === 0}
+                                                >
+                                                    Auto-split (1 per staff)
+                                                </button>
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
                                 <div className="d-flex justify-content-between align-items-center mb-2">
                                     <label className="form-label fw-semibold small mb-0">Assign staff</label>

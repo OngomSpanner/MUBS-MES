@@ -66,14 +66,14 @@ export async function POST(request: Request) {
 
     // Set up the email data
     const mailOptions = {
-      from: process.env.EMAIL_FROM || '"MUBS SPS" <noreply@yourdomain.com>',
+      from: process.env.EMAIL_FROM || '"MUBS M&E System" <noreply@yourdomain.com>',
       to: user.email,
       subject: 'Password Reset Request',
       html: `
         <div style="font-family: Arial, sans-serif; background-color: #f4f6f8; padding: 30px;">
           <div style="max-width: 600px; margin: 0 auto; background-color: #ffffff; padding: 40px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.05);">
             <div style="text-align: center; margin-bottom: 30px;">
-              <h2 style="color: #005696; margin: 0;">Strategy Plan System</h2>
+              <h2 style="color: #005696; margin: 0;">MUBS Monitoring & Evaluation System</h2>
             </div>
             <p style="color: #333333; font-size: 16px; line-height: 1.6;">Hello ${user.full_name},</p>
             <p style="color: #333333; font-size: 16px; line-height: 1.6;">We received a request to reset the password associated with this email address. If you made this request, please click the button below to securely set a new password. This link is valid for 1 hour.</p>

@@ -297,9 +297,6 @@ export default function TrackingView() {
                         </span>
                         All Activities
                     </h5>
-                    <span className="badge bg-dark px-3 py-2 rounded-pill" style={{ fontSize: '.7rem', letterSpacing: '.02em', background: '#1e293b !important' }}>
-                        156 total
-                    </span>
                 </div>
                 <div className="table-responsive">
                     <table className="table mb-0">

@@ -25,6 +25,7 @@ export async function GET() {
                     sr.id,
                     COALESCE(sr.activity_assignment_id, sr.process_assignment_id) as task_id,
                     sr.process_assignment_id,
+                    sr.process_subtask_id,
                     COALESCE(sa.id, psa_sa.id) as activity_id,
                     COALESCE(sa.title, sp.step_name) as report_name,
                     COALESCE(sa.description, psa_sa.description) as task_description,
@@ -43,7 +44,11 @@ export async function GET() {
                     e.qualitative_feedback as reviewer_notes,
                     e.evaluation_date as evaluation_date,
                     eval_hod.full_name as evaluated_by_name,
-                    CASE WHEN sr.process_assignment_id IS NOT NULL THEN 'process_task' ELSE 'legacy' END as assignment_type
+                    CASE
+                      WHEN sr.process_subtask_id IS NOT NULL THEN 'process_subtask'
+                      WHEN sr.process_assignment_id IS NOT NULL THEN 'process_task'
+                      ELSE 'legacy'
+                    END as assignment_type
                 FROM staff_reports sr
                 LEFT JOIN activity_assignments aa ON sr.activity_assignment_id = aa.id
                 LEFT JOIN strategic_activities sa ON aa.activity_id = sa.id
@@ -52,12 +57,13 @@ export async function GET() {
                 LEFT JOIN standard_processes sp ON spa.standard_process_id = sp.id
                 LEFT JOIN standards st ON sp.standard_id = st.id
                 LEFT JOIN strategic_activities psa_sa ON spa.activity_id = psa_sa.id
+                LEFT JOIN staff_process_subtasks sps ON sr.process_subtask_id = sps.id
                 LEFT JOIN evaluations e ON e.staff_report_id = sr.id
                 LEFT JOIN users eval_hod ON e.evaluated_by = eval_hod.id
-                WHERE (aa.assigned_to_user_id = ? OR spa.staff_id = ?)
+                WHERE (aa.assigned_to_user_id = ? OR spa.staff_id = ? OR sps.assigned_to = ?)
                 ORDER BY sr.updated_at DESC
             `,
-            values: [decoded.userId, decoded.userId]
+            values: [decoded.userId, decoded.userId, decoded.userId]
         }) as any[];
 
         const statusMap: Record<string, string | ((r: any) => string)> = {
@@ -76,10 +82,11 @@ export async function GET() {
             return {
                 id: r.id,
                 task_id: r.task_id,
+                process_assignment_id: r.process_assignment_id ?? null,
+                process_subtask_id: r.process_subtask_id ?? null,
                 report_name: r.report_name,
                 activity_title: r.activity_title,
                 task_description: r.task_description,
-                instruction: r.instruction ?? null,
                 start_date: r.start_date,
                 end_date: r.end_date,
                 submitted_at: r.submitted_at_ts || r.submitted_at,
@@ -92,7 +99,7 @@ export async function GET() {
                 reviewer_notes: r.reviewer_notes,
                 evaluated_by_name: r.evaluated_by_name ?? null,
                 evaluation_date: r.evaluation_date ?? null,
-                assignment_type: r.assignment_type === 'process_task' ? 'process_task' : 'legacy',
+                assignment_type: r.assignment_type === 'process_subtask' ? 'process_subtask' : (r.assignment_type === 'process_task' ? 'process_task' : 'legacy'),
             };
         });
 
@@ -136,8 +143,8 @@ export async function POST(req: Request) {
         if (!decoded || !decoded.userId) throw new Error('Invalid token');
 
         const formData = await req.formData();
-        const taskId = formData.get('taskId') as string; // This can be aa.id or spa.id
-        const assignmentType = formData.get('assignmentType') as string || 'legacy';
+        const taskId = formData.get('taskId') as string; // aa.id, spa.id, or subtask id
+        const assignmentType = (formData.get('assignmentType') as string) || 'legacy';
         const description = (formData.get('description') as string)?.trim() ?? '';
         const evidenceLink = formData.get('evidenceLink') as string;
         const isDraft = formData.get('isDraft') === 'true';
@@ -149,7 +156,35 @@ export async function POST(req: Request) {
         let assignmentId = parseInt(taskId);
         
         // Validate assignment based on type
-        if (assignmentType === 'process_task') {
+        if (assignmentType === 'process_subtask') {
+            const subId = assignmentId;
+            const subRows = await query({
+                query: `
+                  SELECT s.id, s.process_assignment_id, spa.start_date
+                  FROM staff_process_subtasks s
+                  JOIN staff_process_assignments spa ON s.process_assignment_id = spa.id
+                  WHERE s.id = ? AND s.assigned_to = ?
+                `,
+                values: [subId, decoded.userId],
+            }) as { id: number; process_assignment_id: number; start_date: string | null }[];
+            if (subRows.length === 0) {
+                return NextResponse.json({ message: 'No subtask assignment found' }, { status: 404 });
+            }
+            const startMissing =
+                subRows[0].start_date == null || String(subRows[0].start_date).trim() === '';
+            if (startMissing) {
+                const priorReport = await query({
+                    query: 'SELECT id FROM staff_reports WHERE process_subtask_id = ? AND submitted_by = ? LIMIT 1',
+                    values: [subId, decoded.userId],
+                }) as { id: number }[];
+                if (priorReport.length === 0) {
+                    return NextResponse.json(
+                        { message: 'This process has not been opened by your HOD yet. You can submit once they set a start date.' },
+                        { status: 403 }
+                    );
+                }
+            }
+        } else if (assignmentType === 'process_task') {
             const spaRecords = await query({
                 query: 'SELECT id, start_date FROM staff_process_assignments WHERE id = ? AND staff_id = ?',
                 values: [assignmentId, decoded.userId]
@@ -213,7 +248,12 @@ export async function POST(req: Request) {
         const reportStatus = isDraft ? 'draft' : 'submitted';
 
         // Insert or update staff report
-        const filterColumn = assignmentType === 'process_task' ? 'process_assignment_id' : 'activity_assignment_id';
+        const filterColumn =
+            assignmentType === 'process_subtask'
+                ? 'process_subtask_id'
+                : assignmentType === 'process_task'
+                  ? 'process_assignment_id'
+                  : 'activity_assignment_id';
         
         const existingReport = await query({
             query: `SELECT id FROM staff_reports WHERE ${filterColumn} = ? AND submitted_by = ?`,
@@ -236,21 +276,31 @@ export async function POST(req: Request) {
                 values: [progress, description || null, combinedEvidence || null, formData.get('kpiActualValue') || null, reportStatus, reportStatus, existingReport[0].id]
             });
         } else {
-            const columns = `(activity_assignment_id, process_assignment_id, submitted_by, report_date, progress_percentage, achievements, attachments, kpi_actual_value, status, submitted_at)`;
-            const values = assignmentType === 'process_task' ? [null, assignmentId] : [assignmentId, null];
+            const columns = `(activity_assignment_id, process_assignment_id, process_subtask_id, submitted_by, report_date, progress_percentage, achievements, attachments, kpi_actual_value, status, submitted_at)`;
+            const values =
+                assignmentType === 'process_subtask'
+                    ? [null, null, assignmentId]
+                    : assignmentType === 'process_task'
+                      ? [null, assignmentId, null]
+                      : [assignmentId, null, null];
             
             await query({
                 query: `
                     INSERT INTO staff_reports 
                     ${columns}
-                    VALUES (?, ?, ?, CURDATE(), ?, ?, ?, ?, ?, IF(? = 'submitted', NOW(), NULL))
+                    VALUES (?, ?, ?, ?, CURDATE(), ?, ?, ?, ?, ?, IF(? = 'submitted', NOW(), NULL))
                 `,
                 values: [...values, decoded.userId, progress, description || null, combinedEvidence || null, formData.get('kpiActualValue') || null, reportStatus, reportStatus]
             });
         }
 
         // Update the assignment status
-        if (assignmentType === 'process_task') {
+        if (assignmentType === 'process_subtask') {
+            await query({
+                query: 'UPDATE staff_process_subtasks SET status = ? WHERE id = ?',
+                values: [reportStatus === 'submitted' ? 'submitted' : 'in_progress', assignmentId],
+            });
+        } else if (assignmentType === 'process_task') {
             await query({
                 query: 'UPDATE staff_process_assignments SET status = ? WHERE id = ?',
                 values: [reportStatus === 'submitted' ? 'submitted' : 'in_progress', assignmentId]

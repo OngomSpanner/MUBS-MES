@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { query } from '@/lib/db';
 import { cookies } from 'next/headers';
 import { verifyToken } from '@/lib/auth';
+import { getVisibleDepartmentIds, inPlaceholders } from '@/lib/department-head';
 
 async function getHodContext(token: string) {
   const decoded = verifyToken(token) as { userId?: number; role?: string } | null;
@@ -49,7 +50,7 @@ export async function GET() {
         JOIN standard_processes sp ON spa.standard_process_id = sp.id
         JOIN standards st ON sp.standard_id = st.id
         JOIN strategic_activities sa ON spa.activity_id = sa.id
-        JOIN users u ON spa.staff_id = u.id
+        LEFT JOIN users u ON spa.staff_id = u.id
         WHERE sa.department_id = ? OR sa.id IN (
           SELECT id FROM strategic_activities WHERE department_id = ? AND source = 'strategic_plan'
         )
@@ -74,6 +75,59 @@ export async function GET() {
       }
     }
 
+    // Attach subtasks for container assignments (staff_id IS NULL)
+    const containerIds = rows
+      .filter((r: any) => r && r.staff_id == null)
+      .map((r: any) => Number(r.id))
+      .filter((n: number) => Number.isFinite(n) && n > 0);
+
+    if (containerIds.length > 0) {
+      const placeholders = inPlaceholders(containerIds.length);
+      const subs = (await query({
+        query: `
+          SELECT
+                 s.id,
+                 s.process_assignment_id,
+                 s.title,
+                 s.assigned_to,
+                 u.full_name as assigned_to_name,
+                 COALESCE(
+                    (
+                      SELECT sr2.status
+                      FROM staff_reports sr2
+                      WHERE sr2.process_subtask_id = s.id
+                      ORDER BY sr2.updated_at DESC
+                      LIMIT 1
+                    ),
+                    s.status
+                 ) as status,
+                 s.start_date,
+                 s.end_date,
+                 s.created_at,
+                 s.updated_at
+          FROM staff_process_subtasks s
+          JOIN users u ON s.assigned_to = u.id
+          WHERE s.process_assignment_id IN (${placeholders})
+          ORDER BY s.process_assignment_id ASC, s.id ASC
+        `,
+        values: [...containerIds],
+      })) as any[];
+
+      const byParent = new Map<number, any[]>();
+      for (const s of subs) {
+        const pid = Number(s.process_assignment_id);
+        if (!byParent.has(pid)) byParent.set(pid, []);
+        byParent.get(pid)!.push(s);
+      }
+
+      rows = rows.map((r: any) => ({
+        ...r,
+        subtasks: byParent.get(Number(r.id)) ?? [],
+      }));
+    } else {
+      rows = rows.map((r: any) => ({ ...r, subtasks: [] }));
+    }
+
     return NextResponse.json(rows);
   } catch (error) {
     console.error('Error fetching process assignments:', error);
@@ -92,27 +146,111 @@ export async function POST(request: Request) {
     if (!ctx) return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
 
     const body = await request.json();
-    const { activity_id, standard_process_id, staff_id, staff_ids, start_date, end_date } = body;
+    const { activity_id, standard_process_id, staff_id, staff_ids, start_date, end_date, breakdown } = body;
 
     const rawIds: number[] = Array.isArray(staff_ids) && staff_ids.length > 0
       ? staff_ids.map((n: unknown) => Number(n)).filter((n) => !Number.isNaN(n))
       : (staff_id != null && staff_id !== '' ? [Number(staff_id)] : []);
 
-    if (!activity_id || !standard_process_id || rawIds.length === 0) {
+    if (!activity_id || !standard_process_id) {
       return NextResponse.json(
-        { message: 'activity_id, standard_process_id and staff_id or staff_ids[] are required' },
+        { message: 'activity_id and standard_process_id are required' },
         { status: 400 }
       );
     }
 
     const deptId = ctx.department_id;
+    const visibleDeptIds = await getVisibleDepartmentIds(ctx.id);
+    if (visibleDeptIds.length === 0) {
+      return NextResponse.json({ message: 'User has no department assigned' }, { status: 403 });
+    }
+    const deptPlaceholders = inPlaceholders(visibleDeptIds.length);
 
     const actRows = await query({
-      query: 'SELECT id FROM strategic_activities WHERE id = ? AND department_id = ?',
-      values: [activity_id, deptId],
+      query: `SELECT id FROM strategic_activities WHERE id = ? AND department_id IN (${deptPlaceholders})`,
+      values: [activity_id, ...visibleDeptIds],
     }) as { id: number }[];
     if (!actRows.length) {
       return NextResponse.json({ message: 'Activity not found or not in your department' }, { status: 403 });
+    }
+
+    // Optional: breakdown into subtasks (container process assignment + per-staff subtasks)
+    if (breakdown && Array.isArray(breakdown.subtasks) && breakdown.subtasks.length > 0) {
+      const subtasks = breakdown.subtasks
+        .map((s: any) => ({
+          title: typeof s?.title === 'string' ? s.title.trim() : '',
+          assigned_to: Number(s?.assigned_to),
+        }))
+        .filter((s: any) => s.title && Number.isFinite(s.assigned_to));
+
+      if (subtasks.length === 0) {
+        return NextResponse.json({ message: 'No valid subtasks provided' }, { status: 400 });
+      }
+
+      // Validate all assignees are in visible departments (department + units)
+      for (const st of subtasks) {
+        const inDept = await query({
+          query: `SELECT id FROM users WHERE id = ? AND department_id IN (${deptPlaceholders})`,
+          values: [st.assigned_to, ...visibleDeptIds],
+        }) as { id: number }[];
+        if (!inDept.length) {
+          return NextResponse.json({ message: 'One or more subtask assignees are not in your department' }, { status: 400 });
+        }
+      }
+
+      // Prevent duplicate container for same activity+process (idempotent-ish)
+      const existingContainer = await query({
+        query: `
+          SELECT id FROM staff_process_assignments
+          WHERE activity_id = ? AND standard_process_id = ? AND staff_id IS NULL
+          LIMIT 1
+        `,
+        values: [activity_id, standard_process_id],
+      }) as { id: number }[];
+
+      let containerId: number;
+      if (existingContainer.length > 0) {
+        containerId = Number(existingContainer[0].id);
+      } else {
+        const result = await query({
+          query: `
+            INSERT INTO staff_process_assignments (activity_id, standard_process_id, staff_id, status, start_date, end_date)
+            VALUES (?, ?, NULL, 'pending', ?, ?)
+          `,
+          values: [activity_id, standard_process_id, start_date || null, end_date || null],
+        });
+        containerId = Number((result as any).insertId);
+      }
+
+      // Insert subtasks
+      const createdSubtaskIds: number[] = [];
+      for (const st of subtasks) {
+        const res = await query({
+          query: `
+            INSERT INTO staff_process_subtasks (process_assignment_id, title, assigned_to, status, start_date, end_date)
+            VALUES (?, ?, ?, 'pending', ?, ?)
+          `,
+          values: [containerId, st.title, st.assigned_to, start_date || null, end_date || null],
+        });
+        createdSubtaskIds.push(Number((res as any).insertId));
+      }
+
+      return NextResponse.json(
+        {
+          message: `Created ${createdSubtaskIds.length} subtask(s)`,
+          containerId,
+          subtaskIds: createdSubtaskIds,
+          created: createdSubtaskIds.length,
+        },
+        { status: 201 }
+      );
+    }
+
+    if (rawIds.length === 0) {
+      return NextResponse.json(
+        { message: 'staff_id or staff_ids[] is required (unless using breakdown)' },
+        { status: 400 }
+      );
     }
 
     const created: number[] = [];
@@ -121,8 +259,8 @@ export async function POST(request: Request) {
 
     for (const sid of rawIds) {
       const inDept = await query({
-        query: 'SELECT id FROM users WHERE id = ? AND department_id = ?',
-        values: [sid, deptId],
+        query: `SELECT id FROM users WHERE id = ? AND department_id IN (${deptPlaceholders})`,
+        values: [sid, ...visibleDeptIds],
       }) as { id: number }[];
       if (!inDept.length) {
         skippedInvalid++;

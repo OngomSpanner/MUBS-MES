@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { query } from '@/lib/db';
 import { cookies } from 'next/headers';
 import { verifyToken } from '@/lib/auth';
+import { getVisibleDepartmentIds, inPlaceholders } from '@/lib/department-head';
 
 export async function GET() {
     try {
@@ -27,14 +28,17 @@ export async function GET() {
             return NextResponse.json([]);
         }
 
-        const myDept = me[0].department_id;
         const myRole = (me[0].role || '').toLowerCase();
         const isHod = myRole === 'hod';
 
-        // 2. Department users: id, full_name, position. If HOD, exclude self so they can only assign to staff.
+        // 2. Visible department users (department + units). If HOD, exclude self so they can only assign to staff.
+        const deptIds = await getVisibleDepartmentIds(decoded.userId);
+        if (!deptIds.length) return NextResponse.json([]);
+        const placeholders = inPlaceholders(deptIds.length);
+
         const deptUsers = await query({
-            query: `SELECT id, full_name, position FROM users WHERE department_id = ? ${isHod ? 'AND id != ?' : ''} ORDER BY full_name ASC`,
-            values: isHod ? [myDept, decoded.userId] : [myDept]
+            query: `SELECT id, full_name, position FROM users WHERE department_id IN (${placeholders}) ${isHod ? 'AND id != ?' : ''} ORDER BY full_name ASC`,
+            values: isHod ? [...deptIds, decoded.userId] : [...deptIds]
         }) as any[];
 
         return NextResponse.json(deptUsers);

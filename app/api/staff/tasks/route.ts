@@ -53,7 +53,6 @@ export async function GET() {
                     sa.id as activity_id,
                     sp.step_name as title,
                     sa.description as description,
-                    st.performance_indicator as instruction,
                     spa.start_date as startDate,
                     spa.end_date as dueDate,
                     spa.status as db_status,
@@ -69,13 +68,102 @@ export async function GET() {
                     'process_task' as assignment_type
                 FROM staff_process_assignments spa
                 JOIN standard_processes sp ON spa.standard_process_id = sp.id
-                JOIN standards st ON sp.standard_id = st.id
                 JOIN strategic_activities sa ON spa.activity_id = sa.id
                 LEFT JOIN departments d ON sa.department_id = d.id
-                WHERE spa.staff_id = ? AND spa.start_date IS NOT NULL
+                WHERE spa.staff_id = ?
             `,
             values: [decoded.userId]
         }) as any[];
+
+        // Fetch process subtask assignments (under a container process task)
+        // Robust to staged migrations where staff_reports.process_subtask_id may not exist yet.
+        let processSubtasksQuery: any[] = [];
+        try {
+            processSubtasksQuery = (await query({
+                query: `
+                    SELECT
+                        sps.id,
+                        sa.id as activity_id,
+                        sps.title as title,
+                        spa.commentary as description,
+                        sp.step_name as parent_process_title,
+                        u.full_name as assignee_name,
+                        (
+                            SELECT GROUP_CONCAT(u2.full_name SEPARATOR ', ')
+                            FROM staff_process_subtasks s2
+                            JOIN users u2 ON s2.assigned_to = u2.id
+                            WHERE s2.process_assignment_id = spa.id AND s2.assigned_to <> ?
+                        ) as team_members,
+                        spa.start_date as startDate,
+                        spa.end_date as dueDate,
+                        sps.status as db_status,
+                        (SELECT sr2.status FROM staff_reports sr2 WHERE sr2.process_subtask_id = sps.id ORDER BY sr2.updated_at DESC LIMIT 1) as latest_report_status,
+                        0 as progress,
+                        NULL as parent_id,
+                        'process' as task_type,
+                        NULL as kpi_target_value,
+                        'once' as frequency,
+                        sa.title as activity_title,
+                        'Strategic Plan' as parent_status,
+                        d.name as unit_name,
+                        'process_subtask' as assignment_type,
+                        spa.id as parent_process_assignment_id
+                    FROM staff_process_subtasks sps
+                    JOIN staff_process_assignments spa ON sps.process_assignment_id = spa.id
+                    JOIN standard_processes sp ON spa.standard_process_id = sp.id
+                    JOIN users u ON sps.assigned_to = u.id
+                    JOIN strategic_activities sa ON spa.activity_id = sa.id
+                    LEFT JOIN departments d ON sa.department_id = d.id
+                    WHERE sps.assigned_to = ?
+                `,
+                values: [decoded.userId, decoded.userId],
+            })) as any[];
+        } catch (e: any) {
+            const msg = String(e?.message || '');
+            if (msg.toLowerCase().includes('process_subtask_id')) {
+                processSubtasksQuery = (await query({
+                    query: `
+                        SELECT
+                            sps.id,
+                            sa.id as activity_id,
+                            sps.title as title,
+                            spa.commentary as description,
+                            sp.step_name as parent_process_title,
+                            u.full_name as assignee_name,
+                            (
+                                SELECT GROUP_CONCAT(u2.full_name SEPARATOR ', ')
+                                FROM staff_process_subtasks s2
+                                JOIN users u2 ON s2.assigned_to = u2.id
+                                WHERE s2.process_assignment_id = spa.id AND s2.assigned_to <> ?
+                            ) as team_members,
+                            spa.start_date as startDate,
+                            spa.end_date as dueDate,
+                            sps.status as db_status,
+                            NULL as latest_report_status,
+                            0 as progress,
+                            NULL as parent_id,
+                            'process' as task_type,
+                            NULL as kpi_target_value,
+                            'once' as frequency,
+                            sa.title as activity_title,
+                            'Strategic Plan' as parent_status,
+                            d.name as unit_name,
+                            'process_subtask' as assignment_type,
+                            spa.id as parent_process_assignment_id
+                        FROM staff_process_subtasks sps
+                        JOIN staff_process_assignments spa ON sps.process_assignment_id = spa.id
+                        JOIN standard_processes sp ON spa.standard_process_id = sp.id
+                        JOIN users u ON sps.assigned_to = u.id
+                        JOIN strategic_activities sa ON spa.activity_id = sa.id
+                        LEFT JOIN departments d ON sa.department_id = d.id
+                        WHERE sps.assigned_to = ?
+                    `,
+                    values: [decoded.userId, decoded.userId],
+                })) as any[];
+            } else {
+                throw e;
+            }
+        }
 
         const statusMap: Record<string, string> = {
             'pending': 'Pending',
@@ -108,7 +196,7 @@ export async function GET() {
             'monthly': 'Monthly Task'
         };
 
-        const allTasks = [...tasksQuery, ...processAssignmentsQuery];
+        const allTasks = [...tasksQuery, ...processAssignmentsQuery, ...processSubtasksQuery];
 
         // Sort by dueDate
         allTasks.sort((a, b) => {
@@ -121,10 +209,12 @@ export async function GET() {
         // not the strategic-plan fiscal year — so Notifications & Deadlines matches assigned work only.
         const enhancedTasks = allTasks.map((task: any) => {
             const derivedStatus = statusFromReportStatus(task.latest_report_status);
-            const status = derivedStatus ?? statusMap[task.db_status] ?? 'Not Started';
+            const isProcessLike = task.assignment_type === 'process_task' || task.assignment_type === 'process_subtask';
+            const isNotOpened = isProcessLike && !task.startDate;
+            const status = isNotOpened ? 'Not opened' : (derivedStatus ?? statusMap[task.db_status] ?? 'Not Started');
 
             const isProcessTask = task.assignment_type === 'process_task';
-            const referenceDate = new Date(task.dueDate || new Date());
+            const referenceDate = new Date(task.dueDate || '9999-12-31');
             const daysLeft = Math.ceil((referenceDate.getTime() - new Date().getTime()) / (1000 * 3600 * 24));
 
             return {

@@ -4,7 +4,7 @@ import React, { useState } from "react";
 import { Modal, Button } from "react-bootstrap";
 import axios from "axios";
 
-interface Task {
+export interface StaffTaskSubmissionContext {
   id: number;
   title: string;
   description?: string;
@@ -13,15 +13,14 @@ interface Task {
   status?: string;
   task_type?: 'process' | 'kpi_driver';
   kpi_target_value?: number | null;
-  assignment_type?: 'legacy' | 'process_task';
-  /** Process task: standards.performance_indicator — not strategic/objective text */
+  assignment_type?: 'legacy' | 'process_task' | 'process_subtask';
   instruction?: string | null;
 }
 
 interface TaskSubmissionModalProps {
   show: boolean;
   onHide: () => void;
-  task: Task | null;
+  task: StaffTaskSubmissionContext | null;
   onSuccess?: () => void;
 }
 
@@ -185,12 +184,6 @@ export default function TaskSubmissionModal({ show, onHide, task, onSuccess }: T
                         <div className="mb-2">
                             <div className="text-muted fw-bold" style={{ fontSize: '0.68rem' }}>Task</div>
                             <div className="fw-semibold text-dark" style={{ fontSize: '0.9rem' }}>{task.title}</div>
-                        </div>
-                        <div className="mb-3">
-                            <div className="text-muted fw-bold" style={{ fontSize: '0.68rem' }}>Instruction</div>
-                            <div className="text-secondary" style={{ fontSize: '0.82rem', lineHeight: '1.45', whiteSpace: 'pre-wrap' }}>
-                                {task.instruction?.trim() ? task.instruction.trim() : '—'}
-                            </div>
                         </div>
                         <div className="d-flex gap-4 flex-wrap">
                             <div className="d-flex align-items-center gap-1 text-muted" style={{ fontSize: '0.75rem' }}>

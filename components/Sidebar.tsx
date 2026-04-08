@@ -13,8 +13,8 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen, onLogoutClick }: 
   const pathname = usePathname();
   const searchParams = useSearchParams();
 
-  const currentKey = (pathname.startsWith('/admin') || pathname.startsWith('/principal') || pathname.startsWith('/department-head') || pathname.startsWith('/ambassador'))
-    ? (searchParams.get('pg') || (pathname.startsWith('/principal') ? 'executive' : pathname.startsWith('/ambassador') ? 'dashboard' : 'dashboard'))
+  const currentKey = (pathname.startsWith('/admin') || pathname.startsWith('/department-head') || pathname.startsWith('/ambassador'))
+    ? (searchParams.get('pg') || (pathname.startsWith('/ambassador') ? 'dashboard' : 'dashboard'))
     : (pathname.substring(1) || 'dashboard');
 
   const adminMenuItems = [
@@ -25,13 +25,6 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen, onLogoutClick }: 
     { key: 'reports', href: '/admin?pg=reports', icon: 'bar_chart', label: 'Reports & Monitoring' },
   ];
 
-  const principalMenuItems = [
-    { key: 'executive', href: '/principal?pg=executive', icon: 'space_dashboard', label: 'Executive Overview' },
-    { key: 'strategic', href: '/principal?pg=strategic', icon: 'track_changes', label: 'Strategic Summary' },
-    { key: 'analytics', href: '/principal?pg=analytics', icon: 'insert_chart', label: 'Performance Analytics' },
-    { key: 'proposals', href: '/principal?pg=proposals', icon: 'gavel', label: 'Committee proposals' },
-    { key: 'reports', href: '/principal?pg=reports', icon: 'description', label: 'Reports' },
-  ];
 
   const departmentHeadMenuItems = [
     { key: 'dashboard', href: '/department-head?pg=dashboard', icon: 'dashboard', label: 'Dashboard' },
@@ -54,28 +47,15 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen, onLogoutClick }: 
     { key: 'submissions', href: '/staff?pg=submissions', icon: 'history', label: 'Submissions & Feedback' },
   ];
 
-  const commMenuItems = [
-    { key: 'dashboard', href: '/comm?pg=dashboard', icon: 'dashboard', label: 'Dashboard' },
-    { key: 'propose', href: '/comm?pg=propose', icon: 'post_add', label: 'New Proposal' },
-    { key: 'my-proposals', href: '/comm?pg=my-proposals', icon: 'list_alt', label: 'All Proposals' },
-    { key: 'pending', href: '/comm?pg=pending', icon: 'pending_actions', label: 'Pending Review' },
-    { key: 'approved', href: '/comm?pg=approved', icon: 'check_circle', label: 'Approved' },
-    { key: 'rejected', href: '/comm?pg=rejected', icon: 'cancel', label: 'Rejected' },
-    { key: 'notifications', href: '/comm?pg=notifications', icon: 'notifications', label: 'Notifications' },
-  ];
 
   let menuItems = adminMenuItems; // Default to admin
 
-  if (pathname.startsWith('/principal')) {
-    menuItems = principalMenuItems;
-  } else if (pathname.startsWith('/department-head')) {
+  if (pathname.startsWith('/department-head')) {
     menuItems = departmentHeadMenuItems;
   } else if (pathname.startsWith('/staff')) {
     menuItems = staffMenuItems;
   } else if (pathname.startsWith('/ambassador')) {
     menuItems = ambassadorMenuItems;
-  } else if (pathname.startsWith('/comm')) {
-    menuItems = commMenuItems;
   }
 
   const isActive = (key: string) => currentKey === key;
@@ -91,8 +71,8 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen, onLogoutClick }: 
             />
           </div>
           <div>
-            <div className="brand-title text-white">STRATEGIC</div>
-            <div className="brand-sub">PLAN SYSTEM</div>
+            <div className="brand-title text-white">MUBS</div>
+            <div className="brand-sub">M&E SYSTEM</div>
           </div>
         </div>
 

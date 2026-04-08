@@ -5,11 +5,11 @@ import axios from "axios";
 import { useSearchParams } from "next/navigation";
 import { Modal, Button } from "react-bootstrap";
 import StatCard from "@/components/StatCard";
-import TaskSubmissionModal from "@/components/Staff/TaskSubmissionModal";
+import TaskSubmissionModal, { type StaffTaskSubmissionContext } from "@/components/Staff/TaskSubmissionModal";
 import SubmissionDetailModal from "@/components/Staff/SubmissionDetailModal";
 import TaskCardQueue from "@/components/Staff/TaskCardQueue";
 
-interface Task {
+interface Task extends StaffTaskSubmissionContext {
   id: number;
   title: string;
   description?: string;
@@ -21,10 +21,11 @@ interface Task {
   task_type?: 'process' | 'kpi_driver';
   kpi_target_value?: number | null;
   activity_title?: string;
-  assignment_type?: 'legacy' | 'process_task';
   unit_name?: string;
-  /** Process task: from standards.performance_indicator */
-  instruction?: string | null;
+  parent_process_title?: string | null;
+  assignee_name?: string | null;
+  /** Comma-separated team member names (excluding current staff) */
+  team_members?: string | null;
 }
 
 interface Stats {
@@ -136,10 +137,24 @@ function StaffTasksContent() {
   const renderTaskRow = (task: Task) => {
     const overdue = task.daysLeft < 0 && task.status !== "Completed";
     const rowBg = overdue ? "#fff5f5" : "transparent";
+    const isSubtask = task.assignment_type === 'process_subtask';
+    const teamPreview = (task.team_members || '').trim();
     return (
       <tr key={task.id} style={{ background: rowBg }}>
         <td className="ps-4">
-          <div className="fw-bold text-dark" style={{ fontSize: ".9rem" }}>{task.title}</div>
+          <div className="fw-bold text-dark" style={{ fontSize: ".9rem" }}>
+            {isSubtask && task.parent_process_title?.trim() ? task.parent_process_title : task.title}
+          </div>
+          {isSubtask && (
+            <div className="text-muted" style={{ fontSize: ".78rem" }}>
+              <span className="fw-semibold">Your duty:</span> {task.title}
+              {teamPreview ? (
+                <span className="ms-2">
+                  <span className="fw-semibold">Team:</span> {teamPreview}
+                </span>
+              ) : null}
+            </div>
+          )}
         </td>
         <td>
           <span className="status-badge" style={{
@@ -348,7 +363,9 @@ function StaffTasksContent() {
               <div className="d-flex justify-content-between align-items-start gap-3">
                 <div className="flex-grow-1">
                   <div className="fw-semibold" style={{ fontSize: "1.0rem", lineHeight: 1.25 }}>
-                    {selectedTaskForReport.title}
+                    {selectedTaskForReport.assignment_type === 'process_subtask' && selectedTaskForReport.parent_process_title?.trim()
+                      ? selectedTaskForReport.parent_process_title
+                      : selectedTaskForReport.title}
                   </div>
                   <div className="text-muted" style={{ fontSize: "0.78rem", marginTop: 2 }}>
                     {selectedTaskForReport.activity_title?.trim() ? selectedTaskForReport.activity_title : "Department task"}
@@ -370,18 +387,28 @@ function StaffTasksContent() {
                 </span>
               </div>
 
-              <div className="mt-3 p-3 rounded-3" style={{ background: "#ffffff", border: "1px solid #e2e8f0" }}>
-                <div className="text-muted fw-bold mb-1" style={{ fontSize: "0.7rem" }}>
-                  Instruction / notes
+              {selectedTaskForReport.assignment_type === 'process_subtask' && (
+                <div className="mt-3 p-3 rounded-3" style={{ background: "#ffffff", border: "1px solid #e2e8f0" }}>
+                  <div className="row g-2">
+                    <div className="col-12 col-md-6">
+                      <div className="text-muted fw-bold mb-1" style={{ fontSize: "0.7rem" }}>
+                        Your duty (sub-task)
+                      </div>
+                      <div className="text-dark fw-semibold" style={{ fontSize: "0.92rem", lineHeight: 1.35 }}>
+                        {selectedTaskForReport.title}
+                      </div>
+                    </div>
+                    <div className="col-12 col-md-6">
+                      <div className="text-muted fw-bold mb-1" style={{ fontSize: "0.7rem" }}>
+                        Team members
+                      </div>
+                      <div className="text-secondary" style={{ whiteSpace: "pre-wrap", fontSize: "0.86rem", lineHeight: 1.45 }}>
+                        {(selectedTaskForReport.team_members || "").trim() ? selectedTaskForReport.team_members : "—"}
+                      </div>
+                    </div>
+                  </div>
                 </div>
-                <div className="text-secondary" style={{ whiteSpace: "pre-wrap", fontSize: "0.86rem", lineHeight: 1.45 }}>
-                  {(
-                    selectedTaskForReport.instruction?.trim() ||
-                    selectedTaskForReport.description?.trim() ||
-                    "—"
-                  )}
-                </div>
-              </div>
+              )}
 
               <div className="row g-2 mt-2">
                 <div className="col-6">
@@ -425,6 +452,7 @@ function StaffTasksContent() {
         show={showViewModal}
         onHide={() => setShowViewModal(false)}
         taskId={selectedTaskForReport?.id}
+        assignmentType={selectedTaskForReport?.assignment_type}
         submission={null}
         onRevise={() => {
           setShowViewModal(false);

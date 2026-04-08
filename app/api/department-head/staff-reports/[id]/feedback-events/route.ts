@@ -33,7 +33,8 @@ export async function GET(_request: Request, context: { params: Promise<{ id: st
                 LEFT JOIN activity_assignments aa ON sr.activity_assignment_id = aa.id
                 LEFT JOIN strategic_activities sa ON aa.activity_id = sa.id
                 LEFT JOIN strategic_activities p ON sa.parent_id = p.id
-                LEFT JOIN staff_process_assignments spa ON sr.process_assignment_id = spa.id
+                LEFT JOIN staff_process_subtasks sps ON sr.process_subtask_id = sps.id
+                LEFT JOIN staff_process_assignments spa ON COALESCE(sr.process_assignment_id, sps.process_assignment_id) = spa.id
                 LEFT JOIN strategic_activities psa_sa ON spa.activity_id = psa_sa.id
                 WHERE sr.id = ?
                 AND (sa.department_id IN (${placeholders}) OR p.department_id IN (${placeholders}) OR psa_sa.department_id IN (${placeholders}))

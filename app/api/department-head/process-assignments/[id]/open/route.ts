@@ -4,6 +4,7 @@ import { cookies } from 'next/headers';
 import { verifyToken } from '@/lib/auth';
 import { getVisibleDepartmentIds, inPlaceholders } from '@/lib/department-head';
 import { addDurationToStartDate } from '@/lib/process-duration';
+import { assertPriorProcessStepsComplete } from '@/lib/process-auto-open';
 
 /** HOD opens a process (task): sets start date; due date = start + standard duration. */
 export async function POST(request: Request, context: { params: Promise<{ id: string }> }) {
@@ -54,6 +55,16 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
             return NextResponse.json({ message: 'This process is already open' }, { status: 400 });
         }
 
+        const body = await request.json().catch(() => ({}));
+        const forceOpen = body?.force === true || body?.hod_override === true;
+
+        if (!forceOpen) {
+            const gate = await assertPriorProcessStepsComplete(assignmentId, departmentIds);
+            if (!gate.ok) {
+                return NextResponse.json({ message: gate.message }, { status: 400 });
+            }
+        }
+
         const row = rows[0];
         const dv = row.duration_value;
         const du = row.duration_unit;
@@ -67,7 +78,6 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
             );
         }
 
-        const body = await request.json().catch(() => ({}));
         const startRaw = body?.start_date as string | undefined;
 
         const toYMD = (d: Date) => {

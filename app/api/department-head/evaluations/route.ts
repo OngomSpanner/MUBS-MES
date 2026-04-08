@@ -8,6 +8,7 @@ import {
     mergeEvaluationFeedback,
     ratingForCompleteMetrics,
 } from '@/lib/evaluation-scoring';
+import { autoOpenNextProcessStepAfterCompletion } from '@/lib/process-auto-open';
 
 async function appendSubmissionFeedbackLog(staffReportId: number, authorUserId: number, body: string) {
     const text = String(body || '').trim();
@@ -45,7 +46,13 @@ export async function GET(req: Request) {
             query: `
                 SELECT 
                     sr.id,
-                    COALESCE(sa.title, sp.step_name) as report_name,
+                    COALESCE(
+                        sa.title,
+                        CASE
+                          WHEN sps.id IS NOT NULL THEN CONCAT(sp.step_name, ' — ', sps.title)
+                          ELSE sp.step_name
+                        END
+                    ) as report_name,
                     COALESCE(p.title, psa_sa.title) as activity_title,
                     u.full_name as staff_name,
                     sr.updated_at as submitted_at,
@@ -64,10 +71,11 @@ export async function GET(req: Request) {
                 LEFT JOIN activity_assignments aa ON sr.activity_assignment_id = aa.id
                 LEFT JOIN strategic_activities sa ON aa.activity_id = sa.id
                 LEFT JOIN strategic_activities p ON sa.parent_id = p.id
-                LEFT JOIN staff_process_assignments spa ON sr.process_assignment_id = spa.id
+                LEFT JOIN staff_process_subtasks sps ON sr.process_subtask_id = sps.id
+                LEFT JOIN staff_process_assignments spa ON COALESCE(sr.process_assignment_id, sps.process_assignment_id) = spa.id
                 LEFT JOIN standard_processes sp ON spa.standard_process_id = sp.id
                 LEFT JOIN strategic_activities psa_sa ON spa.activity_id = psa_sa.id
-                JOIN users u ON COALESCE(aa.assigned_to_user_id, spa.staff_id) = u.id
+                JOIN users u ON COALESCE(aa.assigned_to_user_id, spa.staff_id, sps.assigned_to) = u.id
                 LEFT JOIN evaluations e ON e.staff_report_id = sr.id
                 WHERE (sa.department_id IN (${placeholders}) OR p.department_id IN (${placeholders}) OR psa_sa.department_id IN (${placeholders}))
                 AND (sr.status IN ('submitted', 'evaluated', 'incomplete', 'not_done') OR (sr.status = 'draft' AND e.id IS NOT NULL))
@@ -90,6 +98,9 @@ export async function GET(req: Request) {
         const progressFromDbStatus = (dbStatus: string | null): number | null => {
             if (!dbStatus) return null;
             const s = (dbStatus + '').toLowerCase();
+            // "submitted" means awaiting review; progress is not an evaluation outcome yet.
+            if (s === 'submitted') return 0;
+            if (s === 'draft') return 0;
             if (s === 'evaluated') return 100;
             if (s === 'incomplete') return 50;
             if (s === 'not_done') return 0;
@@ -181,6 +192,8 @@ export async function PUT(req: Request) {
 
         let appliedCompleteScore: number | undefined;
         let delayedHodNoteApplied = false;
+        /** When a standard process step is fully marked Complete, open the next step (sequential workflow). */
+        let autoOpenAfterProcessAssignmentId: number | null = null;
 
         if ((status === 'Incomplete' || legacyReturned) && (!reviewer_notes || String(reviewer_notes).trim() === '')) {
             return NextResponse.json({ message: 'Comment is required when marking Incomplete.' }, { status: 400 });
@@ -189,19 +202,26 @@ export async function PUT(req: Request) {
         const placeholders = inPlaceholders(departmentIds.length);
         const reportCheck = await query({
             query: `
-                SELECT sr.id, sr.activity_assignment_id, sr.process_assignment_id,
-                    COALESCE(aa.activity_id, spa.activity_id) as task_id, 
-                    COALESCE(sa.id, psa_sa.id) as sa_id, 
-                    COALESCE(sa.task_type, 'process') as task_type, 
+                SELECT
+                    sr.id,
+                    sr.activity_assignment_id,
+                    sr.process_assignment_id,
+                    sr.process_subtask_id,
+                    COALESCE(aa.activity_id, spa.activity_id) as task_id,
+                    COALESCE(sa.id, psa_sa.id) as sa_id,
+                    COALESCE(sa.task_type, 'process') as task_type,
                     COALESCE(sa.parent_id, psa_sa.parent_id) as strategic_activity_id,
                     COALESCE(sr.submitted_at, sr.updated_at) as staff_submitted_at,
-                    COALESCE(aa.end_date, spa.end_date) as assignment_end_date
+                    COALESCE(aa.end_date, spa.end_date) as assignment_end_date,
+                    spa.id as resolved_process_assignment_id
                 FROM staff_reports sr
                 LEFT JOIN activity_assignments aa ON sr.activity_assignment_id = aa.id
                 LEFT JOIN strategic_activities sa ON aa.activity_id = sa.id
-                LEFT JOIN staff_process_assignments spa ON sr.process_assignment_id = spa.id
+                LEFT JOIN staff_process_subtasks sps ON sr.process_subtask_id = sps.id
+                LEFT JOIN staff_process_assignments spa ON COALESCE(sr.process_assignment_id, sps.process_assignment_id) = spa.id
                 LEFT JOIN strategic_activities psa_sa ON spa.activity_id = psa_sa.id
-                WHERE sr.id = ? AND (sa.department_id IN (${placeholders}) OR psa_sa.department_id IN (${placeholders}))
+                WHERE sr.id = ?
+                  AND (sa.department_id IN (${placeholders}) OR psa_sa.department_id IN (${placeholders}))
             `,
             values: [staffReportId, ...departmentIds, ...departmentIds]
         }) as any[];
@@ -214,7 +234,8 @@ export async function PUT(req: Request) {
         const taskId = Number(row.task_id ?? row.sa_id ?? 0) || null;
         const parentId = row.strategic_activity_id;
         const assignmentId = row.activity_assignment_id;
-        const processAssignmentId = row.process_assignment_id;
+        const processAssignmentId = row.resolved_process_assignment_id ?? row.process_assignment_id;
+        const processSubtaskId = row.process_subtask_id != null ? Number(row.process_subtask_id) : null;
         // When HOD marks Complete, task progress is set to 100% for Department Tasks display
         const taskProgressWhenComplete = 100;
         const isKpiDriver = taskType === 'kpi_driver';
@@ -266,10 +287,17 @@ export async function PUT(req: Request) {
                 });
             }
             if (processAssignmentId) {
-                await query({
-                    query: 'UPDATE staff_process_assignments SET status = ? WHERE id = ?',
-                    values: ['incomplete', processAssignmentId]
-                });
+                if (processSubtaskId) {
+                    await query({
+                        query: 'UPDATE staff_process_subtasks SET status = ? WHERE id = ?',
+                        values: ['incomplete', processSubtaskId],
+                    });
+                } else {
+                    await query({
+                        query: 'UPDATE staff_process_assignments SET status = ? WHERE id = ?',
+                        values: ['incomplete', processAssignmentId]
+                    });
+                }
             }
         }
 
@@ -303,10 +331,17 @@ export async function PUT(req: Request) {
                 });
             }
             if (processAssignmentId) {
-                await query({
-                    query: 'UPDATE staff_process_assignments SET status = ? WHERE id = ?',
-                    values: ['not_done', processAssignmentId]
-                });
+                if (processSubtaskId) {
+                    await query({
+                        query: 'UPDATE staff_process_subtasks SET status = ? WHERE id = ?',
+                        values: ['not_done', processSubtaskId],
+                    });
+                } else {
+                    await query({
+                        query: 'UPDATE staff_process_assignments SET status = ? WHERE id = ?',
+                        values: ['not_done', processAssignmentId]
+                    });
+                }
             }
         }
         else if (status === 'Complete') {
@@ -380,10 +415,42 @@ export async function PUT(req: Request) {
                 });
             }
             if (processAssignmentId) {
-                await query({
-                    query: 'UPDATE staff_process_assignments SET status = ? WHERE id = ?',
-                    values: ['evaluated', processAssignmentId]
-                });
+                if (processSubtaskId) {
+                    await query({
+                        query: 'UPDATE staff_process_subtasks SET status = ? WHERE id = ?',
+                        values: ['evaluated', processSubtaskId],
+                    });
+                } else {
+                    await query({
+                        query: 'UPDATE staff_process_assignments SET status = ? WHERE id = ?',
+                        values: ['evaluated', processAssignmentId]
+                    });
+                    autoOpenAfterProcessAssignmentId = Number(processAssignmentId);
+                }
+            }
+        }
+
+        // If this report belongs to a sub-task, recompute the parent process_assignment status from its subtasks.
+        // This prevents marking the whole process assignment "evaluated" when only one sub-task is reviewed.
+        if (processAssignmentId && processSubtaskId) {
+            const subStatuses = (await query({
+                query: 'SELECT status FROM staff_process_subtasks WHERE process_assignment_id = ?',
+                values: [processAssignmentId],
+            })) as { status: string }[];
+            const normalized = subStatuses.map((r) => String(r.status || '').toLowerCase());
+            const total = normalized.length;
+            const done = normalized.filter((s) => s === 'completed' || s === 'evaluated').length;
+            let parentStatus = 'in_progress';
+            if (total > 0 && done === total) parentStatus = 'evaluated';
+            else if (normalized.includes('submitted')) parentStatus = 'submitted';
+            else if (normalized.includes('incomplete')) parentStatus = 'incomplete';
+            else if (normalized.includes('not_done')) parentStatus = 'not_done';
+            await query({
+                query: 'UPDATE staff_process_assignments SET status = ? WHERE id = ?',
+                values: [parentStatus, processAssignmentId],
+            });
+            if (parentStatus === 'evaluated') {
+                autoOpenAfterProcessAssignmentId = Number(processAssignmentId);
             }
         }
 
@@ -483,6 +550,14 @@ export async function PUT(req: Request) {
                 values: [parentProgress, parentStatus, parentIdForRecalc]
             }) as any;
             parentUpdated = parentResult?.affectedRows > 0;
+        }
+
+        if (status === 'Complete' && autoOpenAfterProcessAssignmentId != null) {
+            try {
+                await autoOpenNextProcessStepAfterCompletion(autoOpenAfterProcessAssignmentId, departmentIds);
+            } catch (e) {
+                console.error('Auto-open next process step:', e);
+            }
         }
 
         return NextResponse.json({

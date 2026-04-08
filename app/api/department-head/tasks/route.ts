@@ -99,6 +99,8 @@ export async function GET() {
                     spa.end_date as endDate,
                     spa.end_date as dueDate,
                     spa.commentary as description,
+                    sp.step_order as step_order,
+                    spa.created_at as spa_created_at,
                     (SELECT sr2.status FROM staff_reports sr2 WHERE sr2.process_assignment_id = spa.id ORDER BY sr2.updated_at DESC LIMIT 1) as latest_report_status,
                     st.duration_value as duration_value,
                     st.duration_unit as duration_unit,
@@ -108,7 +110,7 @@ export async function GET() {
                 JOIN standard_processes sp ON spa.standard_process_id = sp.id
                 JOIN standards st ON sp.standard_id = st.id
                 JOIN strategic_activities sa ON spa.activity_id = sa.id
-                JOIN users u ON spa.staff_id = u.id
+                LEFT JOIN users u ON spa.staff_id = u.id
                 WHERE (sa.department_id IN (${placeholders}))
             `;
         try {
@@ -129,6 +131,46 @@ export async function GET() {
                 }));
             } else {
                 throw e;
+            }
+        }
+
+        // Subtasks for container process assignments (spa.staff_id IS NULL)
+        const containerAssignmentIds = processAssignmentsQuery
+            .filter((p: any) => p.assigned_to == null)
+            .map((p: any) => Number(p.id))
+            .filter((id: number) => Number.isFinite(id) && id > 0);
+        const subtasksByAssignmentId = new Map<number, { status: string }[]>();
+        if (containerAssignmentIds.length > 0) {
+            const paPlaceholders = inPlaceholders(containerAssignmentIds.length);
+            try {
+                const subRows = (await query({
+                    query: `
+                        SELECT
+                            s.process_assignment_id,
+                            COALESCE(
+                                (
+                                    SELECT sr2.status
+                                    FROM staff_reports sr2
+                                    WHERE sr2.process_subtask_id = s.id
+                                    ORDER BY sr2.updated_at DESC
+                                    LIMIT 1
+                                ),
+                                s.status
+                            ) as status
+                        FROM staff_process_subtasks s
+                        WHERE process_assignment_id IN (${paPlaceholders})
+                    `,
+                    values: [...containerAssignmentIds],
+                })) as any[];
+                for (const r of subRows) {
+                    const pid = Number(r.process_assignment_id);
+                    if (!Number.isFinite(pid) || pid <= 0) continue;
+                    const list = subtasksByAssignmentId.get(pid) ?? [];
+                    list.push({ status: String(r.status ?? '') });
+                    subtasksByAssignmentId.set(pid, list);
+                }
+            } catch {
+                // staff_process_subtasks table may not exist in older schema; ignore
             }
         }
 
@@ -185,23 +227,58 @@ export async function GET() {
             };
         });
 
+        const subtaskProgressFromStatus = (raw: string): number => {
+            const s = String(raw || '').toLowerCase();
+            if (s === 'completed' || s === 'evaluated') return 100;
+            if (s === 'submitted') return 50;
+            if (s === 'in_progress') return 25;
+            return 0; // pending/accepted/unknown
+        };
+
         const mappedProcessAssignments = processAssignmentsQuery.map((p: any) => {
             const hasWindow = p.startDate != null && String(p.startDate).trim() !== '';
-            const derived = statusFromReportStatus(p.latest_report_status);
-            const status =
-                !hasWindow && String(p.db_status || '').toLowerCase() === 'pending'
-                    ? 'Not opened'
-                    : derived ?? processStatusMap[p.db_status] ?? 'Pending';
-            // Do not use 50% for "In Progress" (just opened / staff working)—only for Under Review or HOD evaluation outcomes.
-            const derivedProgress = progressFromReportStatus(p.latest_report_status);
-            const progress =
-                status === 'Completed'
-                    ? 100
-                    : derivedProgress != null
-                      ? derivedProgress
-                      : status === 'Under Review'
-                        ? 50
-                        : 0;
+            const isContainer = p.assigned_to == null;
+
+            let status: string;
+            let progress: number;
+
+            if (!hasWindow && String(p.db_status || '').toLowerCase() === 'pending') {
+                status = 'Not opened';
+                progress = 0;
+            } else if (isContainer) {
+                const subs = subtasksByAssignmentId.get(Number(p.id)) ?? [];
+                const total = subs.length;
+                const normalized = subs.map((s) => (s.status || '').toLowerCase());
+                const completedCount = normalized.filter((s) => s === 'completed' || s === 'evaluated').length;
+
+                // Parent progress = average of subtask progress (100% only when all done)
+                const sum = normalized.reduce((acc, s) => acc + subtaskProgressFromStatus(s), 0);
+                progress = total > 0 ? Math.round(sum / total) : 0;
+
+                // Container status must be derived from its subtasks only.
+                // Never mark Completed unless ALL subtasks are done (completed/evaluated).
+                if (total > 0 && completedCount === total) status = 'Completed';
+                else if (normalized.includes('submitted')) status = 'Under Review';
+                else if (normalized.includes('incomplete')) status = 'Incomplete';
+                else if (normalized.includes('not_done')) status = 'Not Done';
+                else if (normalized.some((s) => s === 'in_progress')) status = 'In Progress';
+                // 0% progress = not started yet; do not label "In Progress" (matches To do / Not completed tabs)
+                else if (progress === 0) status = 'Pending';
+                else status = 'In Progress';
+            } else {
+                const derived = statusFromReportStatus(p.latest_report_status);
+                status = derived ?? processStatusMap[p.db_status] ?? 'Pending';
+                // Do not use 50% for "In Progress" (just opened / staff working)—only for Under Review or HOD evaluation outcomes.
+                const derivedProgress = progressFromReportStatus(p.latest_report_status);
+                progress =
+                    status === 'Completed'
+                        ? 100
+                        : derivedProgress != null
+                          ? derivedProgress
+                          : status === 'Under Review'
+                            ? 50
+                            : 0;
+            }
             return {
                 ...p,
                 status,
@@ -222,7 +299,23 @@ export async function GET() {
                 seen.set(key, t);
             }
         }
-        const tasks = Array.from(seen.values());
+        const tasks = Array.from(seen.values()).sort((a: any, b: any) => {
+            const aid = Number(a.activity_id) || 0;
+            const bid = Number(b.activity_id) || 0;
+            if (aid !== bid) return aid - bid;
+            const aProc = a.tier === 'process_task';
+            const bProc = b.tier === 'process_task';
+            if (aProc && bProc) {
+                const so = (Number(a.step_order) || 0) - (Number(b.step_order) || 0);
+                if (so !== 0) return so;
+                const ta = new Date(a.spa_created_at || 0).getTime();
+                const tb = new Date(b.spa_created_at || 0).getTime();
+                if (ta !== tb) return ta - tb;
+            } else if (aProc !== bProc) {
+                return aProc ? -1 : 1;
+            }
+            return (Number(a.id) || 0) - (Number(b.id) || 0);
+        });
 
         const kanban = {
             todo: tasks.filter((t: any) => ['Not Started', 'Pending', 'Not opened'].includes(t.status)),

@@ -1,8 +1,6 @@
 export type UserRole =
   | 'System Administrator'
   | 'Strategy Manager'
-  | 'Committee Member'
-  | 'Principal'
   | 'Department Head'
   | 'Unit Head'
   | 'HOD'
@@ -24,8 +22,6 @@ export function parseRoles(roleField: unknown): string[] {
  *
  * Priority (highest → lowest):
  * - System Administrator / Strategy Manager → /admin
- * - Committee Member → /comm
- * - Principal → /principal
  * - Department Head / Unit Head / HOD → /department-head
  * - Staff / Viewer → /staff
  * - fallback: Staff
@@ -34,8 +30,6 @@ export function pickDefaultActiveRole(roles: string[]): string {
   const normalized = roles.map((r) => normalizeRoleForCookie(r));
   if (normalized.includes('System Administrator')) return 'System Administrator';
   if (normalized.includes('Strategy Manager')) return 'Strategy Manager';
-  if (normalized.includes('Committee Member')) return 'Committee Member';
-  if (normalized.includes('Principal')) return 'Principal';
   if (normalized.includes('Department Head')) return 'Department Head';
   if (normalized.includes('Unit Head')) return 'Unit Head';
   if (normalized.includes('HOD')) return 'HOD';
@@ -47,8 +41,6 @@ export function pickDefaultActiveRole(roles: string[]): string {
 
 export function dashboardPathForRole(role: string | undefined): '/admin' | '/comm' | '/principal' | '/department-head' | '/ambassador' | '/staff' {
   if (role === 'System Administrator' || role === 'Strategy Manager') return '/admin';
-  if (role === 'Committee Member') return '/comm';
-  if (role === 'Principal') return '/principal';
   if (role === 'Department Head' || role === 'Unit Head' || role === 'HOD') return '/department-head';
   if (role === 'Ambassador') return '/ambassador';
   return '/staff';
@@ -58,8 +50,6 @@ export function dashboardPathForRole(role: string | undefined): '/admin' | '/com
 const CANONICAL_ROLES = [
   'System Administrator',
   'Strategy Manager',
-  'Committee Member',
-  'Principal',
   'Department Head',
   'Unit Head',
   'HOD',
@@ -72,8 +62,6 @@ const CANONICAL_ROLES = [
 const SNAKE_TO_CANONICAL: Record<string, string> = {
   system_admin: 'System Administrator',
   strategy_manager: 'Strategy Manager',
-  committee_member: 'Committee Member',
-  principal: 'Principal',
   department_head: 'Department Head',
   unit_head: 'Unit Head',
   hod: 'HOD',

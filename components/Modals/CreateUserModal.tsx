@@ -26,7 +26,6 @@ export default function CreateUserModal({ show, onHide, onUserCreated }: CreateU
     department_id: '' as string | number,
     managed_unit_id: '' as string | number,
     password: '',
-    committee_types: [] as string[],
     employee_id: '',
     contract_terms: 'Permanent',
     contract_type: 'Full-time',
@@ -40,9 +39,6 @@ export default function CreateUserModal({ show, onHide, onUserCreated }: CreateU
   const [faculties, setFaculties] = useState<Department[]>([]);
   const [loadingOptions, setLoadingOptions] = useState(false);
 
-  const hasCommitteeRole = formData.role
-    ? formData.role.split(',').map((r) => r.trim()).filter(Boolean).some((r) => r === 'committee_member' || formatRoleForDisplay(r) === 'Committee Member')
-    : false;
   
   const hasAmbassadorRole = formData.role
     ? formData.role.split(',').map((r) => r.trim()).filter(Boolean).includes('ambassador')
@@ -100,7 +96,6 @@ export default function CreateUserModal({ show, onHide, onUserCreated }: CreateU
           role: roleList.join(','),
           department_id: departmentId,
           managed_unit_id: hasAmbassadorRole && formData.managed_unit_id !== '' ? Number(formData.managed_unit_id) : null,
-          committee_types: hasCommitteeRole ? formData.committee_types : undefined,
           employee_id: formData.employee_id,
           contract_terms: formData.contract_terms,
           contract_type: formData.contract_type,
@@ -123,7 +118,6 @@ export default function CreateUserModal({ show, onHide, onUserCreated }: CreateU
           department_id: '',
           managed_unit_id: '',
           password: '',
-          committee_types: [],
           employee_id: '',
           contract_terms: 'Permanent',
           contract_type: 'Full-time',
@@ -331,35 +325,6 @@ export default function CreateUserModal({ show, onHide, onUserCreated }: CreateU
                   ))}
                 </Form.Select>
                 <Form.Text className="text-primary small">This user will oversee all units under this Faculty/Office.</Form.Text>
-              </div>
-            )}
-            {hasCommitteeRole && (
-              <div className="col-12">
-                <Form.Label className="fw-bold small">Committees (select committees this member belongs to)</Form.Label>
-                <div className="d-flex flex-wrap gap-2 p-2 border rounded bg-light">
-                  {COMMITTEE_TYPES.map((ct) => {
-                    const checked = formData.committee_types.includes(ct);
-                    return (
-                      <div key={ct} className="form-check">
-                        <input
-                          type="checkbox"
-                          className="form-check-input"
-                          id={`committee-${ct}`}
-                          checked={checked}
-                          onChange={(e) => {
-                            const next = e.target.checked
-                              ? [...formData.committee_types, ct]
-                              : formData.committee_types.filter((x) => x !== ct);
-                            setFormData({ ...formData, committee_types: next });
-                          }}
-                        />
-                        <label className="form-check-label small" htmlFor={`committee-${ct}`}>
-                          {ct}
-                        </label>
-                      </div>
-                    );
-                  })}
-                </div>
               </div>
             )}
             <div className="col-12">

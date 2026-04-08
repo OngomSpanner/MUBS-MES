@@ -26,6 +26,14 @@ export async function POST(request: Request) {
 
     const email = payload.email;
 
+    // Restrict sign-in to @mubs.ac.ug domain
+    if (!email.toLowerCase().endsWith('@mubs.ac.ug')) {
+      return NextResponse.json(
+        { message: 'Only MUBS Email accounts are permitted to sign in.' },
+        { status: 403 }
+      );
+    }
+
     // Find user
     const users = await query({
       query: 'SELECT id, full_name, email, role, status FROM users WHERE email = ?',

@@ -1,5 +1,4 @@
 import StrategicView from './views/Strategic';
-import CommitteeView from './views/Committee';
 import TrackingView from './views/Tracking';
 import UsersView from './views/Users';
 import ReportsView from './views/Reports';
@@ -16,8 +15,6 @@ export default async function AdminDashboard({ searchParams }: AdminPageProps) {
   switch (pg) {
     case 'strategic':
       return <StrategicView />;
-    case 'committee':
-      return <CommitteeView />;
     case 'tracking':
       return <TrackingView />;
     case 'users':

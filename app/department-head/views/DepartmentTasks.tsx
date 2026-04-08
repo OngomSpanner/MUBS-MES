@@ -7,6 +7,7 @@ import StatCard from '@/components/StatCard';
 import DepartmentTaskCardGrid from '@/components/Department/DepartmentTaskCardGrid';
 import EvaluateSubmissionModal, { parseEvidenceItems, type FeedbackHistoryEntry } from '@/components/Department/EvaluateSubmissionModal';
 import { addDurationToStartDate, formatStandardProcessDuration } from '@/lib/process-duration';
+import { PROCESS_REASSIGN_REASONS } from '@/lib/process-reassign-reasons';
 
 
 interface Task {
@@ -34,6 +35,17 @@ interface Task {
     duration_value?: number | null;
     duration_unit?: string | null;
 }
+
+type ProcessSubtask = {
+    id: number;
+    process_assignment_id: number;
+    title: string;
+    assigned_to: number;
+    assigned_to_name: string;
+    status: string;
+    start_date?: string | null;
+    end_date?: string | null;
+};
 
 interface Evaluation {
     id: number;
@@ -131,6 +143,21 @@ export default function DepartmentTasks({ initialActivity, initialAssignee }: De
     const [activityFilter, setActivityFilter] = useState(initialActivity || 'All Tasks');
     const [assigneeFilter, setAssigneeFilter] = useState(initialAssignee || 'All Assignees');
     const [activityIdFilter, setActivityIdFilter] = useState<number | null>(null);
+    const [subtasksByProcessAssignmentId, setSubtasksByProcessAssignmentId] = useState<Record<number, ProcessSubtask[]>>({});
+    const [expandedProcessAssignmentIds, setExpandedProcessAssignmentIds] = useState<Record<number, boolean>>({});
+
+    const subtaskProgress = (rawStatus: string | null | undefined): number => {
+        const s = String(rawStatus || '').toLowerCase();
+        if (s === 'completed' || s === 'evaluated') return 100;
+        if (s === 'submitted') return 50;
+        if (s === 'in_progress') return 25;
+        return 0;
+    };
+
+    const subtaskStatusBlocksReassign = (rawStatus: string | null | undefined): boolean => {
+        const s = String(rawStatus || '').toLowerCase().trim();
+        return s === 'completed' || s === 'evaluated';
+    };
 
     const UNASSIGNED_LABEL = 'Unassigned';
 
@@ -146,12 +173,28 @@ export default function DepartmentTasks({ initialActivity, initialAssignee }: De
     const [openProcessTask, setOpenProcessTask] = useState<Task | null>(null);
     const [openProcessStart, setOpenProcessStart] = useState('');
     const [openProcessSaving, setOpenProcessSaving] = useState(false);
+    const [showBulkOpenModal, setShowBulkOpenModal] = useState(false);
+    const [bulkOpenStart, setBulkOpenStart] = useState('');
+    const [bulkOpenSaving, setBulkOpenSaving] = useState(false);
     const [feedbackHistoryForReview, setFeedbackHistoryForReview] = useState<FeedbackHistoryEntry[]>([]);
 
     const [reassignTask, setReassignTask] = useState<Task | null>(null);
     const [reassignStaffId, setReassignStaffId] = useState<number | ''>('');
-    const [reassignReason, setReassignReason] = useState('');
+    const [reassignReasonCode, setReassignReasonCode] = useState('');
+    const [reassignDescription, setReassignDescription] = useState('');
     const [reassignSaving, setReassignSaving] = useState(false);
+
+    type ReassignSubtaskCtx = {
+        assignmentId: number;
+        subtask: ProcessSubtask;
+        parentProcessTitle: string;
+        activityTitle: string;
+    };
+    const [reassignSubtaskCtx, setReassignSubtaskCtx] = useState<ReassignSubtaskCtx | null>(null);
+    const [reassignSubtaskStaffId, setReassignSubtaskStaffId] = useState<number | ''>('');
+    const [reassignSubtaskReasonCode, setReassignSubtaskReasonCode] = useState('');
+    const [reassignSubtaskDescription, setReassignSubtaskDescription] = useState('');
+    const [reassignSubtaskSaving, setReassignSubtaskSaving] = useState(false);
 
     /** Table view: row opens this modal with full-width action buttons */
     const [tableDetailsTask, setTableDetailsTask] = useState<Task | null>(null);
@@ -196,10 +239,11 @@ export default function DepartmentTasks({ initialActivity, initialAssignee }: De
 
     const fetchData = async () => {
         try {
-            const [tasksRes, activitiesRes, usersRes] = await Promise.all([
+            const [tasksRes, activitiesRes, usersRes, processAssignmentsRes] = await Promise.all([
                 axios.get('/api/department-head/tasks'),
                 axios.get('/api/department-head/activities').catch(() => ({ data: { activities: [] } })),
-                axios.get('/api/users/department')
+                axios.get('/api/users/department'),
+                axios.get('/api/department-head/process-assignments').catch(() => ({ data: [] })),
             ]);
             const tasksData = tasksRes.data?.kanban ? tasksRes.data : {
                 kanban: tasksRes.data?.kanban || { todo: [], inProgress: [], underReview: [], completed: [] },
@@ -208,6 +252,31 @@ export default function DepartmentTasks({ initialActivity, initialAssignee }: De
             };
             setData(tasksData);
             setDepartmentUsers(usersRes.data || []);
+
+            // Subtasks map (container process assignments only)
+            const paRows = Array.isArray(processAssignmentsRes.data) ? processAssignmentsRes.data : [];
+            const map: Record<number, ProcessSubtask[]> = {};
+            for (const row of paRows) {
+                const pid = Number(row?.id);
+                if (!Number.isFinite(pid) || pid <= 0) continue;
+                const staffId = row?.staff_id;
+                if (staffId != null && staffId !== '') continue; // only container rows
+                const subs = Array.isArray(row?.subtasks) ? row.subtasks : [];
+                map[pid] = subs
+                    .map((s: any) => ({
+                        id: Number(s.id),
+                        process_assignment_id: Number(s.process_assignment_id),
+                        title: String(s.title ?? ''),
+                        assigned_to: Number(s.assigned_to),
+                        assigned_to_name: String(s.assigned_to_name ?? ''),
+                        status: String(s.status ?? ''),
+                        start_date: s.start_date ?? null,
+                        end_date: s.end_date ?? null,
+                    }))
+                    .filter((s: any) => Number.isFinite(s.id) && s.id > 0);
+            }
+            setSubtasksByProcessAssignmentId(map);
+
             // Merge parent activities from both APIs so we never miss one (same source of truth, but union in case of any mismatch)
             const activitiesList = Array.isArray(activitiesRes?.data?.activities) ? activitiesRes.data.activities : [];
             // Parent options exactly as they appear in the Activities table
@@ -362,10 +431,19 @@ export default function DepartmentTasks({ initialActivity, initialAssignee }: De
 
     useEffect(() => {
         if (reassignTask) {
-            setReassignReason('');
+            setReassignReasonCode('');
+            setReassignDescription('');
             setReassignStaffId('');
         }
     }, [reassignTask]);
+
+    useEffect(() => {
+        if (reassignSubtaskCtx) {
+            setReassignSubtaskStaffId('');
+            setReassignSubtaskReasonCode('');
+            setReassignSubtaskDescription('');
+        }
+    }, [reassignSubtaskCtx]);
 
     // Helper to update URL and trigger navigation
     const navigate = (mode: 'table' | 'grid' | 'activity', activity?: string, status?: string) => {
@@ -455,7 +533,8 @@ export default function DepartmentTasks({ initialActivity, initialAssignee }: De
             const matchesStatus = f === 'all' ||
                 (f === 'completed' && (p >= 100 || s === 'completed')) ||
                 (f === 'in progress' && p > 0 && p < 100) ||
-                (f === 'not completed' && p < 100 && s !== 'completed');
+                // "Not completed" = not started (0% progress)
+                (f === 'not completed' && p === 0 && s !== 'completed');
 
             return matchesActivity && matchesAssignee && matchesStatus;
         });
@@ -599,6 +678,7 @@ export default function DepartmentTasks({ initialActivity, initialAssignee }: De
         try {
             await axios.post(`/api/department-head/process-assignments/${openProcessTask.id}/open`, {
                 start_date: openProcessStart,
+                force: true,
             });
             setOpenProcessTask(null);
             await fetchData();
@@ -621,13 +701,125 @@ export default function DepartmentTasks({ initialActivity, initialAssignee }: De
         }
     };
 
+    const handleStartBulkOpen = () => {
+        const selectedTasks = selectedTaskIds
+            .map((id) => allTasks.find((t) => t.id === id))
+            .filter(Boolean) as Task[];
+
+        const nonProcess = selectedTasks.filter((t) => t.tier !== 'process_task');
+        if (nonProcess.length > 0) {
+            setMessageModal({
+                show: true,
+                title: 'Only process tasks can be opened',
+                message: 'Remove non-process items from your selection, then try again.',
+                type: 'warning',
+            });
+            return;
+        }
+
+        const notOpened = selectedTasks.filter((t) => String(t.status) !== 'Not opened');
+        if (notOpened.length > 0) {
+            setMessageModal({
+                show: true,
+                title: 'Some selections cannot be opened',
+                message: 'Only processes with status "Not opened" can be opened. Remove already opened/completed items and try again.',
+                type: 'warning',
+            });
+            return;
+        }
+
+        if (!bulkOpenStart.trim()) {
+            const today = new Date();
+            const y = today.getFullYear();
+            const m = String(today.getMonth() + 1).padStart(2, '0');
+            const d = String(today.getDate()).padStart(2, '0');
+            setBulkOpenStart(`${y}-${m}-${d}`);
+        }
+        setShowBulkOpenModal(true);
+    };
+
+    const handleSubmitBulkOpen = async () => {
+        if (!bulkOpenStart.trim()) {
+            setMessageModal({
+                show: true,
+                title: 'Start date required',
+                message: 'Please set when these processes should start.',
+                type: 'warning',
+            });
+            return;
+        }
+
+        const eligible = selectedTaskIds
+            .map((id) => allTasks.find((t) => t.id === id))
+            .filter((t): t is Task => Boolean(t))
+            .filter((t) => t.tier === 'process_task' && String(t.status) === 'Not opened');
+
+        if (eligible.length === 0) {
+            setShowBulkOpenModal(false);
+            setMessageModal({
+                show: true,
+                title: 'Nothing to open',
+                message: 'Select one or more processes with status "Not opened".',
+                type: 'warning',
+            });
+            return;
+        }
+
+        setBulkOpenSaving(true);
+        try {
+            const results = await Promise.allSettled(
+                eligible.map((t) =>
+                    axios.post(`/api/department-head/process-assignments/${t.id}/open`, {
+                        start_date: bulkOpenStart,
+                        force: true,
+                    })
+                )
+            );
+
+            const failed = results.filter((r) => r.status === 'rejected').length;
+            const opened = results.length - failed;
+
+            setShowBulkOpenModal(false);
+            setSelectedTaskIds([]);
+            await fetchData();
+
+            setMessageModal({
+                show: true,
+                title: failed > 0 ? 'Bulk open completed with errors' : 'Processes opened',
+                message:
+                    failed > 0
+                        ? `Opened ${opened} process(es). ${failed} failed — please try opening those individually.`
+                        : `Opened ${opened} process(es). Due dates were set from the standard process duration.`,
+                type: failed > 0 ? 'warning' : 'success',
+            });
+        } catch (err: any) {
+            setMessageModal({
+                show: true,
+                title: 'Could not open processes',
+                message: err.response?.data?.message || 'Request failed.',
+                type: 'error',
+            });
+        } finally {
+            setBulkOpenSaving(false);
+        }
+    };
+
     const handleSubmitReassign = async () => {
         if (!reassignTask) return;
-        if (!String(reassignReason).trim()) {
+        if (!reassignReasonCode.trim()) {
             setMessageModal({
                 show: true,
                 title: 'Reason required',
-                message: 'Please explain why you are reassigning this process.',
+                message: 'Select a reason for this reassignment.',
+                type: 'warning',
+            });
+            return;
+        }
+        if (reassignReasonCode === 'other' && !String(reassignDescription).trim()) {
+            setMessageModal({
+                show: true,
+                title: 'Description required',
+                message: 'When the reason is “Other”, add a short description.',
                 type: 'warning',
             });
             return;
@@ -645,17 +837,19 @@ export default function DepartmentTasks({ initialActivity, initialAssignee }: De
         try {
             await axios.post(`/api/department-head/process-assignments/${reassignTask.id}/reassign`, {
                 new_staff_id: reassignStaffId,
-                reason: String(reassignReason).trim(),
+                reason_code: reassignReasonCode.trim(),
+                description: String(reassignDescription).trim() || undefined,
             });
             setReassignTask(null);
-            setReassignReason('');
+            setReassignReasonCode('');
+            setReassignDescription('');
             setReassignStaffId('');
             await fetchData();
             setMessageModal({
                 show: true,
                 title: 'Process reassigned',
                 message:
-                    'Assignment updated. Dates were cleared — open the process again when the new assignee should start.',
+                    'Assignment updated. Dates were cleared — open the process again when the new assignee should start. Previous and new assignees were notified in the app.',
                 type: 'success',
             });
         } catch (err: any) {
@@ -667,6 +861,69 @@ export default function DepartmentTasks({ initialActivity, initialAssignee }: De
             });
         } finally {
             setReassignSaving(false);
+        }
+    };
+
+    const handleSubmitReassignSubtask = async () => {
+        if (!reassignSubtaskCtx) return;
+        if (!reassignSubtaskReasonCode.trim()) {
+            setMessageModal({
+                show: true,
+                title: 'Reason required',
+                message: 'Select a reason for this reassignment.',
+                type: 'warning',
+            });
+            return;
+        }
+        if (reassignSubtaskReasonCode === 'other' && !String(reassignSubtaskDescription).trim()) {
+            setMessageModal({
+                show: true,
+                title: 'Description required',
+                message: 'When the reason is “Other”, add a short description.',
+                type: 'warning',
+            });
+            return;
+        }
+        if (
+            reassignSubtaskStaffId === '' ||
+            reassignSubtaskStaffId === reassignSubtaskCtx.subtask.assigned_to
+        ) {
+            setMessageModal({
+                show: true,
+                title: 'Choose another staff member',
+                message: 'Select a different assignee for this sub-task.',
+                type: 'warning',
+            });
+            return;
+        }
+        setReassignSubtaskSaving(true);
+        try {
+            await axios.post(
+                `/api/department-head/process-assignments/${reassignSubtaskCtx.assignmentId}/subtasks/${reassignSubtaskCtx.subtask.id}/reassign`,
+                {
+                    new_staff_id: reassignSubtaskStaffId,
+                    reason_code: reassignSubtaskReasonCode.trim(),
+                    description: String(reassignSubtaskDescription).trim() || undefined,
+                }
+            );
+            setReassignSubtaskCtx(null);
+            await fetchData();
+            setMessageModal({
+                show: true,
+                title: 'Sub-task reassigned',
+                message:
+                    'The sub-task assignee was updated. Previous and new assignees were notified in the app.',
+                type: 'success',
+            });
+        } catch (err: any) {
+            setMessageModal({
+                show: true,
+                title: 'Reassign failed',
+                message: err.response?.data?.message || 'Request failed.',
+                type: 'error',
+            });
+        } finally {
+            setReassignSubtaskSaving(false);
         }
     };
 
@@ -714,7 +971,8 @@ export default function DepartmentTasks({ initialActivity, initialAssignee }: De
             if (filterVal === 'all') return true;
             if (filterVal === 'completed') return p >= 100 || s === 'completed';
             if (filterVal === 'in progress') return p > 0 && p < 100;
-            if (filterVal === 'not completed') return p < 100 && s !== 'completed';
+            // "Not completed" = not started (0% progress)
+            if (filterVal === 'not completed') return p === 0 && s !== 'completed';
             if (filterVal === 'todo') return p === 0 && s !== 'completed';
             return false;
         }).length;
@@ -1138,6 +1396,16 @@ export default function DepartmentTasks({ initialActivity, initialAssignee }: De
                             >
                                 Cancel
                             </button>
+                            <button
+                                type="button"
+                                className="btn btn-sm btn-success fw-bold d-flex align-items-center gap-1 shadow-sm"
+                                onClick={handleStartBulkOpen}
+                                disabled={bulkOpenSaving || isBulkDeleting}
+                                title="Open all selected processes (set the same start date)"
+                            >
+                                <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>event_available</span>
+                                Open Selected
+                            </button>
                             <button 
                                 className="btn btn-sm btn-danger fw-bold d-flex align-items-center gap-1 shadow-sm" 
                                 onClick={() => setShowBulkDeleteModal(true)}
@@ -1314,7 +1582,14 @@ export default function DepartmentTasks({ initialActivity, initialAssignee }: De
                                     </td>
                                 </tr>
                             ) : (
-                                pagedTasks.map((task, idx) => (
+                                pagedTasks.map((task, idx) => {
+                                    const isContainerProcess =
+                                        task.tier === 'process_task' &&
+                                        (task.assigned_to == null || String(task.assignee_name || '').trim() === '');
+                                    const subtasks = isContainerProcess ? (subtasksByProcessAssignmentId[task.id] || []) : [];
+                                    const expanded = !!expandedProcessAssignmentIds[task.id];
+                                    return (
+                                    <>
                                     <tr key={`task-${task.id}-${task.assigned_to ?? 'u'}-${idx}`} className={selectedTaskIds.includes(task.id) ? 'bg-primary bg-opacity-10' : ''}>
                                         <td className="ps-4">
                                             <div className="form-check m-0">
@@ -1354,10 +1629,41 @@ export default function DepartmentTasks({ initialActivity, initialAssignee }: De
                                                     color: '#fff',
                                                     fontWeight: 500,
                                                     textTransform: 'none',
-                                                }} title={staffAssigneeTitle(task.assignee_name, UNASSIGNED_LABEL)}>
+                                                }} title={isContainerProcess ? 'Sub-tasks assigned' : staffAssigneeTitle(task.assignee_name, UNASSIGNED_LABEL)}>
                                                     {staffAssigneeInitials(task.assignee_name)}
                                                 </div>
-                                                <span>{staffAssigneeShortLabel(task.assignee_name, UNASSIGNED_LABEL)}</span>
+                                                <div className="min-w-0">
+                                                    <div className="d-flex align-items-center gap-2">
+                                                        <span className="text-truncate">
+                                                            {isContainerProcess ? 'Sub-tasks' : staffAssigneeShortLabel(task.assignee_name, UNASSIGNED_LABEL)}
+                                                        </span>
+                                                        {isContainerProcess && (
+                                                            <button
+                                                                type="button"
+                                                                className="btn btn-xs btn-outline-secondary py-0 px-2 fw-bold"
+                                                                style={{ fontSize: '.7rem' }}
+                                                                onClick={() =>
+                                                                    setExpandedProcessAssignmentIds((prev) => ({
+                                                                        ...prev,
+                                                                        [task.id]: !prev[task.id],
+                                                                    }))
+                                                                }
+                                                                title={expanded ? 'Hide sub-tasks' : 'Show sub-tasks'}
+                                                            >
+                                                                {expanded ? 'Hide' : 'View'} ({subtasks.length})
+                                                            </button>
+                                                        )}
+                                                    </div>
+                                                    {isContainerProcess && subtasks.length > 0 && (
+                                                        <div className="text-muted" style={{ fontSize: '.72rem' }}>
+                                                            {subtasks
+                                                                .slice(0, 2)
+                                                                .map((s) => s.assigned_to_name || `Staff #${s.assigned_to}`)
+                                                                .join(', ')}
+                                                            {subtasks.length > 2 ? ` +${subtasks.length - 2} more` : ''}
+                                                        </div>
+                                                    )}
+                                                </div>
                                             </div>
                                         </td>
                                         <td className="small text-dark fw-normal" style={{ fontSize: '.75rem', textTransform: 'none' }}>
@@ -1409,7 +1715,100 @@ export default function DepartmentTasks({ initialActivity, initialAssignee }: De
                                             </button>
                                         </td>
                                     </tr>
-                                ))
+                                    {isContainerProcess && expanded && (
+                                        <tr key={`subtasks-${task.id}-${idx}`}>
+                                            <td colSpan={9} className="ps-4 pe-4 py-2" style={{ background: '#f8fafc' }}>
+                                                {subtasks.length === 0 ? (
+                                                    <div className="text-muted small">No sub-tasks found for this process.</div>
+                                                ) : (
+                                                    <div className="d-flex flex-column gap-2">
+                                                        {subtasks.map((s) => (
+                                                            <div key={s.id} className="d-flex align-items-center justify-content-between gap-3 p-2 rounded-3 bg-white border">
+                                                                <div className="min-w-0 flex-grow-1">
+                                                                    <div className="fw-semibold text-dark text-truncate" style={{ fontSize: '.82rem' }}>
+                                                                        {s.title}
+                                                                    </div>
+                                                                    <div className="text-muted text-truncate" style={{ fontSize: '.72rem' }}>
+                                                                        {s.assigned_to_name || `Staff #${s.assigned_to}`}
+                                                                    </div>
+                                                                </div>
+                                                                <div className="d-flex align-items-center gap-3 flex-shrink-0">
+                                                                    <div className="d-flex align-items-center gap-2" style={{ minWidth: '110px' }}>
+                                                                        <div className="progress flex-grow-1" style={{ height: '6px', borderRadius: '10px' }}>
+                                                                            <div
+                                                                                className="progress-bar"
+                                                                                style={{
+                                                                                    width: `${subtaskProgress(s.status)}%`,
+                                                                                    background:
+                                                                                        subtaskProgress(s.status) >= 70
+                                                                                            ? '#10b981'
+                                                                                            : subtaskProgress(s.status) >= 30
+                                                                                              ? '#f59e0b'
+                                                                                              : '#3b82f6',
+                                                                                    borderRadius: '10px',
+                                                                                }}
+                                                                            ></div>
+                                                                        </div>
+                                                                        <span className="text-muted fw-bold" style={{ fontSize: '.72rem', minWidth: '32px', textAlign: 'right' }}>
+                                                                            {subtaskProgress(s.status)}%
+                                                                        </span>
+                                                                    </div>
+                                                                    <span
+                                                                        className="badge"
+                                                                        style={{
+                                                                            background:
+                                                                                String(s.status).toLowerCase() === 'completed' || String(s.status).toLowerCase() === 'evaluated'
+                                                                                    ? '#dcfce7'
+                                                                                    : String(s.status).toLowerCase() === 'submitted'
+                                                                                      ? '#fef9c3'
+                                                                                      : '#e0f2fe',
+                                                                            color:
+                                                                                String(s.status).toLowerCase() === 'completed' || String(s.status).toLowerCase() === 'evaluated'
+                                                                                    ? '#15803d'
+                                                                                    : String(s.status).toLowerCase() === 'submitted'
+                                                                                      ? '#a16207'
+                                                                                      : '#0369a1',
+                                                                            fontSize: '.7rem',
+                                                                        }}
+                                                                    >
+                                                                        {s.status || 'pending'}
+                                                                    </span>
+                                                                    <button
+                                                                        type="button"
+                                                                        className="btn btn-sm btn-outline-secondary d-inline-flex align-items-center gap-1 py-0 px-2 fw-bold"
+                                                                        style={{ fontSize: '.72rem', borderRadius: '8px' }}
+                                                                        title={
+                                                                            subtaskStatusBlocksReassign(s.status)
+                                                                                ? 'Cannot reassign completed sub-tasks'
+                                                                                : 'Reassign this sub-task'
+                                                                        }
+                                                                        disabled={subtaskStatusBlocksReassign(s.status)}
+                                                                        onClick={() =>
+                                                                            setReassignSubtaskCtx({
+                                                                                assignmentId: task.id,
+                                                                                subtask: s,
+                                                                                parentProcessTitle: task.title,
+                                                                                activityTitle:
+                                                                                    task.activity_title || DEPT_INTERNAL_LABEL,
+                                                                            })
+                                                                        }
+                                                                    >
+                                                                        <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>
+                                                                            swap_horiz
+                                                                        </span>
+                                                                        Reassign
+                                                                    </button>
+                                                                </div>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                )}
+                                            </td>
+                                        </tr>
+                                    )}
+                                    </>
+                                    );
+                                })
                             )}
                             </tbody>
                         </table>
@@ -1735,6 +2134,74 @@ export default function DepartmentTasks({ initialActivity, initialAssignee }: De
                                         </div>
                                     )}
 
+                                    {tableDetailsTask.tier === 'process_task' &&
+                                        (tableDetailsTask.assigned_to == null ||
+                                            String(tableDetailsTask.assignee_name || '').trim() === '') && (
+                                            <div className="border-top pt-3 mt-3">
+                                                <p
+                                                    className="text-muted text-uppercase fw-bold mb-2"
+                                                    style={{ fontSize: '0.65rem', letterSpacing: '0.04em' }}
+                                                >
+                                                    Sub-tasks
+                                                </p>
+                                                {(subtasksByProcessAssignmentId[tableDetailsTask.id] || []).length ===
+                                                0 ? (
+                                                    <div className="text-muted small">No sub-tasks for this process.</div>
+                                                ) : (
+                                                    <div className="d-flex flex-column gap-2">
+                                                        {(subtasksByProcessAssignmentId[tableDetailsTask.id] || []).map(
+                                                            (s) => (
+                                                                <div
+                                                                    key={s.id}
+                                                                    className="d-flex align-items-center justify-content-between gap-2 flex-wrap p-2 rounded-3 bg-light border"
+                                                                >
+                                                                    <div className="min-w-0">
+                                                                        <div
+                                                                            className="fw-semibold text-dark"
+                                                                            style={{ fontSize: '0.82rem' }}
+                                                                        >
+                                                                            {s.title}
+                                                                        </div>
+                                                                        <div className="text-muted small">
+                                                                            {s.assigned_to_name ||
+                                                                                `Staff #${s.assigned_to}`}{' '}
+                                                                            <span className="badge bg-secondary-subtle text-secondary ms-1">
+                                                                                {s.status || 'pending'}
+                                                                            </span>
+                                                                        </div>
+                                                                    </div>
+                                                                    <button
+                                                                        type="button"
+                                                                        className="btn btn-sm btn-outline-secondary d-inline-flex align-items-center gap-1"
+                                                                        style={{ fontSize: '0.72rem', borderRadius: '8px' }}
+                                                                        disabled={subtaskStatusBlocksReassign(s.status)}
+                                                                        onClick={() =>
+                                                                            setReassignSubtaskCtx({
+                                                                                assignmentId: tableDetailsTask.id,
+                                                                                subtask: s,
+                                                                                parentProcessTitle: tableDetailsTask.title,
+                                                                                activityTitle:
+                                                                                    tableDetailsTask.activity_title ||
+                                                                                    DEPT_INTERNAL_LABEL,
+                                                                            })
+                                                                        }
+                                                                    >
+                                                                        <span
+                                                                            className="material-symbols-outlined"
+                                                                            style={{ fontSize: '16px' }}
+                                                                        >
+                                                                            swap_horiz
+                                                                        </span>
+                                                                        Reassign
+                                                                    </button>
+                                                                </div>
+                                                            )
+                                                        )}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        )}
+
                                     {tableDetailsTask.status !== 'Completed' && (
                                         <div className="border-top pt-3 mt-3">
                                             <p className="text-muted text-uppercase fw-bold mb-2" style={{ fontSize: '0.65rem', letterSpacing: '0.04em' }}>
@@ -1867,6 +2334,74 @@ export default function DepartmentTasks({ initialActivity, initialAssignee }: De
                 </div>
             </div>
 
+            {showBulkOpenModal && (
+                <div
+                    className="modal-backdrop fade show"
+                    style={{ zIndex: 1042 }}
+                    onClick={() => !bulkOpenSaving && setShowBulkOpenModal(false)}
+                />
+            )}
+            <div
+                className={`modal fade ${showBulkOpenModal ? 'show d-block' : ''}`}
+                tabIndex={-1}
+                style={{ zIndex: 1052 }}
+                aria-hidden={!showBulkOpenModal}
+            >
+                <div className="modal-dialog modal-dialog-centered">
+                    <div className="modal-content border-0 shadow-lg" style={{ borderRadius: '12px' }}>
+                        <div className="modal-header border-bottom-0 pb-0 px-4 pt-4">
+                            <h6 className="modal-title fw-bold text-dark d-flex align-items-center gap-2" style={{ fontSize: '1.05rem' }}>
+                                <span className="material-symbols-outlined text-success" style={{ fontSize: '24px' }}>
+                                    event_available
+                                </span>
+                                Open selected processes
+                            </h6>
+                            <button
+                                type="button"
+                                className="btn-close"
+                                onClick={() => !bulkOpenSaving && setShowBulkOpenModal(false)}
+                                disabled={bulkOpenSaving}
+                            />
+                        </div>
+                        <div className="modal-body p-4 pt-2">
+                            <p className="text-muted small mb-3" style={{ fontSize: '0.88rem' }}>
+                                This will open <strong>{selectedTaskIds.length}</strong> selected process(es) and set the same start date for all.
+                            </p>
+                            <div className="mb-4">
+                                <label className="form-label small fw-bold text-muted mb-1">Start date</label>
+                                <input
+                                    type="date"
+                                    className="form-control form-control-sm"
+                                    value={bulkOpenStart}
+                                    onChange={(e) => setBulkOpenStart(e.target.value)}
+                                    disabled={bulkOpenSaving}
+                                />
+                            </div>
+                            <div className="d-flex justify-content-end gap-2">
+                                <button
+                                    type="button"
+                                    className="btn btn-sm btn-light border fw-bold px-3"
+                                    style={{ fontSize: '0.75rem', borderRadius: '8px' }}
+                                    onClick={() => setShowBulkOpenModal(false)}
+                                    disabled={bulkOpenSaving}
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    type="button"
+                                    className="btn btn-sm btn-success fw-bold px-3 shadow-sm"
+                                    style={{ fontSize: '0.75rem', borderRadius: '8px' }}
+                                    onClick={handleSubmitBulkOpen}
+                                    disabled={bulkOpenSaving}
+                                >
+                                    {bulkOpenSaving ? 'Opening…' : 'Open processes'}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             {reassignTask && (
                 <div className="modal-backdrop fade show" style={{ zIndex: 1041 }} onClick={() => !reassignSaving && setReassignTask(null)} />
             )}
@@ -1921,16 +2456,43 @@ export default function DepartmentTasks({ initialActivity, initialAssignee }: De
                                             ))}
                                     </select>
                                 </div>
+                                <div className="mb-3">
+                                    <label className="form-label small fw-bold text-muted mb-1">Reason</label>
+                                    <select
+                                        className="form-select form-select-sm"
+                                        value={reassignReasonCode}
+                                        onChange={(e) => setReassignReasonCode(e.target.value)}
+                                        disabled={reassignSaving}
+                                    >
+                                        <option value="">Select a reason…</option>
+                                        {PROCESS_REASSIGN_REASONS.map((r) => (
+                                            <option key={r.code} value={r.code}>
+                                                {r.label}
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
                                 <div className="mb-4">
-                                    <label className="form-label small fw-bold text-muted mb-1">Reason (required)</label>
+                                    <label className="form-label small fw-bold text-muted mb-1">
+                                        Additional details <span className="fw-normal text-muted">(optional)</span>
+                                    </label>
                                     <textarea
                                         className="form-control form-control-sm"
                                         rows={3}
-                                        placeholder="Explain why this process is being reassigned…"
-                                        value={reassignReason}
-                                        onChange={(e) => setReassignReason(e.target.value)}
+                                        placeholder={
+                                            reassignReasonCode === 'other'
+                                                ? 'Describe the reason (required for “Other”)…'
+                                                : 'Optional context for the assignees…'
+                                        }
+                                        value={reassignDescription}
+                                        onChange={(e) => setReassignDescription(e.target.value)}
                                         disabled={reassignSaving}
                                     />
+                                    {reassignReasonCode === 'other' ? (
+                                        <div className="form-text" style={{ fontSize: '0.72rem' }}>
+                                            “Other” requires a short description above.
+                                        </div>
+                                    ) : null}
                                 </div>
                                 <div className="d-flex justify-content-end gap-2">
                                     <button
@@ -1950,6 +2512,141 @@ export default function DepartmentTasks({ initialActivity, initialAssignee }: De
                                         disabled={reassignSaving}
                                     >
                                         {reassignSaving ? 'Saving…' : 'Reassign'}
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            </div>
+
+            {reassignSubtaskCtx && (
+                <div
+                    className="modal-backdrop fade show"
+                    style={{ zIndex: 1052 }}
+                    onClick={() => !reassignSubtaskSaving && setReassignSubtaskCtx(null)}
+                />
+            )}
+            <div
+                className={`modal fade ${reassignSubtaskCtx ? 'show d-block' : ''}`}
+                tabIndex={-1}
+                style={{ zIndex: 1053 }}
+                aria-hidden={!reassignSubtaskCtx}
+            >
+                <div className="modal-dialog modal-dialog-centered">
+                    <div className="modal-content border-0 shadow-lg" style={{ borderRadius: '12px' }}>
+                        <div className="modal-header border-bottom-0 pb-0 px-4 pt-4">
+                            <h6 className="modal-title fw-bold text-dark d-flex align-items-center gap-2" style={{ fontSize: '1.1rem' }}>
+                                <span className="material-symbols-outlined text-secondary" style={{ fontSize: '24px' }}>
+                                    swap_horiz
+                                </span>
+                                Reassign sub-task
+                            </h6>
+                            <button
+                                type="button"
+                                className="btn-close"
+                                onClick={() => !reassignSubtaskSaving && setReassignSubtaskCtx(null)}
+                                disabled={reassignSubtaskSaving}
+                            />
+                        </div>
+                        {reassignSubtaskCtx && (
+                            <div className="modal-body p-4 pt-2">
+                                <p className="text-muted small mb-3" style={{ fontSize: '0.88rem' }}>
+                                    <strong className="text-dark">{reassignSubtaskCtx.subtask.title}</strong>
+                                    <br />
+                                    Under process:{' '}
+                                    <span className="text-dark">{reassignSubtaskCtx.parentProcessTitle}</span>
+                                    <br />
+                                    Activity: {reassignSubtaskCtx.activityTitle}
+                                    <br />
+                                    Current assignee:{' '}
+                                    {reassignSubtaskCtx.subtask.assigned_to_name ||
+                                        `Staff #${reassignSubtaskCtx.subtask.assigned_to}`}
+                                    . Reports for this sub-task will be cleared for the new assignee.
+                                </p>
+                                <div className="mb-3">
+                                    <label className="form-label small fw-bold text-muted mb-1">New assignee</label>
+                                    <select
+                                        className="form-select form-select-sm"
+                                        value={reassignSubtaskStaffId === '' ? '' : String(reassignSubtaskStaffId)}
+                                        onChange={(e) => {
+                                            const v = e.target.value;
+                                            setReassignSubtaskStaffId(v === '' ? '' : Number(v));
+                                        }}
+                                        disabled={reassignSubtaskSaving}
+                                    >
+                                        <option value="">Select staff…</option>
+                                        {departmentUsers
+                                            .filter((u) => u.id !== reassignSubtaskCtx.subtask.assigned_to)
+                                            .map((u) => (
+                                                <option key={u.id} value={u.id}>
+                                                    {u.full_name}
+                                                    {u.position ? ` — ${u.position}` : ''}
+                                                </option>
+                                            ))}
+                                    </select>
+                                </div>
+                                <div className="mb-3">
+                                    <label className="form-label small fw-bold text-muted mb-1">Reason</label>
+                                    <select
+                                        className="form-select form-select-sm"
+                                        value={reassignSubtaskReasonCode}
+                                        onChange={(e) => setReassignSubtaskReasonCode(e.target.value)}
+                                        disabled={reassignSubtaskSaving}
+                                    >
+                                        <option value="">Select a reason…</option>
+                                        {PROCESS_REASSIGN_REASONS.map((r) => (
+                                            <option key={r.code} value={r.code}>
+                                                {r.label}
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
+                                <div className="mb-4">
+                                    <label className="form-label small fw-bold text-muted mb-1">
+                                        Additional details <span className="fw-normal text-muted">(optional)</span>
+                                    </label>
+                                    <textarea
+                                        className="form-control form-control-sm"
+                                        rows={3}
+                                        placeholder={
+                                            reassignSubtaskReasonCode === 'other'
+                                                ? 'Describe the reason (required for “Other”)…'
+                                                : 'Optional context for the assignees…'
+                                        }
+                                        value={reassignSubtaskDescription}
+                                        onChange={(e) => setReassignSubtaskDescription(e.target.value)}
+                                        disabled={reassignSubtaskSaving}
+                                    />
+                                    {reassignSubtaskReasonCode === 'other' ? (
+                                        <div className="form-text" style={{ fontSize: '0.72rem' }}>
+                                            “Other” requires a short description above.
+                                        </div>
+                                    ) : null}
+                                </div>
+                                <div className="d-flex justify-content-end gap-2">
+                                    <button
+                                        type="button"
+                                        className="btn btn-sm btn-light border fw-bold px-3"
+                                        style={{ fontSize: '0.75rem', borderRadius: '8px' }}
+                                        onClick={() => setReassignSubtaskCtx(null)}
+                                        disabled={reassignSubtaskSaving}
+                                    >
+                                        Cancel
+                                    </button>
+                                    <button
+                                        type="button"
+                                        className="btn btn-sm btn-primary fw-bold px-3 shadow-sm"
+                                        style={{
+                                            fontSize: '0.75rem',
+                                            borderRadius: '8px',
+                                            background: 'var(--mubs-blue)',
+                                            borderColor: 'var(--mubs-blue)',
+                                        }}
+                                        onClick={handleSubmitReassignSubtask}
+                                        disabled={reassignSubtaskSaving}
+                                    >
+                                        {reassignSubtaskSaving ? 'Saving…' : 'Reassign'}
                                     </button>
                                 </div>
                             </div>

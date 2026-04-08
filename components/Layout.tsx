@@ -11,8 +11,8 @@ function LayoutContent({ children, sidebarOpen, setSidebarOpen }: any) {
 
   const getPageKey = () => {
     // When under /admin or /principal, prefer the pg query parameter
-    if (pathname.startsWith('/admin') || pathname.startsWith('/principal')) {
-      return searchParams.get('pg') || (pathname.startsWith('/principal') ? 'executive' : 'dashboard');
+    if (pathname.startsWith('/admin')) {
+      return searchParams.get('pg') || 'dashboard';
     }
     // For other routes, derive from the path segment
     const trimmed = pathname.substring(1);
@@ -24,23 +24,13 @@ function LayoutContent({ children, sidebarOpen, setSidebarOpen }: any) {
     if (key === 'strategic' && pathname.startsWith('/admin')) {
       return 'Standard and Activities';
     }
-    if (key === 'strategic' && pathname.startsWith('/principal')) {
-      return 'Strategic Summary';
-    }
     const pageTitles: { [key: string]: string } = {
       'dashboard': 'Dashboard Overview',
       'strategic': 'Strategic Activities',
       'standards': 'Standards & Objectives',
-      'committee': 'Committee Reports',
       'tracking': 'Budget Tracking',
       'users': 'User Management',
       'reports': 'Reports & Analytics',
-
-      // Principal specific
-      'executive': 'Executive Overview',
-      'analytics': 'Performance Analytics',
-      'proposals': 'Committee proposals',
-      'compliance': 'Performance & Compliance',
 
       // HOD specific
       'activities': 'Assigned Activities',

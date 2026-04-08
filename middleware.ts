@@ -5,8 +5,6 @@ function dashboardPathForRole(activeRole: string | undefined) {
     if (!activeRole) return null;
     const r = activeRole.trim().toLowerCase();
     if (r === 'strategy manager' || r === 'system administrator') return '/admin';
-    if (r === 'committee member') return '/comm';
-    if (r === 'principal') return '/principal';
     if (r === 'department head' || r === 'unit head' || r === 'hod') return '/department-head';
     if (r === 'staff' || r === 'viewer') return '/staff';
     if (r === 'ambassador') return '/ambassador';
@@ -27,8 +25,6 @@ export function middleware(request: NextRequest) {
     // Define route mappings
     const routeRequirements: Record<string, string[]> = {
         '/admin': ['Strategy Manager', 'System Administrator'],
-        '/comm': ['Committee Member'],
-        '/principal': ['Principal'],
         '/department-head': ['Department Head', 'Unit Head', 'HOD'],
         '/staff': ['Staff', 'Viewer'], // Fallbacks
         '/ambassador': ['Ambassador']

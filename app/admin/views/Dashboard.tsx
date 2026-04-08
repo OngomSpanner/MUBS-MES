@@ -69,7 +69,10 @@ export default function Dashboard() {
     try {
       const response = await axios.get('/api/dashboard/stats');
       setStats(response.data.stats);
-      setUnitPerformance(response.data.departmentPerformance);
+      const perf = Array.isArray(response.data.departmentPerformance) ? response.data.departmentPerformance : [];
+      // Highest progress first (top performing)
+      perf.sort((a: any, b: any) => Number(b?.progress ?? 0) - Number(a?.progress ?? 0));
+      setUnitPerformance(perf);
       setRecentActivities(response.data.recentActivities);
 
     } catch (error) {
@@ -232,7 +235,9 @@ export default function Dashboard() {
                 </span>
                 Unit Performance
               </h5>
+              <div className="d-flex align-items-center gap-2">
               <Link href="/admin?pg=tracking" className="btn btn-sm btn-outline-secondary">View all</Link>
+              </div>
             </div>
             <div className="p-4" style={{ height: '320px', overflowY: 'auto' }}>
               {departmentPerformance.slice(0, 8).map((department, index) => (
