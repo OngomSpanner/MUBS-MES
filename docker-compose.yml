@@ -1,0 +1,45 @@
+services:
+  db:
+    image: mysql:8.0
+    container_name: mubs-me-db
+    restart: always
+    environment:
+      MYSQL_DATABASE: mubs_super_admin
+      # Set a password for the root user
+      MYSQL_ROOT_PASSWORD: root_password
+      # Optional: Create a dedicated user
+      # MYSQL_USER: mubs_user
+      # MYSQL_PASSWORD: mubs_password
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    networks:
+      - mubs-network
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: mubs-me-app
+    restart: always
+    ports:
+      - "3000:3000"
+    env_file:
+      - .env
+    environment:
+      # These overrides ensure the app looks for the 'db' container
+      - DB_HOST=db
+      - DB_USER=root
+      - DB_PASSWORD=root_password
+    depends_on:
+      - db
+    networks:
+      - mubs-network
+
+volumes:
+  mysql_data:
+
+networks:
+  mubs-network:
+    driver: bridge
