@@ -7,6 +7,7 @@ import {
     isValidReassignReasonCode,
     reassignReasonLabel,
 } from '@/lib/process-reassign-reasons';
+import { brandEmailWrapper, escapeHtml, sendTransactionalMail } from '@/lib/mail';
 
 /** HOD reassigns a single sub-task under a container process assignment. */
 export async function POST(
@@ -119,9 +120,9 @@ export async function POST(
         }
 
         const newUser = await query({
-            query: `SELECT id, full_name FROM users WHERE id = ? AND department_id IN (${placeholders})`,
+            query: `SELECT id, full_name, email FROM users WHERE id = ? AND department_id IN (${placeholders})`,
             values: [newStaffId, ...departmentIds],
-        }) as { id: number; full_name: string }[];
+        }) as { id: number; full_name: string; email: string }[];
 
         if (newUser.length === 0) {
             return NextResponse.json({ message: 'New assignee must be in your department' }, { status: 400 });
@@ -181,6 +182,41 @@ export async function POST(
                 assignmentId,
             ],
         });
+
+        const base = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
+        const staffLink = `${base}/staff`;
+        if (row.assigned_to != null && row.assigned_to !== newStaffId) {
+            const prev = await query({
+                query: 'SELECT email, full_name FROM users WHERE id = ?',
+                values: [row.assigned_to],
+            }) as { email: string; full_name: string }[];
+            const em = prev[0]?.email?.trim();
+            if (em) {
+                const inner = `
+<p style="color:#333333;font-size:16px;line-height:1.6;">Hello ${escapeHtml(prev[0].full_name || '')},</p>
+<p style="color:#333333;font-size:16px;line-height:1.6;">Sub-task <strong>${escapeHtml(subSnippet)}</strong> (under <strong>${escapeHtml(processSnippet)}</strong>, ${escapeHtml(activitySnippet)}) was reassigned from you to ${escapeHtml(newUser[0].full_name)}.</p>
+<p style="color:#333333;font-size:16px;line-height:1.6;">Reason: ${escapeHtml(reasonInMessage)}</p>
+<p style="color:#666666;font-size:14px;">View tasks: <a href="${escapeHtml(staffLink)}" style="color:#005696;">${escapeHtml(staffLink)}</a></p>`;
+                void sendTransactionalMail({
+                    to: em,
+                    subject: 'M&E: Sub-task reassigned away from you',
+                    html: brandEmailWrapper(inner),
+                });
+            }
+        }
+        const newEm = newUser[0]?.email?.trim();
+        if (newEm) {
+            const inner = `
+<p style="color:#333333;font-size:16px;line-height:1.6;">Hello ${escapeHtml(newUser[0].full_name || '')},</p>
+<p style="color:#333333;font-size:16px;line-height:1.6;">You were assigned sub-task <strong>${escapeHtml(subSnippet)}</strong> under <strong>${escapeHtml(processSnippet)}</strong> (${escapeHtml(activitySnippet)}), reassigned from ${escapeHtml(fromLabel)}.</p>
+<p style="color:#333333;font-size:16px;line-height:1.6;">Reason: ${escapeHtml(reasonInMessage)}</p>
+<p style="color:#666666;font-size:14px;">Open: <a href="${escapeHtml(staffLink)}" style="color:#005696;">${escapeHtml(staffLink)}</a></p>`;
+            void sendTransactionalMail({
+                to: newEm,
+                subject: 'M&E: New sub-task assignment',
+                html: brandEmailWrapper(inner),
+            });
+        }
 
         return NextResponse.json({ message: 'Sub-task reassigned', new_staff_id: newStaffId });
     } catch (error: unknown) {

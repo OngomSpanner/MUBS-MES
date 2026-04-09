@@ -8,8 +8,8 @@ export default function IdleTimeout() {
     const pathname = usePathname();
     const timeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-    // 10 minutes in milliseconds
-    const TIMEOUT_MS = 10 * 60 * 1000;
+    // 15 minutes in milliseconds
+    const TIMEOUT_MS = 15 * 60 * 1000;
 
     const handleLogout = useCallback(async () => {
         try {

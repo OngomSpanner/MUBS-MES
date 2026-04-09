@@ -4,7 +4,7 @@ import { cookies } from 'next/headers';
 import { verifyToken } from '@/lib/auth';
 import { getVisibleDepartmentIds, inPlaceholders } from '@/lib/department-head';
 import { addDurationToStartDate } from '@/lib/process-duration';
-import { assertPriorProcessStepsComplete } from '@/lib/process-auto-open';
+import { assertPriorProcessStepsComplete, notifyStaffProcessStepOpened } from '@/lib/process-auto-open';
 
 /** HOD opens a process (task): sets start date; due date = start + standard duration. */
 export async function POST(request: Request, context: { params: Promise<{ id: string }> }) {
@@ -95,6 +95,8 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
             query: `UPDATE staff_process_assignments SET start_date = ?, end_date = ?, status = 'in_progress' WHERE id = ?`,
             values: [startDate, endDate, assignmentId],
         });
+
+        await notifyStaffProcessStepOpened(assignmentId, startDate, endDate);
 
         return NextResponse.json({ message: 'Process opened', start_date: startDate, end_date: endDate });
     } catch (error: unknown) {

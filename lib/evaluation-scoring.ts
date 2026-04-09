@@ -44,10 +44,10 @@ export function computeCompleteEvaluationMetrics(params: {
 }
 
 /** MySQL evaluations.rating for Complete outcomes (0–2 scale on metrics_achieved) */
-export function ratingForCompleteMetrics(metricsAchieved: 0 | 1 | 2): 'poor' | 'satisfactory' | 'excellent' {
-    if (metricsAchieved >= 2) return 'excellent';
-    if (metricsAchieved === 1) return 'satisfactory';
-    return 'poor';
+export function ratingForCompleteMetrics(metricsAchieved: 0 | 1 | 2): string {
+    if (metricsAchieved >= 2) return 'Exceptional Performance';
+    if (metricsAchieved === 1) return 'Meets Expectations';
+    return 'Below Expectations';
 }
 
 export function mergeEvaluationFeedback(

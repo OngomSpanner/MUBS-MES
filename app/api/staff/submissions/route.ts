@@ -4,6 +4,7 @@ import { cookies } from 'next/headers';
 import { verifyToken } from '@/lib/auth';
 import { writeFile, mkdir } from 'fs/promises';
 import path from 'path';
+import { brandEmailWrapper, escapeHtml, sendTransactionalMail } from '@/lib/mail';
 
 export const dynamic = 'force-dynamic';
 
@@ -16,7 +17,18 @@ export async function GET() {
         const decoded = verifyToken(token) as any;
         if (!decoded || !decoded.userId) throw new Error('Invalid token');
 
-        const ratingToScore: Record<string, number> = { excellent: 5, good: 4, satisfactory: 3, needs_improvement: 2, poor: 1 };
+        const ratingToScore: Record<string, number> = { 
+            excellent: 5, 
+            good: 4, 
+            satisfactory: 3, 
+            needs_improvement: 2, 
+            poor: 1,
+            'Exceptional Performance': 5,
+            'Exceeds Expectations': 4,
+            'Meets Expectations': 3,
+            'Improvement Needed': 2,
+            'Below Expectations': 1
+        };
 
         // Fetch all submissions for this user (including drafts)
         const submissionsRecords = await query({
@@ -311,7 +323,84 @@ export async function POST(req: Request) {
                 values: [reportStatus === 'submitted' ? 'submitted' : 'in_progress', assignmentId]
             });
         }
-        
+
+        if (reportStatus === 'submitted') {
+            const base = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
+            const hodLink = `${base}/department-head`;
+            type HodCtx = { hod_id: number | null; activity_title: string; task_label: string };
+            let ctx: HodCtx | null = null;
+            if (assignmentType === 'process_subtask') {
+                const r = (await query({
+                    query: `
+                        SELECT d.hod_id, sa.title AS activity_title,
+                               CONCAT_WS(' — ', NULLIF(sp.step_name, ''), NULLIF(s.title, '')) AS task_label
+                        FROM staff_process_subtasks s
+                        JOIN staff_process_assignments spa ON s.process_assignment_id = spa.id
+                        JOIN strategic_activities sa ON spa.activity_id = sa.id
+                        JOIN standard_processes sp ON spa.standard_process_id = sp.id
+                        LEFT JOIN departments d ON sa.department_id = d.id
+                        WHERE s.id = ? AND s.assigned_to = ?
+                    `,
+                    values: [assignmentId, decoded.userId],
+                })) as HodCtx[];
+                ctx = r[0] ?? null;
+            } else if (assignmentType === 'process_task') {
+                const r = (await query({
+                    query: `
+                        SELECT d.hod_id, sa.title AS activity_title, sp.step_name AS task_label
+                        FROM staff_process_assignments spa
+                        JOIN strategic_activities sa ON spa.activity_id = sa.id
+                        JOIN standard_processes sp ON spa.standard_process_id = sp.id
+                        LEFT JOIN departments d ON sa.department_id = d.id
+                        WHERE spa.id = ? AND spa.staff_id = ?
+                    `,
+                    values: [assignmentId, decoded.userId],
+                })) as HodCtx[];
+                ctx = r[0] ?? null;
+            } else {
+                const r = (await query({
+                    query: `
+                        SELECT d.hod_id,
+                               COALESCE(p.title, sa.title) AS activity_title,
+                               sa.title AS task_label
+                        FROM activity_assignments aa
+                        JOIN strategic_activities sa ON aa.activity_id = sa.id
+                        LEFT JOIN strategic_activities p ON sa.parent_id = p.id
+                        LEFT JOIN departments d ON sa.department_id = d.id
+                        WHERE aa.id = ? AND aa.assigned_to_user_id = ?
+                    `,
+                    values: [assignmentId, decoded.userId],
+                })) as HodCtx[];
+                ctx = r[0] ?? null;
+            }
+
+            if (ctx?.hod_id != null) {
+                const hodUser = (await query({
+                    query: 'SELECT email, full_name FROM users WHERE id = ? AND status = ?',
+                    values: [ctx.hod_id, 'Active'],
+                })) as { email: string; full_name: string }[];
+                const hodEmail = hodUser[0]?.email?.trim();
+                const staffRow = (await query({
+                    query: 'SELECT full_name FROM users WHERE id = ?',
+                    values: [decoded.userId],
+                })) as { full_name: string }[];
+                const staffName = staffRow[0]?.full_name || 'A staff member';
+                if (hodEmail) {
+                    const inner = `
+<p style="color:#333333;font-size:16px;line-height:1.6;">Hello ${escapeHtml(hodUser[0].full_name || '')},</p>
+<p style="color:#333333;font-size:16px;line-height:1.6;"><strong>${escapeHtml(staffName)}</strong> submitted a report for review.</p>
+<p style="color:#666666;font-size:14px;line-height:1.6;"><strong>Activity:</strong> ${escapeHtml(ctx.activity_title || '')}<br/>
+<strong>Task:</strong> ${escapeHtml(ctx.task_label || '')}</p>
+<p style="color:#333333;font-size:16px;line-height:1.6;">Review submissions in the department head portal: <a href="${escapeHtml(hodLink)}" style="color:#005696;">${escapeHtml(hodLink)}</a></p>`;
+                    void sendTransactionalMail({
+                        to: hodEmail,
+                        subject: 'M&E: Staff report submitted for review',
+                        html: brandEmailWrapper(inner),
+                    });
+                }
+            }
+        }
+
         return NextResponse.json({ success: true, message: isDraft ? 'Draft saved' : 'Report submitted successfully' });
 
     } catch (error: any) {

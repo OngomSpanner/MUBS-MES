@@ -9,6 +9,7 @@ import {
     ratingForCompleteMetrics,
 } from '@/lib/evaluation-scoring';
 import { autoOpenNextProcessStepAfterCompletion } from '@/lib/process-auto-open';
+import { brandEmailWrapper, escapeHtml, sendTransactionalMail } from '@/lib/mail';
 
 async function appendSubmissionFeedbackLog(staffReportId: number, authorUserId: number, body: string) {
     const text = String(body || '').trim();
@@ -108,7 +109,18 @@ export async function GET(req: Request) {
         };
 
         const evaluations = evaluationsQuery.map((e: any) => {
-            const ratingToScore: Record<string, number> = { excellent: 5, good: 4, satisfactory: 3, needs_improvement: 2, poor: 1 };
+            const ratingToScore: Record<string, number> = { 
+                excellent: 5, 
+                good: 4, 
+                satisfactory: 3, 
+                needs_improvement: 2, 
+                poor: 1,
+                'Exceptional Performance': 5,
+                'Exceeds Expectations': 4,
+                'Meets Expectations': 3,
+                'Improvement Needed': 2,
+                'Below Expectations': 1
+            };
             const is02Scale = e.metrics_target === 2 && e.metrics_achieved != null;
             const scoreDisplay = is02Scale ? e.metrics_achieved : (e.rating ? ratingToScore[e.rating] : (e.score != null ? Math.round(Number(e.score) / 20) : undefined));
             const displayStatus = e.db_status === 'submitted' ? 'Pending' : e.db_status === 'incomplete' ? 'Incomplete' : e.db_status === 'not_done' ? 'Not Done' : (e.db_status === 'draft' ? 'Returned' : 'Completed');
@@ -139,12 +151,12 @@ export async function GET(req: Request) {
     }
 }
 
-const ratingFromScore = (score: number): 'poor' | 'needs_improvement' | 'satisfactory' | 'good' | 'excellent' => {
-    if (score <= 1) return 'poor';
-    if (score <= 2) return 'needs_improvement';
-    if (score <= 3) return 'satisfactory';
-    if (score <= 4) return 'good';
-    return 'excellent';
+const ratingFromScore = (score: number): string => {
+    if (score <= 1) return 'Below Expectations';
+    if (score <= 2) return 'Improvement Needed';
+    if (score <= 3) return 'Meets Expectations';
+    if (score <= 4) return 'Exceeds Expectations';
+    return 'Exceptional Performance';
 };
 
 export async function PUT(req: Request) {
@@ -265,7 +277,7 @@ export async function PUT(req: Request) {
                 query: 'SELECT id FROM evaluations WHERE staff_report_id = ?',
                 values: [staffReportId]
             }) as any[];
-            const ratingInc = 'needs_improvement';
+            const ratingInc = 'Improvement Needed';
             if (existing.length > 0) {
                 await query({
                     query: 'UPDATE evaluations SET qualitative_feedback = ?, evaluated_by = ?, evaluation_date = CURRENT_TIMESTAMP, metrics_achieved = 1, metrics_target = 2, rating = ? WHERE staff_report_id = ?',
@@ -310,7 +322,7 @@ export async function PUT(req: Request) {
                 query: 'SELECT id FROM evaluations WHERE staff_report_id = ?',
                 values: [staffReportId]
             }) as any[];
-            const ratingNot = 'poor';
+            const ratingNot = 'Below Expectations';
             if (existing.length > 0) {
                 await query({
                     query: 'UPDATE evaluations SET qualitative_feedback = ?, evaluated_by = ?, evaluation_date = CURRENT_TIMESTAMP, metrics_achieved = 0, metrics_target = 2, rating = ? WHERE staff_report_id = ?',
@@ -558,6 +570,69 @@ export async function PUT(req: Request) {
             } catch (e) {
                 console.error('Auto-open next process step:', e);
             }
+        }
+
+        const assigneeRows = (await query({
+            query: `
+                SELECT u.email, u.full_name, e.qualitative_feedback AS feedback,
+                       COALESCE(
+                         sa.title,
+                         CASE WHEN sps.id IS NOT NULL THEN CONCAT_WS(' — ', NULLIF(sp.step_name, ''), NULLIF(sps.title, '')) ELSE sp.step_name END
+                       ) AS task_name,
+                       COALESCE(p_leg.title, p_proc.title) AS activity_title
+                FROM staff_reports sr
+                LEFT JOIN activity_assignments aa ON sr.activity_assignment_id = aa.id
+                LEFT JOIN strategic_activities sa ON aa.activity_id = sa.id
+                LEFT JOIN strategic_activities p_leg ON sa.parent_id = p_leg.id
+                LEFT JOIN staff_process_subtasks sps ON sr.process_subtask_id = sps.id
+                LEFT JOIN staff_process_assignments spa ON COALESCE(sr.process_assignment_id, sps.process_assignment_id) = spa.id
+                LEFT JOIN standard_processes sp ON spa.standard_process_id = sp.id
+                LEFT JOIN strategic_activities psa_sa ON spa.activity_id = psa_sa.id
+                LEFT JOIN strategic_activities p_proc ON psa_sa.parent_id = p_proc.id
+                JOIN users u ON u.id = COALESCE(aa.assigned_to_user_id, spa.staff_id, sps.assigned_to)
+                LEFT JOIN evaluations e ON e.staff_report_id = sr.id
+                WHERE sr.id = ?
+            `,
+            values: [staffReportId],
+        })) as {
+            email: string;
+            full_name: string;
+            feedback: string | null;
+            task_name: string | null;
+            activity_title: string | null;
+        }[];
+
+        const assignee = assigneeRows[0];
+        const assigneeEmail = assignee?.email?.trim();
+        if (assigneeEmail) {
+            const outcomeLabel =
+                status === 'Complete'
+                    ? 'Complete'
+                    : status === 'Not Done'
+                      ? 'Not Done'
+                      : 'Incomplete — revision requested';
+            const subject =
+                status === 'Complete'
+                    ? 'M&E: Your submission was reviewed (Complete)'
+                    : status === 'Not Done'
+                      ? 'M&E: Your submission was reviewed (Not Done)'
+                      : 'M&E: Your submission was reviewed (revision requested)';
+            const fbRaw = (assignee.feedback || '').trim();
+            const fbShort = fbRaw.length > 2000 ? `${fbRaw.slice(0, 1997)}…` : fbRaw;
+            const base = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
+            const staffLink = `${base}/staff`;
+            const inner = `
+<p style="color:#333333;font-size:16px;line-height:1.6;">Hello ${escapeHtml(assignee.full_name || '')},</p>
+<p style="color:#333333;font-size:16px;line-height:1.6;">Your department head has reviewed your submission. <strong>Outcome:</strong> ${escapeHtml(outcomeLabel)}</p>
+<p style="color:#666666;font-size:14px;line-height:1.6;"><strong>Activity:</strong> ${escapeHtml(assignee.activity_title || '')}<br/>
+<strong>Task:</strong> ${escapeHtml(assignee.task_name || '')}</p>
+${fbShort ? `<p style="color:#333333;font-size:15px;line-height:1.6;"><strong>Feedback:</strong><br/>${escapeHtml(fbShort).replace(/\n/g, '<br/>')}</p>` : ''}
+<p style="color:#333333;font-size:16px;line-height:1.6;">Open the staff portal: <a href="${escapeHtml(staffLink)}" style="color:#005696;">${escapeHtml(staffLink)}</a></p>`;
+            void sendTransactionalMail({
+                to: assigneeEmail,
+                subject,
+                html: brandEmailWrapper(inner),
+            });
         }
 
         return NextResponse.json({

@@ -25,10 +25,10 @@ interface StaffEvaluation {
 }
 
 const getScore = (progress: number) =>
-    progress >= 80 ? 'Excellent' : progress >= 65 ? 'Good' : progress >= 50 ? 'Fair' : 'Poor';
+    progress >= 80 ? 'Exceptional Performance' : progress >= 65 ? 'Exceeds Expectations' : progress >= 50 ? 'Meets Expectations' : 'Below Expectations';
 
 const getEvaluation = (rate: number) =>
-    rate >= 80 ? 'Excellent' : rate >= 60 ? 'Good' : rate >= 40 ? 'Fair' : 'Poor';
+    rate >= 80 ? 'Exceptional Performance' : rate >= 60 ? 'Exceeds Expectations' : rate >= 40 ? 'Meets Expectations' : 'Below Expectations';
 
 export default function ReportsView() {
     const [departmentSummaries, setUnitSummaries] = useState<DepartmentSummary[]>([]);
@@ -137,7 +137,11 @@ export default function ReportsView() {
             'Excellent': { bg: '#dcfce7', color: '#15803d' },
             'Good': { bg: '#fef9c3', color: '#a16207' },
             'Fair': { bg: '#fde8d8', color: '#c2410c' },
-            'Poor': { bg: '#fee2e2', color: '#b91c1c' }
+            'Poor': { bg: '#fee2e2', color: '#b91c1c' },
+            'Exceptional Performance': { bg: '#dcfce7', color: '#15803d' },
+            'Exceeds Expectations': { bg: '#fef9c3', color: '#a16207' },
+            'Meets Expectations': { bg: '#fde8d8', color: '#c2410c' },
+            'Below Expectations': { bg: '#fee2e2', color: '#b91c1c' }
         };
         return styles[score as keyof typeof styles] || { bg: '#f1f5f9', color: '#475569' };
     };

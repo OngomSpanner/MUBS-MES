@@ -1,6 +1,51 @@
 import { query } from '@/lib/db';
 import { inPlaceholders } from '@/lib/department-head';
 import { addDurationToStartDate } from '@/lib/process-duration';
+import { brandEmailWrapper, escapeHtml, sendTransactionalMail } from '@/lib/mail';
+
+/** Email assigned staff when a process step gets start/end dates (manual open or auto-advance). */
+export async function notifyStaffProcessStepOpened(
+    assignmentId: number,
+    startDate: string,
+    endDate: string,
+    options?: { nextStep?: boolean }
+): Promise<void> {
+    const staffRows = (await query({
+        query: `
+            SELECT u.email, u.full_name, sp.step_name, COALESCE(p.title, sa.title) AS activity_title
+            FROM staff_process_assignments spa
+            JOIN strategic_activities sa ON spa.activity_id = sa.id
+            LEFT JOIN strategic_activities p ON sa.parent_id = p.id
+            JOIN standard_processes sp ON spa.standard_process_id = sp.id
+            LEFT JOIN users u ON spa.staff_id = u.id
+            WHERE spa.id = ?
+        `,
+        values: [assignmentId],
+    })) as { email: string | null; full_name: string | null; step_name: string; activity_title: string | null }[];
+
+    const sn = staffRows[0];
+    const em = sn?.email?.trim();
+    if (em && sn) {
+        const base = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
+        const staffLink = `${base}/staff`;
+        const lead = options?.nextStep
+            ? 'The next standard process step is now open for you:'
+            : 'A standard process step is now open for you:';
+        const subject = options?.nextStep ? 'M&E: Next process step opened' : 'M&E: Process step opened';
+        const inner = `
+<p style="color:#333333;font-size:16px;line-height:1.6;">Hello ${escapeHtml(sn.full_name || '')},</p>
+<p style="color:#333333;font-size:16px;line-height:1.6;">${lead} <strong>${escapeHtml(sn.step_name || '')}</strong>.</p>
+<p style="color:#666666;font-size:14px;line-height:1.6;"><strong>Activity:</strong> ${escapeHtml(sn.activity_title || '')}<br/>
+<strong>Start date:</strong> ${escapeHtml(startDate)}<br/>
+<strong>End date:</strong> ${escapeHtml(endDate)}</p>
+<p style="color:#333333;font-size:16px;line-height:1.6;">Open the staff portal: <a href="${escapeHtml(staffLink)}" style="color:#005696;">${escapeHtml(staffLink)}</a></p>`;
+        void sendTransactionalMail({
+            to: em,
+            subject,
+            html: brandEmailWrapper(inner),
+        });
+    }
+}
 
 const toYMD = (d: Date) => {
     const y = d.getFullYear();
@@ -66,6 +111,8 @@ export async function autoOpenNextProcessStepAfterCompletion(
         query: `UPDATE staff_process_assignments SET start_date = ?, end_date = ?, status = 'in_progress' WHERE id = ?`,
         values: [startDate, endDate, next.id],
     });
+
+    await notifyStaffProcessStepOpened(next.id, startDate, endDate, { nextStep: true });
 }
 
 /**

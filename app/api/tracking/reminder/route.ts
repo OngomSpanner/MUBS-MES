@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { query } from '@/lib/db';
 import { cookies } from 'next/headers';
 import { verifyToken } from '@/lib/auth';
+import { brandEmailWrapper, escapeHtml, sendTransactionalMail } from '@/lib/mail';
 
 export async function POST(request: Request) {
   try {
@@ -47,6 +48,26 @@ export async function POST(request: Request) {
       `,
       values: [notifyUserId, message, activity_id]
     });
+
+    if (notifyUserId != null) {
+      const hodRows = (await query({
+        query: 'SELECT email, full_name FROM users WHERE id = ? AND status = ?',
+        values: [notifyUserId, 'Active'],
+      })) as { email: string; full_name: string }[];
+      const hodEmail = hodRows[0]?.email?.trim();
+      if (hodEmail) {
+        const base = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
+        const inner = `
+<p style="color:#333333;font-size:16px;line-height:1.6;">Hello ${escapeHtml(hodRows[0].full_name || '')},</p>
+<p style="color:#333333;font-size:16px;line-height:1.6;">${escapeHtml(message)}</p>
+<p style="color:#333333;font-size:16px;line-height:1.6;">Open the system to update progress: <a href="${escapeHtml(base + '/department-head')}" style="color:#005696;">Department Head portal</a></p>`;
+        void sendTransactionalMail({
+          to: hodEmail,
+          subject: 'M&E: Deadline / progress reminder',
+          html: brandEmailWrapper(inner),
+        });
+      }
+    }
 
     return NextResponse.json({ message: 'Reminder sent.' });
   } catch (error: any) {
