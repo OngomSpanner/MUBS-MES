@@ -1,19 +1,31 @@
 services:
-  db:
+  # Using your preferred name 'mysql8_new'
+  mysql8_new:
     image: mysql:8.0
-    container_name: mubs-me-db
+    container_name: mysql8_new
     restart: always
     environment:
       MYSQL_DATABASE: mubs_super_admin
-      # Set a password for the root user
-      MYSQL_ROOT_PASSWORD: root_password
-      # Optional: Create a dedicated user
-      # MYSQL_USER: mubs_user
-      # MYSQL_PASSWORD: mubs_password
+      MYSQL_ROOT_PASSWORD: RaccoonS!lly4709
     ports:
-      - "3306:3306"
+      - "3308:3306"
     volumes:
       - mysql_data:/var/lib/mysql
+    networks:
+      - mubs-network
+
+  # Using your preferred name 'phpmyadmin_8'
+  phpmyadmin_8:
+    image: phpmyadmin
+    container_name: phpmyadmin_8
+    restart: always
+    ports:
+      - "8085:80"
+    environment:
+      - PMA_HOST=mysql8_new
+      - MYSQL_ROOT_PASSWORD: RaccoonS!lly4709
+    depends_on:
+      - mysql8_new
     networks:
       - mubs-network
 
@@ -28,12 +40,12 @@ services:
     env_file:
       - .env
     environment:
-      # These overrides ensure the app looks for the 'db' container
-      - DB_HOST=db
+      # Link the app to the database container named 'mysql8_new'
+      - DB_HOST=mysql8_new
       - DB_USER=root
-      - DB_PASSWORD=root_password
+      - DB_PASSWORD=RaccoonS!lly4709
     depends_on:
-      - db
+      - mysql8_new
     networks:
       - mubs-network
 
