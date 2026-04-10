@@ -9,6 +9,8 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@fontsource/dm-sans": "^5.2.8",
+    "@fontsource/material-symbols-outlined": "^5.2.40",
     "@react-oauth/google": "^0.13.4",
     "@types/nodemailer": "^7.0.11",
     "axios": "^1.13.5",
@@ -20,6 +22,7 @@
     "jsonwebtoken": "^9.0.3",
     "jspdf": "^4.2.0",
     "jspdf-autotable": "^5.0.7",
+    "material-symbols": "^0.44.1",
     "mysql2": "^3.18.2",
     "next": "16.1.6",
     "nodemailer": "^8.0.1",

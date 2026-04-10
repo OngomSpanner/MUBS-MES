@@ -1,14 +1,15 @@
 import type { Metadata } from "next";
-import { DM_Sans } from "next/font/google";
 import "./globals.css";
 import 'bootstrap/dist/css/bootstrap.min.css';
-import Script from 'next/script';
+import 'material-symbols/outlined.css';
+import '@fontsource/dm-sans/300.css';
+import '@fontsource/dm-sans/400.css';
+import '@fontsource/dm-sans/500.css';
+import '@fontsource/dm-sans/600.css';
+import '@fontsource/dm-sans/700.css';
+import '@fontsource/dm-sans/800.css';
 import IdleTimeout from '@/components/IdleTimeout';
-
-const dmSans = DM_Sans({
-  subsets: ["latin"],
-  weight: ["300", "400", "500", "600", "700", "800"]
-});
+import BootstrapClient from '@/components/BootstrapClient';
 
 export const metadata: Metadata = {
   title: "MUBS M&E System",
@@ -22,16 +23,10 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" data-bs-theme="light">
-      <head>
-        <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet" />
-      </head>
-      <body className={dmSans.className}>
+      <body style={{ fontFamily: "'DM Sans', sans-serif" }}>
         <IdleTimeout />
+        <BootstrapClient />
         {children}
-        <Script
-          src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"
-          strategy="afterInteractive"
-        />
       </body>
     </html>
   );
