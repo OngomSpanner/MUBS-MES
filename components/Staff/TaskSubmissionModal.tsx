@@ -105,6 +105,13 @@ export default function TaskSubmissionModal({ show, onHide, task, onSuccess }: T
 
   const handleSubmit = async (isDraft: boolean) => {
     if (!task) return;
+    const isProcessAssignment =
+      task.assignment_type === "process_task" || task.assignment_type === "process_subtask";
+    const isNotOpened = isProcessAssignment && (task.status === "Not opened" || !task.startDate);
+    if (isNotOpened) {
+      setErrorMsg("This process is not opened by HOD yet. You can submit once it is opened.");
+      return;
+    }
     if (!isDraft && !description.trim()) {
       setErrorMsg("Report Details are required to submit.");
       return;

@@ -185,16 +185,10 @@ export async function POST(req: Request) {
             const startMissing =
                 subRows[0].start_date == null || String(subRows[0].start_date).trim() === '';
             if (startMissing) {
-                const priorReport = await query({
-                    query: 'SELECT id FROM staff_reports WHERE process_subtask_id = ? AND submitted_by = ? LIMIT 1',
-                    values: [subId, decoded.userId],
-                }) as { id: number }[];
-                if (priorReport.length === 0) {
-                    return NextResponse.json(
-                        { message: 'This process has not been opened by your HOD yet. You can submit once they set a start date.' },
-                        { status: 403 }
-                    );
-                }
+                return NextResponse.json(
+                    { message: 'This process has not been opened by your HOD yet. You can submit once they set a start date.' },
+                    { status: 403 }
+                );
             }
         } else if (assignmentType === 'process_task') {
             const spaRecords = await query({
@@ -208,21 +202,13 @@ export async function POST(req: Request) {
             const startMissing =
                 spaRecords[0].start_date == null || String(spaRecords[0].start_date).trim() === '';
             if (startMissing) {
-                const priorReport = await query({
-                    query:
-                        'SELECT id FROM staff_reports WHERE process_assignment_id = ? AND submitted_by = ? LIMIT 1',
-                    values: [assignmentId, decoded.userId],
-                }) as { id: number }[];
-                if (priorReport.length === 0) {
-                    return NextResponse.json(
-                        {
-                            message:
-                                'This process has not been opened by your HOD yet. You can submit once they set a start date.',
-                        },
-                        { status: 403 }
-                    );
-                }
-                // Already had a report (e.g. marked Incomplete and resubmitting): allow without requiring dates again.
+                return NextResponse.json(
+                    {
+                        message:
+                            'This process has not been opened by your HOD yet. You can submit once they set a start date.',
+                    },
+                    { status: 403 }
+                );
             }
         } else {
             const aaRecords = await query({

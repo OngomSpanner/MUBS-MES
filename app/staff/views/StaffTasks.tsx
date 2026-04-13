@@ -114,6 +114,7 @@ function StaffTasksContent() {
   };
 
   const openSubmitFromProcessDetails = () => {
+    if (!selectedTaskForReport || selectedTaskForReport.status === "Not opened") return;
     setShowProcessDetails(false);
     setShowModal(true);
   };
@@ -422,11 +423,17 @@ function StaffTasksContent() {
           )}
         </Modal.Body>
         <Modal.Footer className="border-0 pt-0 px-3 pb-3 justify-content-end">
+        {selectedTaskForReport?.status === "Not opened" && (
+          <div className="me-auto small text-muted">
+            This process is not opened yet. You can submit once HOD opens it.
+          </div>
+        )}
           <Button
             variant="primary"
             className="fw-bold d-inline-flex align-items-center gap-2"
             style={{ borderRadius: "10px", padding: "10px 14px" }}
             onClick={openSubmitFromProcessDetails}
+          disabled={selectedTaskForReport?.status === "Not opened"}
           >
             <span className="material-symbols-outlined" style={{ fontSize: "18px" }}>upload_file</span>
             {selectedTaskForReport?.status === "Returned" ? "Resubmit report" : "Submit report"}
