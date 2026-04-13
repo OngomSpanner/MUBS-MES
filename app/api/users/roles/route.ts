@@ -9,15 +9,11 @@ import { verifyToken } from '@/lib/auth';
  */
 const ASSIGNABLE_ROLES = [
   'strategy_manager',
-  'committee_member',
   'hod',
   'unit_head',
-  'department_head',
   'staff',
-  'principal',
   'system_admin',
-  'ambassador',
-  'viewer'
+  'ambassador'
 ] as const;
 
 export async function GET() {
@@ -38,10 +34,28 @@ export async function GET() {
     }) as { role: string }[];
 
     const fromDb = rows.map((r) => r.role);
-    const combined: string[] = [...ASSIGNABLE_ROLES];
-    for (const r of fromDb) {
-      if (r && !combined.includes(r)) combined.push(r);
+    const rolesToExclude = ['viewer', 'department_head', 'committee_member', 'principal'];
+    
+    // Use a Set to track seen roles (lowercase for case-insensitive uniqueness)
+    const seen = new Set<string>();
+    const combined: string[] = [];
+
+    // 1. Add assignable roles first
+    for (const r of ASSIGNABLE_ROLES) {
+      if (!rolesToExclude.includes(r.toLowerCase()) && !seen.has(r.toLowerCase())) {
+        combined.push(r);
+        seen.add(r.toLowerCase());
+      }
     }
+
+    // 2. Add roles found in DB that aren't excluded and aren't already added
+    for (const r of fromDb) {
+      if (r && !rolesToExclude.includes(r.toLowerCase()) && !seen.has(r.toLowerCase())) {
+        combined.push(r);
+        seen.add(r.toLowerCase());
+      }
+    }
+
     combined.sort();
 
     return NextResponse.json({ roles: combined });

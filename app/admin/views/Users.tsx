@@ -322,10 +322,9 @@ export default function UsersView() {
         const styles: { [key: string]: { bg: string; color: string } } = {
             'System Administrator': { bg: '#eff6ff', color: 'var(--mubs-blue)' },
             'Strategy Manager': { bg: '#fdf2f8', color: '#9333ea' },
-            'Department Head': { bg: '#fff7ed', color: '#ea580c' },
+            'Head of Department': { bg: '#f0f9ff', color: '#0369a1' },
             'Unit Head': { bg: '#f0f9ff', color: '#0369a1' },
             'HOD': { bg: '#f0f9ff', color: '#0369a1' },
-            'Committee Member': { bg: '#f5f3ff', color: '#6d28d9' },
             'Staff': { bg: '#eff6ff', color: 'var(--mubs-blue)' },
             'Ambassador': { bg: '#fff7ed', color: '#ea580c' }
         };
@@ -335,9 +334,8 @@ export default function UsersView() {
     const getRoleIcon = (role: string) =>
         role === 'System Administrator' ? 'shield' :
             role === 'Strategy Manager' ? 'manage_accounts' :
-                role === 'Department Head' || role === 'Unit Head' || role === 'HOD' ? 'corporate_fare' :
-                    role === 'Committee Member' ? 'groups' : 
-                        role === 'Ambassador' ? 'verified_user' : 'assignment_ind';
+                role === 'Head of Department' || role === 'Unit Head' || role === 'HOD' ? 'corporate_fare' :
+                    role === 'Ambassador' ? 'verified_user' : 'assignment_ind';
 
     // Client-side pagination
     const totalPages = Math.max(1, Math.ceil(users.length / PAGE_SIZE));
