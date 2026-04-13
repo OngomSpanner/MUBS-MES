@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import 'bootstrap/dist/css/bootstrap.min.css';
-import 'material-symbols/outlined.css';
 import '@fontsource/dm-sans/300.css';
 import '@fontsource/dm-sans/400.css';
 import '@fontsource/dm-sans/500.css';
@@ -23,6 +22,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" data-bs-theme="light">
+      <head />
       <body style={{ fontFamily: "'DM Sans', sans-serif" }}>
         <IdleTimeout />
         <BootstrapClient />

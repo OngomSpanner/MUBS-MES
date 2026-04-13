@@ -356,7 +356,7 @@ export default function CreateUserModal({ show, onHide, onUserCreated }: CreateU
             style={{ background: 'var(--mubs-blue)', borderColor: 'var(--mubs-blue)' }}
             className="fw-bold text-white"
           >
-            <span className="material-symbols-outlined me-1" style={{ fontSize: '18px' }}>check</span>
+            <span className="material-symbols-outlined me-1" style={{ fontSize: '18px', verticalAlign: 'middle' }}>check</span>
             Create User
           </Button>
         </Modal.Footer>

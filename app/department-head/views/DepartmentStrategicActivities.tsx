@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import axios from 'axios';
+
 import StatCard from '@/components/StatCard';
 
 interface Activity {
@@ -853,9 +854,7 @@ export default function DepartmentStrategicActivities() {
                                         color: '#c2410c',
                                     }}
                                 >
-                                    <span className="material-symbols-outlined" style={{ fontSize: '28px' }}>
-                                        assignment_late
-                                    </span>
+                                    <span className="material-symbols-outlined" style={{ fontSize: '28px' }}>assignment_late</span>
                                 </div>
                                 <h2
                                     id="hod-assignments-required-title"
@@ -1138,9 +1137,7 @@ export default function DepartmentStrategicActivities() {
                                                     style={{ fontSize: '14px', cursor: 'pointer' }}
                                                     role="presentation"
                                                     onClick={() => removeStaffFromAssign(id)}
-                                                >
-                                                    close
-                                                </span>
+                                                >close</span>
                                             </span>
                                         );
                                     })}

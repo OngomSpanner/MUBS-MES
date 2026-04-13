@@ -3,6 +3,7 @@
 import { useEffect, useState, useRef, useMemo } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import axios from 'axios';
+
 import StatCard from '@/components/StatCard';
 import DepartmentTaskCardGrid from '@/components/Department/DepartmentTaskCardGrid';
 import EvaluateSubmissionModal, { parseEvidenceItems, type FeedbackHistoryEntry } from '@/components/Department/EvaluateSubmissionModal';
@@ -1575,9 +1576,7 @@ export default function DepartmentTasks({ initialActivity, initialAssignee }: De
                                         <span
                                             className="material-symbols-outlined d-block mb-2 mx-auto"
                                             style={{ fontSize: '36px', opacity: 0.3 }}
-                                        >
-                                            checklist
-                                        </span>
+                                        >checklist</span>
                                         No processes found in this section.
                                     </td>
                                 </tr>
@@ -1708,9 +1707,7 @@ export default function DepartmentTasks({ initialActivity, initialAssignee }: De
                                                 style={{ fontSize: '.75rem', borderRadius: '8px' }}
                                                 onClick={() => setTableDetailsTask(task)}
                                             >
-                                                <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>
-                                                    visibility
-                                                </span>
+                                                <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>visibility</span>
                                                 View details
                                             </button>
                                         </td>
@@ -1793,9 +1790,7 @@ export default function DepartmentTasks({ initialActivity, initialAssignee }: De
                                                                             })
                                                                         }
                                                                     >
-                                                                        <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>
-                                                                            swap_horiz
-                                                                        </span>
+                                                                        <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>swap_horiz</span>
                                                                         Reassign
                                                                     </button>
                                                                 </div>
@@ -1861,9 +1856,7 @@ export default function DepartmentTasks({ initialActivity, initialAssignee }: De
                                         window.scrollTo({ top: 0, behavior: 'smooth' });
                                     }}
                                 >
-                                    <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>
-                                        chevron_left
-                                    </span>
+                                    <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>chevron_left</span>
                                 </button>
                                 {[...Array(totalPages)].map((_, i) => (
                                     <button
@@ -1902,9 +1895,7 @@ export default function DepartmentTasks({ initialActivity, initialAssignee }: De
                                         window.scrollTo({ top: 0, behavior: 'smooth' });
                                     }}
                                 >
-                                    <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>
-                                        chevron_right
-                                    </span>
+                                    <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>chevron_right</span>
                                 </button>
                             </div>
                         </div>
@@ -1931,9 +1922,7 @@ export default function DepartmentTasks({ initialActivity, initialAssignee }: De
                             <>
                                 <div className="modal-header border-bottom-0 pb-0 px-4 pt-4">
                                     <h6 className="modal-title fw-bold text-dark d-flex align-items-center gap-2 mb-0" style={{ fontSize: '1.05rem' }}>
-                                        <span className="material-symbols-outlined text-primary" style={{ fontSize: '24px' }}>
-                                            checklist
-                                        </span>
+                                        <span className="material-symbols-outlined text-primary" style={{ fontSize: '24px' }}>checklist</span>
                                         Process details
                                     </h6>
                                     <button type="button" className="btn-close" onClick={() => setTableDetailsTask(null)} aria-label="Close" />
@@ -2111,9 +2100,7 @@ export default function DepartmentTasks({ initialActivity, initialAssignee }: De
                                                                             } catch {}
                                                                         }}
                                                                     >
-                                                                        <span className="material-symbols-outlined" style={{ fontSize: 16 }}>
-                                                                            visibility
-                                                                        </span>
+                                                                        <span className="material-symbols-outlined" style={{ fontSize: 16 }}>visibility</span>
                                                                         {ev.label}
                                                                     </button>
                                                                 ))}
@@ -2173,7 +2160,7 @@ export default function DepartmentTasks({ initialActivity, initialAssignee }: De
                                                                     <button
                                                                         type="button"
                                                                         className="btn btn-sm btn-outline-secondary d-inline-flex align-items-center gap-1"
-                                                                        style={{ fontSize: '0.72rem', borderRadius: '8px' }}
+                                                                        style={{ fontSize: '.72rem', borderRadius: '8px' }}
                                                                         disabled={subtaskStatusBlocksReassign(s.status)}
                                                                         onClick={() =>
                                                                             setReassignSubtaskCtx({
@@ -2186,12 +2173,7 @@ export default function DepartmentTasks({ initialActivity, initialAssignee }: De
                                                                             })
                                                                         }
                                                                     >
-                                                                        <span
-                                                                            className="material-symbols-outlined"
-                                                                            style={{ fontSize: '16px' }}
-                                                                        >
-                                                                            swap_horiz
-                                                                        </span>
+                                                                        <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>swap_horiz</span>
                                                                         Reassign
                                                                     </button>
                                                                 </div>
@@ -2230,9 +2212,7 @@ export default function DepartmentTasks({ initialActivity, initialAssignee }: De
                     <div className="modal-content border-0 shadow-lg" style={{ borderRadius: '12px' }}>
                         <div className="modal-header border-bottom-0 pb-0 px-4 pt-4">
                             <h6 className="modal-title fw-bold text-dark d-flex align-items-center gap-2" style={{ fontSize: '1.1rem' }}>
-                                <span className="material-symbols-outlined text-success" style={{ fontSize: '24px' }}>
-                                    event_available
-                                </span>
+                                <span className="material-symbols-outlined text-success" style={{ fontSize: '24px' }}>event_available</span>
                                 Open process
                             </h6>
                             <button
@@ -2351,9 +2331,7 @@ export default function DepartmentTasks({ initialActivity, initialAssignee }: De
                     <div className="modal-content border-0 shadow-lg" style={{ borderRadius: '12px' }}>
                         <div className="modal-header border-bottom-0 pb-0 px-4 pt-4">
                             <h6 className="modal-title fw-bold text-dark d-flex align-items-center gap-2" style={{ fontSize: '1.05rem' }}>
-                                <span className="material-symbols-outlined text-success" style={{ fontSize: '24px' }}>
-                                    event_available
-                                </span>
+                                <span className="material-symbols-outlined text-success" style={{ fontSize: '24px' }}>event_available</span>
                                 Open selected processes
                             </h6>
                             <button
@@ -2415,9 +2393,7 @@ export default function DepartmentTasks({ initialActivity, initialAssignee }: De
                     <div className="modal-content border-0 shadow-lg" style={{ borderRadius: '12px' }}>
                         <div className="modal-header border-bottom-0 pb-0 px-4 pt-4">
                             <h6 className="modal-title fw-bold text-dark d-flex align-items-center gap-2" style={{ fontSize: '1.1rem' }}>
-                                <span className="material-symbols-outlined text-secondary" style={{ fontSize: '24px' }}>
-                                    swap_horiz
-                                </span>
+                                <span className="material-symbols-outlined text-secondary" style={{ fontSize: '24px' }}>swap_horiz</span>
                                 Reassign process (task)
                             </h6>
                             <button
@@ -2537,9 +2513,7 @@ export default function DepartmentTasks({ initialActivity, initialAssignee }: De
                     <div className="modal-content border-0 shadow-lg" style={{ borderRadius: '12px' }}>
                         <div className="modal-header border-bottom-0 pb-0 px-4 pt-4">
                             <h6 className="modal-title fw-bold text-dark d-flex align-items-center gap-2" style={{ fontSize: '1.1rem' }}>
-                                <span className="material-symbols-outlined text-secondary" style={{ fontSize: '24px' }}>
-                                    swap_horiz
-                                </span>
+                                <span className="material-symbols-outlined text-secondary" style={{ fontSize: '24px' }}>swap_horiz</span>
                                 Reassign sub-task
                             </h6>
                             <button

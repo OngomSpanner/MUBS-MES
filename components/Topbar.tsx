@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { formatRoleForDisplay, dashboardPathForRole, normalizeRoleForCookie } from '@/lib/role-routing';
-import Icon from './Icon';
+
 
 interface TopbarProps {
   pageTitle: string;
@@ -67,11 +67,11 @@ export default function Topbar({ pageTitle, toggleSidebar }: TopbarProps) {
           style={{ background: 'rgba(255,255,255,.1)', borderRadius: '8px' }}
           onClick={toggleSidebar}
         >
-          <Icon name="menu" className="ms-icon" />
+          <span className="material-symbols-outlined ms-icon">menu</span>
         </button>
         <nav className="breadcrumb-nav d-flex align-items-center text-white-50">
           <span>{activeRole ? formatRoleForDisplay(activeRole) : 'Portal'}</span>
-          <Icon name="chevron_right" style={{ fontSize: '14px', color: '#93c5fd', margin: '0 .3rem' }} />
+          <span className="material-symbols-outlined" style={{ fontSize: '14px', color: '#93c5fd', margin: '0 .3rem' }}>chevron_right</span>
           <span className="text-white fw-bold" id="breadcrumbLabel">{pageTitle}</span>
         </nav>
       </div>
@@ -98,7 +98,7 @@ export default function Topbar({ pageTitle, toggleSidebar }: TopbarProps) {
             alignItems: 'center',
             justifyContent: 'center'
           }}>
-            <Icon name="person" style={{ color: 'var(--mubs-navy)', fontSize: '20px' }} />
+            <span className="material-symbols-outlined" style={{ color: 'var(--mubs-navy)', fontSize: '20px' }}>person</span>
           </div>
         </button>
 
@@ -134,7 +134,7 @@ export default function Topbar({ pageTitle, toggleSidebar }: TopbarProps) {
               await fetch('/api/auth/logout', { method: 'POST' });
               window.location.href = '/';
             }}>
-              <Icon name="logout" className="me-1" style={{ fontSize: '18px' }} />Logout
+              <span className="material-symbols-outlined me-1" style={{ fontSize: '18px' }}>logout</span>Logout
             </a>
           </li>
         </ul>

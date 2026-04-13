@@ -18,8 +18,10 @@ const BORDER: Record<StatCardProps['color'], string> = {
 export default function StatCard({ label, value, color }: StatCardProps) {
   return (
     <div className="stat-card" style={{ borderLeftColor: BORDER[color] }}>
-      <div className="stat-label">{label}</div>
-      <div className="stat-value">{value}</div>
+      <div>
+        <div className="stat-label mb-0">{label}</div>
+        <div className="stat-value">{value}</div>
+      </div>
     </div>
   );
 }

@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import axios from 'axios';
 
+
 type PerformancePeriod = 'week' | 'month' | 'quarter';
 
 interface DepartmentHeadData {
@@ -437,11 +438,11 @@ export default function DepartmentHeadDashboard() {
                                             <td>
                                                 <div className="d-flex align-items-center gap-2">
                                                     <div className="activity-icon">
-                                                        <span className="material-symbols-outlined">
-                                                            {act.title.toLowerCase().includes('computer') ? 'computer' :
-                                                                act.title.toLowerCase().includes('digital') ? 'laptop' :
-                                                                    act.title.toLowerCase().includes('curriculum') ? 'code' : 'school'}
-                                                        </span>
+                                                        <span className="material-symbols-outlined">{
+                                                            act.title.toLowerCase().includes('computer') ? 'computer' :
+                                                            act.title.toLowerCase().includes('digital') ? 'laptop' :
+                                                            act.title.toLowerCase().includes('curriculum') ? 'code' : 'school'
+                                                        }</span>
                                                     </div>
                                                     <div>
                                                         <div className="fw-bold text-dark text-truncate" style={{ fontSize: '.85rem', maxWidth: '250px' }}>{act.title}</div>

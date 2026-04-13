@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import axios from "axios";
+
 import StatCard from "@/components/StatCard";
 import { labelForActivityUnitOfMeasure } from "@/lib/activity-unit-of-measure";
 
@@ -165,9 +166,7 @@ export default function StaffProcessTasks() {
                           style={{ borderRadius: '8px', fontSize: '.78rem' }}
                           onClick={() => openTask(a)}
                         >
-                          <span className="material-symbols-outlined" style={{ fontSize: '15px' }}>
-                            {a.status === 'completed' ? 'visibility' : 'edit_note'}
-                          </span>
+                          <span className="material-symbols-outlined" style={{ fontSize: '15px' }}>{a.status === 'completed' ? 'visibility' : 'edit_note'}</span>
                           {a.status === 'completed' ? 'View' : 'Update'}
                         </button>
                       </td>

@@ -4,6 +4,7 @@ import { useEffect, useState, Suspense, useCallback } from "react";
 import axios from "axios";
 import { useSearchParams } from "next/navigation";
 import { Modal, Button } from "react-bootstrap";
+
 import StatCard from "@/components/StatCard";
 import TaskSubmissionModal, { type StaffTaskSubmissionContext } from "@/components/Staff/TaskSubmissionModal";
 import SubmissionDetailModal from "@/components/Staff/SubmissionDetailModal";
@@ -178,9 +179,7 @@ function StaffTasksContent() {
             className="btn btn-sm btn-outline-primary fw-bold d-inline-flex align-items-center gap-1 text-nowrap"
             style={{ borderRadius: "8px", fontSize: ".8rem", whiteSpace: "nowrap" }}
           >
-            <span className="material-symbols-outlined" style={{ fontSize: "16px" }}>
-              {task.status === "Completed" || task.status === "Under Review" || task.status === "Incomplete" ? "visibility" : "assignment"}
-            </span>
+            <span className="material-symbols-outlined" style={{ fontSize: "16px" }}>{task.status === "Completed" || task.status === "Under Review" || task.status === "Incomplete" ? "visibility" : "assignment"}</span>
             {task.status === "Completed" || task.status === "Under Review" || task.status === "Incomplete" ? "View Details" : "View process"}
           </button>
         </td>
@@ -288,12 +287,7 @@ function StaffTasksContent() {
               {currentTasks.length === 0 ? (
                 <tr>
                   <td colSpan={5} className="text-center py-4 text-muted">
-                    <span
-                      className="material-symbols-outlined d-block mb-2"
-                      style={{ fontSize: "36px", opacity: 0.3 }}
-                    >
-                      checklist
-                    </span>
+                      <span className="material-symbols-outlined d-block mb-2 text-muted" style={{ fontSize: "36px", opacity: 0.3 }}>checklist</span>
                     No processes found in this section.
                   </td>
                 </tr>

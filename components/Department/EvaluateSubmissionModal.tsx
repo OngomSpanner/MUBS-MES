@@ -95,9 +95,7 @@ const EvaluateSubmissionModal: React.FC<EvaluateSubmissionModalProps> = ({
                 <div className="modal-content border-0 shadow-lg" style={{ borderRadius: '12px' }}>
                     <div className="modal-header border-bottom-0 pb-0 px-4 pt-4">
                         <h5 className="modal-title fw-bold text-dark d-flex align-items-center gap-2" style={{ fontSize: '1.1rem' }}>
-                            <span className="material-symbols-outlined text-primary" style={{ fontSize: '24px' }}>
-                                {isProcessReview ? 'fact_check' : 'rate_review'}
-                            </span>
+                            <span className="material-symbols-outlined text-primary" style={{ fontSize: '24px' }}>{isProcessReview ? 'fact_check' : 'rate_review'}</span>
                             {isProcessReview ? 'Review submission' : 'Evaluate submission'}
                         </h5>
                         <button type="button" className="btn-close" onClick={onClose} disabled={isSubmitting} aria-label="Close" />
@@ -134,15 +132,11 @@ const EvaluateSubmissionModal: React.FC<EvaluateSubmissionModalProps> = ({
                                         </span>
                                     </div>
                                     <div className="text-muted mb-1" style={{ fontSize: '0.85rem' }}>
-                                        <span className="material-symbols-outlined me-2" style={{ fontSize: '16px', verticalAlign: 'middle' }}>
-                                            category
-                                        </span>
+                                        <span className="material-symbols-outlined me-2" style={{ fontSize: '16px', verticalAlign: 'middle' }}>category</span>
                                         {item.activity_title}
                                     </div>
                                     <div className="text-muted" style={{ fontSize: '0.85rem' }}>
-                                        <span className="material-symbols-outlined me-2" style={{ fontSize: '16px', verticalAlign: 'middle' }}>
-                                            person
-                                        </span>
+                                        <span className="material-symbols-outlined me-2" style={{ fontSize: '16px', verticalAlign: 'middle' }}>person</span>
                                         By <strong>{item.staff_name}</strong>
                                         <span className="text-muted ms-1">&middot; {formatDate(item.submitted_at)}</span>
                                     </div>
@@ -165,9 +159,7 @@ const EvaluateSubmissionModal: React.FC<EvaluateSubmissionModalProps> = ({
 
                         <div className="mb-4">
                             <label className="form-label fw-semibold mb-2 d-flex align-items-center gap-2" style={{ fontSize: '0.85rem' }}>
-                                <span className="material-symbols-outlined text-primary" style={{ fontSize: '18px' }}>
-                                    attach_file
-                                </span>
+                                <span className="material-symbols-outlined text-primary" style={{ fontSize: '18px' }}>attach_file</span>
                                 Evidence
                             </label>
                             {parseEvidenceItems(item.attachments).length === 0 ? (
@@ -190,9 +182,7 @@ const EvaluateSubmissionModal: React.FC<EvaluateSubmissionModalProps> = ({
                                                 }
                                             }}
                                         >
-                                            <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>
-                                                visibility
-                                            </span>
+                                            <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>visibility</span>
                                             {ev.label}
                                         </button>
                                     ))}
@@ -243,9 +233,7 @@ const EvaluateSubmissionModal: React.FC<EvaluateSubmissionModalProps> = ({
                             {item.task_type === 'kpi_driver' && (
                                 <div className="col-12">
                                     <label className="form-label fw-semibold mb-2 d-flex align-items-center gap-2" style={{ fontSize: '0.85rem' }}>
-                                        <span className="material-symbols-outlined text-primary" style={{ fontSize: '18px' }}>
-                                            analytics
-                                        </span>
+                                        <span className="material-symbols-outlined text-primary" style={{ fontSize: '18px' }}>analytics</span>
                                         Achieved value
                                     </label>
                                     <div className="d-flex align-items-center gap-4">
@@ -329,9 +317,7 @@ const EvaluateSubmissionModal: React.FC<EvaluateSubmissionModalProps> = ({
                             onClick={onSubmit}
                             disabled={isSubmitting || !selectedRating[item.id]}
                         >
-                            <span className="material-symbols-outlined" style={{ fontSize: '20px' }}>
-                                send
-                            </span>
+                            <span className="material-symbols-outlined" style={{ fontSize: '20px' }}>send</span>
                             {isSubmitting ? 'Saving…' : isProcessReview ? 'Save review' : 'Submit evaluation'}
                         </button>
                     </div>

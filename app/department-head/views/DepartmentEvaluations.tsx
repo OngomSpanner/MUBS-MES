@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import axios from 'axios';
+
 import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -653,9 +654,7 @@ export default function DepartmentEvaluations() {
                                                                     color: e.status === 'Completed' ? '#15803d' : e.status === 'Not Done' ? '#475569' : '#b45309',
                                                                     fontSize: '0.7rem', padding: '4px 8px', borderRadius: '6px', fontWeight: '600'
                                                                 }}>
-                                                                    <span className="material-symbols-outlined me-1" style={{ fontSize: '12px', verticalAlign: 'middle' }}>
-                                                                        {e.status === 'Completed' ? 'check_circle' : e.status === 'Not Done' ? 'cancel' : 'feedback'}
-                                                                    </span>
+                                                                    <span className="material-symbols-outlined me-1" style={{ fontSize: '12px', verticalAlign: 'middle' }}>{e.status === 'Completed' ? 'check_circle' : e.status === 'Not Done' ? 'cancel' : 'feedback'}</span>
                                                                     {e.status === 'Completed' ? 'Complete' : e.status === 'Not Done' ? 'Not Done' : (e.status === 'Incomplete' ? 'Incomplete' : 'Returned')}
                                                                 </span>
                                                             )}

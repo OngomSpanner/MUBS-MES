@@ -6,6 +6,7 @@ import Image from 'next/image';
 import { GoogleOAuthProvider, GoogleLogin } from '@react-oauth/google';
 import { Modal, Button, Form } from 'react-bootstrap';
 
+
 const clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || 'dummy';
 
 export default function LoginPage() {
@@ -273,9 +274,7 @@ function LoginFormContent() {
                     style={{ zIndex: 5 }}
                     onClick={() => setShowPassword((v) => !v)}
                   >
-                    <span className="material-symbols-outlined" style={{ fontSize: '22px' }}>
-                      {showPassword ? 'visibility_off' : 'visibility'}
-                    </span>
+                    <span className="material-symbols-outlined" style={{ fontSize: '22px' }}>{showPassword ? 'visibility_off' : 'visibility'}</span>
                   </button>
                 </div>
                 
