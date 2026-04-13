@@ -32,6 +32,26 @@ body {
   font-size: 22px;
 }
 
+/* SVG Sprite Icon Helpers */
+.svg-icon {
+  width: 1.25rem;
+  height: 1.25rem;
+  vertical-align: middle;
+  fill: currentColor;
+  transition: transform 0.1s ease;
+}
+
+.ms-icon {
+  width: 20px;
+  height: 20px;
+  opacity: 0.8;
+}
+
+.active .ms-icon, 
+.sidebar-link:hover .ms-icon {
+  opacity: 1;
+}
+
 .app-shell {
   display: flex;
   height: 100vh;

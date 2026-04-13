@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname, useSearchParams } from 'next/navigation';
+import Icon from './Icon';
 
 interface SidebarProps {
   sidebarOpen: boolean;
@@ -84,7 +85,7 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen, onLogoutClick }: 
               className={`sidebar-link ${isActive(item.key) ? 'active' : ''}`}
               onClick={() => setSidebarOpen(false)}
             >
-              <span className="material-symbols-outlined">{item.icon}</span>
+              <Icon name={item.icon} className="ms-icon" />
               {item.label}
               {item.badge && (
                 <span className="ms-auto" style={{
@@ -107,7 +108,7 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen, onLogoutClick }: 
             style={{ color: '#fca5a5' }}
             onClick={(e) => { e.preventDefault(); onLogoutClick(); }}
           >
-            <span className="material-symbols-outlined">logout</span> Logout
+            <Icon name="logout" className="ms-icon" /> Logout
           </a>
         </nav>
 
@@ -115,7 +116,7 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen, onLogoutClick }: 
           <div className="help-card">
             <div className="d-flex align-items-center gap-2 mb-1">
               <div className="help-avatar">
-                <span className="material-symbols-outlined">support_agent</span>
+                <Icon name="support_agent" className="ms-icon" />
               </div>
               <span style={{ fontSize: '.78rem', fontWeight: 700 }}>Need Help?</span>
             </div>
