@@ -39,13 +39,7 @@ export async function GET() {
                     sr.process_assignment_id,
                     sr.process_subtask_id,
                     COALESCE(sa.id, psa_sa.id) as activity_id,
-                    COALESCE(
-                        sa.title,
-                        CASE
-                            WHEN sps.id IS NOT NULL THEN CONCAT_WS(' — ', NULLIF(sp.step_name, ''), NULLIF(sps.title, ''))
-                            ELSE sp.step_name
-                        END
-                    ) as report_name,
+                    COALESCE(sa.title, sp.step_name) as report_name,
                     COALESCE(sa.description, psa_sa.description) as task_description,
                     st.performance_indicator as instruction,
                     COALESCE(aa.start_date, spa.start_date) as start_date,
@@ -71,11 +65,11 @@ export async function GET() {
                 LEFT JOIN activity_assignments aa ON sr.activity_assignment_id = aa.id
                 LEFT JOIN strategic_activities sa ON aa.activity_id = sa.id
                 LEFT JOIN strategic_activities p ON sa.parent_id = p.id
-                LEFT JOIN staff_process_subtasks sps ON sr.process_subtask_id = sps.id
-                LEFT JOIN staff_process_assignments spa ON COALESCE(sr.process_assignment_id, sps.process_assignment_id) = spa.id
+                LEFT JOIN staff_process_assignments spa ON sr.process_assignment_id = spa.id
                 LEFT JOIN standard_processes sp ON spa.standard_process_id = sp.id
                 LEFT JOIN standards st ON sp.standard_id = st.id
                 LEFT JOIN strategic_activities psa_sa ON spa.activity_id = psa_sa.id
+                LEFT JOIN staff_process_subtasks sps ON sr.process_subtask_id = sps.id
                 LEFT JOIN evaluations e ON e.staff_report_id = sr.id
                 LEFT JOIN users eval_hod ON e.evaluated_by = eval_hod.id
                 WHERE (aa.assigned_to_user_id = ? OR spa.staff_id = ? OR sps.assigned_to = ?)
