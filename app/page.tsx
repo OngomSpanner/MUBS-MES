@@ -37,7 +37,14 @@ function LoginFormContent() {
     if (searchParams.get('admin') === 'true' || searchParams.get('emergency') === '1') {
       setShowAdminLogin(true);
     }
-  }, [searchParams]);
+
+    // Prefetch the dashboard shells while user is on login page
+    // This allows the browser to download CSS/JS before the user even clicks Login
+    router.prefetch('/admin');
+    router.prefetch('/staff');
+    router.prefetch('/department-head');
+    router.prefetch('/set-password');
+  }, [searchParams, router]);
 
   const handleForgotPassword = async (e: React.FormEvent) => {
     e.preventDefault();
