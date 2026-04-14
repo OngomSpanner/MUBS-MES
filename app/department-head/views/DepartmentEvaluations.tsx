@@ -8,7 +8,49 @@ import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import StatCard from '@/components/StatCard';
 import EvaluationCardGrid from '@/components/Department/EvaluationCardGrid';
-import EvaluateSubmissionModal, { type FeedbackHistoryEntry } from '@/components/Department/EvaluateSubmissionModal';
+import EvaluateSubmissionModal, {
+    parseEvidenceItems,
+    type FeedbackHistoryEntry,
+} from '@/components/Department/EvaluateSubmissionModal';
+import { linkify } from '@/lib/linkify';
+
+/** URLs pasted only in report text (not in attachments column). */
+function extractEvidenceUrlsFromSummary(text: string | null | undefined): { label: string; url: string }[] {
+    if (!text?.trim()) return [];
+    const re = /(\/uploads\/[a-zA-Z0-9._-]+)|(https?:\/\/[^\s<>"']+)/g;
+    const out: { label: string; url: string }[] = [];
+    const seen = new Set<string>();
+    let m: RegExpExecArray | null;
+    const s = text;
+    re.lastIndex = 0;
+    while ((m = re.exec(s)) !== null) {
+        const url = m[0];
+        if (seen.has(url)) continue;
+        seen.add(url);
+        out.push({
+            label: url.startsWith('/uploads/') ? 'Uploaded file' : 'Evidence link',
+            url,
+        });
+    }
+    return out;
+}
+
+function mergeEvidenceForReview(
+    attachments: string | null | undefined,
+    reportSummary: string | null | undefined
+): { label: string; url: string }[] {
+    const fromCol = parseEvidenceItems(attachments);
+    const fromText = extractEvidenceUrlsFromSummary(reportSummary);
+    const seen = new Set(fromCol.map((x) => x.url));
+    const merged = [...fromCol];
+    for (const x of fromText) {
+        if (!seen.has(x.url)) {
+            merged.push(x);
+            seen.add(x.url);
+        }
+    }
+    return merged;
+}
 
 interface Evaluation {
     id: number;
@@ -349,7 +391,12 @@ export default function DepartmentEvaluations() {
                             </h5>
                             <button type="button" className="btn-close" onClick={() => setViewModalItem(null)}></button>
                         </div>
-                        {viewModalItem && (
+                        {viewModalItem && (() => {
+                            const mergedEvidence = mergeEvidenceForReview(
+                                viewModalItem.attachments,
+                                viewModalItem.report_summary
+                            );
+                            return (
                             <div className="modal-body p-4">
                                 {/* Info Banner */}
                                 <div className="p-3 rounded-3 mb-4" style={{ background: '#f8fafc', border: '1px solid #e2e8f0' }}>
@@ -392,16 +439,54 @@ export default function DepartmentEvaluations() {
                                 </div>
 
 
-                                {/* Report Details */}
+                                {/* Report summary + evidence in one card (HOD sees actions here) */}
                                 <div className="mb-4">
                                     <label className="form-label fw-semibold mb-2 d-flex align-items-center gap-2" style={{ fontSize: '0.85rem' }}>
                                         <span className="material-symbols-outlined text-primary" style={{ fontSize: '18px' }}>subject</span>
-                                        Report Summary
+                                        Report summary & evidence
                                     </label>
                                     <div className="p-3 rounded-3" style={{ background: '#f8fafc', border: '1px solid #e2e8f0' }}>
-                                        <p className="mb-0 text-secondary" style={{ fontSize: '0.9rem', lineHeight: '1.5', whiteSpace: 'pre-wrap' }}>
-                                            {viewModalItem.report_summary || 'No summary provided.'}
-                                        </p>
+                                        <div className="text-secondary" style={{ fontSize: '0.9rem', lineHeight: '1.5', whiteSpace: 'pre-wrap' }}>
+                                            {viewModalItem.report_summary ? (
+                                                linkify(viewModalItem.report_summary)
+                                            ) : (
+                                                <span className="mb-0">No summary provided.</span>
+                                            )}
+                                        </div>
+                                        {mergedEvidence.length > 0 ? (
+                                            <>
+                                                <hr className="my-3 border-secondary border-opacity-25" />
+                                                <div className="d-flex flex-wrap gap-2">
+                                                    {mergedEvidence.map((ev, idx) => (
+                                                        <button
+                                                            key={`${ev.url}-${idx}`}
+                                                            type="button"
+                                                            className="btn btn-primary d-inline-flex align-items-center gap-2 px-3 py-2 fw-bold shadow-sm"
+                                                            style={{
+                                                                borderRadius: '8px',
+                                                                fontSize: '0.82rem',
+                                                                background: 'var(--mubs-blue)',
+                                                                borderColor: 'var(--mubs-blue)',
+                                                            }}
+                                                            onClick={() => {
+                                                                try {
+                                                                    window.open(ev.url, '_blank', 'noopener,noreferrer');
+                                                                } catch (e) {
+                                                                    console.error('Error opening evidence url', e);
+                                                                }
+                                                            }}
+                                                        >
+                                                            <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>visibility</span>
+                                                            {ev.label}
+                                                        </button>
+                                                    ))}
+                                                </div>
+                                            </>
+                                        ) : (
+                                            <p className="mb-0 mt-2 text-muted small" style={{ fontSize: '0.78rem' }}>
+                                                No file or link is attached.
+                                            </p>
+                                        )}
                                     </div>
                                 </div>
 
@@ -433,7 +518,8 @@ export default function DepartmentEvaluations() {
                                     </div>
                                 </div>
                             </div>
-                        )}
+                            );
+                        })()}
                     </div>
                 </div>
             </div>

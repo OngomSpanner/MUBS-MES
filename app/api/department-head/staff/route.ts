@@ -54,7 +54,6 @@ export async function GET() {
                     ) AS active_tasks
                 FROM users u
                 WHERE u.department_id IN (${placeholders})
-                AND u.role NOT LIKE '%Admin%' AND u.role NOT LIKE '%Principal%'
                 ORDER BY u.full_name ASC
             `,
             values: [...departmentIds]
