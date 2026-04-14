@@ -374,8 +374,28 @@ export async function POST(req: Request) {
         }
 
         // Support single (assigned_to) or multiple (assigned_to_ids) assignees
-        const rawIds: number[] = Array.isArray(assigned_to_ids)
-            ? assigned_to_ids.map((x: unknown) => Number(x)).filter((x) => !Number.isNaN(x) && x > 0)
+        // Accept arrays, comma-separated strings, or array-like objects with an id field.
+        const idsFromList: number[] = (() => {
+            if (Array.isArray(assigned_to_ids)) {
+                return assigned_to_ids
+                    .map((x: unknown) => {
+                        if (typeof x === 'object' && x !== null && 'id' in (x as Record<string, unknown>)) {
+                            return Number((x as Record<string, unknown>).id);
+                        }
+                        return Number(x);
+                    })
+                    .filter((x) => !Number.isNaN(x) && x > 0);
+            }
+            if (typeof assigned_to_ids === 'string') {
+                return assigned_to_ids
+                    .split(',')
+                    .map((s: string) => Number(s.trim()))
+                    .filter((x) => !Number.isNaN(x) && x > 0);
+            }
+            return [];
+        })();
+        const rawIds: number[] = idsFromList.length > 0
+            ? idsFromList
             : (assigned_to != null && assigned_to !== '' ? [Number(assigned_to)] : []).filter((x) => !Number.isNaN(x) && x > 0);
         const assigneeUserIds = [...new Set(rawIds)];
 
@@ -383,6 +403,14 @@ export async function POST(req: Request) {
         const filteredAssigneeIds = (role === 'hod' || role === 'unit head')
             ? assigneeUserIds.filter((id) => id !== userId)
             : assigneeUserIds;
+
+        // If client attempted assignment but no valid assignee survived parsing/filtering, fail fast.
+        if ((assigned_to_ids !== undefined || assigned_to !== undefined) && filteredAssigneeIds.length === 0) {
+            return NextResponse.json(
+                { message: 'Select at least one valid staff assignee (not your own account).' },
+                { status: 400 }
+            );
+        }
 
         const placeholders = inPlaceholders(departmentIds.length);
         let parentDeptId: number;
