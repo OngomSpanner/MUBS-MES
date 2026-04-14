@@ -23,7 +23,7 @@ function getTransporter(): nodemailer.Transporter | null {
 }
 
 export function defaultMailFrom(): string {
-    return process.env.EMAIL_FROM || '"MUBS M&E System" <noreply@yourdomain.com>';
+    return process.env.EMAIL_FROM || '"MUBS M&E System" <noreply@mubs.ac.ug>';
 }
 
 /** Escape text for HTML email bodies (user-supplied titles, names, etc.). */
