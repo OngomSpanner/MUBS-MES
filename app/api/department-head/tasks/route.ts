@@ -3,6 +3,84 @@ import { query } from '@/lib/db';
 import { cookies } from 'next/headers';
 import { verifyToken } from '@/lib/auth';
 import { getVisibleDepartmentIds, inPlaceholders } from '@/lib/department-head';
+import { insertStandardProcessRow } from '@/lib/standard-processes-db';
+
+/** System standard: one process step so departmental tasks can use container + subtasks (same model as strategic). */
+const DEPT_WORKFLOW_STANDARD_TITLE = 'Departmental operational workflow (system)';
+const DEPT_WORKFLOW_STEP_NAME = 'Complete departmental task';
+
+async function ensureDepartmentalWorkflowStandard(): Promise<{ standardId: number; processId: number }> {
+    const quality =
+        'Internal workflow used to track departmental tasks that may be split across staff.';
+    const output = 'Each assigned sub-task is completed and submitted by the responsible staff member.';
+    const pi = 'Timely completion of departmental operational work.';
+
+    const existing = (await query({
+        query: `SELECT id FROM standards WHERE title = ? LIMIT 1`,
+        values: [DEPT_WORKFLOW_STANDARD_TITLE],
+    })) as { id: number }[];
+
+    let standardId: number;
+    if (existing.length > 0) {
+        standardId = Number(existing[0].id);
+    } else {
+        let ins: any;
+        try {
+            ins = await query({
+                query: `INSERT INTO standards (
+          title, quality_standard, output_standard, performance_indicator, duration_value, duration_unit, target
+        ) VALUES (?, ?, ?, ?, 1, 'days', NULL)`,
+                values: [DEPT_WORKFLOW_STANDARD_TITLE, quality, output, pi],
+            }) as any;
+        } catch (e: unknown) {
+            const err = e as { code?: string; errno?: number };
+            if (err?.code === 'ER_BAD_FIELD_ERROR' || err?.errno === 1054) {
+                try {
+                    ins = await query({
+                        query: `INSERT INTO standards (title, quality_standard, output_standard, performance_indicator, target) VALUES (?, ?, ?, ?, ?)`,
+                        values: [DEPT_WORKFLOW_STANDARD_TITLE, quality, output, pi, null],
+                    }) as any;
+                } catch (e2: unknown) {
+                    const err2 = e2 as { code?: string; errno?: number };
+                    if (err2?.code === 'ER_BAD_FIELD_ERROR' || err2?.errno === 1054) {
+                        ins = await query({
+                            query: `INSERT INTO standards (title, quality_standard, output_standard, target) VALUES (?, ?, ?, ?)`,
+                            values: [DEPT_WORKFLOW_STANDARD_TITLE, quality, output, null],
+                        }) as any;
+                    } else {
+                        throw e2;
+                    }
+                }
+            } else {
+                throw e;
+            }
+        }
+        standardId = Number(ins.insertId);
+        if (!Number.isFinite(standardId) || standardId <= 0) {
+            throw new Error('Could not create departmental workflow standard');
+        }
+        await insertStandardProcessRow(standardId, DEPT_WORKFLOW_STEP_NAME, 1, 1, 'days');
+    }
+
+    let procs = (await query({
+        query: `SELECT id FROM standard_processes WHERE standard_id = ? ORDER BY step_order ASC, id ASC LIMIT 1`,
+        values: [standardId],
+    })) as { id: number }[];
+
+    if (!procs.length) {
+        await insertStandardProcessRow(standardId, DEPT_WORKFLOW_STEP_NAME, 1, 1, 'days');
+        procs = (await query({
+            query: `SELECT id FROM standard_processes WHERE standard_id = ? ORDER BY step_order ASC, id ASC LIMIT 1`,
+            values: [standardId],
+        })) as { id: number }[];
+    }
+
+    const processId = Number(procs[0]?.id);
+    if (!Number.isFinite(processId) || processId <= 0) {
+        throw new Error('Departmental workflow standard has no process step');
+    }
+    return { standardId, processId };
+}
 
 async function getAuthFromToken() {
     const cookieStore = await cookies();
@@ -19,6 +97,13 @@ export async function GET() {
     try {
         const { departmentIds, userId } = await getAuthFromToken();
         const placeholders = inPlaceholders(departmentIds.length);
+        const isOverdueByDaysLeftLikeStaffView = (dueDate: string | null | undefined): boolean => {
+            if (!dueDate) return false;
+            const ref = new Date(dueDate);
+            if (Number.isNaN(ref.getTime())) return false;
+            const daysLeft = Math.ceil((ref.getTime() - new Date().getTime()) / (1000 * 3600 * 24));
+            return daysLeft < 0;
+        };
 
         // Two-tier flat: Weekly Tasks (strategic_activities with parent_id set) linked to one Strategic Activity (parent_id IS NULL).
         // Progress = strategic_activities.progress, same scale as Department Efficiency: Complete=100%, Incomplete=50%, Not Done=0% (set when HOD evaluates in Submissions).
@@ -39,6 +124,7 @@ export async function GET() {
                         aa.assigned_to_user_id as assigned_to,
                         COALESCE(p.id, sa.id) as activity_id,
                         COALESCE(p.title, '') as activity_title,
+                        COALESCE(sa.source, '') as source,
                         sa.description,
                         sa.task_type,
                         sa.kpi_target_value,
@@ -66,7 +152,7 @@ export async function GET() {
                         COALESCE(sa.start_date, p.start_date) as startDate,
                         COALESCE(sa.end_date, p.end_date) as endDate,
                         COALESCE(sa.end_date, p.end_date) as dueDate,
-                        u.full_name as assignee_name, aa.assigned_to_user_id as assigned_to, COALESCE(p.id, sa.id) as activity_id, COALESCE(p.title, '') as activity_title, sa.description, sa.frequency, sa.frequency_interval
+                        u.full_name as assignee_name, aa.assigned_to_user_id as assigned_to, COALESCE(p.id, sa.id) as activity_id, COALESCE(p.title, '') as activity_title, COALESCE(sa.source, '') as source, sa.description, sa.frequency, sa.frequency_interval
                         FROM strategic_activities sa
                         LEFT JOIN strategic_activities p ON sa.parent_id = p.id
                         LEFT JOIN activity_assignments aa ON aa.activity_id = sa.id
@@ -92,6 +178,7 @@ export async function GET() {
                     sp.step_name as title,
                     sa.title as activity_title,
                     sa.id as activity_id,
+                    COALESCE(sa.source, '') as source,
                     u.full_name as assignee_name,
                     spa.staff_id as assigned_to,
                     spa.status as db_status,
@@ -215,9 +302,17 @@ export async function GET() {
 
         const mappedTasks = tasksQuery.map((t: any) => {
             const derivedProgress = progressFromReportStatus(t.latest_report_status);
-            const progress = derivedProgress != null ? derivedProgress : (t.progress != null ? Number(t.progress) : 0);
+            let progress = derivedProgress != null ? derivedProgress : (t.progress != null ? Number(t.progress) : 0);
             const derivedStatus = statusFromReportStatus(t.latest_report_status);
-            const status = derivedStatus ?? statusMap[t.db_status] ?? 'Not Started';
+            let status = derivedStatus ?? statusMap[t.db_status] ?? 'Not Started';
+            const overdue = isOverdueByDaysLeftLikeStaffView(t.dueDate || t.endDate || t.end_date);
+            if (
+                overdue &&
+                !['Completed', 'Under Review', 'Incomplete', 'Not Done'].includes(status)
+            ) {
+                status = 'Incomplete';
+                progress = 0;
+            }
             return {
                 ...t,
                 progress,
@@ -279,6 +374,15 @@ export async function GET() {
                             ? 50
                             : 0;
             }
+            const overdue = isOverdueByDaysLeftLikeStaffView(p.dueDate || p.endDate || p.end_date);
+            if (
+                overdue &&
+                !['Completed', 'Under Review', 'Incomplete', 'Not Done'].includes(status)
+            ) {
+                status = 'Incomplete';
+                progress = 0;
+            }
+
             return {
                 ...p,
                 status,
@@ -288,7 +392,23 @@ export async function GET() {
             };
         });
 
-        const allTasksCombined = [...mappedTasks, ...mappedProcessAssignments];
+        const activityIdsWithProcessAssignments = new Set<number>(
+            mappedProcessAssignments
+                .map((p: any) => Number(p.activity_id))
+                .filter((id: number) => Number.isFinite(id) && id > 0)
+        );
+
+        // When a departmental task has been split into process assignments/subtasks,
+        // suppress the parent weekly-task row to avoid duplicate "unassigned" entries.
+        const mappedTasksFiltered = mappedTasks.filter((t: any) => {
+            const aid = Number(t.activity_id ?? t.id);
+            if (!Number.isFinite(aid) || aid <= 0) return true;
+            const hasProcess = activityIdsWithProcessAssignments.has(aid);
+            const isProcessTask = String(t.task_type ?? '').toLowerCase().trim() === 'process';
+            return !(hasProcess && isProcessTask);
+        });
+
+        const allTasksCombined = [...mappedTasksFiltered, ...mappedProcessAssignments];
 
         // One row per task per assignee
         const seen = new Map<string, typeof allTasksCombined[0]>();
@@ -360,7 +480,7 @@ export async function POST(req: Request) {
         const { departmentIds, userId, role } = await getAuthFromToken();
         const body = await req.json();
 
-        const { title, parent_id, assigned_to, assigned_to_ids, end_date, start_date, description, task_type, kpi_target_value, frequency, frequency_interval } = body;
+        const { title, parent_id, assigned_to, assigned_to_ids, end_date, start_date, description, task_type, kpi_target_value, frequency, frequency_interval, subtasks: subtasksBody } = body;
 
         if (!title || !end_date) {
             return NextResponse.json({ message: 'Missing required fields (title, end_date)' }, { status: 400 });
@@ -371,6 +491,20 @@ export async function POST(req: Request) {
 
         if (isKpiDriver && (parent_id == null || parent_id === '')) {
             return NextResponse.json({ message: 'KPI-Driver Task (Strategy Plan) requires a Parent Strategic Activity.' }, { status: 400 });
+        }
+
+        const cleanedSubtasks = (Array.isArray(subtasksBody) ? subtasksBody : [])
+            .map((s: any) => ({
+                title: typeof s?.title === 'string' ? s.title.trim() : '',
+                assigned_to: Number(s?.assigned_to),
+            }))
+            .filter((s: { title: string; assigned_to: number }) => s.title && Number.isFinite(s.assigned_to) && s.assigned_to > 0);
+
+        if (cleanedSubtasks.length > 0 && (parent_id != null && parent_id !== '')) {
+            return NextResponse.json(
+                { message: 'Sub-task breakdown is only available for departmental tasks (no parent strategic activity).' },
+                { status: 400 }
+            );
         }
 
         // Support single (assigned_to) or multiple (assigned_to_ids) assignees
@@ -404,12 +538,44 @@ export async function POST(req: Request) {
             ? assigneeUserIds.filter((id) => id !== userId)
             : assigneeUserIds;
 
-        // If client attempted assignment but no valid assignee survived parsing/filtering, fail fast.
-        if ((assigned_to_ids !== undefined || assigned_to !== undefined) && filteredAssigneeIds.length === 0) {
-            return NextResponse.json(
-                { message: 'Select at least one valid staff assignee (not your own account).' },
-                { status: 400 }
-            );
+        const useSubtaskBreakdown = cleanedSubtasks.length > 0;
+
+        if (!useSubtaskBreakdown) {
+            if ((assigned_to_ids !== undefined || assigned_to !== undefined) && filteredAssigneeIds.length === 0) {
+                return NextResponse.json(
+                    { message: 'Select exactly one staff assignee (not your own account), or use break down into sub-tasks for multiple staff.' },
+                    { status: 400 }
+                );
+            }
+            if (filteredAssigneeIds.length !== 1) {
+                return NextResponse.json(
+                    {
+                        message:
+                            'Assign exactly one staff member to this task, or use break down into sub-tasks to split work across multiple staff.',
+                    },
+                    { status: 400 }
+                );
+            }
+        } else {
+            const deptPlaceholders = inPlaceholders(departmentIds.length);
+            for (const st of cleanedSubtasks) {
+                if ((role === 'hod' || role === 'unit head') && st.assigned_to === userId) {
+                    return NextResponse.json(
+                        { message: 'You cannot assign a sub-task to yourself. Assign to a staff member.' },
+                        { status: 403 }
+                    );
+                }
+                const inDept = (await query({
+                    query: `SELECT id FROM users WHERE id = ? AND department_id IN (${deptPlaceholders})`,
+                    values: [st.assigned_to, ...departmentIds],
+                })) as { id: number }[];
+                if (!inDept.length) {
+                    return NextResponse.json(
+                        { message: 'One or more sub-task assignees are not in your department.' },
+                        { status: 400 }
+                    );
+                }
+            }
         }
 
         const placeholders = inPlaceholders(departmentIds.length);
@@ -489,15 +655,60 @@ export async function POST(req: Request) {
 
         const insertedTaskId = result.insertId;
 
-        // Create one assignment per selected staff member
-        for (const assignedToId of filteredAssigneeIds) {
+        if (useSubtaskBreakdown) {
+            const { standardId, processId } = await ensureDepartmentalWorkflowStandard();
+            try {
+                await query({
+                    query: `UPDATE strategic_activities SET standard_id = ? WHERE id = ?`,
+                    values: [standardId, insertedTaskId],
+                });
+            } catch (updErr: any) {
+                if (!updErr?.message?.includes('standard_id') && updErr?.code !== 'ER_BAD_FIELD_ERROR') {
+                    throw updErr;
+                }
+            }
+
+            const existingContainer = (await query({
+                query: `
+          SELECT id FROM staff_process_assignments
+          WHERE activity_id = ? AND standard_process_id = ? AND staff_id IS NULL
+          LIMIT 1
+        `,
+                values: [insertedTaskId, processId],
+            })) as { id: number }[];
+
+            let containerId: number;
+            if (existingContainer.length > 0) {
+                containerId = Number(existingContainer[0].id);
+            } else {
+                const spaRes = await query({
+                    query: `
+            INSERT INTO staff_process_assignments (activity_id, standard_process_id, staff_id, status, start_date, end_date)
+            VALUES (?, ?, NULL, 'pending', ?, ?)
+          `,
+                    values: [insertedTaskId, processId, startDate, end_date],
+                });
+                containerId = Number((spaRes as any).insertId);
+            }
+
+            for (const st of cleanedSubtasks) {
+                await query({
+                    query: `
+            INSERT INTO staff_process_subtasks (process_assignment_id, title, assigned_to, status, start_date, end_date)
+            VALUES (?, ?, ?, 'pending', ?, ?)
+          `,
+                    values: [containerId, st.title, st.assigned_to, startDate, end_date],
+                });
+            }
+        } else {
+            const assignedToId = filteredAssigneeIds[0];
             await query({
                 query: `
                     INSERT INTO activity_assignments
                     (activity_id, assigned_to_user_id, assigned_by, start_date, end_date, status)
                     VALUES (?, ?, ?, ?, ?, 'pending')
                 `,
-                values: [insertedTaskId, assignedToId, userId, startDate, end_date]
+                values: [insertedTaskId, assignedToId, userId, startDate, end_date],
             });
         }
 

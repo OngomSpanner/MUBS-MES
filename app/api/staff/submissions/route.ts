@@ -8,6 +8,14 @@ import { brandEmailWrapper, escapeHtml, sendTransactionalMail } from '@/lib/mail
 
 export const dynamic = 'force-dynamic';
 
+function isOverdueByDaysLeftLikeStaffView(dueDate: string | null | undefined): boolean {
+    if (!dueDate) return false;
+    const ref = new Date(dueDate);
+    if (Number.isNaN(ref.getTime())) return false;
+    const daysLeft = Math.ceil((ref.getTime() - new Date().getTime()) / (1000 * 3600 * 24));
+    return daysLeft < 0;
+}
+
 export async function GET() {
     try {
         const cookieStore = await cookies();
@@ -178,13 +186,13 @@ export async function POST(req: Request) {
             const subId = assignmentId;
             const subRows = await query({
                 query: `
-                  SELECT s.id, s.process_assignment_id, spa.start_date
+                  SELECT s.id, s.process_assignment_id, spa.start_date, spa.end_date
                   FROM staff_process_subtasks s
                   JOIN staff_process_assignments spa ON s.process_assignment_id = spa.id
                   WHERE s.id = ? AND s.assigned_to = ?
                 `,
                 values: [subId, decoded.userId],
-            }) as { id: number; process_assignment_id: number; start_date: string | null }[];
+            }) as { id: number; process_assignment_id: number; start_date: string | null; end_date: string | null }[];
             if (subRows.length === 0) {
                 return NextResponse.json({ message: 'No subtask assignment found' }, { status: 404 });
             }
@@ -196,11 +204,17 @@ export async function POST(req: Request) {
                     { status: 403 }
                 );
             }
+            if (!isDraft && isOverdueByDaysLeftLikeStaffView(subRows[0].end_date)) {
+                return NextResponse.json(
+                    { message: 'This task is overdue and can no longer be submitted. Please contact your Supervisor.' },
+                    { status: 403 }
+                );
+            }
         } else if (assignmentType === 'process_task') {
             const spaRecords = await query({
-                query: 'SELECT id, start_date FROM staff_process_assignments WHERE id = ? AND staff_id = ?',
+                query: 'SELECT id, start_date, end_date FROM staff_process_assignments WHERE id = ? AND staff_id = ?',
                 values: [assignmentId, decoded.userId]
-            }) as { id: number; start_date: string | null }[];
+            }) as { id: number; start_date: string | null; end_date: string | null }[];
             if (spaRecords.length === 0) {
                 console.warn(`Staff Submissions: POST 404 - Process assignment ${assignmentId} not found for user ${decoded.userId}`);
                 return NextResponse.json({ message: 'No process assignment found' }, { status: 404 });
@@ -216,14 +230,26 @@ export async function POST(req: Request) {
                     { status: 403 }
                 );
             }
+            if (!isDraft && isOverdueByDaysLeftLikeStaffView(spaRecords[0].end_date)) {
+                return NextResponse.json(
+                    { message: 'This task is overdue and can no longer be submitted. Please contact your Supervisor.' },
+                    { status: 403 }
+                );
+            }
         } else {
             const aaRecords = await query({
-                query: 'SELECT id FROM activity_assignments WHERE id = ? AND assigned_to_user_id = ?',
+                query: 'SELECT id, end_date FROM activity_assignments WHERE id = ? AND assigned_to_user_id = ?',
                 values: [assignmentId, decoded.userId]
-            }) as any[];
+            }) as { id: number; end_date: string | null }[];
             if (aaRecords.length === 0) {
                 console.warn(`Staff Submissions: POST 404 - Activity assignment ${assignmentId} not found for user ${decoded.userId}`);
                 return NextResponse.json({ message: 'No activity assignment found' }, { status: 404 });
+            }
+            if (!isDraft && isOverdueByDaysLeftLikeStaffView(aaRecords[0].end_date)) {
+                return NextResponse.json(
+                    { message: 'This task is overdue and can no longer be submitted. Please contact your Supervisor.' },
+                    { status: 403 }
+                );
             }
         }
 

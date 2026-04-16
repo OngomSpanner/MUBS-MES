@@ -105,11 +105,21 @@ export default function TaskSubmissionModal({ show, onHide, task, onSuccess }: T
 
   const handleSubmit = async (isDraft: boolean) => {
     if (!task) return;
+    const due = task.dueDate ? new Date(task.dueDate) : null;
+    const daysLeft =
+      due && !Number.isNaN(due.getTime())
+        ? Math.ceil((due.getTime() - new Date().getTime()) / (1000 * 3600 * 24))
+        : 0;
+    const isOverdueAndNotCompleted = daysLeft < 0 && task.status !== "Completed";
     const isProcessAssignment =
       task.assignment_type === "process_task" || task.assignment_type === "process_subtask";
     const isNotOpened = isProcessAssignment && (task.status === "Not opened" || !task.startDate);
     if (isNotOpened) {
       setErrorMsg("This process is not opened by HOD yet. You can submit once it is opened.");
+      return;
+    }
+    if (!isDraft && isOverdueAndNotCompleted) {
+      setErrorMsg("This task is overdue and can no longer be submitted. Please contact your Supervisor.");
       return;
     }
     if (!isDraft && !description.trim()) {

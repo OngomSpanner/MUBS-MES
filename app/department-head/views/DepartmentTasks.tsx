@@ -35,6 +35,7 @@ interface Task {
     performance_indicator?: string | null;
     duration_value?: number | null;
     duration_unit?: string | null;
+    source?: string | null;
 }
 
 type ProcessSubtask = {
@@ -170,6 +171,7 @@ export default function DepartmentTasks({ initialActivity, initialAssignee }: De
     const [statusFilter, setStatusFilter] = useState('All');
     const [showBulkDeleteModal, setShowBulkDeleteModal] = useState(false);
     const [bulkDeleteError, setBulkDeleteError] = useState<string | null>(null);
+    const [activityProcessScope, setActivityProcessScope] = useState<'all' | 'strategic' | 'department'>('all');
 
     const [openProcessTask, setOpenProcessTask] = useState<Task | null>(null);
     const [openProcessStart, setOpenProcessStart] = useState('');
@@ -510,9 +512,11 @@ export default function DepartmentTasks({ initialActivity, initialAssignee }: De
 
     const filterTasks = (tasks: Task[]): Task[] => {
         return tasks.filter(t => {
+            let hasActivityIdMatch = false;
             if (activityIdFilter != null) {
                 const tid = Number((t as any).activity_id);
                 if (!Number.isFinite(tid) || tid !== activityIdFilter) return false;
+                hasActivityIdMatch = true;
             }
 
             const taskActivity = (t.activity_title ?? '').trim();
@@ -521,6 +525,7 @@ export default function DepartmentTasks({ initialActivity, initialAssignee }: De
             const displayAssignee = taskAssignee === '' ? UNASSIGNED_LABEL : (t.assignee_name ?? '');
 
             const matchesActivity =
+                hasActivityIdMatch ||
                 activityFilter === 'All Tasks' ||
                 (activityFilter === 'All Strategic Activities' && displayActivity !== DEPT_INTERNAL_LABEL) ||
                 normalizeForCompare(displayActivity) === normalizeForCompare(activityFilter);
@@ -951,6 +956,11 @@ export default function DepartmentTasks({ initialActivity, initialAssignee }: De
     ];
  
     const filteredTasks = filterTasks(allTasks);
+    const isDepartmentalTaskTable =
+        viewMode === 'table' &&
+        filteredTasks.length > 0 &&
+        // Departmental tasks are non-strategic (source is empty/null in tasks API).
+        filteredTasks.every((t) => !String((t as any).source ?? '').trim());
 
     // Filter counts for the dropdown - must honor current activity/assignee filters but NOT status filter
     const getStatusCount = (f: string) => {
@@ -1017,6 +1027,34 @@ export default function DepartmentTasks({ initialActivity, initialAssignee }: De
         if (b.title === DEPT_INTERNAL_LABEL) return -1;
         return a.title.localeCompare(b.title);
     });
+
+    const isDepartmentProcessTask = (t: Task) => !String((t as any).source ?? '').trim();
+    const activityGroupsForCards = activityGroups
+        .map((group) => {
+            const scopedTasks = group.tasks.filter((t) => {
+                if (activityProcessScope === 'all') return true;
+                if (activityProcessScope === 'strategic') return !isDepartmentProcessTask(t);
+                return isDepartmentProcessTask(t);
+            });
+            if (scopedTasks.length === 0) return null;
+            const total = scopedTasks.length;
+            const completed = scopedTasks.filter((t) => t.progress >= 100 || t.status === 'Completed').length;
+            const inProgress = scopedTasks.filter((t) => t.progress > 0 && t.progress < 100).length;
+            const todo = scopedTasks.filter((t) => (t.progress || 0) === 0 && t.status !== 'Completed').length;
+            const avgProgress = Math.round(
+                scopedTasks.reduce((sum, t) => sum + (t.progress || 0), 0) / (total || 1)
+            );
+            return {
+                ...group,
+                tasks: scopedTasks,
+                total,
+                completed,
+                inProgress,
+                todo,
+                avgProgress,
+            };
+        })
+        .filter(Boolean) as typeof activityGroups;
 
     // Evaluation Helpers & Handlers
     const handleViewEvaluation = async (taskId: number) => {
@@ -1424,8 +1462,25 @@ export default function DepartmentTasks({ initialActivity, initialAssignee }: De
                 )}
                                 {viewMode === 'activity' ? (
                     <div className="p-4" style={{ background: '#f8fafc' }}>
+                        <div className="d-flex gap-2 flex-wrap mb-3">
+                            {[
+                                { id: 'all', label: 'All processes' },
+                                { id: 'strategic', label: 'Strategic processes' },
+                                { id: 'department', label: 'Department processes' },
+                            ].map((opt) => (
+                                <button
+                                    key={opt.id}
+                                    type="button"
+                                    className={`btn btn-sm fw-bold ${activityProcessScope === opt.id ? 'btn-primary' : 'btn-outline-secondary'}`}
+                                    style={{ borderRadius: '10px', fontSize: '.75rem' }}
+                                    onClick={() => setActivityProcessScope(opt.id as 'all' | 'strategic' | 'department')}
+                                >
+                                    {opt.label}
+                                </button>
+                            ))}
+                        </div>
                         <div className="row g-4">
-                            {activityGroups.map((group) => (
+                            {activityGroupsForCards.map((group) => (
                                 <div key={group.title} className="col-12 col-md-6 col-xl-4">
                                     <div 
                                         className="card h-100 border-0 shadow-sm" 
@@ -1446,15 +1501,6 @@ export default function DepartmentTasks({ initialActivity, initialAssignee }: De
                                     >
                                         <div className="card-body p-4 d-flex flex-column">
                                             <div className="mb-3">
-                                                <div className="d-flex justify-content-between align-items-start mb-2">
-                                                    <span className="badge" style={{ 
-                                                        background: group.title === DEPT_INTERNAL_LABEL ? '#f1f5f9' : '#dbeafe', 
-                                                        color: group.title === DEPT_INTERNAL_LABEL ? '#475569' : '#1e40af',
-                                                        fontSize: '0.7rem'
-                                                    }}>
-                                                        {group.title === DEPT_INTERNAL_LABEL ? 'Operational' : (group.pillar || 'Strategic Activity')}
-                                                    </span>
-                                                </div>
                                                 <h6 className="card-title fw-bold text-dark mb-1" style={{ fontSize: '1rem', display: '-webkit-box', WebkitLineClamp: '2', WebkitBoxOrient: 'vertical', overflow: 'hidden', minHeight: '3rem' }}>
                                                     {group.title}
                                                 </h6>
@@ -1523,7 +1569,7 @@ export default function DepartmentTasks({ initialActivity, initialAssignee }: De
                                     </div>
                                 </div>
                             ))}
-                            {activityGroups.length === 0 && (
+                            {activityGroupsForCards.length === 0 && (
                                 <div className="col-12 text-center py-5">
                                     <div className="text-muted">No activities found matching filters.</div>
                                 </div>
@@ -1559,9 +1605,9 @@ export default function DepartmentTasks({ initialActivity, initialAssignee }: De
                                         />
                                     </div>
                                 </th>
-                                <th>Process</th>
-                                <th>Performance indicator</th>
-                                <th>Strategic Activity</th>
+                                <th>{isDepartmentalTaskTable ? 'Task' : 'Process'}</th>
+                                {!isDepartmentalTaskTable && <th>Performance indicator</th>}
+                                {!isDepartmentalTaskTable && <th>Strategic Activity</th>}
                                 <th>Staff Assigned</th>
                                 <th>Due</th>
                                 <th>Progress</th>
@@ -1572,7 +1618,7 @@ export default function DepartmentTasks({ initialActivity, initialAssignee }: De
                         <tbody key={`tasks-${activityFilter}-${assigneeFilter}-${pagedTasks.length}`}>
                             {pagedTasks.length === 0 ? (
                                 <tr>
-                                    <td colSpan={9} className="text-center py-4 text-muted">
+                                    <td colSpan={isDepartmentalTaskTable ? 7 : 9} className="text-center py-4 text-muted">
                                         <span
                                             className="material-symbols-outlined d-block mb-2 mx-auto"
                                             style={{ fontSize: '36px', opacity: 0.3 }}
@@ -1603,17 +1649,23 @@ export default function DepartmentTasks({ initialActivity, initialAssignee }: De
                                             </div>
                                         </td>
                                         <td className="small text-dark fw-normal" style={{ fontSize: '.8rem', textTransform: 'none' }}>
-                                            {task.title}
+                                            {isDepartmentalTaskTable
+                                                ? (task.activity_title || task.title || DEPT_INTERNAL_LABEL)
+                                                : (isContainerProcess ? `${task.title} (Sub-tasks)` : task.title)}
                                         </td>
-                                        <td
-                                            style={{ fontSize: '.8rem', maxWidth: '200px', textTransform: 'none' }}
-                                            className="text-dark small fw-normal"
-                                        >
-                                            {task.performance_indicator?.trim() ? task.performance_indicator : '—'}
-                                        </td>
-                                        <td className="small text-dark fw-normal" style={{ fontSize: '.8rem', textTransform: 'none' }}>
-                                            {task.activity_title || DEPT_INTERNAL_LABEL}
-                                        </td>
+                                        {!isDepartmentalTaskTable && (
+                                            <td
+                                                style={{ fontSize: '.8rem', maxWidth: '200px', textTransform: 'none' }}
+                                                className="text-dark small fw-normal"
+                                            >
+                                                {task.performance_indicator?.trim() ? task.performance_indicator : '—'}
+                                            </td>
+                                        )}
+                                        {!isDepartmentalTaskTable && (
+                                            <td className="small text-dark fw-normal" style={{ fontSize: '.8rem', textTransform: 'none' }}>
+                                                {task.activity_title || DEPT_INTERNAL_LABEL}
+                                            </td>
+                                        )}
                                         <td className="text-dark fw-normal" style={{ fontSize: '.8rem', textTransform: 'none' }}>
                                             <div className="d-flex align-items-center gap-2">
                                                 <div className="staff-avatar" style={{
@@ -1714,7 +1766,7 @@ export default function DepartmentTasks({ initialActivity, initialAssignee }: De
                                     </tr>
                                     {isContainerProcess && expanded && (
                                         <tr key={`subtasks-${task.id}-${idx}`}>
-                                            <td colSpan={9} className="ps-4 pe-4 py-2" style={{ background: '#f8fafc' }}>
+                                            <td colSpan={isDepartmentalTaskTable ? 7 : 9} className="ps-4 pe-4 py-2" style={{ background: '#f8fafc' }}>
                                                 {subtasks.length === 0 ? (
                                                     <div className="text-muted small">No sub-tasks found for this process.</div>
                                                 ) : (
