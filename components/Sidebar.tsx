@@ -34,6 +34,7 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen, onLogoutClick }: 
     { key: 'tasks', href: '/department-head?pg=tasks', icon: 'checklist', label: 'Processes' },
     { key: 'staff', href: '/department-head?pg=staff', icon: 'group', label: 'Staff & Warnings' },
     { key: 'evaluations', href: '/department-head?pg=evaluations', icon: 'fact_check', label: 'Submissions & reviews' },
+    { key: 'reports', href: '/department-head?pg=reports', icon: 'analytics', label: 'Performance & Reports' },
   ];
   
   const ambassadorMenuItems = [

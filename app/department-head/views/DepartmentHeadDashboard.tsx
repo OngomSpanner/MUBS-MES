@@ -5,8 +5,6 @@ import { useRouter } from 'next/navigation';
 import axios from 'axios';
 
 
-type PerformancePeriod = 'week' | 'month' | 'quarter';
-
 interface DepartmentHeadData {
     departmentName?: string;
     stats: {
@@ -51,23 +49,11 @@ interface DepartmentHeadData {
     noDepartment?: boolean;
 }
 
-interface PerformanceData {
-    performancePercent: number | null;
-    totalPoints: number;
-    maxPoints: number;
-    period: PerformancePeriod;
-    timeSeries: Array<{ periodLabel: string; complete: number; incomplete: number; notDone: number; performancePercent: number }>;
-    byStaff: Array<{ staffName: string; complete: number; incomplete: number; notDone: number; performancePercent: number }>;
-    message?: string;
-}
-
 export default function DepartmentHeadDashboard() {
     const router = useRouter();
     const [data, setData] = useState<DepartmentHeadData | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
-    const [performancePeriod, setPerformancePeriod] = useState<PerformancePeriod>('week');
-    const [performance, setPerformance] = useState<PerformanceData | null>(null);
 
     useEffect(() => {
         const fetchData = async () => {
@@ -83,19 +69,6 @@ export default function DepartmentHeadDashboard() {
         };
         fetchData();
     }, []);
-
-    useEffect(() => {
-        if (data?.noDepartment) return;
-        const fetchPerf = async () => {
-            try {
-                const res = await axios.get(`/api/department-head/performance?period=${performancePeriod}`);
-                setPerformance(res.data);
-            } catch (e: any) {
-                setPerformance(null);
-            }
-        };
-        fetchPerf();
-    }, [performancePeriod, data?.noDepartment]);
 
     if (error) {
         return (
@@ -176,101 +149,6 @@ export default function DepartmentHeadDashboard() {
                         <button type="button" className="alert-link fw-semibold btn btn-link p-0 border-0 text-decoration-underline" onClick={() => router.push('/department-head?pg=staff')}> Review staff →</button>
                     </div>
                     <button type="button" className="btn-close ms-auto" data-bs-dismiss="alert"></button>
-                </div>
-            )}
-
-            {/* Department Performance % (Complete=2, Incomplete=1, Not Done=0) */}
-            {!data.noDepartment && (
-                <div className="table-card mb-4 p-4" style={{ borderRadius: '16px', border: '1px solid rgba(13, 148, 136, 0.15)' }}>
-                    <div className="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-3">
-                        <div className="d-flex align-items-center gap-3">
-                            <div style={{ width: '40px', height: '40px', borderRadius: '12px', background: 'linear-gradient(135deg, #0d9488, #0f766e)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                <span className="material-symbols-outlined text-white" style={{ fontSize: '22px' }}>trending_up</span>
-                            </div>
-                            <div>
-                                <h5 className="mb-0 fw-black" style={{ color: 'var(--mubs-navy)', fontSize: '1.1rem' }}>Department Efficiency</h5>
-                                <p className="mb-0 text-muted small">Performance % from task outcomes (Complete=2 pts, Incomplete=1 pt, Not Done=0 pts)</p>
-                            </div>
-                        </div>
-                        <div className="d-flex align-items-center gap-2">
-                            <label className="text-muted small mb-0">Period:</label>
-                            <select
-                                className="form-select form-select-sm"
-                                style={{ width: '120px' }}
-                                value={performancePeriod}
-                                onChange={(e) => setPerformancePeriod(e.target.value as PerformancePeriod)}
-                            >
-                                <option value="week">Week</option>
-                                <option value="month">Month</option>
-                                <option value="quarter">Quarter</option>
-                            </select>
-                        </div>
-                    </div>
-                    {performance && (
-                        <>
-                            <div className="d-flex flex-wrap align-items-center gap-4 mb-4">
-                                <div className="text-center p-3 rounded-3" style={{ background: performance.performancePercent != null ? (performance.performancePercent >= 70 ? '#dcfce7' : performance.performancePercent >= 40 ? '#fef3c7' : '#fee2e2') : '#f1f5f9', minWidth: '120px' }}>
-                                    <div className="fw-black" style={{ fontSize: '2rem', color: performance.performancePercent != null ? (performance.performancePercent >= 70 ? '#15803d' : performance.performancePercent >= 40 ? '#b45309' : '#dc2626') : '#64748b' }}>
-                                        {performance.performancePercent != null ? `${performance.performancePercent}%` : '—'}
-                                    </div>
-                                    <div className="text-muted" style={{ fontSize: '.75rem' }}>Overall</div>
-                                </div>
-                                <div className="text-muted small">
-                                    Points: <strong>{performance.totalPoints}</strong> / {performance.maxPoints} max
-                                </div>
-                            </div>
-                            {performance.timeSeries && performance.timeSeries.length > 0 && (
-                                <>
-                                    <div className="d-flex gap-2 mb-2 flex-wrap" style={{ fontSize: '.7rem' }}>
-                                        <span className="d-inline-flex align-items-center gap-1"><span style={{ width: 8, height: 8, borderRadius: 4, background: '#22c55e' }}></span> Complete</span>
-                                        <span className="d-inline-flex align-items-center gap-1"><span style={{ width: 8, height: 8, borderRadius: 4, background: '#f59e0b' }}></span> Incomplete</span>
-                                        <span className="d-inline-flex align-items-center gap-1"><span style={{ width: 8, height: 8, borderRadius: 4, background: '#dc2626' }}></span> Not Done</span>
-                                    </div>
-                                    <div className="d-flex align-items-end gap-1 mb-3" style={{ minHeight: '72px' }}>
-                                        {performance.timeSeries.map((ts, i) => {
-                                            const total = ts.complete + ts.incomplete + ts.notDone;
-                                            const maxH = 56;
-                                            const scale = total > 0 ? maxH / total : 0;
-                                            return (
-                                                <div key={i} className="d-flex flex-column align-items-center" style={{ flex: 1, minWidth: 28 }}>
-                                                    <div className="d-flex flex-column-reverse w-100 rounded overflow-hidden" style={{ height: maxH }}>
-                                                        {ts.complete > 0 && <div style={{ height: ts.complete * scale, background: '#22c55e' }} />}
-                                                        {ts.incomplete > 0 && <div style={{ height: ts.incomplete * scale, background: '#f59e0b' }} />}
-                                                        {ts.notDone > 0 && <div style={{ height: ts.notDone * scale, background: '#dc2626' }} />}
-                                                    </div>
-                                                    <span className="mt-1 text-muted" style={{ fontSize: '.6rem' }}>{ts.periodLabel}</span>
-                                                </div>
-                                            );
-                                        })}
-                                    </div>
-                                    <div className="pt-2 border-top" style={{ borderColor: 'rgba(0,0,0,0.06)' }}>
-                                        <div className="fw-bold mb-2" style={{ fontSize: '.85rem' }}>Performance % over time</div>
-                                        <div className="d-flex align-items-end gap-1" style={{ height: 40 }}>
-                                            {performance.timeSeries.map((ts, i) => (
-                                                <div key={i} className="flex-fill d-flex flex-column align-items-center" style={{ minWidth: 24 }}>
-                                                    <div className="w-100 rounded" style={{ height: Math.max(4, (ts.performancePercent / 100) * 36), background: ts.performancePercent >= 70 ? '#22c55e' : ts.performancePercent >= 40 ? '#f59e0b' : '#dc2626' }} title={`${ts.periodLabel}: ${ts.performancePercent}%`} />
-                                                </div>
-                                            ))}
-                                        </div>
-                                    </div>
-                                </>
-                            )}
-                            {performance.byStaff && performance.byStaff.length > 0 && (
-                                <div className="mt-3 pt-3 border-top" style={{ borderColor: 'rgba(0,0,0,0.06)' }}>
-                                    <div className="fw-bold mb-2" style={{ fontSize: '.85rem' }}>By staff</div>
-                                    <div className="d-flex flex-wrap gap-2">
-                                        {performance.byStaff.slice(0, 8).map((s, i) => (
-                                            <div key={i} className="d-inline-flex align-items-center gap-2 px-2 py-1 rounded" style={{ background: '#f8fafc', fontSize: '.8rem' }}>
-                                                <span className="text-dark fw-semibold text-truncate" style={{ maxWidth: '120px' }}>{s.staffName}</span>
-                                                <span className="badge" style={{ background: s.performancePercent >= 70 ? '#dcfce7' : s.performancePercent >= 40 ? '#fef3c7' : '#fee2e2', color: s.performancePercent >= 70 ? '#15803d' : s.performancePercent >= 40 ? '#b45309' : '#dc2626' }}>{s.performancePercent}%</span>
-                                            </div>
-                                        ))}
-                                    </div>
-                                </div>
-                            )}
-                        </>
-                    )}
-                    {performance?.message && <p className="text-muted small mb-0">{performance.message}</p>}
                 </div>
             )}
 

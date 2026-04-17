@@ -6,6 +6,7 @@ import DepartmentalActivities from './views/DepartmentalActivities';
 import DepartmentTasks from './views/DepartmentTasks';
 import DepartmentStaff from './views/DepartmentStaff';
 import DepartmentEvaluations from './views/DepartmentEvaluations';
+import DepartmentReports from './views/DepartmentReports';
 
 interface DepartmentHeadPageProps {
     searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
@@ -29,6 +30,8 @@ export default async function DepartmentHeadPage({ searchParams }: DepartmentHea
                 return <DepartmentStaff />;
             case 'evaluations':
                 return <DepartmentEvaluations />;
+            case 'reports':
+                return <DepartmentReports />;
             case 'dashboard':
             default:
                 return <DepartmentHeadDashboard />;

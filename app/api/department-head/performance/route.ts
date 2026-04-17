@@ -7,7 +7,8 @@ import { sqlTopStrategicMain } from '@/lib/strategic-activity-sql';
 
 export const dynamic = 'force-dynamic';
 
-type Period = 'week' | 'month' | 'quarter';
+type Period = 'day' | 'week' | 'month' | 'quarter' | 'annual' | 'financial_year';
+type ActivityScope = 'all' | 'strategic' | 'departmental';
 
 /** Same strategic-activity scope as `/api/dashboard/department-head` and `/api/department-head/activities`. */
 function activityVisibilitySql(): string {
@@ -22,7 +23,16 @@ function getPeriodBounds(period: Period): { start: Date; buckets: { key: string;
     const buckets: { key: string; label: string }[] = [];
     const start = new Date(now);
 
-    if (period === 'week') {
+    if (period === 'day') {
+        // Last 14 days including today
+        start.setDate(now.getDate() - 13);
+        for (let i = 0; i < 14; i++) {
+            const d = new Date(start);
+            d.setDate(start.getDate() + i);
+            const key = d.toISOString().slice(0, 10);
+            buckets.push({ key, label: `${d.getDate()}/${d.getMonth() + 1}` });
+        }
+    } else if (period === 'week') {
         start.setDate(now.getDate() - 11 * 7); // Go back 11 weeks + this week = 12 buckets
         for (let i = 0; i < 12; i++) {
             const d = new Date(start);
@@ -37,7 +47,7 @@ function getPeriodBounds(period: Period): { start: Date; buckets: { key: string;
             const d = new Date(start.getFullYear(), start.getMonth() + i, 1);
             buckets.push({ key: d.toISOString().slice(0, 7), label: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}` });
         }
-    } else {
+    } else if (period === 'quarter') {
         // Start 3 quarters ago to include current quarter in the 4 buckets
         start.setMonth(now.getMonth() - 9 - (now.getMonth() % 3));
         for (let i = 0; i < 4; i++) {
@@ -49,8 +59,34 @@ function getPeriodBounds(period: Period): { start: Date; buckets: { key: string;
             const q = Math.floor(displayMonth / 3) + 1;
             buckets.push({ key: `${displayYear}-Q${q}`, label: `Q${q} ${displayYear}` });
         }
+    } else if (period === 'annual') {
+        // Last 5 calendar years including current year
+        start.setMonth(0, 1);
+        start.setFullYear(now.getFullYear() - 4);
+        for (let i = 0; i < 5; i++) {
+            const y = start.getFullYear() + i;
+            buckets.push({ key: `${y}`, label: `${y}` });
+        }
+    } else {
+        // Financial year (Jul-Jun), last 4 FY periods including current FY
+        const currentYear = now.getFullYear();
+        const currentMonth = now.getMonth() + 1; // 1-12
+        const currentFyStartYear = currentMonth >= 7 ? currentYear : currentYear - 1;
+        const firstFyStartYear = currentFyStartYear - 3;
+        start.setFullYear(firstFyStartYear, 6, 1); // July 1
+        for (let i = 0; i < 4; i++) {
+            const fyStart = firstFyStartYear + i;
+            const fyEndShort = String((fyStart + 1) % 100).padStart(2, '0');
+            buckets.push({ key: `FY${fyStart}/${fyEndShort}`, label: `FY ${fyStart}/${fyEndShort}` });
+        }
     }
     return { start, buckets };
+}
+
+function getSourceFilterSql(scope: ActivityScope, alias = 'sa'): string {
+    if (scope === 'strategic') return `COALESCE(${alias}.source, '') = 'strategic_plan'`;
+    if (scope === 'departmental') return `COALESCE(${alias}.source, '') = ''`;
+    return '1=1';
 }
 
 export async function GET(req: Request) {
@@ -76,12 +112,16 @@ export async function GET(req: Request) {
 
         const { searchParams } = new URL(req.url);
         const period = (searchParams.get('period') || 'week') as Period;
-        if (!['week', 'month', 'quarter'].includes(period)) {
-            return NextResponse.json({ message: 'period must be week, month, or quarter' }, { status: 400 });
+        const source = (searchParams.get('source') || 'all') as ActivityScope;
+        if (!['day', 'week', 'month', 'quarter', 'annual', 'financial_year'].includes(period)) {
+            return NextResponse.json({ message: 'period must be day, week, month, quarter, annual, or financial_year' }, { status: 400 });
+        }
+        if (!['all', 'strategic', 'departmental'].includes(source)) {
+            return NextResponse.json({ message: 'source must be all, strategic, or departmental' }, { status: 400 });
         }
 
         const placeholders = inPlaceholders(departmentIds.length);
-        const vis = activityVisibilitySql();
+        const sourceSql = getSourceFilterSql(source);
         let rows: { db_status: string; eval_date: string; staff_id: number; staff_name: string }[] = [];
         try {
             const q = await query({
@@ -98,7 +138,7 @@ export async function GET(req: Request) {
                         LEFT JOIN evaluations e ON e.staff_report_id = sr.id
                         LEFT JOIN users u ON u.id = aa.assigned_to_user_id
                         WHERE sa.department_id IN (${placeholders})
-                          AND ${vis}
+                          AND ${sourceSql}
                           AND sr.status IN ('evaluated', 'incomplete', 'not_done')
                         UNION ALL
                         SELECT 
@@ -112,7 +152,7 @@ export async function GET(req: Request) {
                         LEFT JOIN evaluations e ON e.staff_report_id = sr.id
                         LEFT JOIN users u ON u.id = spa.staff_id
                         WHERE sa.department_id IN (${placeholders})
-                          AND ${vis}
+                          AND ${sourceSql}
                           AND sr.status IN ('evaluated', 'incomplete', 'not_done')
                     ) perf_rows
                 `,
@@ -147,15 +187,25 @@ export async function GET(req: Request) {
             if (d < start) return;
 
             let key: string;
-            if (period === 'week') {
+            if (period === 'day') {
+                key = d.toISOString().slice(0, 10);
+            } else if (period === 'week') {
                 const sun = new Date(d);
                 sun.setDate(d.getDate() - d.getDay());
                 key = sun.toISOString().slice(0, 10);
             } else if (period === 'month') {
                 key = d.toISOString().slice(0, 7);
-            } else {
+            } else if (period === 'quarter') {
                 const q = Math.floor(d.getMonth() / 3) + 1;
                 key = `${d.getFullYear()}-Q${q}`;
+            } else if (period === 'annual') {
+                key = `${d.getFullYear()}`;
+            } else {
+                const year = d.getFullYear();
+                const month = d.getMonth() + 1;
+                const fyStart = month >= 7 ? year : year - 1;
+                const fyEndShort = String((fyStart + 1) % 100).padStart(2, '0');
+                key = `FY${fyStart}/${fyEndShort}`;
             }
             if (!bucketCounts[key]) bucketCounts[key] = { complete: 0, incomplete: 0, notDone: 0 };
 

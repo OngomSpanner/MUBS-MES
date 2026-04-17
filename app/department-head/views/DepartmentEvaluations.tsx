@@ -495,27 +495,13 @@ export default function DepartmentEvaluations() {
                                     background: viewModalItem.status === 'Completed' ? '#f0fdf4' : '#fff1f2', 
                                     border: `1px solid ${viewModalItem.status === 'Completed' ? '#dcfce7' : '#fee2e2'}` 
                                 }}>
-                                    <div className="row g-3 align-items-center">
-                                        <div className="col-4 text-center border-end">
-                                            <div className="fw-black text-dark" style={{ fontSize: '1.4rem', lineHeight: '1' }}>{viewModalItem.score ?? '-'}</div>
-                                            <div className="text-muted fw-bold mt-2" style={{ fontSize: '0.6rem', letterSpacing: '0.5px' }}>RATING</div>
-                                            <div className="fw-bold mt-2" style={{ 
-                                                fontSize: '0.8rem',
-                                                color: getRatingLabel(viewModalItem).startsWith('Complete') ? '#15803d' : (getRatingLabel(viewModalItem) === 'Not Done' ? '#64748b' : '#b45309')
-                                            }}>
-                                                {getRatingLabel(viewModalItem)}
-                                            </div>
-                                        </div>
-                                        <div className="col-8 ps-4">
-                                            <div className="fw-bold text-dark mb-2 d-flex align-items-center gap-2" style={{ fontSize: '0.85rem' }}>
-                                                <span className="material-symbols-outlined text-secondary" style={{ fontSize: '18px' }}>forum</span>
-                                                Feedback
-                                            </div>
-                                            <p className="mb-0 text-dark italic" style={{ fontSize: '0.85rem', lineHeight: '1.5' }}>
-                                                {viewModalItem.reviewer_notes ? `"${viewModalItem.reviewer_notes}"` : 'No comments.'}
-                                            </p>
-                                        </div>
+                                    <div className="fw-bold text-dark mb-2 d-flex align-items-center gap-2" style={{ fontSize: '0.85rem' }}>
+                                        <span className="material-symbols-outlined text-secondary" style={{ fontSize: '18px' }}>forum</span>
+                                        Feedback
                                     </div>
+                                    <p className="mb-0 text-dark italic" style={{ fontSize: '0.85rem', lineHeight: '1.5' }}>
+                                        {viewModalItem.reviewer_notes ? `"${viewModalItem.reviewer_notes}"` : 'No comments.'}
+                                    </p>
                                 </div>
                             </div>
                             );
