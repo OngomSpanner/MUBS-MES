@@ -4,6 +4,7 @@ import bcrypt from 'bcryptjs';
 import { cookies } from 'next/headers';
 import { verifyToken } from '@/lib/auth';
 import { isCommitteeType } from '@/lib/committee-types';
+import { normalizeStaffCategory } from '@/lib/staff-categories';
 
 export async function GET(request: Request) {
   try {
@@ -72,6 +73,16 @@ export async function POST(request: Request) {
 
     const finalFullName = full_name || `${first_name || ''} ${surname || ''}`.trim();
 
+    const staffCategoryRaw =
+      staff_category !== undefined && staff_category !== null ? String(staff_category).trim() : '';
+    const staffCategoryDb = normalizeStaffCategory(staff_category);
+    if (staffCategoryRaw !== '' && !staffCategoryDb) {
+      return NextResponse.json(
+        { message: 'Invalid staff category. Use Academic, Administrative, or Support.' },
+        { status: 400 }
+      );
+    }
+
     if (!finalFullName || !email || !role) {
       return NextResponse.json(
         { message: 'Name (Full or First/Surname), email and at least one role are required' },
@@ -124,7 +135,7 @@ export async function POST(request: Request) {
         values: [
           finalFullName, email, hashedPassword, roleStr, departmentId, managedUnitId, 
           'Active', first_name || null, surname || null, other_names || null, 
-          employee_id || null, contract_terms || null, contract_type || null, staff_category || null,
+          employee_id || null, contract_terms || null, contract_type || null, staffCategoryDb,
           position || null, contract_start || null, contract_end || null
         ]
       });
@@ -142,7 +153,7 @@ export async function POST(request: Request) {
           values: [
             finalFullName, email, hashedPassword, roleStr, departmentId, managedUnitId, 
             'Active', first_name || null, surname || null, other_names || null, 
-            employee_id || null, contract_terms || null, contract_type || null, staff_category || null,
+            employee_id || null, contract_terms || null, contract_type || null, staffCategoryDb,
             position || null, contract_start || null, contract_end || null
           ]
         });

@@ -6,6 +6,7 @@ import { Modal, Button, Form } from 'react-bootstrap';
 import CreateUserModal from '@/components/Modals/CreateUserModal';
 import { formatRoleForDisplay } from '@/lib/role-routing';
 import { COMMITTEE_TYPES } from '@/lib/committee-types';
+import { STAFF_CATEGORIES } from '@/lib/staff-categories';
 import axios from 'axios';
 
 interface User {
@@ -752,8 +753,11 @@ export default function UsersView() {
                                 value={editForm.staff_category}
                                 onChange={(e) => setEditForm({ ...editForm, staff_category: e.target.value })}
                             >
-                                <option value="Administrative">Administrative</option>
-                                <option value="Support">Support</option>
+                                {STAFF_CATEGORIES.map((c) => (
+                                    <option key={c} value={c}>
+                                        {c}
+                                    </option>
+                                ))}
                             </Form.Select>
                         </div>
 

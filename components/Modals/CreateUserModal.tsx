@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { Modal, Button, Form } from 'react-bootstrap';
 import { formatRoleForDisplay } from '@/lib/role-routing';
 import { COMMITTEE_TYPES } from '@/lib/committee-types';
+import { STAFF_CATEGORIES } from '@/lib/staff-categories';
 
 interface CreateUserModalProps {
   show: boolean;
@@ -208,8 +209,11 @@ export default function CreateUserModal({ show, onHide, onUserCreated }: CreateU
                 value={formData.staff_category}
                 onChange={(e) => setFormData({ ...formData, staff_category: e.target.value })}
               >
-                <option value="Administrative">Administrative</option>
-                <option value="Support">Support</option>
+                {STAFF_CATEGORIES.map((c) => (
+                  <option key={c} value={c}>
+                    {c}
+                  </option>
+                ))}
               </Form.Select>
             </div>
             <div className="col-md-8">
