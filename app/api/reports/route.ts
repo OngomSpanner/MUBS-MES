@@ -179,7 +179,7 @@ export async function GET(request: Request) {
                 COUNT(*) AS total,
                 SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) AS completed,
                 SUM(CASE WHEN status = 'in_progress' THEN 1 ELSE 0 END) AS in_progress,
-                SUM(CASE WHEN status = 'overdue' OR (end_date IS NOT NULL AND end_date < CURDATE() AND status != 'completed') THEN 1 ELSE 0 END) AS delayed
+                SUM(CASE WHEN status = 'overdue' OR (end_date IS NOT NULL AND end_date < CURDATE() AND status != 'completed') THEN 1 ELSE 0 END) AS delayed_cnt
               FROM strategic_activities
               WHERE parent_id IS NULL AND COALESCE(TRIM(source), '') <> ''
             `,
@@ -190,7 +190,7 @@ export async function GET(request: Request) {
           const total = Number(s.total ?? 0);
           const completed = Number(s.completed ?? 0);
           const in_progress = Number(s.in_progress ?? 0);
-          const delayed = Number(s.delayed ?? 0);
+          const delayed = Number(s.delayed_cnt ?? 0);
           const status = {
             completed,
             in_progress,
