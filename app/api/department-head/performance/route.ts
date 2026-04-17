@@ -122,7 +122,7 @@ export async function GET(req: Request) {
 
         const placeholders = inPlaceholders(departmentIds.length);
         const sourceSql = getSourceFilterSql(source);
-        let rows: { db_status: string; eval_date: string; staff_id: number; staff_name: string }[] = [];
+        let rows: { db_status: string; eval_date: string; staff_id: number | null; staff_name: string | null }[] = [];
         try {
             const q = await query({
                 query: `
@@ -144,13 +144,14 @@ export async function GET(req: Request) {
                         SELECT 
                             sr.status as db_status,
                             DATE(COALESCE(e.evaluation_date, sr.updated_at)) as eval_date,
-                            spa.staff_id as staff_id,
+                            COALESCE(spa.staff_id, sps.assigned_to) as staff_id,
                             u.full_name as staff_name
                         FROM staff_reports sr
-                        INNER JOIN staff_process_assignments spa ON sr.process_assignment_id = spa.id
+                        LEFT JOIN staff_process_subtasks sps ON sr.process_subtask_id = sps.id
+                        INNER JOIN staff_process_assignments spa ON COALESCE(sr.process_assignment_id, sps.process_assignment_id) = spa.id
                         INNER JOIN strategic_activities sa ON spa.activity_id = sa.id
                         LEFT JOIN evaluations e ON e.staff_report_id = sr.id
-                        LEFT JOIN users u ON u.id = spa.staff_id
+                        LEFT JOIN users u ON u.id = COALESCE(spa.staff_id, sps.assigned_to)
                         WHERE sa.department_id IN (${placeholders})
                           AND ${sourceSql}
                           AND sr.status IN ('evaluated', 'incomplete', 'not_done')
@@ -210,18 +211,22 @@ export async function GET(req: Request) {
             if (!bucketCounts[key]) bucketCounts[key] = { complete: 0, incomplete: 0, notDone: 0 };
 
             const sid = Number(r.staff_id);
-            if (!staffCounts[sid]) staffCounts[sid] = { name: r.staff_name || 'Unknown', complete: 0, incomplete: 0, notDone: 0 };
+            const staffName = String(r.staff_name || '').trim();
+            const hasValidStaff = Number.isFinite(sid) && sid > 0 && staffName.length > 0;
+            if (hasValidStaff && !staffCounts[sid]) {
+                staffCounts[sid] = { name: staffName, complete: 0, incomplete: 0, notDone: 0 };
+            }
 
             const status = (r.db_status || '').toLowerCase();
             if (status === 'evaluated') {
                 bucketCounts[key].complete++;
-                staffCounts[sid].complete++;
+                if (hasValidStaff) staffCounts[sid].complete++;
             } else if (status === 'incomplete') {
                 bucketCounts[key].incomplete++;
-                staffCounts[sid].incomplete++;
+                if (hasValidStaff) staffCounts[sid].incomplete++;
             } else if (status === 'not_done') {
                 bucketCounts[key].notDone++;
-                staffCounts[sid].notDone++;
+                if (hasValidStaff) staffCounts[sid].notDone++;
             }
         });
 
