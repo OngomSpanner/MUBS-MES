@@ -28,7 +28,7 @@ function LayoutContent({ children, sidebarOpen, setSidebarOpen }: any) {
       'dashboard': 'Dashboard Overview',
       'strategic': 'Strategic Activities',
       'standards': 'Standards & Objectives',
-      'tracking': 'Budget Tracking',
+      'tracking': 'Activity Tracking',
       'users': 'User Management',
       'reports': 'Reports & Analytics',
 
