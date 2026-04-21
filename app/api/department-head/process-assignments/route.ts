@@ -3,6 +3,8 @@ import { query } from '@/lib/db';
 import { cookies } from 'next/headers';
 import { verifyToken } from '@/lib/auth';
 import { getVisibleDepartmentIds, inPlaceholders } from '@/lib/department-head';
+import { ensureDepartmentSectionTables, staffBelongsToDepartmentSection } from '@/lib/department-sections';
+import { ensureStaffProcessAssignmentSectionColumn } from '@/lib/staff-process-assignments-schema';
 
 async function getHodContext(token: string) {
   const decoded = verifyToken(token) as { userId?: number; role?: string } | null;
@@ -24,12 +26,16 @@ export async function GET() {
     const ctx = await getHodContext(token);
     if (!ctx) return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
 
+    await ensureStaffProcessAssignmentSectionColumn();
+    await ensureDepartmentSectionTables();
+
     const hodSelect = `
         SELECT 
           spa.id,
           spa.activity_id,
           spa.standard_process_id,
           spa.staff_id,
+          spa.section_id,
           spa.status,
           spa.actual_value,
           spa.commentary,
@@ -45,12 +51,14 @@ export async function GET() {
           sa.pillar,
           sa.unit_of_measure,
           u.full_name AS staff_name,
-          u.position AS staff_position
+          u.position AS staff_position,
+          ds.name AS section_name
         FROM staff_process_assignments spa
         JOIN standard_processes sp ON spa.standard_process_id = sp.id
         JOIN standards st ON sp.standard_id = st.id
         JOIN strategic_activities sa ON spa.activity_id = sa.id
         LEFT JOIN users u ON spa.staff_id = u.id
+        LEFT JOIN department_sections ds ON spa.section_id = ds.id
         WHERE sa.department_id = ? OR sa.id IN (
           SELECT id FROM strategic_activities WHERE department_id = ? AND source = 'strategic_plan'
         )
@@ -145,8 +153,16 @@ export async function POST(request: Request) {
     const ctx = await getHodContext(token);
     if (!ctx) return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
 
+    await ensureStaffProcessAssignmentSectionColumn();
+
     const body = await request.json();
     const { activity_id, standard_process_id, staff_id, staff_ids, start_date, end_date, breakdown } = body;
+
+    const rawSectionId = body?.section_id;
+    const sectionScopeId =
+      rawSectionId != null && rawSectionId !== ''
+        ? Number(rawSectionId)
+        : null;
 
     const rawIds: number[] = Array.isArray(staff_ids) && staff_ids.length > 0
       ? staff_ids.map((n: unknown) => Number(n)).filter((n) => !Number.isNaN(n))
@@ -174,6 +190,23 @@ export async function POST(request: Request) {
       return NextResponse.json({ message: 'Activity not found or not in your department' }, { status: 403 });
     }
 
+    const persistedSectionId =
+      sectionScopeId != null && Number.isFinite(sectionScopeId) ? sectionScopeId : null;
+
+    if (sectionScopeId != null && Number.isFinite(sectionScopeId)) {
+      await ensureDepartmentSectionTables();
+      const secOk = await query({
+        query: `
+          SELECT id FROM department_sections
+          WHERE id = ? AND department_id IN (${deptPlaceholders})
+        `,
+        values: [sectionScopeId, ...visibleDeptIds],
+      }) as { id: number }[];
+      if (!secOk.length) {
+        return NextResponse.json({ message: 'Section not found or not accessible for your department' }, { status: 400 });
+      }
+    }
+
     // Optional: breakdown into subtasks (container process assignment + per-staff subtasks)
     if (breakdown && Array.isArray(breakdown.subtasks) && breakdown.subtasks.length > 0) {
       const subtasks = breakdown.subtasks
@@ -185,6 +218,20 @@ export async function POST(request: Request) {
 
       if (subtasks.length === 0) {
         return NextResponse.json({ message: 'No valid subtasks provided' }, { status: 400 });
+      }
+
+      if (sectionScopeId != null && Number.isFinite(sectionScopeId)) {
+        for (const st of subtasks) {
+          const ok = await staffBelongsToDepartmentSection(sectionScopeId, st.assigned_to, visibleDeptIds);
+          if (!ok) {
+            return NextResponse.json(
+              {
+                message: `Assignee must belong to the selected section (user id ${st.assigned_to}).`,
+              },
+              { status: 400 }
+            );
+          }
+        }
       }
 
       // Validate all assignees are in visible departments (department + units)
@@ -214,10 +261,16 @@ export async function POST(request: Request) {
       } else {
         const result = await query({
           query: `
-            INSERT INTO staff_process_assignments (activity_id, standard_process_id, staff_id, status, start_date, end_date)
-            VALUES (?, ?, NULL, 'pending', ?, ?)
+            INSERT INTO staff_process_assignments (activity_id, standard_process_id, staff_id, section_id, status, start_date, end_date)
+            VALUES (?, ?, NULL, ?, 'pending', ?, ?)
           `,
-          values: [activity_id, standard_process_id, start_date || null, end_date || null],
+          values: [
+            activity_id,
+            standard_process_id,
+            persistedSectionId,
+            start_date || null,
+            end_date || null,
+          ],
         });
         containerId = Number((result as any).insertId);
       }
@@ -253,6 +306,20 @@ export async function POST(request: Request) {
       );
     }
 
+    if (sectionScopeId != null && Number.isFinite(sectionScopeId)) {
+      for (const sid of rawIds) {
+        const ok = await staffBelongsToDepartmentSection(sectionScopeId, sid, visibleDeptIds);
+        if (!ok) {
+          return NextResponse.json(
+            {
+              message: `Staff must belong to the selected section (user id ${sid}).`,
+            },
+            { status: 400 }
+          );
+        }
+      }
+    }
+
     const created: number[] = [];
     let skippedDuplicate = 0;
     let skippedInvalid = 0;
@@ -281,10 +348,17 @@ export async function POST(request: Request) {
 
       const result = await query({
         query: `
-          INSERT INTO staff_process_assignments (activity_id, standard_process_id, staff_id, status, start_date, end_date)
-          VALUES (?, ?, ?, 'pending', ?, ?)
+          INSERT INTO staff_process_assignments (activity_id, standard_process_id, staff_id, section_id, status, start_date, end_date)
+          VALUES (?, ?, ?, ?, 'pending', ?, ?)
         `,
-        values: [activity_id, standard_process_id, sid, start_date || null, end_date || null],
+        values: [
+          activity_id,
+          standard_process_id,
+          sid,
+          persistedSectionId,
+          start_date || null,
+          end_date || null,
+        ],
       });
       created.push((result as any).insertId);
     }

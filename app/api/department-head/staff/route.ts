@@ -3,9 +3,25 @@ import { query } from '@/lib/db';
 import { cookies } from 'next/headers';
 import { verifyToken } from '@/lib/auth';
 import { getVisibleDepartmentIds, inPlaceholders } from '@/lib/department-head';
+import { ensureDepartmentSectionTables } from '@/lib/department-sections';
+
+type DecodedToken = {
+    userId?: number;
+};
+
+type StaffRow = {
+    id: number;
+    full_name: string;
+    position: string | null;
+    leave_status: string;
+    contract_end_date: string | null;
+    active_tasks: number;
+};
 
 export async function GET() {
     try {
+        await ensureDepartmentSectionTables();
+
         const cookieStore = await cookies();
         const token = cookieStore.get('token')?.value;
 
@@ -13,7 +29,7 @@ export async function GET() {
             return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
         }
 
-        const decoded = verifyToken(token) as any;
+        const decoded = verifyToken(token) as DecodedToken | null;
         if (!decoded || !decoded.userId) {
             return NextResponse.json({ message: 'Invalid token' }, { status: 401 });
         }
@@ -29,6 +45,7 @@ export async function GET() {
             query: `
                 SELECT 
                     u.id,
+                    u.department_id,
                     u.full_name,
                     u.email,
                     u.position,
@@ -40,6 +57,8 @@ export async function GET() {
                     u.staff_category,
                     u.contract_start_date,
                     u.status AS account_status,
+                    ds.id AS section_id,
+                    ds.name AS section_name,
                     (
                         (
                             SELECT COUNT(*) FROM activity_assignments aa_cnt
@@ -53,22 +72,27 @@ export async function GET() {
                         )
                     ) AS active_tasks
                 FROM users u
+                LEFT JOIN department_section_staff dss ON dss.staff_user_id = u.id
+                LEFT JOIN department_sections ds ON ds.id = dss.section_id
                 WHERE u.department_id IN (${placeholders})
                 ORDER BY u.full_name ASC
             `,
             values: [...departmentIds]
-        }) as any[];
+        }) as StaffRow[];
 
         // HR Alerts
-        const alerts = staff.filter((s: any) =>
+        const alerts = staff.filter((s) =>
             s.leave_status !== 'On Duty' ||
             (s.contract_end_date && new Date(s.contract_end_date).getTime() - new Date().getTime() < 30 * 24 * 3600 * 1000)
-        ).map((s: any) => ({
+        ).map((s) => ({
             id: s.id,
             name: s.full_name,
             position: s.position,
             type: s.leave_status !== 'On Duty' ? 'Leave' : 'Contract',
-            message: s.leave_status !== 'On Duty' ? `On ${s.leave_status}` : `Expires on ${new Date(s.contract_end_date).toLocaleDateString()}`,
+            message:
+                s.leave_status !== 'On Duty'
+                    ? `On ${s.leave_status}`
+                    : `Expires on ${s.contract_end_date ? new Date(s.contract_end_date).toLocaleDateString() : '—'}`,
             daysRemaining: s.contract_end_date ? Math.ceil((new Date(s.contract_end_date).getTime() - new Date().getTime()) / (1000 * 3600 * 24)) : null,
             activeTasks: s.active_tasks
         }));
@@ -77,10 +101,11 @@ export async function GET() {
             staff,
             alerts
         });
-    } catch (error: any) {
+    } catch (error: unknown) {
+        const message = error instanceof Error ? error.message : 'Unknown error';
         console.error('Department Staff API Error:', error);
         return NextResponse.json(
-            { message: 'Error fetching department staff', detail: error.message },
+            { message: 'Error fetching department staff', detail: message },
             { status: 500 }
         );
     }

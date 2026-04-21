@@ -9,6 +9,8 @@ export type PublicStandardProcess = {
   standard_id: number;
   step_name: string;
   step_order: number;
+  duration_value: number | null;
+  duration_unit: string | null;
 };
 
 export type PublicStandard = {
@@ -32,6 +34,14 @@ export function toPublicProcessRow(row: Record<string, unknown>): PublicStandard
     standard_id: Number(row.standard_id),
     step_name: String(row.step_name ?? ''),
     step_order: Number(row.step_order ?? 0),
+    duration_value:
+      row.duration_value != null && row.duration_value !== '' && Number.isFinite(Number(row.duration_value))
+        ? Number(row.duration_value)
+        : null,
+    duration_unit:
+      row.duration_unit != null && String(row.duration_unit).trim() !== ''
+        ? String(row.duration_unit).trim().toLowerCase()
+        : null,
   };
 }
 

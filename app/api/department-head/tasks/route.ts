@@ -189,8 +189,7 @@ export async function GET() {
                     sp.step_order as step_order,
                     spa.created_at as spa_created_at,
                     (SELECT sr2.status FROM staff_reports sr2 WHERE sr2.process_assignment_id = spa.id ORDER BY sr2.updated_at DESC LIMIT 1) as latest_report_status,
-                    st.duration_value as duration_value,
-                    st.duration_unit as duration_unit,
+                    __DURATION_COLS__
                     __PI_COL__
                     0 as progress
                 FROM staff_process_assignments spa
@@ -202,20 +201,30 @@ export async function GET() {
             `;
         try {
             processAssignmentsQuery = (await query({
-                query: processAssignBase.replace('__PI_COL__', 'st.performance_indicator,\n                    '),
+                query: processAssignBase
+                    .replace('__DURATION_COLS__', 'COALESCE(spa.duration_value, sp.duration_value, st.duration_value) as duration_value,\n                    COALESCE(spa.duration_unit, sp.duration_unit, st.duration_unit) as duration_unit,\n                    ')
+                    .replace('__PI_COL__', 'st.performance_indicator,\n                    '),
                 values: [...departmentIds],
             })) as any[];
         } catch (e: unknown) {
             const err = e as { code?: string; errno?: number };
             if (err?.code === 'ER_BAD_FIELD_ERROR' || err?.errno === 1054) {
-                processAssignmentsQuery = (await query({
-                    query: processAssignBase.replace('__PI_COL__', ''),
-                    values: [...departmentIds],
-                })) as any[];
-                processAssignmentsQuery = processAssignmentsQuery.map((row: any) => ({
-                    ...row,
-                    performance_indicator: null,
-                }));
+                try {
+                    processAssignmentsQuery = (await query({
+                        query: processAssignBase
+                            .replace('__DURATION_COLS__', 'COALESCE(sp.duration_value, st.duration_value) as duration_value,\n                    COALESCE(sp.duration_unit, st.duration_unit) as duration_unit,\n                    ')
+                            .replace('__PI_COL__', ''),
+                        values: [...departmentIds],
+                    })) as any[];
+                } catch {
+                    processAssignmentsQuery = (await query({
+                        query: processAssignBase
+                            .replace('__DURATION_COLS__', 'st.duration_value as duration_value,\n                    st.duration_unit as duration_unit,\n                    ')
+                            .replace('__PI_COL__', ''),
+                        values: [...departmentIds],
+                    })) as any[];
+                }
+                processAssignmentsQuery = processAssignmentsQuery.map((row: any) => ({ ...row, performance_indicator: null }));
             } else {
                 throw e;
             }

@@ -99,9 +99,8 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
       id
     ];
     try {
-      if (!unit) return NextResponse.json({ message: 'Duration unit is required' }, { status: 400 });
-      if (dvNum == null || !Number.isFinite(dvNum) || dvNum < 1) {
-        return NextResponse.json({ message: 'Duration value must be at least 1' }, { status: 400 });
+      if ((unit && (dvNum == null || !Number.isFinite(dvNum) || dvNum < 1)) || (!unit && dvNum != null)) {
+        return NextResponse.json({ message: 'If provided, standard duration must include both unit and value (>= 1)' }, { status: 400 });
       }
       await query({
         query: `UPDATE standards SET 
@@ -153,8 +152,8 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
           sid,
           row.stepName,
           i,
-          null,
-          null
+          row.durationValue,
+          row.durationUnit
         );
       }
     }

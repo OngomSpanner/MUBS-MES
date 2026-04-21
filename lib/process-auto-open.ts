@@ -84,7 +84,10 @@ export async function autoOpenNextProcessStepAfterCompletion(
 
     const nextRows = (await query({
         query: `
-            SELECT spa.id, spa.start_date, st2.duration_value, st2.duration_unit
+            SELECT spa.id, spa.start_date,
+                   COALESCE(sp2.duration_value, st2.duration_value) as duration_value,
+                   COALESCE(sp2.duration_unit, st2.duration_unit) as duration_unit,
+                   sa.end_date as activity_end_date
             FROM staff_process_assignments spa
             JOIN strategic_activities sa ON spa.activity_id = sa.id
             JOIN standard_processes sp2 ON spa.standard_process_id = sp2.id
@@ -97,7 +100,13 @@ export async function autoOpenNextProcessStepAfterCompletion(
             LIMIT 1
         `,
         values: [activity_id, standard_id, step_order, ...departmentIds],
-    })) as { id: number; start_date: string | null; duration_value: number | null; duration_unit: string | null }[];
+    })) as {
+        id: number;
+        start_date: string | null;
+        duration_value: number | null;
+        duration_unit: string | null;
+        activity_end_date: string | null;
+    }[];
 
     if (!nextRows[0]) return;
     const next = nextRows[0];
@@ -106,6 +115,8 @@ export async function autoOpenNextProcessStepAfterCompletion(
 
     const startDate = toYMD(new Date());
     const endDate = addDurationToStartDate(startDate, next.duration_value, next.duration_unit);
+    const activityEnd = next.activity_end_date ? String(next.activity_end_date).slice(0, 10) : '';
+    if (activityEnd && endDate > activityEnd) return;
 
     await query({
         query: `UPDATE staff_process_assignments SET start_date = ?, end_date = ?, status = 'in_progress' WHERE id = ?`,

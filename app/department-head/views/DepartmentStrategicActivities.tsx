@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import axios from 'axios';
 
 import StatCard from '@/components/StatCard';
+import { expandProcessAssignmentsForDisplay } from '@/lib/process-assignment-display';
 
 interface Activity {
     id: number;
@@ -85,6 +86,8 @@ export default function DepartmentStrategicActivities() {
         id: number;
         standard_process_id: number;
         staff_id: number | null;
+        section_id?: number | null;
+        section_name?: string | null;
         status: string;
         staff_name: string | null;
         start_date?: string | null;
@@ -107,6 +110,15 @@ export default function DepartmentStrategicActivities() {
     const [assignBreakdownEnabled, setAssignBreakdownEnabled] = useState(false);
     const [assignSubtasks, setAssignSubtasks] = useState<Array<{ title: string; assigned_to: number | '' }>>([]);
     const [showAssignModal, setShowAssignModal] = useState(false);
+    type AssignSectionOption = {
+        id: number;
+        name: string;
+        department_id: number;
+        head_user_id: number | null;
+        staff: Array<{ id: number }>;
+    };
+    const [assignSections, setAssignSections] = useState<AssignSectionOption[]>([]);
+    const [assignmentSectionId, setAssignmentSectionId] = useState<number | ''>('');
     const [assignmentsLoaded, setAssignmentsLoaded] = useState(false);
     const [processCatalogLoaded, setProcessCatalogLoaded] = useState(false);
     const [showAssignmentsRequiredDialog, setShowAssignmentsRequiredDialog] = useState(false);
@@ -179,11 +191,14 @@ export default function DepartmentStrategicActivities() {
         if (!assigningTask || assignStaffIds.length === 0 || !selectedActivity) return;
         setAssignSaving(true);
         try {
-            const payload: any = {
+            const payload: Record<string, unknown> = {
                 activity_id: selectedActivity.id,
                 standard_process_id: assigningTask.id,
                 staff_ids: assignStaffIds,
             };
+            if (assignmentSectionId !== '') {
+                payload.section_id = assignmentSectionId;
+            }
 
             if (assignBreakdownEnabled) {
                 const cleaned = assignSubtasks
@@ -216,6 +231,7 @@ export default function DepartmentStrategicActivities() {
             setShowAssignModal(false);
             setAssignStaffIds([]);
             setStaffSearchTerm('');
+            setAssignmentSectionId('');
             setAssignBreakdownEnabled(false);
             setAssignSubtasks([]);
             setAssigningTask(null);
@@ -231,7 +247,16 @@ export default function DepartmentStrategicActivities() {
         try {
             await axios.delete(`/api/department-head/process-assignments/${assignmentId}`);
             if (selectedActivity) await fetchProcessAssignments(selectedActivity.id);
-        } catch { alert('Could not remove assignment'); }
+        } catch (e: unknown) {
+            const msg =
+                typeof e === 'object' &&
+                e !== null &&
+                'response' in e &&
+                typeof (e as { response?: { data?: { message?: string } } }).response?.data?.message === 'string'
+                    ? (e as { response: { data: { message: string } } }).response.data.message
+                    : 'Could not remove assignment';
+            alert(msg);
+        }
     };
 
     const toYMD = (date: Date) => {
@@ -247,18 +272,51 @@ export default function DepartmentStrategicActivities() {
         if (!showAssignModal) return;
         (async () => {
             try {
-                const res = await axios.get('/api/users/department');
-                setDepartmentUsers(Array.isArray(res.data) ? res.data : []);
+                const [usersRes, secRes] = await Promise.all([
+                    axios.get('/api/users/department'),
+                    axios.get('/api/department-head/sections'),
+                ]);
+                setDepartmentUsers(Array.isArray(usersRes.data) ? usersRes.data : []);
+                const sectionsPayload = secRes.data as { sections?: AssignSectionOption[] } | undefined;
+                setAssignSections(Array.isArray(sectionsPayload?.sections) ? sectionsPayload.sections : []);
             } catch (err) {
-                console.error('Failed to fetch department users:', err);
+                console.error('Failed to fetch assign modal data:', err);
                 setDepartmentUsers([]);
+                setAssignSections([]);
             }
         })();
     }, [showAssignModal]);
 
+    const assignPoolUsers = useMemo(() => {
+        if (assignmentSectionId === '') return departmentUsers;
+        const sec = assignSections.find((s) => s.id === assignmentSectionId);
+        if (!sec) return departmentUsers;
+        const allowed = new Set<number>();
+        for (const m of sec.staff || []) allowed.add(Number(m.id));
+        if (sec.head_user_id != null) allowed.add(Number(sec.head_user_id));
+        return departmentUsers.filter((u) => allowed.has(u.id));
+    }, [departmentUsers, assignSections, assignmentSectionId]);
+
+    const assignPoolFingerprint = useMemo(() => {
+        const ids = assignPoolUsers.map((u) => u.id);
+        ids.sort((a, b) => a - b);
+        return ids.join(',');
+    }, [assignPoolUsers]);
+
+    useEffect(() => {
+        if (assignmentSectionId === '') {
+            const allowed = new Set(assignPoolUsers.map((u) => u.id));
+            setAssignStaffIds((prev) => prev.filter((id) => allowed.has(id)));
+            return;
+        }
+        const sec = assignSections.find((s) => s.id === assignmentSectionId);
+        if (!sec) return;
+        setAssignStaffIds(assignPoolUsers.map((u) => u.id));
+    }, [assignmentSectionId, assignSections, assignPoolFingerprint, assignPoolUsers]);
+
     const staffSearchResults = (() => {
         const q = staffSearchTerm.trim().toLowerCase();
-        const pool = departmentUsers.filter((u) => !assignStaffIds.includes(u.id));
+        const pool = assignPoolUsers.filter((u) => !assignStaffIds.includes(u.id));
         const matches =
             q === ''
                 ? pool
@@ -281,7 +339,7 @@ export default function DepartmentStrategicActivities() {
     };
 
     const addAllDepartmentStaff = () => {
-        const all = departmentUsers.map((u) => u.id).filter((id) => !assignStaffIds.includes(id));
+        const all = assignPoolUsers.map((u) => u.id).filter((id) => !assignStaffIds.includes(id));
         if (all.length === 0) return;
         setAssignStaffIds((prev) => [...new Set([...prev, ...all])]);
         setStaffSearchTerm('');
@@ -291,7 +349,7 @@ export default function DepartmentStrategicActivities() {
     const addAllDepartmentStaffByPosition = (positionLabel?: string) => {
         const selectedKey = normalizeForCompare(positionLabel ?? staffPositionAddAll);
         if (!selectedKey) return;
-        const matches = departmentUsers
+        const matches = assignPoolUsers
             .filter((u) => normalizeForCompare(u.position) === selectedKey)
             .map((u) => u.id)
             .filter((id) => !assignStaffIds.includes(id));
@@ -301,7 +359,7 @@ export default function DepartmentStrategicActivities() {
 
     const availablePositions = (() => {
         const map = new Map<string, string>();
-        for (const u of departmentUsers) {
+        for (const u of assignPoolUsers) {
             const key = normalizeForCompare(u.position);
             if (!key) continue;
             if (!map.has(key)) map.set(key, u.position || '');
@@ -721,48 +779,207 @@ export default function DepartmentStrategicActivities() {
                                                             </div>
                                                             {taskAssignments.length > 0 && (
                                                                 <div className="mt-2 d-flex flex-wrap gap-1">
-                                                                    {taskAssignments.map(sa => {
-                                                                        const hasStaff = String(sa.staff_name ?? '').trim() !== '';
-                                                                        const subtasks = Array.isArray((sa as any).subtasks) ? (sa as any).subtasks : [];
-                                                                        // Container: completion = all sub-tasks done (not parent spa.status alone).
-                                                                        const isDone = hasStaff
-                                                                            ? assignmentIsTerminal(sa)
-                                                                            : subtasks.length > 0
-                                                                              ? subtasks.every(subtaskIsTerminal)
-                                                                              : assignmentIsTerminal(sa);
+                                                                    {expandProcessAssignmentsForDisplay<Assignment>(taskAssignments).map((item) => {
+                                                                        if (item.kind === 'container') {
+                                                                            const sa = item.a;
+                                                                            const hasStaff = String(sa.staff_name ?? '').trim() !== '';
+                                                                            const subtasks = Array.isArray(sa.subtasks) ? sa.subtasks : [];
+                                                                            const sectionLabel = String(sa.section_name ?? '').trim();
+                                                                            const useSectionSummary =
+                                                                                !hasStaff && subtasks.length > 0 && sectionLabel !== '';
+                                                                            const isDone = hasStaff
+                                                                                ? assignmentIsTerminal(sa)
+                                                                                : subtasks.length > 0
+                                                                                  ? subtasks.every(subtaskIsTerminal)
+                                                                                  : assignmentIsTerminal(sa);
+                                                                            return (
+                                                                                <span
+                                                                                    key={`c-${sa.id}`}
+                                                                                    className="badge d-inline-flex align-items-center gap-1"
+                                                                                    style={{
+                                                                                        background: isDone ? '#dcfce7' : '#e0f2fe',
+                                                                                        color: isDone ? '#15803d' : '#0369a1',
+                                                                                        fontSize: '0.7rem',
+                                                                                        fontWeight: 500,
+                                                                                    }}
+                                                                                >
+                                                                                    <span className="material-symbols-outlined" style={{ fontSize: '12px' }}>
+                                                                                        {isDone ? 'check_circle' : useSectionSummary ? 'groups' : 'person'}
+                                                                                    </span>
+                                                                                    {hasStaff
+                                                                                        ? isDone
+                                                                                            ? `Task completed by ${sa.staff_name}`
+                                                                                            : sa.staff_name
+                                                                                        : isDone
+                                                                                          ? 'All sub-tasks completed'
+                                                                                          : useSectionSummary
+                                                                                            ? `${sectionLabel} (duties pending)`
+                                                                                            : 'Sub-tasks assigned'}
+                                                                                    {!isDone && (
+                                                                                        <>
+                                                                                            <span className="ms-1 text-muted" style={{ fontSize: '0.65rem' }}>
+                                                                                                ({sa.status})
+                                                                                            </span>
+                                                                                            {!assignmentIsOpen(sa) ? (
+                                                                                                <button
+                                                                                                    type="button"
+                                                                                                    className="btn-close p-0 ms-1"
+                                                                                                    style={{ fontSize: '9px', opacity: 0.75 }}
+                                                                                                    title={
+                                                                                                        hasStaff
+                                                                                                            ? 'Remove assignment'
+                                                                                                            : 'Remove assignment and all duties under this step'
+                                                                                                    }
+                                                                                                    aria-label="Remove assignment"
+                                                                                                    onClick={() => handleRemoveAssignment(sa.id)}
+                                                                                                />
+                                                                                            ) : (
+                                                                                                <span
+                                                                                                    className="ms-1 text-muted"
+                                                                                                    style={{ fontSize: '0.62rem' }}
+                                                                                                    title="Opened processes cannot be removed here"
+                                                                                                >
+                                                                                                    locked
+                                                                                                </span>
+                                                                                            )}
+                                                                                        </>
+                                                                                    )}
+                                                                                </span>
+                                                                            );
+                                                                        }
+                                                                        if (item.kind === 'section_group') {
+                                                                            const rows = item.rows;
+                                                                            const sectionName = String(rows[0]?.section_name ?? '').trim();
+                                                                            const isDone = rows.every((r) => assignmentIsTerminal(r));
+                                                                            const pending = rows.filter((r) => !assignmentIsTerminal(r)).length;
+                                                                            const anyOpened = rows.some((r) => assignmentIsOpen(r));
+                                                                            return (
+                                                                                <span
+                                                                                    key={`sec-${rows[0]?.section_id ?? rows[0]?.id}`}
+                                                                                    className="badge d-inline-flex align-items-center gap-1"
+                                                                                    style={{
+                                                                                        background: isDone ? '#dcfce7' : '#e0f2fe',
+                                                                                        color: isDone ? '#15803d' : '#0369a1',
+                                                                                        fontSize: '0.7rem',
+                                                                                        fontWeight: 500,
+                                                                                    }}
+                                                                                >
+                                                                                    <span className="material-symbols-outlined" style={{ fontSize: '12px' }}>
+                                                                                        {isDone ? 'check_circle' : 'groups'}
+                                                                                    </span>
+                                                                                    {isDone ? `${sectionName} — completed` : sectionName}
+                                                                                    {!isDone && (
+                                                                                        <>
+                                                                                            <span className="ms-1 text-muted" style={{ fontSize: '0.65rem' }}>
+                                                                                                ({pending} pending)
+                                                                                            </span>
+                                                                                            {!anyOpened ? (
+                                                                                                <button
+                                                                                                    type="button"
+                                                                                                    className="btn-close p-0 ms-1"
+                                                                                                    style={{ fontSize: '9px', opacity: 0.75 }}
+                                                                                                    title={`Remove all assignments for ${sectionName}`}
+                                                                                                    aria-label="Remove section assignments"
+                                                                                                    onClick={async () => {
+                                                                                                        if (!confirm(`Remove all assignments for ${sectionName}?`))
+                                                                                                            return;
+                                                                                                        try {
+                                                                                                            for (const r of rows) {
+                                                                                                                await axios.delete(
+                                                                                                                    `/api/department-head/process-assignments/${r.id}`
+                                                                                                                );
+                                                                                                            }
+                                                                                                            if (selectedActivity)
+                                                                                                                await fetchProcessAssignments(selectedActivity.id);
+                                                                                                        } catch (e: unknown) {
+                                                                                                            const msg =
+                                                                                                                typeof e === 'object' &&
+                                                                                                                e !== null &&
+                                                                                                                'response' in e &&
+                                                                                                                typeof (e as {
+                                                                                                                    response?: { data?: { message?: string } };
+                                                                                                                }).response?.data?.message === 'string'
+                                                                                                                    ? (
+                                                                                                                          e as {
+                                                                                                                              response: {
+                                                                                                                                  data: {
+                                                                                                                                      message: string;
+                                                                                                                                  };
+                                                                                                                              };
+                                                                                                                          }
+                                                                                                                      ).response.data.message
+                                                                                                                    : 'Could not remove assignment';
+                                                                                                            alert(msg);
+                                                                                                        }
+                                                                                                    }}
+                                                                                                />
+                                                                                            ) : (
+                                                                                                <span
+                                                                                                    className="ms-1 text-muted"
+                                                                                                    style={{ fontSize: '0.62rem' }}
+                                                                                                    title="Cannot remove: one or more steps are already open"
+                                                                                                >
+                                                                                                    locked
+                                                                                                </span>
+                                                                                            )}
+                                                                                        </>
+                                                                                    )}
+                                                                                </span>
+                                                                            );
+                                                                        }
+                                                                        const sa = item.a;
+                                                                        const isDone = assignmentIsTerminal(sa);
                                                                         return (
-                                                                            <span key={sa.id} className="badge d-inline-flex align-items-center gap-1" 
-                                                                                style={{ 
-                                                                                    background: isDone ? '#dcfce7' : '#e0f2fe', 
-                                                                                    color: isDone ? '#15803d' : '#0369a1', 
-                                                                                    fontSize: '0.7rem', 
-                                                                                    fontWeight: 500 
+                                                                            <span
+                                                                                key={sa.id}
+                                                                                className="badge d-inline-flex align-items-center gap-1"
+                                                                                style={{
+                                                                                    background: isDone ? '#dcfce7' : '#e0f2fe',
+                                                                                    color: isDone ? '#15803d' : '#0369a1',
+                                                                                    fontSize: '0.7rem',
+                                                                                    fontWeight: 500,
                                                                                 }}
                                                                             >
-                                                                                <span className="material-symbols-outlined" style={{ fontSize: '12px' }}>{isDone ? 'check_circle' : 'person'}</span>
-                                                                                {hasStaff ? (isDone ? `Task completed by ${sa.staff_name}` : sa.staff_name) : (isDone ? 'All sub-tasks completed' : 'Sub-tasks assigned')}
+                                                                                <span className="material-symbols-outlined" style={{ fontSize: '12px' }}>
+                                                                                    {isDone ? 'check_circle' : 'person'}
+                                                                                </span>
+                                                                                {isDone ? `Task completed by ${sa.staff_name}` : sa.staff_name}
                                                                                 {!isDone && (
                                                                                     <>
-                                                                                        <span className="ms-1 text-muted" style={{ fontSize: '0.65rem' }}>({sa.status})</span>
-                                                                                        {/* Only allow removing direct staff assignment; container is managed via subtasks */}
-                                                                                        {hasStaff ? (
+                                                                                        <span className="ms-1 text-muted" style={{ fontSize: '0.65rem' }}>
+                                                                                            ({sa.status})
+                                                                                        </span>
+                                                                                        {!assignmentIsOpen(sa) ? (
                                                                                             <button
                                                                                                 type="button"
                                                                                                 className="btn-close p-0 ms-1"
-                                                                                                style={{ fontSize: '7px', opacity: 0.6 }}
+                                                                                                style={{ fontSize: '9px', opacity: 0.75 }}
+                                                                                                title="Remove assignment"
+                                                                                                aria-label="Remove assignment"
                                                                                                 onClick={() => handleRemoveAssignment(sa.id)}
                                                                                             />
-                                                                                        ) : null}
+                                                                                        ) : (
+                                                                                            <span
+                                                                                                className="ms-1 text-muted"
+                                                                                                style={{ fontSize: '0.62rem' }}
+                                                                                                title="Opened processes cannot be removed here"
+                                                                                            >
+                                                                                                locked
+                                                                                            </span>
+                                                                                        )}
                                                                                     </>
                                                                                 )}
                                                                             </span>
                                                                         );
                                                                     })}
-                                                                    {/* Show subtask assignees under container assignment(s) */}
                                                                     {taskAssignments
                                                                         .filter((a) => String(a.staff_name ?? '').trim() === '')
-                                                                        .flatMap((a) => (Array.isArray((a as any).subtasks) ? (a as any).subtasks : []))
-                                                                        .map((st: any) => (
+                                                                        .flatMap((a) => {
+                                                                            const sn = String(a.section_name ?? '').trim();
+                                                                            if (sn !== '') return [];
+                                                                            return Array.isArray(a.subtasks) ? a.subtasks : [];
+                                                                        })
+                                                                        .map((st) => (
                                                                             <span
                                                                                 key={`st-${st.id}`}
                                                                                 className="badge d-inline-flex align-items-center gap-1"
@@ -773,7 +990,9 @@ export default function DepartmentStrategicActivities() {
                                                                                     fontWeight: 500,
                                                                                 }}
                                                                             >
-                                                                                <span className="material-symbols-outlined" style={{ fontSize: '12px' }}>subdirectory_arrow_right</span>
+                                                                                <span className="material-symbols-outlined" style={{ fontSize: '12px' }}>
+                                                                                    subdirectory_arrow_right
+                                                                                </span>
                                                                                 {st.assigned_to_name}
                                                                                 <span className="ms-1 text-muted" style={{ fontSize: '0.65rem' }}>
                                                                                     ({st.status})
@@ -900,10 +1119,32 @@ export default function DepartmentStrategicActivities() {
                                         setAssignStaffIds([]);
                                         setStaffSearchTerm('');
                                         setStaffPositionAddAll('');
+                                        setAssignmentSectionId('');
                                     }}
                                 />
                             </div>
                             <div className="modal-body px-4 py-3">
+                                <div className="mb-3">
+                                    <label className="form-label small fw-bold mb-1">Assign within</label>
+                                    <select
+                                        className="form-select form-select-sm"
+                                        value={assignmentSectionId === '' ? '' : String(assignmentSectionId)}
+                                        onChange={(e) => {
+                                            const v = e.target.value;
+                                            setAssignmentSectionId(v === '' ? '' : Number(v));
+                                        }}
+                                    >
+                                        <option value="">Whole department / unit</option>
+                                        {assignSections.map((s) => (
+                                            <option key={s.id} value={s.id}>
+                                                {s.name}
+                                            </option>
+                                        ))}
+                                    </select>
+                                    <div className="form-text small text-muted">
+                                        Optional: only staff in this section appear below (manage sections under Staff → Sections).
+                                    </div>
+                                </div>
                                 <div className="row g-3 mb-3">
                                     <div className="col-12">
                                         <div className="p-3 rounded h-100" style={{ background: '#f0f9ff', border: '1px solid #bae6fd', fontSize: '0.82rem', color: '#0369a1' }}>
@@ -950,10 +1191,9 @@ export default function DepartmentStrategicActivities() {
                                                     const on = e.target.checked;
                                                     setAssignBreakdownEnabled(on);
                                                     if (on && assignSubtasks.length === 0) {
-                                                        // Default: one subtask per selected staff, editable
                                                         const initial = assignStaffIds.map((sid) => ({
                                                             assigned_to: sid,
-                                                            title: `${assigningTask.taskName} — ${departmentUsers.find((u) => u.id === sid)?.full_name ?? 'Sub-task'}`,
+                                                            title: '',
                                                         }));
                                                         setAssignSubtasks(initial);
                                                     }
@@ -964,13 +1204,33 @@ export default function DepartmentStrategicActivities() {
 
                                     {assignBreakdownEnabled && (
                                         <div className="mt-3 d-flex flex-column gap-2">
+                                            {assignSubtasks.length > 0 ? (
+                                                <div
+                                                    className="d-flex flex-wrap gap-2 align-items-end border-bottom pb-1 mb-1"
+                                                    style={{ columnGap: '0.5rem' }}
+                                                >
+                                                    <span
+                                                        className="small fw-semibold text-secondary"
+                                                        style={{ flex: 1, minWidth: 220, fontSize: '0.72rem' }}
+                                                    >
+                                                        Duty
+                                                    </span>
+                                                    <span
+                                                        className="small fw-semibold text-secondary"
+                                                        style={{ width: 220, fontSize: '0.72rem' }}
+                                                    >
+                                                        Assigned to
+                                                    </span>
+                                                    <span style={{ width: 38 }} aria-hidden />
+                                                </div>
+                                            ) : null}
                                             {assignSubtasks.map((st, idx) => (
                                                 <div key={idx} className="d-flex flex-wrap gap-2 align-items-center">
                                                     <input
                                                         className="form-control form-control-sm"
                                                         style={{ flex: 1, minWidth: 220 }}
                                                         value={st.title}
-                                                        placeholder={`Sub-task #${idx + 1} title`}
+                                                        placeholder={`Duty #${idx + 1}`}
                                                         onChange={(e) => {
                                                             const arr = [...assignSubtasks];
                                                             arr[idx] = { ...arr[idx], title: e.target.value };
@@ -992,7 +1252,7 @@ export default function DepartmentStrategicActivities() {
                                                     >
                                                         <option value="">Assign to…</option>
                                                         {assignStaffIds.map((sid) => {
-                                                            const u = departmentUsers.find((x) => x.id === sid);
+                                                            const u = assignPoolUsers.find((x) => x.id === sid);
                                                             return (
                                                                 <option key={sid} value={sid}>
                                                                     {u?.full_name || `Staff #${sid}`}
@@ -1029,7 +1289,7 @@ export default function DepartmentStrategicActivities() {
                                                     onClick={() => {
                                                         const auto = assignStaffIds.map((sid) => ({
                                                             assigned_to: sid,
-                                                            title: `${assigningTask.taskName} — ${departmentUsers.find((u) => u.id === sid)?.full_name ?? 'Sub-task'}`,
+                                                            title: '',
                                                         }));
                                                         setAssignSubtasks(auto);
                                                     }}
@@ -1096,7 +1356,7 @@ export default function DepartmentStrategicActivities() {
                                                 addAllDepartmentStaffByPosition(val);
                                             }
                                         }}
-                                        disabled={departmentUsers.length === 0}
+                                        disabled={assignPoolUsers.length === 0}
                                     >
                                         <option value="">Add staff…</option>
                                         <option value="__ALL__">All staff</option>
@@ -1123,7 +1383,7 @@ export default function DepartmentStrategicActivities() {
                                 </div>
                                 <div className="d-flex flex-wrap gap-2" style={{ maxHeight: '120px', overflowY: 'auto' }}>
                                     {assignStaffIds.map((id) => {
-                                        const u = departmentUsers.find((x) => x.id === id);
+                                        const u = assignPoolUsers.find((x) => x.id === id);
                                         return (
                                             <span
                                                 key={id}
@@ -1154,6 +1414,7 @@ export default function DepartmentStrategicActivities() {
                                         setShowAssignModal(false);
                                         setAssignStaffIds([]);
                                         setStaffSearchTerm('');
+                                        setAssignmentSectionId('');
                                     }}
                                 >
                                     Cancel

@@ -299,10 +299,9 @@ export default function StrategicView() {
         if (!output) return setStandardError('Output standard is required.');
         const perf = standardForm.performance_indicator.trim();
         if (!perf) return setStandardError('Performance indicator is required.');
-        if (!standardForm.duration_unit) return setStandardError('Select a duration unit.');
         const durCount = parseInt(String(standardForm.duration_value || ''), 10);
-        if (!Number.isFinite(durCount) || durCount < 1) {
-            return setStandardError('Enter a duration count of at least 1.');
+        if ((standardForm.duration_unit && (!Number.isFinite(durCount) || durCount < 1)) || (!standardForm.duration_unit && standardForm.duration_value)) {
+            return setStandardError('If fallback duration is set, include valid value (>= 1) and unit.');
         }
         const namedProcesses = standardForm.processes.filter((p) => p.step_name.trim());
         if (namedProcesses.length === 0) return setStandardError('At least one process is required.');
@@ -867,18 +866,18 @@ export default function StrategicView() {
                                     min={1}
                                     size="sm"
                                     style={{ width: '120px' }}
-                                    required
                                     name="standard_duration_value"
                                     value={standardForm.duration_value}
                                     onChange={(e) => setStandardForm({ ...standardForm, duration_value: e.target.value })}
+                                    required
                                 />
                                 <Form.Select
                                     size="sm"
                                     style={{ width: '180px' }}
-                                    required
                                     name="standard_duration_unit"
                                     value={standardForm.duration_unit}
                                     onChange={(e) => setStandardForm({ ...standardForm, duration_unit: e.target.value })}
+                                    required
                                 >
                                     {PROCESS_DURATION_UNIT_OPTIONS.map((opt) => (
                                         <option key={opt.value} value={opt.value}>
@@ -893,13 +892,6 @@ export default function StrategicView() {
                                     )}
                                 </div>
                             </div>
-                            {(!standardForm.duration_unit ||
-                                !Number.isFinite(parseInt(String(standardForm.duration_value || ''), 10)) ||
-                                parseInt(String(standardForm.duration_value || ''), 10) < 1) && (
-                                <div className="small text-danger mt-1" style={{ fontSize: '0.78rem' }}>
-                                    Duration is required. Without it, HODs cannot compute task due dates (start + duration).
-                                </div>
-                            )}
                         </div>
 
                         <div className="col-12 pt-1"><hr className="opacity-25 my-2" />

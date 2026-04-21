@@ -1,13 +1,13 @@
 'use client';
 
-import { useEffect, useState, useRef, useMemo } from 'react';
+import { Fragment, useEffect, useState, useRef, useMemo } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import axios from 'axios';
 
 import StatCard from '@/components/StatCard';
 import DepartmentTaskCardGrid from '@/components/Department/DepartmentTaskCardGrid';
 import EvaluateSubmissionModal, { parseEvidenceItems, type FeedbackHistoryEntry } from '@/components/Department/EvaluateSubmissionModal';
-import { addDurationToStartDate, formatStandardProcessDuration } from '@/lib/process-duration';
+import { addDurationToStartDate, formatStandardProcessDuration, PROCESS_DURATION_UNIT_OPTIONS } from '@/lib/process-duration';
 import { PROCESS_REASSIGN_REASONS } from '@/lib/process-reassign-reasons';
 
 
@@ -146,6 +146,8 @@ export default function DepartmentTasks({ initialActivity, initialAssignee }: De
     const [assigneeFilter, setAssigneeFilter] = useState(initialAssignee || 'All Assignees');
     const [activityIdFilter, setActivityIdFilter] = useState<number | null>(null);
     const [subtasksByProcessAssignmentId, setSubtasksByProcessAssignmentId] = useState<Record<number, ProcessSubtask[]>>({});
+    /** Container process assignments (`staff_id` null) assigned under a department section — show section in table instead of listing staff. */
+    const [containerSectionNameByPaId, setContainerSectionNameByPaId] = useState<Record<number, string>>({});
     const [expandedProcessAssignmentIds, setExpandedProcessAssignmentIds] = useState<Record<number, boolean>>({});
 
     const subtaskProgress = (rawStatus: string | null | undefined): number => {
@@ -175,6 +177,8 @@ export default function DepartmentTasks({ initialActivity, initialAssignee }: De
 
     const [openProcessTask, setOpenProcessTask] = useState<Task | null>(null);
     const [openProcessStart, setOpenProcessStart] = useState('');
+    const [openProcessDurationValue, setOpenProcessDurationValue] = useState('1');
+    const [openProcessDurationUnit, setOpenProcessDurationUnit] = useState('weeks');
     const [openProcessSaving, setOpenProcessSaving] = useState(false);
     const [showBulkOpenModal, setShowBulkOpenModal] = useState(false);
     const [bulkOpenStart, setBulkOpenStart] = useState('');
@@ -279,6 +283,20 @@ export default function DepartmentTasks({ initialActivity, initialAssignee }: De
                     .filter((s: any) => Number.isFinite(s.id) && s.id > 0);
             }
             setSubtasksByProcessAssignmentId(map);
+
+            const sectionMap: Record<number, string> = {};
+            for (const row of paRows) {
+                const pid = Number(row?.id);
+                if (!Number.isFinite(pid) || pid <= 0) continue;
+                const staffId = row?.staff_id;
+                if (staffId != null && staffId !== '') continue;
+                const sid = row?.section_id;
+                const label = String(row?.section_name ?? '').trim();
+                if (sid != null && label !== '') {
+                    sectionMap[pid] = label;
+                }
+            }
+            setContainerSectionNameByPaId(sectionMap);
 
             // Merge parent activities from both APIs so we never miss one (same source of truth, but union in case of any mismatch)
             const activitiesList = Array.isArray(activitiesRes?.data?.activities) ? activitiesRes.data.activities : [];
@@ -402,16 +420,38 @@ export default function DepartmentTasks({ initialActivity, initialAssignee }: De
             const m = String(d.getMonth() + 1).padStart(2, '0');
             const day = String(d.getDate()).padStart(2, '0');
             setOpenProcessStart(`${y}-${m}-${day}`);
+            setOpenProcessDurationValue(
+                openProcessTask.duration_value != null && Number.isFinite(Number(openProcessTask.duration_value))
+                    ? String(openProcessTask.duration_value)
+                    : '1'
+            );
+            setOpenProcessDurationUnit(
+                String(openProcessTask.duration_unit || '').trim() ? String(openProcessTask.duration_unit) : 'weeks'
+            );
         }
     }, [openProcessTask]);
 
     const openProcessComputedDue = useMemo(() => {
         if (!openProcessTask || !openProcessStart) return '';
-        const dv = openProcessTask.duration_value;
-        const du = openProcessTask.duration_unit;
+        const dv = parseInt(String(openProcessDurationValue || ''), 10);
+        const du = openProcessDurationUnit;
         if (dv == null || !String(du || '').trim()) return '';
         return addDurationToStartDate(openProcessStart, dv, du);
+    }, [openProcessTask, openProcessStart, openProcessDurationValue, openProcessDurationUnit]);
+
+    const openProcessStandardLimitDue = useMemo(() => {
+        if (!openProcessTask || !openProcessStart) return '';
+        const baseValue =
+            openProcessTask.duration_value != null && Number.isFinite(Number(openProcessTask.duration_value))
+                ? Number(openProcessTask.duration_value)
+                : null;
+        const baseUnit = String(openProcessTask.duration_unit || '').trim().toLowerCase();
+        if (baseValue == null || !baseUnit) return '';
+        return addDurationToStartDate(openProcessStart, baseValue, baseUnit);
     }, [openProcessTask, openProcessStart]);
+
+    const openProcessExceedsStandardDuration =
+        !!openProcessComputedDue && !!openProcessStandardLimitDue && openProcessComputedDue > openProcessStandardLimitDue;
 
     useEffect(() => {
         if (!evaluateModalItem) {
@@ -680,10 +720,31 @@ export default function DepartmentTasks({ initialActivity, initialAssignee }: De
             });
             return;
         }
+        const durNum = parseInt(String(openProcessDurationValue || ''), 10);
+        if (!Number.isFinite(durNum) || durNum < 1 || !String(openProcessDurationUnit || '').trim()) {
+            setMessageModal({
+                show: true,
+                title: 'Duration required',
+                message: 'Set a valid duration value (>= 1) and duration unit.',
+                type: 'warning',
+            });
+            return;
+        }
+        if (openProcessExceedsStandardDuration) {
+            setMessageModal({
+                show: true,
+                title: 'Duration exceeds standard limit',
+                message: `The computed end date (${formatDateWithYear(openProcessComputedDue)}) exceeds the standard duration limit (${formatDateWithYear(openProcessStandardLimitDue)}). Reduce duration or change start date.`,
+                type: 'warning',
+            });
+            return;
+        }
         setOpenProcessSaving(true);
         try {
             await axios.post(`/api/department-head/process-assignments/${openProcessTask.id}/open`, {
                 start_date: openProcessStart,
+                duration_value: durNum,
+                duration_unit: openProcessDurationUnit,
                 force: true,
             });
             setOpenProcessTask(null);
@@ -692,7 +753,7 @@ export default function DepartmentTasks({ initialActivity, initialAssignee }: De
                 show: true,
                 title: 'Process opened',
                 message:
-                    'The due date was set from the standard process duration. Staff can work and submit within that window.',
+                    'The due date was set from the duration you provided, within the activity timeline.',
                 type: 'success',
             });
         } catch (err: any) {
@@ -1580,6 +1641,7 @@ export default function DepartmentTasks({ initialActivity, initialAssignee }: De
                     <div className="p-4 bg-white">
                         <DepartmentTaskCardGrid 
                             tasks={pagedTasks}
+                            containerSectionNameByPaId={containerSectionNameByPaId}
                             onDelete={handleDeleteTask}
                             onViewEvaluation={handleViewEvaluation}
                             onOpenProcess={(t) => setOpenProcessTask(t)}
@@ -1633,8 +1695,12 @@ export default function DepartmentTasks({ initialActivity, initialAssignee }: De
                                         (task.assigned_to == null || String(task.assignee_name || '').trim() === '');
                                     const subtasks = isContainerProcess ? (subtasksByProcessAssignmentId[task.id] || []) : [];
                                     const expanded = !!expandedProcessAssignmentIds[task.id];
+                                    const containerSectionLabel =
+                                        isContainerProcess ? containerSectionNameByPaId[task.id] : undefined;
+                                    const useSectionStaffCell =
+                                        typeof containerSectionLabel === 'string' && containerSectionLabel.trim() !== '';
                                     return (
-                                    <>
+                                    <Fragment key={`task-wrap-${task.id}-${task.assigned_to ?? 'u'}-${idx}`}>
                                     <tr key={`task-${task.id}-${task.assigned_to ?? 'u'}-${idx}`} className={selectedTaskIds.includes(task.id) ? 'bg-primary bg-opacity-10' : ''}>
                                         <td className="ps-4">
                                             <div className="form-check m-0">
@@ -1680,13 +1746,25 @@ export default function DepartmentTasks({ initialActivity, initialAssignee }: De
                                                     color: '#fff',
                                                     fontWeight: 500,
                                                     textTransform: 'none',
-                                                }} title={isContainerProcess ? 'Sub-tasks assigned' : staffAssigneeTitle(task.assignee_name, UNASSIGNED_LABEL)}>
-                                                    {staffAssigneeInitials(task.assignee_name)}
+                                                }} title={
+                                                    useSectionStaffCell
+                                                        ? `${containerSectionLabel} — use View to see staff and duties`
+                                                        : isContainerProcess
+                                                          ? 'Sub-tasks assigned'
+                                                          : staffAssigneeTitle(task.assignee_name, UNASSIGNED_LABEL)
+                                                }>
+                                                    {useSectionStaffCell
+                                                        ? staffAssigneeInitials(containerSectionLabel)
+                                                        : staffAssigneeInitials(task.assignee_name)}
                                                 </div>
                                                 <div className="min-w-0">
                                                     <div className="d-flex align-items-center gap-2">
                                                         <span className="text-truncate">
-                                                            {isContainerProcess ? 'Sub-tasks' : staffAssigneeShortLabel(task.assignee_name, UNASSIGNED_LABEL)}
+                                                            {isContainerProcess
+                                                                ? useSectionStaffCell
+                                                                    ? containerSectionLabel
+                                                                    : 'Sub-tasks'
+                                                                : staffAssigneeShortLabel(task.assignee_name, UNASSIGNED_LABEL)}
                                                         </span>
                                                         {isContainerProcess && (
                                                             <button
@@ -1705,7 +1783,7 @@ export default function DepartmentTasks({ initialActivity, initialAssignee }: De
                                                             </button>
                                                         )}
                                                     </div>
-                                                    {isContainerProcess && subtasks.length > 0 && (
+                                                    {isContainerProcess && subtasks.length > 0 && !useSectionStaffCell && (
                                                         <div className="text-muted" style={{ fontSize: '.72rem' }}>
                                                             {subtasks
                                                                 .slice(0, 2)
@@ -1853,7 +1931,7 @@ export default function DepartmentTasks({ initialActivity, initialAssignee }: De
                                             </td>
                                         </tr>
                                     )}
-                                    </>
+                                    </Fragment>
                                     );
                                 })
                             )}
@@ -2020,6 +2098,19 @@ export default function DepartmentTasks({ initialActivity, initialAssignee }: De
                                             </div>
                                             <span>{staffAssigneeTitle(tableDetailsTask.assignee_name, UNASSIGNED_LABEL)}</span>
                                         </dd>
+                                        {tableDetailsTask.tier === 'process_task' &&
+                                            (tableDetailsTask.assigned_to == null ||
+                                                String(tableDetailsTask.assignee_name || '').trim() === '') &&
+                                            containerSectionNameByPaId[tableDetailsTask.id] && (
+                                                <>
+                                                    <dt className="col-5 text-muted text-uppercase fw-bold" style={{ fontSize: '0.65rem', letterSpacing: '0.04em' }}>
+                                                        Section
+                                                    </dt>
+                                                    <dd className="col-7 mb-2 text-dark" style={{ textTransform: 'none' }}>
+                                                        {containerSectionNameByPaId[tableDetailsTask.id]}
+                                                    </dd>
+                                                </>
+                                            )}
                                         {(tableDetailsTask.startDate || tableDetailsTask.endDate) && (
                                             <>
                                                 <dt className="col-5 text-muted text-uppercase fw-bold" style={{ fontSize: '0.65rem', letterSpacing: '0.04em' }}>
@@ -2306,16 +2397,46 @@ export default function DepartmentTasks({ initialActivity, initialAssignee }: De
                                                 </dd>
                                             </>
                                         ) : null}
-                                        <dt className="col-sm-4 text-muted fw-bold" style={{ fontSize: '0.72rem' }}>
-                                            Duration
-                                        </dt>
-                                        <dd className="col-sm-8 mb-0 text-dark" style={{ fontSize: '0.82rem' }}>
-                                            {formatStandardProcessDuration(
-                                                openProcessTask.duration_value ?? null,
-                                                openProcessTask.duration_unit ?? null
-                                            ) || '—'}
-                                        </dd>
+                                        {openProcessStandardLimitDue ? (
+                                            <>
+                                                <dt className="col-sm-4 text-muted fw-bold" style={{ fontSize: '0.72rem' }}>
+                                                    Process duration
+                                                </dt>
+                                                <dd className="col-sm-8 mb-2 text-dark" style={{ fontSize: '0.82rem' }}>
+                                                    {formatDateWithYear(openProcessStandardLimitDue)} (
+                                                    {formatStandardProcessDuration(openProcessTask.duration_value, openProcessTask.duration_unit) || '—'})
+                                                </dd>
+                                            </>
+                                        ) : null}
                                     </dl>
+                                </div>
+                                <div className="row g-2 mb-3">
+                                    <div className="col-6">
+                                        <label className="form-label small fw-bold text-muted mb-1">Duration value</label>
+                                        <input
+                                            type="number"
+                                            min={1}
+                                            className="form-control form-control-sm"
+                                            value={openProcessDurationValue}
+                                            onChange={(e) => setOpenProcessDurationValue(e.target.value)}
+                                            disabled={openProcessSaving}
+                                        />
+                                    </div>
+                                    <div className="col-6">
+                                        <label className="form-label small fw-bold text-muted mb-1">Duration unit</label>
+                                        <select
+                                            className="form-select form-select-sm"
+                                            value={openProcessDurationUnit}
+                                            onChange={(e) => setOpenProcessDurationUnit(e.target.value)}
+                                            disabled={openProcessSaving}
+                                        >
+                                            {PROCESS_DURATION_UNIT_OPTIONS.map((opt) => (
+                                                <option key={opt.value} value={opt.value}>
+                                                    {opt.label}
+                                                </option>
+                                            ))}
+                                        </select>
+                                    </div>
                                 </div>
                                 <div className="mb-3">
                                     <label className="form-label small fw-bold text-muted mb-1">Start date</label>
@@ -2334,11 +2455,15 @@ export default function DepartmentTasks({ initialActivity, initialAssignee }: De
                                     <div className="fw-semibold text-dark" style={{ fontSize: '0.88rem' }}>
                                         {openProcessComputedDue
                                             ? formatDateWithYear(openProcessComputedDue)
-                                            : openProcessTask.duration_value == null ||
-                                                !String(openProcessTask.duration_unit || '').trim()
-                                              ? 'Duration missing on standard — contact admin'
+                                            : !String(openProcessDurationUnit || '').trim()
+                                              ? 'Set process task duration first'
                                               : '—'}
                                     </div>
+                                    {openProcessExceedsStandardDuration ? (
+                                        <div className="text-danger fw-semibold mt-1" style={{ fontSize: '0.72rem' }}>
+                                            End date exceeds standard duration limit. Reduce duration or adjust start date.
+                                        </div>
+                                    ) : null}
                                 </div>
                                 <div className="d-flex justify-content-end gap-2">
                                     <button
@@ -2355,7 +2480,7 @@ export default function DepartmentTasks({ initialActivity, initialAssignee }: De
                                         className="btn btn-sm btn-success fw-bold px-3 shadow-sm"
                                         style={{ fontSize: '0.75rem', borderRadius: '8px' }}
                                         onClick={handleSubmitOpenProcess}
-                                        disabled={openProcessSaving}
+                                        disabled={openProcessSaving || openProcessExceedsStandardDuration}
                                     >
                                         {openProcessSaving ? 'Saving…' : 'Open process'}
                                     </button>

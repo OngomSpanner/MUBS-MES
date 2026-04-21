@@ -91,9 +91,8 @@ export async function POST(request: Request) {
 
     let result: unknown;
     try {
-      if (!unit) return NextResponse.json({ message: 'Duration unit is required' }, { status: 400 });
-      if (dvNum == null || !Number.isFinite(dvNum) || dvNum < 1) {
-        return NextResponse.json({ message: 'Duration value must be at least 1' }, { status: 400 });
+      if ((unit && (dvNum == null || !Number.isFinite(dvNum) || dvNum < 1)) || (!unit && dvNum != null)) {
+        return NextResponse.json({ message: 'If provided, standard duration must include both unit and value (>= 1)' }, { status: 400 });
       }
       result = await query({
         query: `INSERT INTO standards (
@@ -143,8 +142,8 @@ export async function POST(request: Request) {
         standardId,
         row.stepName,
         i,
-        null,
-        null
+        row.durationValue,
+        row.durationUnit
       );
     }
 

@@ -20,10 +20,12 @@ interface Task {
     endDate?: string;
     tier?: string;
     performance_indicator?: string | null;
+    section_name?: string | null;
 }
 
 interface DepartmentTaskCardGridProps {
     tasks: Task[];
+    containerSectionNameByPaId?: Record<number, string>;
     onDelete: (task: Task) => void;
     onViewEvaluation: (taskId: number) => void;
     onOpenProcess?: (task: Task) => void;
@@ -37,7 +39,7 @@ const DEPT_INTERNAL_LABEL = 'Department task';
 const UNASSIGNED_LABEL = 'Unassigned';
 
 const DepartmentTaskCardGrid: React.FC<DepartmentTaskCardGridProps> = ({ 
-    tasks, onDelete, onViewEvaluation, onOpenProcess, onReassignProcess, deletingId, selectedTaskIds, onToggleTaskSelect 
+    tasks, containerSectionNameByPaId = {}, onDelete, onViewEvaluation, onOpenProcess, onReassignProcess, deletingId, selectedTaskIds, onToggleTaskSelect 
 }) => {
     const router = useRouter();
 
@@ -75,8 +77,22 @@ const DepartmentTaskCardGrid: React.FC<DepartmentTaskCardGridProps> = ({
                 const dueHint = processDueLine(task);
                 const statusStyle = getStatusStyle(task.status);
                 const progressColor = (task.progress || 0) > 70 ? '#10b981' : ((task.progress || 0) > 30 ? '#f59e0b' : '#3b82f6');
-                const assigneeName = task.assignee_name?.split(' ')[0] || UNASSIGNED_LABEL;
-                const initials = task.assignee_name?.split(' ').map(n => n[0]).join('') || '?';
+                const isContainerProcess =
+                    task.tier === 'process_task' &&
+                    (task.assigned_to == null || String(task.assignee_name || '').trim() === '');
+                const sectionLabel = isContainerProcess ? containerSectionNameByPaId[task.id] : undefined;
+                const useSectionLabel = typeof sectionLabel === 'string' && sectionLabel.trim() !== '';
+                const assigneeName = useSectionLabel
+                    ? sectionLabel
+                    : task.assignee_name?.split(' ')[0] || UNASSIGNED_LABEL;
+                const initials = useSectionLabel
+                    ? sectionLabel
+                        .split(/\s+/)
+                        .map((n) => n[0] || '')
+                        .join('')
+                        .slice(0, 2)
+                        .toUpperCase() || '?'
+                    : task.assignee_name?.split(' ').map(n => n[0]).join('') || '?';
 
                 const isSelected = selectedTaskIds.includes(task.id);
                 const lockCompletedProcess = task.tier === 'process_task' && task.status === 'Completed';
@@ -133,7 +149,11 @@ const DepartmentTaskCardGrid: React.FC<DepartmentTaskCardGridProps> = ({
                                             background: 'var(--mubs-blue)', width: '28px', height: '28px', fontSize: '.7rem',
                                             borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center',
                                             color: '#fff', fontWeight: 'bold'
-                                        }} title={task.assignee_name || UNASSIGNED_LABEL}>
+                                        }} title={
+                                            useSectionLabel
+                                                ? `${sectionLabel} — open details to view staff and duties`
+                                                : task.assignee_name || UNASSIGNED_LABEL
+                                        }>
                                             {initials}
                                         </div>
                                         <span className="fw-semibold text-dark" style={{ fontSize: '.8rem', maxWidth: '100px', wordBreak: 'break-word' }}>
