@@ -25,7 +25,7 @@ function LoginFormContent() {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [showAdminLogin, setShowAdminLogin] = useState(false);
+
 
   // Forgot Password States
   const [showForgotModal, setShowForgotModal] = useState(false);
@@ -33,11 +33,7 @@ function LoginFormContent() {
   const [forgotLoading, setForgotLoading] = useState(false);
   const [forgotMessage, setForgotMessage] = useState({ type: '', text: '' });
 
-  useEffect(() => {
-    if (searchParams.get('admin') === 'true' || searchParams.get('emergency') === '1') {
-      setShowAdminLogin(true);
-    }
-  }, [searchParams]);
+  // Effect removed - always showing both methods now
 
   const handleForgotPassword = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -196,9 +192,9 @@ function LoginFormContent() {
           style={{
             maxWidth: '420px',
             width: '92%',
-            padding: '2.8rem 2.25rem',
-            borderRadius: '32px',
-            background: 'rgba(255, 255, 255, 0.6)',
+            padding: '2.2rem 2rem',
+            borderRadius: '24px',
+            background: 'rgba(255, 255, 255, 0.7)',
             backdropFilter: 'blur(20px)',
             WebkitBackdropFilter: 'blur(20px)',
             border: '1px solid rgba(255, 255, 255, 0.4)',
@@ -208,10 +204,10 @@ function LoginFormContent() {
           }}
         >
           <div className="text-center mb-4">
-            <div className="mb-3 d-flex justify-content-center">
-              <Image src="/logo.png" alt="MUBS Logo" width={80} height={80} style={{ objectFit: 'contain' }} priority />
+            <div className="mb-2 d-flex justify-content-center">
+              <Image src="/logo.png" alt="MUBS Logo" width={65} height={65} style={{ objectFit: 'contain' }} priority />
             </div>
-            <h4 className="fw-bold mb-1" style={{ color: '#003d6b', letterSpacing: '-0.02em' }}>MUBS Monitoring & Evaluation System</h4>
+            <h3 className="fw-bold mb-0" style={{ color: '#003d6b', letterSpacing: '-0.02em', fontSize: '1.5rem' }}>MUBS Monitoring & Evaluation System</h3>
           </div>
 
           {error && (
@@ -234,12 +230,11 @@ function LoginFormContent() {
             />
           </div>
 
-          {showAdminLogin && (
             <div style={{ animation: 'fadeIn 0.5s ease-out' }}>
-              <div className="d-flex align-items-center my-4">
-                <div style={{ flex: 1, height: '1px', background: 'rgba(222, 226, 230, 0.6)' }}></div>
-                <span className="mx-3 text-muted small fw-bold text-uppercase" style={{ letterSpacing: '0.12em', fontSize: '0.62rem', opacity: 0.8 }}>Admin Emergency Access</span>
-                <div style={{ flex: 1, height: '1px', background: 'rgba(222, 226, 230, 0.6)' }}></div>
+              <div className="d-flex align-items-center my-3">
+                <div style={{ flex: 1, height: '1px', background: 'rgba(222, 226, 230, 0.8)' }}></div>
+                <span className="mx-3 text-muted small fw-bold text-uppercase" style={{ letterSpacing: '0.12em', fontSize: '0.6rem', opacity: 0.8 }}>Or Sign In With Email</span>
+                <div style={{ flex: 1, height: '1px', background: 'rgba(222, 226, 230, 0.8)' }}></div>
               </div>
 
               <form onSubmit={handleLogin}>
@@ -252,7 +247,7 @@ function LoginFormContent() {
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     required
-                    style={{ borderRadius: '14px', background: 'rgba(248, 249, 250, 0.5)', border: '1px solid rgba(222, 226, 230, 0.8)', color: '#000' }}
+                    style={{ borderRadius: '10px', background: 'rgba(248, 249, 250, 0.5)', border: '1px solid rgba(222, 226, 230, 0.8)', color: '#000' }}
                   />
                   <label htmlFor="email" className="text-muted">Email address</label>
                 </div>
@@ -265,7 +260,7 @@ function LoginFormContent() {
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     required
-                    style={{ borderRadius: '14px', background: 'rgba(248, 249, 250, 0.5)', border: '1px solid rgba(222, 226, 230, 0.8)', color: '#000' }}
+                    style={{ borderRadius: '10px', background: 'rgba(248, 249, 250, 0.5)', border: '1px solid rgba(222, 226, 230, 0.8)', color: '#000' }}
                   />
                   <label htmlFor="password" className="text-muted">Password</label>
                   <button
@@ -283,17 +278,17 @@ function LoginFormContent() {
                   className="btn w-100 py-2 fw-bold text-white d-flex align-items-center justify-content-center gap-2 position-relative overflow-hidden mb-3"
                   disabled={loading}
                   style={{
-                    borderRadius: '14px',
-                    background: 'linear-gradient(90deg, #005696 0%, #007ac3 100%)',
+                    borderRadius: '10px',
+                    background: '#005696',
                     border: 'none',
-                    height: '52px',
-                    boxShadow: '0 8px 20px rgba(0,86,150,0.3)'
+                    height: '46px',
+                    boxShadow: '0 4px 12px rgba(0,86,150,0.2)'
                   }}
                 >
                   {loading ? (
                     <span className="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
                   ) : (
-                    <>Admin Login <span className="material-symbols-outlined ms-1">arrow_forward</span></>
+                    <>Sign In <span className="material-symbols-outlined ms-1">arrow_forward</span></>
                   )}
                 </button>
 
@@ -309,7 +304,7 @@ function LoginFormContent() {
                 </div>
               </form>
             </div>
-          )}
+
 
           <div className="text-center mt-3">
             <div className="mx-auto mb-3" style={{ height: '3px', width: '50px', display: 'flex', borderRadius: '4px', overflow: 'hidden' }}>
