@@ -72,14 +72,6 @@ The **MUBS Monitoring & Evaluation System** is a web application built to stream
    ```
    Open [http://localhost:3000](http://localhost:3000) with your browser to see the outcome.
 
-## Scripts & Maintenance
-
-The root directory contains several utility scripts for database migrations, schema inspection, and testing:
-- **Migration & Schema Setup:** `migrate-committee.js`, `migrate-hr.js`, `migrate-strategic.js`, `migrate-tracking.js`, `migrate-user-roles.js`
-- **Data Seeding:** `seed-committee.js`, `seed-hr.js`, `seed-multi-roles.js`, `seed-reports-trends.js`
-- **Database Tools:** `dump-schema.js`, `inspect-schema.js`, `check-db.mjs`
-
-Run these scripts using Node.js as needed during ongoing development and deployment setup.
 
 ## License
 
