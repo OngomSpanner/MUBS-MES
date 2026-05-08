@@ -46,7 +46,7 @@ The **MUBS Monitoring & Evaluation System** is a web application built to stream
 
 1. **Clone the repository:**
    ```bash
-   git clone https://github.com/OngomSpanner/MUBS-MES.git
+   git clone <your-repo-url>
    cd sps3
    ```
 
@@ -60,10 +60,12 @@ The **MUBS Monitoring & Evaluation System** is a web application built to stream
    Configure your database credentials in the `.env.local` file:
    ```env
    DB_HOST=localhost
+   DB_PORT=3306
    DB_USER=root
    DB_PASSWORD=
    DB_NAME=sps
    JWT_SECRET=your_jwt_secret_key
+   NEXT_PUBLIC_GOOGLE_CLIENT_ID=your_google_oauth_client_id
    ```
 
 4. **Run the Development Server:**
@@ -71,6 +73,21 @@ The **MUBS Monitoring & Evaluation System** is a web application built to stream
    npm run dev
    ```
    Open [http://localhost:3000](http://localhost:3000) with your browser to see the outcome.
+
+## Database scripts (optional)
+
+The `scripts/` folder contains one-off migration and maintenance utilities. They read DB settings from `.env.local`.
+
+Examples:
+
+```bash
+node scripts/migrate_phase_1.js
+node scripts/migrate-process-subtasks.js
+node scripts/migrate-process-container-allow-null-staff.js
+node scripts/migrate-staff-reports-process-subtasks.js
+```
+
+If you run a script and it fails, confirm `.env.local` is present and points to the correct MySQL database.
 
 
 ## License
