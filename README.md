@@ -4,13 +4,13 @@ The **MUBS Monitoring & Evaluation System** is a web application built to stream
 
 ## Features
 
-- **Role-Based Access Control (RBAC):** Tailored dashboards and workflows for Admin, Department Head (HOD), Staff, and Strategic Plan Ambassador
-- **Strategic Planning:** Define and manage strategic activities aligned with institutional pillars (Teaching & Learning, Research & Innovation, Governance, Infrastructure, Partnerships).
-- **Departmental work management:** Create departmental tasks, assign process steps, and optionally break down steps into sub-tasks.
-- **Activity Tracking:** Monitor progress on activities with status updates, timelines, and notes.
-- **Comprehensive Reporting:** Generate dynamic reports, trends analysis, and export data seamlessly using built-in PDF (jsPDF) and Excel (XLSX) generation tools.
-- **Notifications System:** In-app notifications to keep users informed about important updates, proposal statuses, and system alerts.
-- **Advanced Task Management:** Bulk delete functionality, recurring task intervals, and intuitive modal interfaces for efficient activity handling.
+- **Role-Based Access Control (RBAC):** Tailored dashboards and workflows for Admin, Department Head (HOD), Staff, and Strategic Plan Ambassador.
+- **Strategic planning setup:** Create and manage standards/process templates and strategic plan activities aligned to institutional pillars.
+- **Department task management:** Create departmental activities, assign process steps to staff, and optionally break down steps into sub-tasks.
+- **Progress tracking:** Monitor status and progress across strategic and departmental activities.
+- **Submissions & reviews:** Staff submit task reports; HOD reviews and returns/accepts submissions with feedback.
+- **Performance & reporting:** Department and staff performance summaries with export to PDF (jsPDF) and Excel (XLSX).
+- **Notifications & deadlines:** Staff notifications and upcoming deadline views to support timely submissions.
 
 ## Tech Stack
 
