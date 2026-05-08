@@ -5,18 +5,22 @@ The **MUBS Monitoring & Evaluation System** is a web application built to stream
 ## Features
 
 - **Role-Based Access Control (RBAC):** Tailored dashboards and workflows for Admin, Department Head (HOD), Staff, and Strategic Plan Ambassador.
-- **Strategic planning setup:** Create and manage standards/process templates and strategic plan activities aligned to institutional pillars.
-- **Department task management:** Create departmental activities, assign process steps to staff, and optionally break down steps into sub-tasks.
-- **Progress tracking:** Monitor status and progress across strategic and departmental activities.
-- **Submissions & reviews:** Staff submit task reports; HOD reviews and returns/accepts submissions with feedback.
-- **Performance & reporting:** Department and staff performance summaries with export to PDF (jsPDF) and Excel (XLSX).
-- **Notifications & deadlines:** Staff notifications and upcoming deadline views to support timely submissions.
+- **User & Department Management:** Admin abilities to create accounts, manage roles, and map users to specific departments or faculties.
+- **Authentication & Account Recovery:** Secure user onboarding, password setup, and self-service password recovery.
+- **Strategic Planning Setup:** Create and manage standards/process templates and strategic plan activities aligned to institutional pillars.
+- **Department Task Management:** Create departmental activities, assign process steps to staff, and optionally break down steps into sub-tasks.
+- **Progress Tracking:** Monitor status and progress across strategic and departmental activities.
+- **Submissions & Evidence:** Staff submit task reports with optional file attachments (evidence); HOD reviews and returns/accepts submissions with feedback.
+- **Staff Warnings System:** Department Heads can monitor individual staff performance and issue formal warnings for non-compliance or missed deadlines.
+- **Performance & Reporting:** Department and staff performance summaries with export to PDF (jsPDF) and Excel (XLSX).
+- **Ambassador Oversight:** Strategic Plan Ambassadors have access to high-level faculty-wide reports to monitor performance across entire faculties or offices.
+- **Notifications & Deadlines:** Staff notifications and upcoming deadline views to support timely submissions.
 
 ## Tech Stack
 
 - **Framework:** [Next.js 16](https://nextjs.org/) (App Router)
 - **Library:** React 19, TypeScript
-- **Styling:** Bootstrap 5, React Bootstrap, and Tailwind CSS 4
+- **Styling:** Bootstrap 5, React Bootstrap, and Tailwind CSS
 - **Backend API:** Next.js Route Handlers
 - **Database:** MySQL (interfaced via `mysql2`)
 - **Authentication & Security:** JWT (`jsonwebtoken`) and password hashing (`bcryptjs`)
@@ -62,7 +66,7 @@ The **MUBS Monitoring & Evaluation System** is a web application built to stream
    DB_HOST=localhost
    DB_PORT=3306
    DB_USER=root
-   DB_PASSWORD=
+   DB_PASSWORD=your_db_password
    DB_NAME=sps
    JWT_SECRET=your_jwt_secret_key
    NEXT_PUBLIC_GOOGLE_CLIENT_ID=your_google_oauth_client_id
