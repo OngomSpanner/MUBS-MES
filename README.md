@@ -46,7 +46,7 @@ The **MUBS Monitoring & Evaluation System** is a web application built to stream
 
 1. **Clone the repository:**
    ```bash
-   git clone https://github.com/OngomSpanner/MUBS-Strategy-Plan-System.git
+   git clone https://github.com/OngomSpanner/MUBS-MES.git
    cd sps3
    ```
 
@@ -64,11 +64,6 @@ The **MUBS Monitoring & Evaluation System** is a web application built to stream
    DB_PASSWORD=
    DB_NAME=sps
    JWT_SECRET=your_jwt_secret_key
-   ```
-   Run the provided seed/migration scripts to initialize the database schema and default roles. For example:
-   ```bash
-   node migrate-user-roles.js
-   node seed-multi-roles.js
    ```
 
 4. **Run the Development Server:**
