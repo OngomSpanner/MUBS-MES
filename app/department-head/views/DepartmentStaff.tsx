@@ -19,8 +19,7 @@ interface Staff {
     staff_category?: string | null;
     contract_start_date?: string | null;
     account_status?: string | null;
-    section_id?: number | null;
-    section_name?: string | null;
+    sections?: Array<{ id: number; name: string }>;
 }
 
 interface Alert {
@@ -169,6 +168,15 @@ export default function DepartmentStaff() {
         const t = new Date(d);
         if (Number.isNaN(t.getTime())) return null;
         return t.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+    };
+
+    const formatSectionNames = (staff: Staff): string => {
+        const list = Array.isArray(staff.sections)
+            ? staff.sections
+                .map((s) => (s && typeof s.name === 'string' ? s.name.trim() : ''))
+                .filter(Boolean)
+            : [];
+        return list.length ? list.join(', ') : 'Unassigned';
     };
 
     const effectiveCreateDepartmentId = (): number | null => {
@@ -666,7 +674,7 @@ export default function DepartmentStaff() {
                                 <div className="rounded-3 border bg-light overflow-hidden mb-4">
                                     {[
                                         { label: 'Position', value: profileStaff.position || '—' },
-                                        { label: 'Section', value: profileStaff.section_name || 'Unassigned' },
+                                        { label: 'Sections', value: formatSectionNames(profileStaff) },
                                         { label: 'Staff category', value: profileStaff.staff_category || '—' },
                                         { label: 'Contract type', value: profileStaff.contract_type || '—' },
                                         { label: 'Employment status', value: profileStaff.employment_status || '—' },

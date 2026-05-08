@@ -99,22 +99,12 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
     });
 
     if (validStaffIds.length > 0) {
-      const clearPlaceholders = inPlaceholders(validStaffIds.length);
-      await query({
-        query: `
-          DELETE FROM department_section_staff
-          WHERE staff_user_id IN (${clearPlaceholders})
-        `,
-        values: [...validStaffIds],
-      });
-
       for (const staffId of validStaffIds) {
         await query({
           query: `
             INSERT INTO department_section_staff (section_id, staff_user_id, assigned_by)
             VALUES (?, ?, ?)
             ON DUPLICATE KEY UPDATE
-              section_id = VALUES(section_id),
               assigned_by = VALUES(assigned_by),
               assigned_at = CURRENT_TIMESTAMP
           `,

@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MUBS M&E System - User Manual</title>
+    <style>
+        :root {
+            --primary: #0f172a;
+            --primary-light: #1e293b;
+            --accent: #3b82f6;
+            --text: #334155;
+            --text-light: #64748b;
+            --bg: #f8fafc;
+            --card-bg: #ffffff;
+            --border: #e2e8f0;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            line-height: 1.6;
+            color: var(--text);
+            background-color: var(--bg);
+            margin: 0;
+            padding: 0;
+        }
+
+        header {
+            background-color: var(--primary);
+            color: white;
+            padding: 3rem 2rem;
+            text-align: center;
+            border-bottom: 4px solid var(--accent);
+        }
+
+        header h1 {
+            margin: 0 0 1rem 0;
+            font-size: 2.5rem;
+            letter-spacing: -0.02em;
+        }
+
+        header p {
+            margin: 0;
+            font-size: 1.2rem;
+            color: #cbd5e1;
+            max-width: 600px;
+            margin: 0 auto;
+        }
+
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+
+        .section {
+            background: var(--card-bg);
+            border-radius: 12px;
+            padding: 2.5rem;
+            margin-bottom: 2rem;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+            border: 1px solid var(--border);
+        }
+
+        h2 {
+            color: var(--primary);
+            font-size: 1.8rem;
+            margin-top: 0;
+            margin-bottom: 1.5rem;
+            padding-bottom: 0.5rem;
+            border-bottom: 2px solid var(--border);
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        h3 {
+            color: var(--primary-light);
+            font-size: 1.4rem;
+            margin-top: 2rem;
+            margin-bottom: 1rem;
+        }
+
+        h4 {
+            color: var(--accent);
+            font-size: 1.1rem;
+            margin-bottom: 0.5rem;
+            margin-top: 1.5rem;
+        }
+
+        p {
+            margin-bottom: 1rem;
+        }
+
+        ul {
+            padding-left: 1.5rem;
+            margin-bottom: 1.5rem;
+        }
+
+        li {
+            margin-bottom: 0.5rem;
+        }
+
+        .role-badge {
+            display: inline-block;
+            background-color: #eff6ff;
+            color: #1d4ed8;
+            padding: 0.25rem 0.75rem;
+            border-radius: 9999px;
+            font-size: 0.875rem;
+            font-weight: 600;
+            margin-bottom: 1rem;
+            border: 1px solid #bfdbfe;
+        }
+
+        .screenshot-placeholder {
+            background: #f1f5f9;
+            border: 2px dashed #cbd5e1;
+            border-radius: 8px;
+            padding: 3rem 1rem;
+            text-align: center;
+            color: #475569;
+            margin: 1.5rem 0;
+            font-weight: 600;
+        }
+
+        .screenshot-placeholder p {
+            font-size: 0.85rem;
+            margin-top: 0.5rem;
+            color: #94a3b8;
+            font-weight: 400;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 1.5rem;
+            margin-top: 1.5rem;
+        }
+
+        .card {
+            background: var(--bg);
+            padding: 1.5rem;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+
+        .card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+            border-color: #cbd5e1;
+        }
+
+        .card h5 {
+            margin-top: 0;
+            color: var(--primary);
+            border-bottom: 1px solid var(--border);
+            padding-bottom: 0.5rem;
+            margin-bottom: 1rem;
+            font-size: 1.05rem;
+        }
+        
+        .detail-list {
+            list-style-type: none;
+            padding: 0;
+        }
+        
+        .detail-list li {
+            margin-bottom: 0.8rem;
+            font-size: 0.95rem;
+        }
+
+        .detail-list strong {
+            color: var(--primary-light);
+        }
+
+        footer {
+            text-align: center;
+            padding: 2rem;
+            color: var(--text-light);
+            font-size: 0.9rem;
+            border-top: 1px solid var(--border);
+            margin-top: 2rem;
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                padding: 1rem;
+            }
+            .section {
+                padding: 1.5rem;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <h1>MUBS M&E System</h1>
+        <p>System Description & User Manual</p>
+    </header>
+
+    <div class="container">
+        
+        <div class="section" id="introduction">
+            <h2>1. System Overview</h2>
+            <p>The <strong>MUBS Monitoring & Evaluation (MUBS M&E) System</strong>, also referred to as the Strategic Performance System, is a comprehensive web-based platform designed to track, manage, and evaluate strategic activities and operational tasks across the institution.</p>
+            <p>The system streamlines workflows by aligning daily staff tasks with overarching institutional strategic goals, providing real-time tracking, structured reporting, and performance evaluation mechanisms.</p>
+        </div>
+
+        <div class="section" id="how-to-use">
+            <h2>2. General Usage Guide</h2>
+            <p>To use the system effectively, follow these general steps:</p>
+            <ol>
+                <li><strong>Login:</strong> Access the system via the <a href="https://mubsme.mubs.ac.ug">https://mubsme.mubs.ac.ug</a> . Enter your credentials. The system will automatically direct you to the appropriate dashboard based on your assigned role.</li>
+                <li><strong>Navigation:</strong> Use the sidebar or top navigation menu to access different sections relevant to your role.</li>
+                <li><strong>Dashboards:</strong> Upon logging in, your dashboard provides a high-level summary of pending items, active tasks, and performance metrics. Always check your dashboard first for urgent alerts.</li>
+            </ol>
+        </div>
+
+        <div class="section" id="module-admin">
+            <h2>3. Admin Module</h2>
+            <span class="role-badge">Roles: System Administrator, Strategy Manager</span>
+            <p>The Admin Module is the control center of the MUBS M&E system. It allows high-level management of users, strategic standards, and institution-wide tracking.</p>
+            
+            <h3>Admin Dashboard</h3>
+            <div style="margin: 1.5rem 0;">
+                <img src="/screenshots/admin-dashboard.png" alt="Admin Dashboard" width="100%" style="border-radius: 8px; border: 1px solid var(--border); box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);" />
+            </div>
+            
+            <p>The Dashboard provides a holistic view of the system's usage and overall institutional performance metrics. Key UI elements include:</p>
+            <ul class="detail-list">
+                <li><strong>Stat Cards (Top Row):</strong> Provide high-level numbers for <em>Total Activities</em>, <em>Overall Progress (%)</em>, <em>System Users</em>, and <em>Delayed Activities</em>.</li>
+                <li><strong>Quick Actions Card:</strong> Contains immediate buttons for frequent administrative tasks like <em>Create New User</em>, <em>Add Strategic Activity</em>, and reviewing delayed items.</li>
+                <li><strong>Critical HR Alerts Card:</strong> Displays a list of staff members requiring urgent attention, such as contract expirations or pending leaves. Colored badges indicate the alert type.</li>
+                <li><strong>Office/Faculty Performance Card:</strong> Shows horizontal progress bars for each department, visually indicating completion rates (Green for on-track, yellow for caution, red for delayed).</li>
+                <li><strong>Recent System Activity Card:</strong> A timeline log showing the latest actions taken within the system.</li>
+            </ul>
+
+            <h3>Users Management Page</h3>
+            <div style="margin: 1.5rem 0;">
+                <img src="/screenshots/admin-users.png" alt="Admin Users View" width="100%" style="border-radius: 8px; border: 1px solid var(--border); box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);" />
+            </div>
+            <p>Allows administrators to add new users, edit details, and manage system access.</p>
+            <ul class="detail-list">
+                <li><strong>Stat Cards:</strong> Top numbers showing <em>System Users</em>, <em>Active Accounts</em>, and <em>Defined Roles</em>.</li>
+                <li><strong>Sub-Tabs:</strong> Toggle buttons to switch between the <em>"All Users"</em> view and the <em>"Departments & Units"</em> management view.</li>
+                <li><strong>All Users Table:</strong> Lists every user with columns for User details (name/date added), Email, Role (colored badges), and Department. It includes a search bar and role filter dropdown. Actions allow editing and deleting users.</li>
+                <li><strong>Departments & Units Table:</strong> When selected, shows departments and their parent faculties. Includes actions to create new sub-units or edit existing structures.</li>
+            </ul>
+            
+            <h3>Other Admin Pages (Sub-sections)</h3>
+            <ul class="detail-list">
+                <li><strong>Tracking:</strong> Allows administrators to monitor the progress of specific activities across all departments. Provides a bird's-eye view to identify bottlenecks or delayed projects.</li>
+                <li><strong>Strategic Planning:</strong> The core configuration area where Strategy Managers define high-level strategic goals, set up standards, and create the templates that all departments must align with.</li>
+                <li><strong>Reports:</strong> Generates high-level, institution-wide analytical reports on performance metrics and compliance to present to university leadership.</li>
+            </ul>
+        </div>
+
+        <div class="section" id="module-dept-head">
+            <h2>4. Department Head Module</h2>
+            <span class="role-badge">Roles: Department Head, Unit Head, HOD</span>
+            <p>Designed for academic and administrative leaders to oversee their specific department's performance, manage their staff, and ensure departmental activities align with the institution's strategic goals.</p>
+            
+            <h3>Department Head Dashboard</h3>
+            <div style="margin: 1.5rem 0;">
+                <img src="/screenshots/department-head-dashboard.png" alt="Department Head Dashboard" width="100%" style="border-radius: 8px; border: 1px solid var(--border); box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);" />
+            </div>
+            <p>A focused overview of the department's current standing. Key UI elements include:</p>
+            <ul class="detail-list">
+                <li><strong>Hero Banner:</strong> Displays the specific Department/Faculty name.</li>
+                <li><strong>Warning Strip:</strong> A dismissible alert at the top indicating if any department staff require HR attention.</li>
+                <li><strong>Quick Action Tiles:</strong> Four clickable tiles directing the head to <em>Strategic activities</em>, <em>Department tasks</em>, <em>Submissions & reviews</em>, and <em>System warnings</em>.</li>
+                <li><strong>Strategic Activity Progress Table:</strong> Shows activities assigned from the institutional strategic plan, displaying status badges (e.g., On Track, Delayed) and a visual progress bar for each.</li>
+                <li><strong>Department Tasks Table:</strong> Similar to the strategic table, but for operational tasks strictly created within the department.</li>
+                <li><strong>Recent Submissions Sidebar:</strong> A compact list displaying staff task submissions that have recently come in, along with their status (e.g., Reviewed, Pending) and a button to view/review them.</li>
+            </ul>
+
+            <h3>Other Department Head Pages (Sub-sections)</h3>
+            <ul class="detail-list">
+                <li><strong>Strategic Activities:</strong> Aligns department tasks with broader institutional strategic goals. Allows heads to map their activities directly to the standards set by Admins.</li>
+                <li><strong>Department Tasks & Activities:</strong> Facilities for managing operational tasks and general activities specific to the department that may not be directly tied to the strategic plan.</li>
+                <li><strong>Staff Management:</strong> Allows heads to view and manage the staff members assigned to their department, including reviewing their workloads and HR alerts.</li>
+                <li><strong>Evaluations & Submissions:</strong> Provides tools to review, provide feedback, and evaluate the quality of tasks submitted by staff members.</li>
+                <li><strong>Department Reports:</strong> Generates focused reports detailing the department's internal performance, staff productivity, and strategic alignment.</li>
+            </ul>
+        </div>
+
+        <div class="section" id="module-staff">
+            <h2>5. Staff Module</h2>
+            <span class="role-badge">Roles: Staff, Viewer</span>
+            <p>The Staff Module is the operational engine of the system where individual contributors receive task assignments, report progress, and manage their daily workflows.</p>
+            
+            <h3>Staff Dashboard</h3>
+            <div style="margin: 1.5rem 0;">
+                <img src="/screenshots/staff-dashboard.png" alt="Staff Dashboard" width="100%" style="border-radius: 8px; border: 1px solid var(--border); box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);" />
+            </div>
+            <p>A personal workspace highlighting the user's active tasks. Key UI elements include:</p>
+            <ul class="detail-list">
+                <li><strong>Stat Cards:</strong> Quick overview showing <em>Total Tasks</em> assigned, tasks currently <em>In Progress</em>, tasks <em>Overdue</em>, and <em>Completed</em> tasks.</li>
+                <li><strong>Quick Action Tiles:</strong> Four central buttons providing instant access to <em>Submit report</em>, <em>View my tasks</em>, <em>Submissions (feedback)</em>, and <em>Check deadlines</em>.</li>
+                <li><strong>Today's Focus Areas Card:</strong> Displays high-priority assigned tasks that need immediate attention. Each entry shows the task title, a progress bar, status, and an <strong>"UPDATE"</strong> button that opens a modal to submit work directly from the dashboard.</li>
+                <li><strong>Upcoming Deadlines Sidebar:</strong> A vertical list of tasks nearing their due date. It utilizes urgent badges (e.g., "OVERDUE", "URGENT" for &lt;2 days, "SOON") to highlight time-sensitive items.</li>
+            </ul>
+
+            <h3>Other Staff Pages (Sub-sections)</h3>
+            <ul class="detail-list">
+                <li><strong>My Tasks:</strong> A detailed view of all tasks assigned to the staff member, including instructions, requirements, and due dates.</li>
+                <li><strong>Process Steps & Tasks:</strong> For complex workflows, staff can view and complete specific individual steps within a larger process.</li>
+                <li><strong>Submit Report & Submissions:</strong> The interface used to officially submit completed work, upload necessary evidence or documents, and view a history of past submissions.</li>
+                <li><strong>Feedback:</strong> An area to review comments and evaluations provided by the Department Head on previously submitted tasks, facilitating continuous improvement.</li>
+                <li><strong>Deadlines & Notifications:</strong> Keeps staff aware of critical dates and alerts them to new assignments, rejected submissions, or system-wide announcements.</li>
+            </ul>
+        </div>
+
+        <div class="section" id="module-ambassador">
+            <h2>6. Ambassador Module</h2>
+            <span class="role-badge">Roles: Ambassador</span>
+            <p>A specialized module for Strategy Ambassadors who monitor specific cross-departmental strategic initiatives and faculty-wide compliance.</p>
+            
+            <h3>Ambassador Dashboard</h3>
+            <div style="margin: 1.5rem 0;">
+                <img src="/screenshots/ambassador-dashboard.png" alt="Ambassador Dashboard" width="100%" style="border-radius: 8px; border: 1px solid var(--border); box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);" />
+            </div>
+            <p>Provides a comprehensive overview of the specific strategic initiatives the ambassador is responsible for monitoring across their assigned faculty or cross-departmental area. Key UI elements include:</p>
+            <ul class="detail-list">
+                <li><strong>Faculty Hero Banner:</strong> A prominent blue gradient banner displaying high-level metrics: Faculty Strategic Progress, Area Activities, and Compliance Rate. It also breaks down total activities into <em>On Track</em>, <em>In Progress</em>, and <em>Delayed</em>.</li>
+                <li><strong>Stat Cards:</strong> Four quick-glance cards showing <em>Departments Oversaw</em>, <em>Area Risk Alerts</em>, <em>Compliance Average</em>, and active <em>Managed Units</em>.</li>
+                <li><strong>Departmental Progress Roster:</strong> A detailed table listing all sub-units or departments being monitored, complete with their individual activity count, visual progress bars, and status badges (e.g., On Track, Warning, Critical).</li>
+                <li><strong>Faculty Risk Benching:</strong> A critical sidebar section highlighting specific risk alerts across departments, showing severity, progress, and upcoming due dates.</li>
+                <li><strong>Faculty Submission Heatmap:</strong> A visual grid (heatmap) tracking the frequency and timeliness of submissions across different months for the entire faculty.</li>
+            </ul>
+
+            <h3>Other Ambassador Pages (Sub-sections)</h3>
+            <ul class="detail-list">
+                <li><strong>Ambassador Reports:</strong> Specialized reporting tools used to generate insights on the adoption, compliance, and success of strategic initiatives across the specific faculties being monitored.</li>
+            </ul>
+        </div>
+
+    </div>
+
+    <footer>
+        <p>&copy; 2026 Makerere University Business School (MUBS). All rights reserved.</p>
+        <p>MUBS M&E / Strategic Performance System User Manual</p>
+    </footer>
+
+</body>
+</html>
