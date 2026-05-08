@@ -1,13 +1,13 @@
-# MUBS Monitoring & Evaluation System (M&E)
+# MUBS Monitoring & Evaluation System
 
-The MUBS Monitoring & Evaluation System (M&E) is a comprehensive web application built to streamline institutional planning, activity tracking, committee proposals, and performance reporting. Designed for educational or organizational institutions, it provides role-based access for streamlined governance, from the Principal level to individual staff members.
+The **MUBS Monitoring & Evaluation System** is a web application built to streamline institutional planning, activity tracking, staff submissions/reviews, and performance reporting. It provides **role-based access** across Admin, Department Head (HOD), Staff, and Strategic Plan Ambassador workflows.
 
 ## Features
 
-- **Role-Based Access Control (RBAC):** Tailored dashboards and functionalities for Admins, Strategy Managers, Unit Heads, Staff, and Committee Members
+- **Role-Based Access Control (RBAC):** Tailored dashboards and workflows for Admin, Department Head (HOD), Staff, and Strategic Plan Ambassador
 - **Strategic Planning:** Define and manage strategic activities aligned with institutional pillars (Teaching & Learning, Research & Innovation, Governance, Infrastructure, Partnerships).
-- **Committee Management:** Submit, review, and track committee proposals including budget allocations and workflows.
-- **Activity Tracking:** Monitor progress on various tasks and activities with status updates, timelines, and detailed notes.
+- **Departmental work management:** Create departmental tasks, assign process steps, and optionally break down steps into sub-tasks.
+- **Activity Tracking:** Monitor progress on activities with status updates, timelines, and notes.
 - **Comprehensive Reporting:** Generate dynamic reports, trends analysis, and export data seamlessly using built-in PDF (jsPDF) and Excel (XLSX) generation tools.
 - **Notifications System:** In-app notifications to keep users informed about important updates, proposal statuses, and system alerts.
 - **Advanced Task Management:** Bulk delete functionality, recurring task intervals, and intuitive modal interfaces for efficient activity handling.
@@ -26,8 +26,10 @@ The MUBS Monitoring & Evaluation System (M&E) is a comprehensive web application
 
 - `/app`: Contains all Next.js App Router pages, layouts, and API routes.
   - `/admin`: Consolidated administrative views and configuration.
-  - `/principal`, `/unit-head`, `/staff`: Context-aware, role-specific dashboards.
-  - `/strategic`, `/committee`, `/tracking`, `/reports`, `/users`: Dedicated modules for core functionalities.
+  - `/department-head`: Department Head (HOD) views (activities, processes, staff/sections, submissions/reviews, reports).
+  - `/staff`: Staff views (tasks, submissions, notifications/deadlines).
+  - `/ambassador`: Strategic Plan Ambassador (faculty/office oversight) views.
+  - `/strategic`: Convenience redirect to Admin strategic setup.
   - `/api`: Extensible backend RESTful endpoints.
 - `/components`: Reusable UI elements and layout components.
 - `/lib`: Utility functions, database connection logic, and helpers.
