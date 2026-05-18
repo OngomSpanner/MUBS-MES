@@ -14,7 +14,10 @@ export async function GET() {
     const cookieStore = await cookies();
     const token = cookieStore.get('token')?.value;
     if (!token) return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
-    
+
+    const decoded = verifyToken(token);
+    if (!decoded) return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
+
     let standards: Record<string, unknown>[];
     try {
       standards = (await query({
