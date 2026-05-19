@@ -170,9 +170,10 @@ export async function PUT(
         throw err;
       }
 
-      // Handle Detailed (child) rows
+      // Handle Detailed (child) rows — only manage department detail copies (source='strategic_plan'),
+      // not weekly tasks or other children created by HODs
       const children = await query({
-        query: 'SELECT id FROM strategic_activities WHERE parent_id = ? ORDER BY id',
+        query: `SELECT id FROM strategic_activities WHERE parent_id = ? AND COALESCE(source, '') = 'strategic_plan' ORDER BY id`,
         values: [mainId]
       }) as { id: number }[];
       const childIds = children.map((c) => c.id);
