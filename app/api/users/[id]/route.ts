@@ -11,6 +11,16 @@ export async function GET(
 ) {
   const { id } = await params;
   try {
+    const cookieStore = await cookies();
+    const token = cookieStore.get('token')?.value;
+    if (!token) {
+      return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
+    }
+    const decoded = verifyToken(token);
+    if (!decoded) {
+      return NextResponse.json({ message: 'Invalid token' }, { status: 401 });
+    }
+
     const userRows = await query({
       query: `SELECT id, full_name, email, role, department_id, managed_unit_id, status,
                      first_name, surname, other_names, employee_id, contract_terms, 
@@ -61,9 +71,13 @@ export async function PUT(
     if (!token) {
       return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
     }
-    const decoded = verifyToken(token);
-    if (!decoded) {
+    const decoded = verifyToken(token) as { userId?: number; role?: string } | null;
+    if (!decoded?.userId) {
       return NextResponse.json({ message: 'Invalid token' }, { status: 401 });
+    }
+    const callerRole = (decoded.role || '').toLowerCase().replace(/\s+/g, '_');
+    if (callerRole !== 'system_admin' && callerRole !== 'system_administrator' && callerRole !== 'strategy_manager') {
+      return NextResponse.json({ message: 'Forbidden: admin role required' }, { status: 403 });
     }
 
     const body = await request.json();
@@ -183,6 +197,20 @@ export async function PATCH(
 ) {
   const { id } = await params;
   try {
+    const cookieStore = await cookies();
+    const token = cookieStore.get('token')?.value;
+    if (!token) {
+      return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
+    }
+    const decoded = verifyToken(token) as { userId?: number; role?: string } | null;
+    if (!decoded?.userId) {
+      return NextResponse.json({ message: 'Invalid token' }, { status: 401 });
+    }
+    const callerRole = (decoded.role || '').toLowerCase().replace(/\s+/g, '_');
+    if (callerRole !== 'system_admin' && callerRole !== 'system_administrator' && callerRole !== 'strategy_manager') {
+      return NextResponse.json({ message: 'Forbidden: admin role required' }, { status: 403 });
+    }
+
     const { status } = await request.json();
 
     await query({
@@ -206,6 +234,20 @@ export async function DELETE(
 ) {
   const { id } = await params;
   try {
+    const cookieStore = await cookies();
+    const token = cookieStore.get('token')?.value;
+    if (!token) {
+      return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
+    }
+    const decoded = verifyToken(token) as { userId?: number; role?: string } | null;
+    if (!decoded?.userId) {
+      return NextResponse.json({ message: 'Invalid token' }, { status: 401 });
+    }
+    const callerRole = (decoded.role || '').toLowerCase().replace(/\s+/g, '_');
+    if (callerRole !== 'system_admin' && callerRole !== 'system_administrator' && callerRole !== 'strategy_manager') {
+      return NextResponse.json({ message: 'Forbidden: admin role required' }, { status: 403 });
+    }
+
     await query({
       query: 'DELETE FROM users WHERE id = ?',
       values: [id]
