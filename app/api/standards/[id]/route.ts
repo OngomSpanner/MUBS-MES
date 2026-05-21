@@ -136,15 +136,15 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
 
     // Replace processes
     if (processes !== undefined) {
-      await query({
-        query: `DELETE FROM standard_processes WHERE standard_id = ?`,
-        values: [id]
-      });
-
       const parsed = parseStandardProcessesPayload(processes);
       if (!parsed.ok) {
         return NextResponse.json({ message: parsed.message }, { status: 400 });
       }
+
+      await query({
+        query: `DELETE FROM standard_processes WHERE standard_id = ?`,
+        values: [id]
+      });
       const sid = Number(id);
       for (let i = 0; i < parsed.items.length; i++) {
         const row = parsed.items[i];
