@@ -15,7 +15,10 @@ export async function GET(
         if (!token) {
             return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
         }
-        verifyToken(token);
+        const decoded = verifyToken(token);
+        if (!decoded) {
+            return NextResponse.json({ message: 'Invalid token' }, { status: 401 });
+        }
         const userId = Number(id);
         if (!userId) {
             return NextResponse.json({ message: 'Invalid user id' }, { status: 400 });
@@ -46,7 +49,10 @@ export async function PUT(
         if (!token) {
             return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
         }
-        verifyToken(token);
+        const decoded = verifyToken(token);
+        if (!decoded) {
+            return NextResponse.json({ message: 'Invalid token' }, { status: 401 });
+        }
         const userId = Number(id);
         if (!userId) {
             return NextResponse.json({ message: 'Invalid user id' }, { status: 400 });
