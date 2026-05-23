@@ -89,6 +89,12 @@ export async function POST(request: Request) {
       null,
     ];
 
+    // Validate processes BEFORE any DB writes to prevent orphaned standards
+    const parsed = parseStandardProcessesPayload(processes);
+    if (!parsed.ok) {
+      return NextResponse.json({ message: parsed.message }, { status: 400 });
+    }
+
     let result: unknown;
     try {
       if ((unit && (dvNum == null || !Number.isFinite(dvNum) || dvNum < 1)) || (!unit && dvNum != null)) {
@@ -132,10 +138,6 @@ export async function POST(request: Request) {
       return NextResponse.json({ message: 'Error creating standard' }, { status: 500 });
     }
 
-    const parsed = parseStandardProcessesPayload(processes);
-    if (!parsed.ok) {
-      return NextResponse.json({ message: parsed.message }, { status: 400 });
-    }
     for (let i = 0; i < parsed.items.length; i++) {
       const row = parsed.items[i];
       await insertStandardProcessRow(
