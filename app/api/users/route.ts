@@ -61,8 +61,15 @@ export async function POST(request: Request) {
     if (!token) {
       return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
     }
-    const decoded = verifyToken(token) as any;
-    const assignedBy = decoded?.userId ?? null;
+    const decoded = verifyToken(token) as { userId?: number; role?: string } | null;
+    if (!decoded?.userId) {
+      return NextResponse.json({ message: 'Invalid token' }, { status: 401 });
+    }
+    const callerRole = (decoded.role || '').toLowerCase().replace(/\s+/g, '_');
+    if (callerRole !== 'system_admin' && callerRole !== 'system_administrator' && callerRole !== 'strategy_manager') {
+      return NextResponse.json({ message: 'Forbidden: admin role required' }, { status: 403 });
+    }
+    const assignedBy = decoded.userId;
 
     const body = await request.json();
     const { 
