@@ -79,4 +79,25 @@ The **MUBS Monitoring & Evaluation System** is a web application built to stream
    ```bash
    npm run dev
    ```
+<<<<<<< HEAD
    Open [http://localhost:3000](http://localhost:3000) with your browser to see the outcome.
+=======
+   Open [http://localhost:3000](http://localhost:3000) with your browser to see the outcome.
+
+## Database scripts (optional)
+
+The `scripts/` folder contains one-off migration and maintenance utilities. They read DB settings from `.env.local`.
+
+Examples:
+
+```bash
+node scripts/migrate_phase_1.js
+node scripts/migrate-process-subtasks.js
+node scripts/migrate-process-container-allow-null-staff.js
+node scripts/migrate-staff-reports-process-subtasks.js
+```
+
+If you run a script and it fails, confirm `.env.local` is present and points to the correct MySQL database.
+
+
+>>>>>>> f293ba906931186109e514345db9129e12445d18
