@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "sync:hrms": "tsx scripts/sync-users-from-hrms.ts"
   },
   "dependencies": {
     "@fontsource/dm-sans": "^5.2.8",
@@ -44,6 +45,7 @@
     "eslint-config-next": "16.1.6",
     "postcss": "^8",
     "tailwindcss": "^4",
+    "tsx": "^4.22.3",
     "typescript": "^5"
   }
 }

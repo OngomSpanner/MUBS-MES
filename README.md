@@ -15,6 +15,7 @@ The **MUBS Monitoring & Evaluation System** is a web application built to stream
 - **Performance & Reporting:** Department and staff performance summaries with export to PDF (jsPDF) and Excel (XLSX).
 - **Ambassador Oversight:** Strategic Plan Ambassadors have access to high-level faculty-wide reports to monitor performance across entire faculties or offices.
 - **Notifications & Deadlines:** Staff notifications and upcoming deadline views to support timely submissions.
+- **Staff Development & Training:** Admin opportunity windows (by staff category), staff applications, approval workflow with study-leave linkage, and training summary reports.
 
 ## Tech Stack
 
@@ -72,28 +73,10 @@ The **MUBS Monitoring & Evaluation System** is a web application built to stream
    NEXT_PUBLIC_GOOGLE_CLIENT_ID=your_google_oauth_client_id
    ```
 
-4. **Run the Development Server:**
+4. **HRMS sync (optional):** Run `node scripts/migrate-hrms-sync-columns.js` and `node scripts/migrate-hr-sync-runs.js` if not already applied. **Sync from HR** is manual anytime; the server also runs a **full automatic sync on the last day of each month** (hourly check while `npm run dev` / `npm run start` is running). Optional external cron: `POST /api/cron/hrms-monthly-sync` with `Authorization: Bearer <CRON_SECRET>`.
+
+5. **Run the Development Server:**
    ```bash
    npm run dev
    ```
    Open [http://localhost:3000](http://localhost:3000) with your browser to see the outcome.
-
-## Database scripts (optional)
-
-The `scripts/` folder contains one-off migration and maintenance utilities. They read DB settings from `.env.local`.
-
-Examples:
-
-```bash
-node scripts/migrate_phase_1.js
-node scripts/migrate-process-subtasks.js
-node scripts/migrate-process-container-allow-null-staff.js
-node scripts/migrate-staff-reports-process-subtasks.js
-```
-
-If you run a script and it fails, confirm `.env.local` is present and points to the correct MySQL database.
-
-
-## License
-
-This project is licensed under the MIT License.

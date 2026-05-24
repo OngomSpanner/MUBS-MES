@@ -5,6 +5,14 @@ import { cookies } from 'next/headers';
 import { verifyToken } from '@/lib/auth';
 import { isCommitteeType } from '@/lib/committee-types';
 import { normalizeStaffCategory } from '@/lib/staff-categories';
+import {
+  isEmploymentStatus,
+  isGender,
+  isLeaveStatus,
+  normalizeDisabilityPayload,
+  normalizeOptionalDate,
+  normalizeOptionalString,
+} from '@/lib/staff-biodata';
 
 export async function GET(request: Request) {
   try {
@@ -68,7 +76,10 @@ export async function POST(request: Request) {
     const { 
       full_name, email, password, role, department_id, managed_unit_id, committee_types,
       first_name, surname, other_names, employee_id, contract_terms, contract_type, staff_category,
-      position, contract_start, contract_end
+      position, contract_start, contract_end,
+      gender, nationality, date_of_birth, date_first_appointment, date_current_appointment,
+      date_office_assignment, retirement_date, designation_grade, employment_status, leave_status,
+      disability_status, disability_type, workplace_accommodation, special_support_needs,
     } = body;
 
     const finalFullName = full_name || `${first_name || ''} ${surname || ''}`.trim();
@@ -88,6 +99,35 @@ export async function POST(request: Request) {
         { message: 'Name (Full or First/Surname), email and at least one role are required' },
         { status: 400 }
       );
+    }
+
+    const genderRaw = gender !== undefined && gender !== null ? String(gender).trim() : '';
+    const genderDb = genderRaw === '' ? null : genderRaw;
+    if (genderDb && !isGender(genderDb)) {
+      return NextResponse.json({ message: 'Invalid gender value.' }, { status: 400 });
+    }
+
+    const employmentStatusDb =
+      employment_status && isEmploymentStatus(String(employment_status).trim())
+        ? String(employment_status).trim()
+        : 'active';
+
+    const leaveStatusDb =
+      leave_status && isLeaveStatus(String(leave_status).trim())
+        ? String(leave_status).trim()
+        : 'On Duty';
+
+    const contractStart = normalizeOptionalDate(contract_start);
+    const contractEnd = normalizeOptionalDate(contract_end);
+
+    const pwd = normalizeDisabilityPayload({
+      disability_status,
+      disability_type,
+      workplace_accommodation,
+      special_support_needs,
+    });
+    if (pwd.error) {
+      return NextResponse.json({ message: pwd.error }, { status: 400 });
     }
 
     const existing = await query({
@@ -130,13 +170,31 @@ export async function POST(request: Request) {
                    full_name, email, password_hash, role, department_id, managed_unit_id, 
                    status, must_change_password, first_name, surname, other_names, 
                    employee_id, contract_terms, contract_type, staff_category,
-                   position, contract_start, contract_end
-                 ) VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                   position, contract_start, contract_end, contract_start_date, contract_end_date,
+                   gender, nationality, designation_grade,
+                   date_of_birth, date_first_appointment, date_current_appointment,
+                   date_office_assignment, retirement_date, employment_status, leave_status,
+                   disability_status, disability_type, workplace_accommodation, special_support_needs
+                 ) VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         values: [
           finalFullName, email, hashedPassword, roleStr, departmentId, managedUnitId, 
           'Active', first_name || null, surname || null, other_names || null, 
           employee_id || null, contract_terms || null, contract_type || null, staffCategoryDb,
-          position || null, contract_start || null, contract_end || null
+          position || null, contractStart, contractEnd, contractStart, contractEnd,
+          genderDb,
+          normalizeOptionalString(nationality, 100),
+          normalizeOptionalString(designation_grade, 100),
+          normalizeOptionalDate(date_of_birth),
+          normalizeOptionalDate(date_first_appointment),
+          normalizeOptionalDate(date_current_appointment),
+          normalizeOptionalDate(date_office_assignment),
+          normalizeOptionalDate(retirement_date),
+          employmentStatusDb,
+          leaveStatusDb,
+          pwd.disability_status,
+          pwd.disability_type,
+          pwd.workplace_accommodation,
+          pwd.special_support_needs,
         ]
       });
       newUserId = (result as any).insertId;
@@ -154,7 +212,7 @@ export async function POST(request: Request) {
             finalFullName, email, hashedPassword, roleStr, departmentId, managedUnitId, 
             'Active', first_name || null, surname || null, other_names || null, 
             employee_id || null, contract_terms || null, contract_type || null, staffCategoryDb,
-            position || null, contract_start || null, contract_end || null
+            position || null, contractStart, contractEnd
           ]
         });
         newUserId = (result as any).insertId;

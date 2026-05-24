@@ -4,6 +4,9 @@ import { useState, useEffect } from 'react';
 import Layout from '@/components/Layout';
 import axios from 'axios';
 import * as XLSX from 'xlsx';
+import StaffProfileModal from '@/components/Staff/StaffProfileModal';
+import { GENDER_OPTIONS, StaffProfileData } from '@/lib/staff-biodata';
+import { STAFF_CATEGORIES } from '@/lib/staff-categories';
 
 interface DepartmentSummary {
     department: string;
@@ -16,12 +19,42 @@ interface DepartmentSummary {
 }
 
 interface StaffEvaluation {
+    user_id: number;
     name: string;
+    email: string;
     department: string;
+    gender?: string | null;
+    staff_category?: string | null;
+    designation_grade?: string | null;
+    position?: string | null;
+    disability_status?: string | null;
+    disability_type?: string | null;
+    workplace_accommodation?: string | null;
+    special_support_needs?: string | null;
+    leave_status?: string | null;
+    employment_status?: string | null;
+    contract_type?: string | null;
+    nationality?: string | null;
+    date_of_birth?: string | null;
+    date_first_appointment?: string | null;
+    date_current_appointment?: string | null;
+    date_office_assignment?: string | null;
+    retirement_date?: string | null;
+    contract_start_date?: string | null;
+    contract_end_date?: string | null;
+    account_status?: string | null;
+    active_tasks?: number;
     assigned: number;
     completed: number;
     rate: number;
     evaluation: string;
+}
+
+interface StaffReportSummary {
+    total_active: number;
+    pwd_count: number;
+    pwd_pct: number;
+    filtered_count: number;
 }
 
 const getScore = (progress: number) =>
@@ -43,6 +76,11 @@ export default function ReportsView() {
 
     const [summaryUnitFilter, setSummaryUnitFilter] = useState('All Departments');
     const [selectedUnit, setSelectedUnit] = useState('All Departments');
+    const [pwdFilter, setPwdFilter] = useState('all');
+    const [genderFilter, setGenderFilter] = useState('All');
+    const [categoryFilter, setCategoryFilter] = useState('All');
+    const [staffSummary, setStaffSummary] = useState<StaffReportSummary | null>(null);
+    const [profileStaff, setProfileStaff] = useState<StaffProfileData | null>(null);
     const [dateFrom, setDateFrom] = useState('');
     const [dateTo, setDateTo] = useState('');
     const [activeTab, setActiveTab] = useState<'summary' | 'staff' | 'trends'>('summary');
@@ -58,7 +96,7 @@ export default function ReportsView() {
     const STAFF_PAGE_SIZE = 5;
 
     useEffect(() => { setUnitPage(1); }, [summaryUnitFilter]);
-    useEffect(() => { setStaffPage(1); }, [selectedUnit]);
+    useEffect(() => { setStaffPage(1); }, [selectedUnit, pwdFilter, genderFilter, categoryFilter]);
 
     useEffect(() => {
         axios.get('/api/departments')
@@ -102,22 +140,51 @@ export default function ReportsView() {
         const params = new URLSearchParams();
         params.append('type', 'staff-evaluation');
         if (selectedUnit !== 'All Departments') params.append('department', selectedUnit);
+        if (pwdFilter !== 'all') params.append('pwd', pwdFilter);
+        if (genderFilter !== 'All') params.append('gender', genderFilter);
+        if (categoryFilter !== 'All') params.append('staff_category', categoryFilter);
 
         axios.get(`/api/reports?${params.toString()}`)
             .then(({ data }) => {
-                const rows: StaffEvaluation[] = (data.data as any[]).map(r => ({
+                const payload = data.data as { rows?: any[]; summary?: StaffReportSummary };
+                const rows = Array.isArray(payload?.rows) ? payload.rows : (Array.isArray(data.data) ? data.data : []);
+                const mapped: StaffEvaluation[] = rows.map((r: any) => ({
+                    user_id: Number(r.user_id),
                     name: r.name,
+                    email: r.email || '',
                     department: r.department ?? '—',
+                    gender: r.gender ?? null,
+                    staff_category: r.staff_category ?? null,
+                    designation_grade: r.designation_grade ?? null,
+                    position: r.position ?? null,
+                    disability_status: r.disability_status ?? null,
+                    disability_type: r.disability_type ?? null,
+                    workplace_accommodation: r.workplace_accommodation ?? null,
+                    special_support_needs: r.special_support_needs ?? null,
+                    leave_status: r.leave_status ?? null,
+                    employment_status: r.employment_status ?? null,
+                    contract_type: r.contract_type ?? null,
+                    nationality: r.nationality ?? null,
+                    date_of_birth: r.date_of_birth ?? null,
+                    date_first_appointment: r.date_first_appointment ?? null,
+                    date_current_appointment: r.date_current_appointment ?? null,
+                    date_office_assignment: r.date_office_assignment ?? null,
+                    retirement_date: r.retirement_date ?? null,
+                    contract_start_date: r.contract_start_date ?? null,
+                    contract_end_date: r.contract_end_date ?? null,
+                    account_status: r.account_status ?? null,
+                    active_tasks: Number(r.active_tasks ?? 0),
                     assigned: Number(r.assigned),
                     completed: Number(r.completed),
                     rate: Number(r.rate ?? 0),
-                    evaluation: getEvaluation(Number(r.rate ?? 0))
+                    evaluation: getEvaluation(Number(r.rate ?? 0)),
                 }));
-                setStaffEvaluations(rows);
+                setStaffEvaluations(mapped);
+                setStaffSummary(payload?.summary ?? null);
             })
             .catch(err => console.error('staff-evaluation error', err))
             .finally(() => setLoadingStaff(false));
-    }, [selectedUnit]);
+    }, [selectedUnit, pwdFilter, genderFilter, categoryFilter]);
 
     const fetchStrategicOverview = async () => {
         setLoadingTrend(true);
@@ -152,6 +219,34 @@ export default function ReportsView() {
         }
     }, [activeTab]);
 
+    const staffToProfile = (s: StaffEvaluation): StaffProfileData => ({
+        id: s.user_id,
+        full_name: s.name,
+        email: s.email,
+        department: s.department,
+        gender: s.gender,
+        nationality: s.nationality,
+        position: s.position,
+        designation_grade: s.designation_grade,
+        staff_category: s.staff_category,
+        contract_type: s.contract_type,
+        leave_status: s.leave_status,
+        employment_status: s.employment_status,
+        account_status: s.account_status,
+        date_of_birth: s.date_of_birth,
+        date_first_appointment: s.date_first_appointment,
+        date_current_appointment: s.date_current_appointment,
+        date_office_assignment: s.date_office_assignment,
+        retirement_date: s.retirement_date,
+        contract_start_date: s.contract_start_date,
+        contract_end_date: s.contract_end_date,
+        active_tasks: s.active_tasks,
+        disability_status: s.disability_status,
+        disability_type: s.disability_type,
+        workplace_accommodation: s.workplace_accommodation,
+        special_support_needs: s.special_support_needs,
+    });
+
     const exportExcel = (dataset: 'departments' | 'staff', filename: string) => {
         const rows = dataset === 'departments'
             ? filteredUnitSummaries.map(u => ({
@@ -160,8 +255,17 @@ export default function ReportsView() {
                 'Avg Progress (%)': u.progress, Score: u.score
             }))
             : filteredStaff.map(s => ({
-                'Staff Name': s.name, Department: s.department, Assigned: s.assigned,
-                Completed: s.completed, 'Completion Rate (%)': s.rate, Evaluation: s.evaluation
+                'Staff Name': s.name,
+                Department: s.department,
+                Gender: s.gender || '',
+                Category: s.staff_category || '',
+                'Designation / Grade': s.designation_grade || '',
+                'Disability Status': s.disability_status || '',
+                'Disability Type': s.disability_type || '',
+                Assigned: s.assigned,
+                Completed: s.completed,
+                'Completion Rate (%)': s.rate,
+                Evaluation: s.evaluation
             }));
 
         const ws = XLSX.utils.json_to_sheet(rows);
@@ -192,8 +296,18 @@ export default function ReportsView() {
         } else {
             autoTable(doc, {
                 startY: 28,
-                head: [['Staff Name', 'Department', 'Assigned', 'Completed', 'Rate', 'Evaluation']],
-                body: filteredStaff.map(s => [s.name, s.department, s.assigned, s.completed, `${s.rate}%`, s.evaluation]),
+                head: [['Staff Name', 'Department', 'Gender', 'PwD', 'Category', 'Assigned', 'Completed', 'Rate', 'Evaluation']],
+                body: filteredStaff.map(s => [
+                    s.name,
+                    s.department,
+                    s.gender || '—',
+                    s.disability_status || '—',
+                    s.staff_category || '—',
+                    s.assigned,
+                    s.completed,
+                    `${s.rate}%`,
+                    s.evaluation,
+                ]),
                 styles: { fontSize: 8 },
                 headStyles: { fillColor: [30, 92, 164] }
             });
@@ -223,6 +337,8 @@ export default function ReportsView() {
     // Paginated department summaries
     const totalUnitPages = Math.max(1, Math.ceil(filteredUnitSummaries.length / UNIT_PAGE_SIZE));
     const paginatedUnits = filteredUnitSummaries.slice((departmentPage - 1) * UNIT_PAGE_SIZE, departmentPage * UNIT_PAGE_SIZE);
+
+    const showPwdColumns = pwdFilter === 'yes' || pwdFilter === 'all';
 
     // Filtered + paginated staff evaluations
     const filteredStaff = selectedUnit === 'All Departments'
@@ -414,7 +530,7 @@ export default function ReportsView() {
                 </li>
                 <li className="nav-item">
                     <button className={`nav-link border rounded-pill px-4 fw-bold ${activeTab === 'staff' ? 'active bg-primary text-white border-primary' : 'text-muted'}`} onClick={() => setActiveTab('staff')}>
-                        Staff Appraisal
+                        Staff Appraisal &amp; Profiles
                     </button>
                 </li>
                 <li className="nav-item">
@@ -545,56 +661,113 @@ export default function ReportsView() {
             )}
 
             {activeTab === 'staff' && (
-                /* Staff Evaluations */
                 <div className="table-card">
                     <div className="table-card-header">
                         <h5>
                             <span className="material-symbols-outlined me-2" style={{ color: 'var(--mubs-blue)' }}>person_search</span>
-                            Staff Evaluation Snapshots
+                            Staff Appraisal &amp; Profiles
                         </h5>
                         <div className="d-flex gap-2 flex-wrap align-items-center">
                             <select
                                 className="form-select form-select-sm"
-                                style={{ width: '180px' }}
+                                style={{ width: '160px' }}
                                 value={selectedUnit}
                                 onChange={e => setSelectedUnit(e.target.value)}
                             >
                                 <option>All Departments</option>
                                 {departmentsList.map(name => <option key={name} value={name}>{name}</option>)}
                             </select>
+                            <select
+                                className="form-select form-select-sm"
+                                style={{ width: '130px' }}
+                                value={pwdFilter}
+                                onChange={e => setPwdFilter(e.target.value)}
+                            >
+                                <option value="all">All staff</option>
+                                <option value="yes">PwD only</option>
+                                <option value="no">Non-PwD</option>
+                                <option value="not_recorded">Not recorded</option>
+                            </select>
+                            <select
+                                className="form-select form-select-sm"
+                                style={{ width: '120px' }}
+                                value={genderFilter}
+                                onChange={e => setGenderFilter(e.target.value)}
+                            >
+                                <option value="All">All genders</option>
+                                {GENDER_OPTIONS.map(g => <option key={g} value={g}>{g}</option>)}
+                            </select>
+                            <select
+                                className="form-select form-select-sm"
+                                style={{ width: '140px' }}
+                                value={categoryFilter}
+                                onChange={e => setCategoryFilter(e.target.value)}
+                            >
+                                <option value="All">All categories</option>
+                                {STAFF_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+                            </select>
+                            <button
+                                className="btn btn-sm btn-outline-danger fw-bold"
+                                onClick={() => exportPDF('staff', 'Staff Evaluations')}
+                            >
+                                PDF
+                            </button>
                             <button
                                 className="btn btn-sm btn-primary fw-bold"
                                 style={{ background: 'var(--mubs-blue)', borderColor: 'var(--mubs-blue)' }}
                                 onClick={() => exportExcel('staff', 'Staff Evaluations')}
                             >
                                 <span className="material-symbols-outlined me-1" style={{ fontSize: '16px' }}>download</span>
-                                Export Current View
+                                Export
                             </button>
                         </div>
                     </div>
+                    {staffSummary && (
+                        <div className="px-4 py-2 border-bottom bg-light small d-flex flex-wrap gap-3">
+                            <span><strong>{staffSummary.pwd_count}</strong> PwD staff of <strong>{staffSummary.total_active}</strong> active ({staffSummary.pwd_pct}%)</span>
+                            <span className="text-muted">Showing {filteredStaff.length} in current filter</span>
+                        </div>
+                    )}
                     <div className="table-responsive">
                         <table className="table mb-0">
                             <thead>
                                 <tr>
                                     <th>Staff Name</th>
                                     <th>Department</th>
+                                    {showPwdColumns && <th>Gender</th>}
+                                    {showPwdColumns && <th>PwD</th>}
+                                    {pwdFilter === 'yes' && <th>Disability Type</th>}
+                                    {showPwdColumns && <th>Category</th>}
                                     <th>Activities Assigned</th>
                                     <th>Completed</th>
                                     <th>Completion Rate</th>
                                     <th>Evaluation</th>
+                                    <th className="text-end">Actions</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {loadingStaff ? (
-                                    <tr><td colSpan={6} className="text-center py-4"><div className="spinner-border text-primary" role="status"><span className="visually-hidden">Loading...</span></div></td></tr>
+                                    <tr><td colSpan={12} className="text-center py-4"><div className="spinner-border text-primary" role="status"><span className="visually-hidden">Loading...</span></div></td></tr>
                                 ) : paginatedStaff.length === 0 ? (
-                                    <tr><td colSpan={6} className="text-center py-4 text-muted">No evaluations found</td></tr>
-                                ) : paginatedStaff.map((staff, index) => {
+                                    <tr><td colSpan={12} className="text-center py-4 text-muted">No staff found for the selected filters</td></tr>
+                                ) : paginatedStaff.map((staff) => {
                                     const scoreStyle = getScoreBadge(staff.evaluation);
                                     return (
-                                        <tr key={index}>
+                                        <tr key={staff.user_id}>
                                             <td className="fw-bold text-dark" style={{ fontSize: '.85rem' }}>{staff.name}</td>
                                             <td style={{ fontSize: '.83rem' }}>{staff.department}</td>
+                                            {showPwdColumns && <td style={{ fontSize: '.83rem' }}>{staff.gender || '—'}</td>}
+                                            {showPwdColumns && (
+                                                <td style={{ fontSize: '.83rem' }}>
+                                                    {staff.disability_status === 'Yes' ? (
+                                                        <span className="badge bg-info text-dark">Yes</span>
+                                                    ) : (
+                                                        staff.disability_status || '—'
+                                                    )}
+                                                </td>
+                                            )}
+                                            {pwdFilter === 'yes' && <td style={{ fontSize: '.83rem' }}>{staff.disability_type || '—'}</td>}
+                                            {showPwdColumns && <td style={{ fontSize: '.83rem' }}>{staff.staff_category || '—'}</td>}
                                             <td style={{ fontSize: '.83rem' }}>{staff.assigned}</td>
                                             <td style={{ fontSize: '.83rem' }}>{staff.completed}</td>
                                             <td>
@@ -605,6 +778,17 @@ export default function ReportsView() {
                                             </td>
                                             <td>
                                                 <span className="status-badge" style={{ background: scoreStyle.bg, color: scoreStyle.color }}>{staff.evaluation}</span>
+                                            </td>
+                                            <td className="text-end">
+                                                <button
+                                                    type="button"
+                                                    className="btn btn-sm btn-outline-primary fw-bold d-inline-flex align-items-center gap-1 px-2 py-1"
+                                                    style={{ fontSize: '.75rem', borderRadius: '8px' }}
+                                                    onClick={() => setProfileStaff(staffToProfile(staff))}
+                                                >
+                                                    <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>person_search</span>
+                                                    Profile
+                                                </button>
                                             </td>
                                         </tr>
                                     );
@@ -620,6 +804,17 @@ export default function ReportsView() {
                     </div>
                 </div>
             )}
+
+            <StaffProfileModal
+                staff={profileStaff}
+                onClose={() => setProfileStaff(null)}
+                mode="admin"
+                onEditUser={() => {
+                    const id = profileStaff?.id;
+                    setProfileStaff(null);
+                    if (id) window.location.href = `/admin?pg=users&edit=${id}`;
+                }}
+            />
         </Layout>
     );
 }

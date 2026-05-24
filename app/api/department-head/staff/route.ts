@@ -23,6 +23,18 @@ type StaffRow = {
     staff_category?: string | null;
     contract_start_date?: string | null;
     account_status?: string | null;
+    gender?: string | null;
+    nationality?: string | null;
+    designation_grade?: string | null;
+    date_of_birth?: string | null;
+    date_first_appointment?: string | null;
+    date_current_appointment?: string | null;
+    date_office_assignment?: string | null;
+    retirement_date?: string | null;
+    disability_status?: string | null;
+    disability_type?: string | null;
+    workplace_accommodation?: string | null;
+    special_support_needs?: string | null;
     active_tasks: number;
     sections_concat?: string | null;
 };
@@ -64,8 +76,20 @@ export async function GET() {
                     u.employment_status,
                     u.contract_type,
                     u.staff_category,
-                    u.contract_start_date,
+                    COALESCE(u.contract_start_date, u.contract_start) AS contract_start_date,
                     u.status AS account_status,
+                    u.gender,
+                    u.nationality,
+                    u.designation_grade,
+                    DATE_FORMAT(u.date_of_birth, '%Y-%m-%d') AS date_of_birth,
+                    DATE_FORMAT(u.date_first_appointment, '%Y-%m-%d') AS date_first_appointment,
+                    DATE_FORMAT(u.date_current_appointment, '%Y-%m-%d') AS date_current_appointment,
+                    DATE_FORMAT(u.date_office_assignment, '%Y-%m-%d') AS date_office_assignment,
+                    DATE_FORMAT(u.retirement_date, '%Y-%m-%d') AS retirement_date,
+                    u.disability_status,
+                    u.disability_type,
+                    u.workplace_accommodation,
+                    u.special_support_needs,
                     GROUP_CONCAT(DISTINCT CONCAT(ds.id, ':', ds.name) ORDER BY ds.name SEPARATOR '||') AS sections_concat,
                     (
                         (
@@ -95,8 +119,20 @@ export async function GET() {
                     u.employment_status,
                     u.contract_type,
                     u.staff_category,
-                    u.contract_start_date,
-                    account_status
+                    contract_start_date,
+                    account_status,
+                    u.gender,
+                    u.nationality,
+                    u.designation_grade,
+                    date_of_birth,
+                    date_first_appointment,
+                    date_current_appointment,
+                    date_office_assignment,
+                    retirement_date,
+                    u.disability_status,
+                    u.disability_type,
+                    u.workplace_accommodation,
+                    u.special_support_needs
                 ORDER BY u.full_name ASC
             `,
             values: [...departmentIds]

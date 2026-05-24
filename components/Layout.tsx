@@ -37,7 +37,7 @@ function LayoutContent({ children, sidebarOpen, setSidebarOpen }: any) {
 
       // Both HOD and Staff specific shared keys
       'tasks': 'Task Management',
-      'staff': 'Staff Roster & HR',
+      'staff': 'Staff Development & Training',
       'submissions': 'Submissions & Feedback Tracking',
       'evaluations': 'Evaluations',
 

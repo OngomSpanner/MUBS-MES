@@ -5,6 +5,14 @@ import { Modal, Button, Form } from 'react-bootstrap';
 import { formatRoleForDisplay } from '@/lib/role-routing';
 import { COMMITTEE_TYPES } from '@/lib/committee-types';
 import { STAFF_CATEGORIES } from '@/lib/staff-categories';
+import {
+  EMPLOYMENT_STATUSES,
+  EMPLOYMENT_STATUS_LABELS,
+  GENDER_OPTIONS,
+  LEAVE_STATUSES,
+  DISABILITY_STATUS_OPTIONS,
+  DISABILITY_TYPE_OPTIONS,
+} from '@/lib/staff-biodata';
 
 interface CreateUserModalProps {
   show: boolean;
@@ -34,6 +42,20 @@ export default function CreateUserModal({ show, onHide, onUserCreated }: CreateU
     position: '',
     contract_start: '',
     contract_end: '',
+    gender: '',
+    nationality: '',
+    date_of_birth: '',
+    date_first_appointment: '',
+    date_current_appointment: '',
+    date_office_assignment: '',
+    retirement_date: '',
+    designation_grade: '',
+    employment_status: 'active',
+    leave_status: 'On Duty',
+    disability_status: '',
+    disability_type: '',
+    workplace_accommodation: '',
+    special_support_needs: '',
   });
   const [roles, setRoles] = useState<string[]>([]);
   const [departments, setDepartments] = useState<Department[]>([]);
@@ -104,6 +126,20 @@ export default function CreateUserModal({ show, onHide, onUserCreated }: CreateU
           position: formData.position,
           contract_start: formData.contract_start,
           contract_end: formData.contract_end,
+          gender: formData.gender || null,
+          nationality: formData.nationality,
+          date_of_birth: formData.date_of_birth,
+          date_first_appointment: formData.date_first_appointment,
+          date_current_appointment: formData.date_current_appointment,
+          date_office_assignment: formData.date_office_assignment,
+          retirement_date: formData.retirement_date,
+          designation_grade: formData.designation_grade,
+          employment_status: formData.employment_status,
+          leave_status: formData.leave_status,
+          disability_status: formData.disability_status || null,
+          disability_type: formData.disability_type,
+          workplace_accommodation: formData.workplace_accommodation,
+          special_support_needs: formData.special_support_needs,
         })
       });
 
@@ -126,6 +162,20 @@ export default function CreateUserModal({ show, onHide, onUserCreated }: CreateU
           position: '',
           contract_start: '',
           contract_end: '',
+          gender: '',
+          nationality: '',
+          date_of_birth: '',
+          date_first_appointment: '',
+          date_current_appointment: '',
+          date_office_assignment: '',
+          retirement_date: '',
+          designation_grade: '',
+          employment_status: 'active',
+          leave_status: 'On Duty',
+          disability_status: '',
+          disability_type: '',
+          workplace_accommodation: '',
+          special_support_needs: '',
         });
       } else {
         const data = await response.json().catch(() => ({}));
@@ -262,6 +312,161 @@ export default function CreateUserModal({ show, onHide, onUserCreated }: CreateU
                 <option value="Part-time">Part-time</option>
               </Form.Select>
             </div>
+
+            <div className="col-12 py-1">
+              <hr className="my-1 opacity-25" />
+              <div className="fw-bold small text-primary mb-2">Personal &amp; Biodata</div>
+            </div>
+            <div className="col-md-4">
+              <Form.Label className="fw-bold small">Gender</Form.Label>
+              <Form.Select
+                value={formData.gender}
+                onChange={(e) => setFormData({ ...formData, gender: e.target.value })}
+              >
+                <option value="">Select gender</option>
+                {GENDER_OPTIONS.map((g) => (
+                  <option key={g} value={g}>{g}</option>
+                ))}
+              </Form.Select>
+            </div>
+            <div className="col-md-4">
+              <Form.Label className="fw-bold small">Nationality</Form.Label>
+              <Form.Control
+                type="text"
+                value={formData.nationality}
+                onChange={(e) => setFormData({ ...formData, nationality: e.target.value })}
+              />
+            </div>
+            <div className="col-md-4">
+              <Form.Label className="fw-bold small">Date of Birth</Form.Label>
+              <Form.Control
+                type="date"
+                value={formData.date_of_birth}
+                onChange={(e) => setFormData({ ...formData, date_of_birth: e.target.value })}
+              />
+            </div>
+            <div className="col-md-4">
+              <Form.Label className="fw-bold small">Designation / Grade</Form.Label>
+              <Form.Control
+                type="text"
+                value={formData.designation_grade}
+                onChange={(e) => setFormData({ ...formData, designation_grade: e.target.value })}
+              />
+            </div>
+            <div className="col-md-4">
+              <Form.Label className="fw-bold small">First Appointment</Form.Label>
+              <Form.Control
+                type="date"
+                value={formData.date_first_appointment}
+                onChange={(e) => setFormData({ ...formData, date_first_appointment: e.target.value })}
+              />
+            </div>
+            <div className="col-md-4">
+              <Form.Label className="fw-bold small">Current Position Since</Form.Label>
+              <Form.Control
+                type="date"
+                value={formData.date_current_appointment}
+                onChange={(e) => setFormData({ ...formData, date_current_appointment: e.target.value })}
+              />
+            </div>
+            <div className="col-md-4">
+              <Form.Label className="fw-bold small">Current Office Since</Form.Label>
+              <Form.Control
+                type="date"
+                value={formData.date_office_assignment}
+                onChange={(e) => setFormData({ ...formData, date_office_assignment: e.target.value })}
+              />
+            </div>
+            <div className="col-md-4">
+              <Form.Label className="fw-bold small">Retirement Date</Form.Label>
+              <Form.Control
+                type="date"
+                value={formData.retirement_date}
+                onChange={(e) => setFormData({ ...formData, retirement_date: e.target.value })}
+              />
+            </div>
+            <div className="col-md-4">
+              <Form.Label className="fw-bold small">Employment Status</Form.Label>
+              <Form.Select
+                value={formData.employment_status}
+                onChange={(e) => setFormData({ ...formData, employment_status: e.target.value })}
+              >
+                {EMPLOYMENT_STATUSES.map((s) => (
+                  <option key={s} value={s}>{EMPLOYMENT_STATUS_LABELS[s]}</option>
+                ))}
+              </Form.Select>
+            </div>
+            <div className="col-md-4">
+              <Form.Label className="fw-bold small">Leave Status</Form.Label>
+              <Form.Select
+                value={formData.leave_status}
+                onChange={(e) => setFormData({ ...formData, leave_status: e.target.value })}
+              >
+                {LEAVE_STATUSES.map((s) => (
+                  <option key={s} value={s}>{s}</option>
+                ))}
+              </Form.Select>
+            </div>
+
+            <div className="col-12 py-1">
+              <hr className="my-1 opacity-25" />
+              <div className="fw-bold small text-primary mb-2">Persons with Disabilities (PwD)</div>
+            </div>
+            <div className="col-md-4">
+              <Form.Label className="fw-bold small">Disability Status</Form.Label>
+              <Form.Select
+                value={formData.disability_status}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  setFormData({
+                    ...formData,
+                    disability_status: v,
+                    ...(v !== 'Yes'
+                      ? { disability_type: '', workplace_accommodation: '', special_support_needs: '' }
+                      : {}),
+                  });
+                }}
+              >
+                <option value="">Not recorded</option>
+                {DISABILITY_STATUS_OPTIONS.map((s) => (
+                  <option key={s} value={s}>{s}</option>
+                ))}
+              </Form.Select>
+            </div>
+            {formData.disability_status === 'Yes' && (
+              <>
+                <div className="col-md-8">
+                  <Form.Label className="fw-bold small">Type / Category</Form.Label>
+                  <Form.Select
+                    value={formData.disability_type}
+                    onChange={(e) => setFormData({ ...formData, disability_type: e.target.value })}
+                  >
+                    <option value="">Select type</option>
+                    {DISABILITY_TYPE_OPTIONS.map((t) => (
+                      <option key={t} value={t}>{t}</option>
+                    ))}
+                  </Form.Select>
+                </div>
+                <div className="col-md-6">
+                  <Form.Label className="fw-bold small">Workplace Accommodation</Form.Label>
+                  <Form.Control
+                    as="textarea"
+                    rows={2}
+                    value={formData.workplace_accommodation}
+                    onChange={(e) => setFormData({ ...formData, workplace_accommodation: e.target.value })}
+                  />
+                </div>
+                <div className="col-md-6">
+                  <Form.Label className="fw-bold small">Special Support Needs</Form.Label>
+                  <Form.Control
+                    as="textarea"
+                    rows={2}
+                    value={formData.special_support_needs}
+                    onChange={(e) => setFormData({ ...formData, special_support_needs: e.target.value })}
+                  />
+                </div>
+              </>
+            )}
 
             <div className="col-12 py-1">
               <hr className="my-1 opacity-25" />

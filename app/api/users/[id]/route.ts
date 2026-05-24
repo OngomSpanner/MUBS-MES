@@ -4,6 +4,14 @@ import bcrypt from 'bcryptjs';
 import { cookies } from 'next/headers';
 import { verifyToken } from '@/lib/auth';
 import { normalizeStaffCategory } from '@/lib/staff-categories';
+import {
+  isEmploymentStatus,
+  isGender,
+  isLeaveStatus,
+  normalizeDisabilityPayload,
+  normalizeOptionalDate,
+  normalizeOptionalString,
+} from '@/lib/staff-biodata';
 
 export async function GET(
   request: Request,
@@ -12,12 +20,24 @@ export async function GET(
   const { id } = await params;
   try {
     const userRows = await query({
-      query: `SELECT id, full_name, email, role, department_id, managed_unit_id, status,
-                     first_name, surname, other_names, employee_id, contract_terms, 
-                     contract_type, staff_category, position,
-                     DATE_FORMAT(contract_start, '%Y-%m-%d') as contract_start,
-                     DATE_FORMAT(contract_end, '%Y-%m-%d') as contract_end
-              FROM users WHERE id = ?`,
+      query: `SELECT u.id, u.full_name, u.email, u.role, u.department_id, u.managed_unit_id, u.status,
+                     u.first_name, u.surname, u.other_names, u.employee_id, u.contract_terms, 
+                     u.contract_type, u.staff_category, u.position,
+                     u.gender, u.nationality, u.designation_grade,
+                     u.employment_status, u.leave_status,
+                     DATE_FORMAT(COALESCE(u.contract_start, u.contract_start_date), '%Y-%m-%d') AS contract_start,
+                     DATE_FORMAT(COALESCE(u.contract_end, u.contract_end_date), '%Y-%m-%d') AS contract_end,
+                     DATE_FORMAT(u.date_of_birth, '%Y-%m-%d') AS date_of_birth,
+                     DATE_FORMAT(u.date_first_appointment, '%Y-%m-%d') AS date_first_appointment,
+                     DATE_FORMAT(u.date_current_appointment, '%Y-%m-%d') AS date_current_appointment,
+                     DATE_FORMAT(u.date_office_assignment, '%Y-%m-%d') AS date_office_assignment,
+                     DATE_FORMAT(u.retirement_date, '%Y-%m-%d') AS retirement_date,
+                     u.disability_status, u.disability_type, u.workplace_accommodation, u.special_support_needs,
+                     u.faculty_office,
+                     COALESCE(d.name, '') AS department
+              FROM users u
+              LEFT JOIN departments d ON u.department_id = d.id
+              WHERE u.id = ?`,
       values: [id]
     });
 
@@ -70,7 +90,10 @@ export async function PUT(
     const { 
       full_name, email, role, department_id, managed_unit_id, status, committee_types,
       first_name, surname, other_names, employee_id, contract_terms, contract_type, staff_category,
-      position, contract_start, contract_end
+      position, contract_start, contract_end,
+      gender, nationality, date_of_birth, date_first_appointment, date_current_appointment,
+      date_office_assignment, retirement_date, designation_grade, employment_status, leave_status,
+      disability_status, disability_type, workplace_accommodation, special_support_needs,
     } = body;
 
     const finalFullName = full_name || `${first_name || ''} ${surname || ''}`.trim();
@@ -92,6 +115,41 @@ export async function PUT(
       );
     }
 
+    const genderRaw = gender !== undefined && gender !== null ? String(gender).trim() : '';
+    const genderDb = genderRaw === '' ? null : genderRaw;
+    if (genderDb && !isGender(genderDb)) {
+      return NextResponse.json({ message: 'Invalid gender value.' }, { status: 400 });
+    }
+
+    const employmentStatusRaw =
+      employment_status !== undefined && employment_status !== null
+        ? String(employment_status).trim()
+        : '';
+    const employmentStatusDb = employmentStatusRaw === '' ? null : employmentStatusRaw;
+    if (employmentStatusDb && !isEmploymentStatus(employmentStatusDb)) {
+      return NextResponse.json({ message: 'Invalid employment status.' }, { status: 400 });
+    }
+
+    const leaveStatusRaw =
+      leave_status !== undefined && leave_status !== null ? String(leave_status).trim() : '';
+    const leaveStatusDb = leaveStatusRaw === '' ? null : leaveStatusRaw;
+    if (leaveStatusDb && !isLeaveStatus(leaveStatusDb)) {
+      return NextResponse.json({ message: 'Invalid leave status.' }, { status: 400 });
+    }
+
+    const contractStart = normalizeOptionalDate(contract_start);
+    const contractEnd = normalizeOptionalDate(contract_end);
+
+    const pwd = normalizeDisabilityPayload({
+      disability_status,
+      disability_type,
+      workplace_accommodation,
+      special_support_needs,
+    });
+    if (pwd.error) {
+      return NextResponse.json({ message: pwd.error }, { status: 400 });
+    }
+
     const roleStr = typeof role === 'string' ? role : (Array.isArray(role) ? role.join(',') : '');
     const departmentId = department_id !== undefined && department_id !== '' ? Number(department_id) : null;
     const managedUnitId = managed_unit_id !== undefined && managed_unit_id !== '' ? Number(managed_unit_id) : null;
@@ -101,14 +159,37 @@ export async function PUT(
       SET full_name = ?, email = ?, role = ?, department_id = ?, managed_unit_id = ?, 
           status = ?, first_name = ?, surname = ?, other_names = ?, 
           employee_id = ?, contract_terms = ?, contract_type = ?, staff_category = ?,
-          position = ?, contract_start = ?, contract_end = ?
+          position = ?, contract_start = ?, contract_end = ?,
+          contract_start_date = ?, contract_end_date = ?,
+          gender = ?, nationality = ?, designation_grade = ?,
+          date_of_birth = ?, date_first_appointment = ?, date_current_appointment = ?,
+          date_office_assignment = ?, retirement_date = ?,
+          employment_status = COALESCE(?, employment_status),
+          leave_status = COALESCE(?, leave_status),
+          disability_status = ?, disability_type = ?,
+          workplace_accommodation = ?, special_support_needs = ?
       WHERE id = ?
     `;
     const updateValues = [
       finalFullName, email.trim(), roleStr, departmentId, managedUnitId, 
       status || 'Active', first_name || null, surname || null, other_names || null,
       employee_id || null, contract_terms || null, contract_type || null, staffCategoryDb,
-      position || null, contract_start || null, contract_end || null,
+      position || null, contractStart, contractEnd,
+      contractStart, contractEnd,
+      genderDb,
+      normalizeOptionalString(nationality, 100),
+      normalizeOptionalString(designation_grade, 100),
+      normalizeOptionalDate(date_of_birth),
+      normalizeOptionalDate(date_first_appointment),
+      normalizeOptionalDate(date_current_appointment),
+      normalizeOptionalDate(date_office_assignment),
+      normalizeOptionalDate(retirement_date),
+      employmentStatusDb,
+      leaveStatusDb,
+      pwd.disability_status,
+      pwd.disability_type,
+      pwd.workplace_accommodation,
+      pwd.special_support_needs,
       id
     ];
 

@@ -1,12 +1,22 @@
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
+import { useSearchParams, useRouter } from 'next/navigation';
 import Layout from '@/components/Layout';
 import { Modal, Button, Form } from 'react-bootstrap';
 import CreateUserModal from '@/components/Modals/CreateUserModal';
+import HrSyncControl from '@/components/HrSyncControl';
 import { formatRoleForDisplay } from '@/lib/role-routing';
 import { COMMITTEE_TYPES } from '@/lib/committee-types';
 import { STAFF_CATEGORIES } from '@/lib/staff-categories';
+import {
+    EMPLOYMENT_STATUSES,
+    EMPLOYMENT_STATUS_LABELS,
+    GENDER_OPTIONS,
+    LEAVE_STATUSES,
+    DISABILITY_STATUS_OPTIONS,
+    DISABILITY_TYPE_OPTIONS,
+} from '@/lib/staff-biodata';
 import axios from 'axios';
 
 interface User {
@@ -29,6 +39,9 @@ interface UserStats {
 }
 
 export default function UsersView() {
+    const searchParams = useSearchParams();
+    const router = useRouter();
+    const handledEditIdRef = useRef<string | null>(null);
     const [users, setUsers] = useState<User[]>([]);
     const [loading, setLoading] = useState(true);
     const [stats, setStats] = useState<UserStats>({ total: 0, active: 0, suspended: 0, definedRoles: 0 });
@@ -56,7 +69,21 @@ export default function UsersView() {
         position: '',
         contract_start: '',
         contract_end: '',
-        status: 'Active'
+        status: 'Active',
+        gender: '',
+        nationality: '',
+        date_of_birth: '',
+        date_first_appointment: '',
+        date_current_appointment: '',
+        date_office_assignment: '',
+        retirement_date: '',
+        designation_grade: '',
+        employment_status: 'active',
+        leave_status: 'On Duty',
+        disability_status: '',
+        disability_type: '',
+        workplace_accommodation: '',
+        special_support_needs: '',
     });
     const [departments, setDepartments] = useState<{ id: number; name: string }[]>([]);
     const [faculties, setFaculties] = useState<{ id: number; name: string }[]>([]);
@@ -87,7 +114,79 @@ export default function UsersView() {
     useEffect(() => { setCurrentPage(1); }, [searchTerm, roleFilter, activeSubTab, deptSearchTerm]);
 
     useEffect(() => { fetchUsers(); }, [searchTerm, roleFilter]);
-    useEffect(() => { fetchStats(); }, []);
+
+    const closeEditModal = useCallback(() => {
+        setShowEditModal(false);
+        handledEditIdRef.current = null;
+        if (searchParams.get('edit')) {
+            router.replace('/admin?pg=users');
+        }
+    }, [router, searchParams]);
+
+    useEffect(() => {
+        const editId = searchParams.get('edit');
+        if (!editId) {
+            handledEditIdRef.current = null;
+            return;
+        }
+        if (handledEditIdRef.current === editId) return;
+        handledEditIdRef.current = editId;
+        (async () => {
+            try {
+                const { data } = await axios.get(`/api/users/${editId}`);
+                setSelectedUser({
+                    id: data.id,
+                    full_name: data.full_name,
+                    email: data.email,
+                    role: data.role,
+                    department_id: data.department_id,
+                    managed_unit_id: data.managed_unit_id,
+                    department: data.department || '',
+                    status: data.status,
+                    created_date: '',
+                });
+                setEditForm({
+                    first_name: data.first_name || '',
+                    surname: data.surname || '',
+                    other_names: data.other_names || '',
+                    email: data.email || '',
+                    role: data.role || '',
+                    department_id: data.department_id != null ? data.department_id : '',
+                    managed_unit_id: data.managed_unit_id != null ? data.managed_unit_id : '',
+                    committee_types: Array.isArray(data.committees) ? data.committees : [],
+                    employee_id: data.employee_id || '',
+                    contract_terms: data.contract_terms || 'Permanent',
+                    contract_type: data.contract_type || 'Full-time',
+                    staff_category: data.staff_category || 'Administrative',
+                    position: data.position || '',
+                    contract_start: data.contract_start || '',
+                    contract_end: data.contract_end || '',
+                    status: data.status || 'Active',
+                    gender: data.gender || '',
+                    nationality: data.nationality || '',
+                    date_of_birth: data.date_of_birth || '',
+                    date_first_appointment: data.date_first_appointment || '',
+                    date_current_appointment: data.date_current_appointment || '',
+                    date_office_assignment: data.date_office_assignment || '',
+                    retirement_date: data.retirement_date || '',
+                    designation_grade: data.designation_grade || '',
+                    employment_status: data.employment_status || 'active',
+                    leave_status: data.leave_status || 'On Duty',
+                    disability_status: data.disability_status || '',
+                    disability_type: data.disability_type || '',
+                    workplace_accommodation: data.workplace_accommodation || '',
+                    special_support_needs: data.special_support_needs || '',
+                });
+                setShowEditModal(true);
+            } catch {
+                handledEditIdRef.current = null;
+            }
+        })();
+    }, [searchParams]);
+
+    useEffect(() => {
+        fetchStats();
+    }, []);
 
     useEffect(() => {
         const loadRoles = async () => {
@@ -178,7 +277,21 @@ export default function UsersView() {
                 position: data.position || '',
                 contract_start: data.contract_start || '',
                 contract_end: data.contract_end || '',
-                status: data.status || user.status
+                status: data.status || user.status,
+                gender: data.gender || '',
+                nationality: data.nationality || '',
+                date_of_birth: data.date_of_birth || '',
+                date_first_appointment: data.date_first_appointment || '',
+                date_current_appointment: data.date_current_appointment || '',
+                date_office_assignment: data.date_office_assignment || '',
+                retirement_date: data.retirement_date || '',
+                designation_grade: data.designation_grade || '',
+                employment_status: data.employment_status || 'active',
+                leave_status: data.leave_status || 'On Duty',
+                disability_status: data.disability_status || '',
+                disability_type: data.disability_type || '',
+                workplace_accommodation: data.workplace_accommodation || '',
+                special_support_needs: data.special_support_needs || '',
             });
         } catch {
             setEditForm({
@@ -197,7 +310,21 @@ export default function UsersView() {
                 position: '',
                 contract_start: '',
                 contract_end: '',
-                status: user.status
+                status: user.status,
+                gender: '',
+                nationality: '',
+                date_of_birth: '',
+                date_first_appointment: '',
+                date_current_appointment: '',
+                date_office_assignment: '',
+                retirement_date: '',
+                designation_grade: '',
+                employment_status: 'active',
+                leave_status: 'On Duty',
+                disability_status: '',
+                disability_type: '',
+                workplace_accommodation: '',
+                special_support_needs: '',
             });
         }
         setShowEditModal(true);
@@ -223,10 +350,24 @@ export default function UsersView() {
                 position: editForm.position,
                 contract_start: editForm.contract_start,
                 contract_end: editForm.contract_end,
-                status: editForm.status
+                status: editForm.status,
+                gender: editForm.gender || null,
+                nationality: editForm.nationality,
+                date_of_birth: editForm.date_of_birth,
+                date_first_appointment: editForm.date_first_appointment,
+                date_current_appointment: editForm.date_current_appointment,
+                date_office_assignment: editForm.date_office_assignment,
+                retirement_date: editForm.retirement_date,
+                designation_grade: editForm.designation_grade,
+                employment_status: editForm.employment_status,
+                leave_status: editForm.leave_status,
+                disability_status: editForm.disability_status || null,
+                disability_type: editForm.disability_type,
+                workplace_accommodation: editForm.workplace_accommodation,
+                special_support_needs: editForm.special_support_needs,
             };
             await axios.put(`/api/users/${selectedUser.id}`, payload);
-            setShowEditModal(false);
+            closeEditModal();
             fetchUsers();
             fetchStats();
         } catch (error: any) {
@@ -418,6 +559,12 @@ export default function UsersView() {
                                 <option key={r} value={r}>{formatRoleForDisplay(r)}</option>
                             ))}
                         </select>
+                        <HrSyncControl
+                            onSynced={() => {
+                                fetchUsers();
+                                fetchStats();
+                            }}
+                        />
                         <button className="btn btn-sm create-btn" onClick={() => setShowCreateModal(true)}>
                             <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>person_add</span>
                             New User
@@ -689,7 +836,7 @@ export default function UsersView() {
             )}
 
             {/* Edit User Modal */}
-            <Modal show={showEditModal} onHide={() => setShowEditModal(false)} centered backdrop="static" keyboard={false} size="lg">
+            <Modal show={showEditModal} onHide={closeEditModal} centered backdrop="static" keyboard={false} size="lg">
                 <Modal.Header closeButton className="modal-header-mubs">
                     <Modal.Title className="fw-bold d-flex align-items-center gap-2">
                         <span className="material-symbols-outlined">manage_accounts</span>
@@ -810,6 +957,174 @@ export default function UsersView() {
                             </Form.Select>
                         </div>
 
+                        <div className="col-12 py-1">
+                            <hr className="my-1 opacity-25" />
+                            <div className="fw-bold small text-primary mb-2">Personal &amp; Biodata</div>
+                        </div>
+
+                        <div className="col-md-4">
+                            <Form.Label className="fw-bold small">Gender</Form.Label>
+                            <Form.Select
+                                value={editForm.gender}
+                                onChange={(e) => setEditForm({ ...editForm, gender: e.target.value })}
+                            >
+                                <option value="">Select gender</option>
+                                {GENDER_OPTIONS.map((g) => (
+                                    <option key={g} value={g}>{g}</option>
+                                ))}
+                            </Form.Select>
+                        </div>
+                        <div className="col-md-4">
+                            <Form.Label className="fw-bold small">Nationality</Form.Label>
+                            <Form.Control
+                                type="text"
+                                value={editForm.nationality}
+                                onChange={(e) => setEditForm({ ...editForm, nationality: e.target.value })}
+                            />
+                        </div>
+                        <div className="col-md-4">
+                            <Form.Label className="fw-bold small">Date of Birth</Form.Label>
+                            <Form.Control
+                                type="date"
+                                value={editForm.date_of_birth}
+                                onChange={(e) => setEditForm({ ...editForm, date_of_birth: e.target.value })}
+                            />
+                        </div>
+                        <div className="col-md-4">
+                            <Form.Label className="fw-bold small">Designation / Grade</Form.Label>
+                            <Form.Control
+                                type="text"
+                                placeholder="e.g. Senior Lecturer (Grade 3)"
+                                value={editForm.designation_grade}
+                                onChange={(e) => setEditForm({ ...editForm, designation_grade: e.target.value })}
+                            />
+                        </div>
+                        <div className="col-md-4">
+                            <Form.Label className="fw-bold small">Date of First Appointment</Form.Label>
+                            <Form.Control
+                                type="date"
+                                value={editForm.date_first_appointment}
+                                onChange={(e) => setEditForm({ ...editForm, date_first_appointment: e.target.value })}
+                            />
+                        </div>
+                        <div className="col-md-4">
+                            <Form.Label className="fw-bold small">Date Appointed to Current Position</Form.Label>
+                            <Form.Control
+                                type="date"
+                                value={editForm.date_current_appointment}
+                                onChange={(e) => setEditForm({ ...editForm, date_current_appointment: e.target.value })}
+                            />
+                        </div>
+                        <div className="col-md-4">
+                            <Form.Label className="fw-bold small">Date Assigned to Current Office</Form.Label>
+                            <Form.Control
+                                type="date"
+                                value={editForm.date_office_assignment}
+                                onChange={(e) => setEditForm({ ...editForm, date_office_assignment: e.target.value })}
+                            />
+                        </div>
+                        <div className="col-md-4">
+                            <Form.Label className="fw-bold small">Retirement Date</Form.Label>
+                            <Form.Control
+                                type="date"
+                                value={editForm.retirement_date}
+                                onChange={(e) => setEditForm({ ...editForm, retirement_date: e.target.value })}
+                            />
+                        </div>
+
+                        <div className="col-12 py-1">
+                            <hr className="my-1 opacity-25" />
+                            <div className="fw-bold small text-primary mb-2">Persons with Disabilities (PwD)</div>
+                        </div>
+
+                        <div className="col-md-4">
+                            <Form.Label className="fw-bold small">Disability Status</Form.Label>
+                            <Form.Select
+                                value={editForm.disability_status}
+                                onChange={(e) => {
+                                    const v = e.target.value;
+                                    setEditForm({
+                                        ...editForm,
+                                        disability_status: v,
+                                        ...(v !== 'Yes'
+                                            ? {
+                                                  disability_type: '',
+                                                  workplace_accommodation: '',
+                                                  special_support_needs: '',
+                                              }
+                                            : {}),
+                                    });
+                                }}
+                            >
+                                <option value="">Not recorded</option>
+                                {DISABILITY_STATUS_OPTIONS.map((s) => (
+                                    <option key={s} value={s}>{s}</option>
+                                ))}
+                            </Form.Select>
+                        </div>
+                        {editForm.disability_status === 'Yes' && (
+                            <>
+                                <div className="col-md-8">
+                                    <Form.Label className="fw-bold small">Type / Category of Disability</Form.Label>
+                                    <Form.Select
+                                        value={editForm.disability_type}
+                                        onChange={(e) => setEditForm({ ...editForm, disability_type: e.target.value })}
+                                    >
+                                        <option value="">Select type</option>
+                                        {DISABILITY_TYPE_OPTIONS.map((t) => (
+                                            <option key={t} value={t}>{t}</option>
+                                        ))}
+                                    </Form.Select>
+                                </div>
+                                <div className="col-md-6">
+                                    <Form.Label className="fw-bold small">Workplace Accommodation Requirements</Form.Label>
+                                    <Form.Control
+                                        as="textarea"
+                                        rows={2}
+                                        value={editForm.workplace_accommodation}
+                                        onChange={(e) => setEditForm({ ...editForm, workplace_accommodation: e.target.value })}
+                                    />
+                                </div>
+                                <div className="col-md-6">
+                                    <Form.Label className="fw-bold small">Special Support Needs</Form.Label>
+                                    <Form.Control
+                                        as="textarea"
+                                        rows={2}
+                                        value={editForm.special_support_needs}
+                                        onChange={(e) => setEditForm({ ...editForm, special_support_needs: e.target.value })}
+                                    />
+                                </div>
+                            </>
+                        )}
+
+                        <div className="col-12 py-1">
+                            <hr className="my-1 opacity-25" />
+                            <div className="fw-bold small text-primary mb-2">HR Employment Status</div>
+                        </div>
+
+                        <div className="col-md-6">
+                            <Form.Label className="fw-bold small">Employment Status</Form.Label>
+                            <Form.Select
+                                value={editForm.employment_status}
+                                onChange={(e) => setEditForm({ ...editForm, employment_status: e.target.value })}
+                            >
+                                {EMPLOYMENT_STATUSES.map((s) => (
+                                    <option key={s} value={s}>{EMPLOYMENT_STATUS_LABELS[s]}</option>
+                                ))}
+                            </Form.Select>
+                        </div>
+                        <div className="col-md-6">
+                            <Form.Label className="fw-bold small">Leave Status</Form.Label>
+                            <Form.Select
+                                value={editForm.leave_status}
+                                onChange={(e) => setEditForm({ ...editForm, leave_status: e.target.value })}
+                            >
+                                {LEAVE_STATUSES.map((s) => (
+                                    <option key={s} value={s}>{s}</option>
+                                ))}
+                            </Form.Select>
+                        </div>
+
                         <div className="col-md-6">
                             <Form.Label className="fw-bold small">Account Status</Form.Label>
                             <Form.Select
@@ -908,7 +1223,7 @@ export default function UsersView() {
                     </div>
                 </Modal.Body>
                 <Modal.Footer>
-                    <Button variant="light" onClick={() => setShowEditModal(false)} disabled={saving}>Cancel</Button>
+                    <Button variant="light" onClick={closeEditModal} disabled={saving}>Cancel</Button>
                     <Button
                         style={{ background: 'var(--mubs-blue)', borderColor: 'var(--mubs-blue)' }}
                         className="fw-bold text-white"

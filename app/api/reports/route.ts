@@ -21,6 +21,9 @@ export async function GET(request: Request) {
     const from = searchParams.get('from');
     const to = searchParams.get('to');
     const department = searchParams.get('department');
+    const pwdFilter = searchParams.get('pwd');
+    const genderFilter = searchParams.get('gender');
+    const categoryFilter = searchParams.get('staff_category');
 
     let data: any;
 
@@ -93,18 +96,67 @@ export async function GET(request: Request) {
           whereClause += ' AND d.name = ?';
           vals.push(department);
         }
+        if (genderFilter && genderFilter !== 'All') {
+          whereClause += ' AND u.gender = ?';
+          vals.push(genderFilter);
+        }
+        if (categoryFilter && categoryFilter !== 'All') {
+          whereClause += ' AND u.staff_category = ?';
+          vals.push(categoryFilter);
+        }
+        if (pwdFilter === 'yes') {
+          whereClause += " AND u.disability_status = 'Yes'";
+        } else if (pwdFilter === 'no') {
+          whereClause += " AND u.disability_status = 'No'";
+        } else if (pwdFilter === 'not_recorded') {
+          whereClause += ' AND u.disability_status IS NULL';
+        }
 
-        data = await query({
+        const rows = (await query({
           query: `
             SELECT
+              u.id AS user_id,
               u.full_name AS name,
+              u.email,
               COALESCE(d.name, '—') AS department,
+              u.gender,
+              u.staff_category,
+              u.designation_grade,
+              u.position,
+              u.disability_status,
+              u.disability_type,
+              u.workplace_accommodation,
+              u.special_support_needs,
+              u.leave_status,
+              u.employment_status,
+              u.contract_type,
+              u.nationality,
+              DATE_FORMAT(u.date_of_birth, '%Y-%m-%d') AS date_of_birth,
+              DATE_FORMAT(u.date_first_appointment, '%Y-%m-%d') AS date_first_appointment,
+              DATE_FORMAT(u.date_current_appointment, '%Y-%m-%d') AS date_current_appointment,
+              DATE_FORMAT(u.date_office_assignment, '%Y-%m-%d') AS date_office_assignment,
+              DATE_FORMAT(u.retirement_date, '%Y-%m-%d') AS retirement_date,
+              DATE_FORMAT(COALESCE(u.contract_start_date, u.contract_start), '%Y-%m-%d') AS contract_start_date,
+              DATE_FORMAT(COALESCE(u.contract_end_date, u.contract_end), '%Y-%m-%d') AS contract_end_date,
+              u.status AS account_status,
               IFNULL(assigned.cnt, 0) AS assigned,
               IFNULL(compl.cnt, 0) AS completed,
               CASE
                 WHEN IFNULL(assigned.cnt, 0) = 0 THEN 0
                 ELSE ROUND(IFNULL(compl.cnt, 0) * 100.0 / assigned.cnt, 0)
-              END AS rate
+              END AS rate,
+              (
+                (
+                  SELECT COUNT(*) FROM activity_assignments aa_cnt
+                  WHERE aa_cnt.assigned_to_user_id = u.id
+                  AND LOWER(TRIM(COALESCE(aa_cnt.status, ''))) NOT IN ('completed', 'evaluated', 'not_done')
+                )
+                + (
+                  SELECT COUNT(*) FROM staff_process_assignments spa_cnt
+                  WHERE spa_cnt.staff_id = u.id
+                  AND LOWER(TRIM(COALESCE(spa_cnt.status, ''))) NOT IN ('evaluated', 'completed', 'not_done')
+                )
+              ) AS active_tasks
             FROM users u
             LEFT JOIN departments d ON u.department_id = d.id
             LEFT JOIN (
@@ -122,17 +174,64 @@ export async function GET(request: Request) {
             ) compl ON compl.assigned_to_user_id = u.id
             ${whereClause}
             ORDER BY d.name ASC, u.full_name ASC
-            LIMIT 100
+            LIMIT 500
           `,
           values: vals
-        });
-        data = (data as any[]).map((r: any) => ({
-          name: r.name,
-          department: r.department,
-          assigned: Number(r.assigned ?? 0),
-          completed: Number(r.completed ?? 0),
-          rate: Number(r.rate ?? 0)
-        }));
+        })) as any[];
+
+        const summaryRows = (await query({
+          query: `
+            SELECT
+              COUNT(*) AS total_active,
+              SUM(CASE WHEN u.disability_status = 'Yes' THEN 1 ELSE 0 END) AS pwd_count
+            FROM users u
+            WHERE u.status = 'Active'
+          `,
+          values: []
+        })) as any[];
+
+        const totalActive = Number(summaryRows[0]?.total_active ?? 0);
+        const pwdCount = Number(summaryRows[0]?.pwd_count ?? 0);
+        const pwdPct = totalActive > 0 ? Math.round((pwdCount * 1000) / totalActive) / 10 : 0;
+
+        data = {
+          rows: (rows || []).map((r: any) => ({
+            user_id: Number(r.user_id),
+            name: r.name,
+            email: r.email,
+            department: r.department,
+            gender: r.gender ?? null,
+            staff_category: r.staff_category ?? null,
+            designation_grade: r.designation_grade ?? null,
+            position: r.position ?? null,
+            disability_status: r.disability_status ?? null,
+            disability_type: r.disability_type ?? null,
+            workplace_accommodation: r.workplace_accommodation ?? null,
+            special_support_needs: r.special_support_needs ?? null,
+            leave_status: r.leave_status ?? null,
+            employment_status: r.employment_status ?? null,
+            contract_type: r.contract_type ?? null,
+            nationality: r.nationality ?? null,
+            date_of_birth: r.date_of_birth ?? null,
+            date_first_appointment: r.date_first_appointment ?? null,
+            date_current_appointment: r.date_current_appointment ?? null,
+            date_office_assignment: r.date_office_assignment ?? null,
+            retirement_date: r.retirement_date ?? null,
+            contract_start_date: r.contract_start_date ?? null,
+            contract_end_date: r.contract_end_date ?? null,
+            account_status: r.account_status ?? null,
+            active_tasks: Number(r.active_tasks ?? 0),
+            assigned: Number(r.assigned ?? 0),
+            completed: Number(r.completed ?? 0),
+            rate: Number(r.rate ?? 0),
+          })),
+          summary: {
+            total_active: totalActive,
+            pwd_count: pwdCount,
+            pwd_pct: pwdPct,
+            filtered_count: (rows || []).length,
+          },
+        };
         break;
       }
 
