@@ -98,6 +98,3 @@ node scripts/migrate-staff-reports-process-subtasks.js
 ```
 
 If you run a script and it fails, confirm `.env.local` is present and points to the correct MySQL database.
-
-
->>>>>>> f293ba906931186109e514345db9129e12445d18
