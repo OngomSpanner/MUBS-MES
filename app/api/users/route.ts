@@ -28,31 +28,54 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const role = searchParams.get('role');
     const search = searchParams.get('search');
+    const page = Math.max(parseInt(searchParams.get('page') || '1', 10) || 1, 1);
+    const limit = Math.min(Math.max(parseInt(searchParams.get('limit') || '10', 10) || 10, 1), 100);
+    const offset = (page - 1) * limit;
 
-    let sql = `
-      SELECT u.id, u.full_name, u.email, u.role, u.status, u.department_id, u.managed_unit_id,
-             d.name AS department,
-             DATE_FORMAT(u.created_at, '%d %b %Y') as created_date
-      FROM users u
-      LEFT JOIN departments d ON u.department_id = d.id
-      WHERE 1=1
-    `;
-    const values: any[] = [];
+    let where = ' WHERE 1=1';
+    const values: unknown[] = [];
 
     if (role && role !== 'All Roles') {
-      sql += ' AND u.role LIKE ?';
+      where += ' AND u.role LIKE ?';
       values.push(`%${role}%`);
     }
 
     if (search) {
-      sql += ' AND (u.full_name LIKE ? OR u.email LIKE ?)';
+      where += ' AND (u.full_name LIKE ? OR u.email LIKE ?)';
       values.push(`%${search}%`, `%${search}%`);
     }
 
-    sql += ' ORDER BY u.created_at DESC LIMIT 50';
+    const fromClause = `
+      FROM users u
+      LEFT JOIN departments d ON u.department_id = d.id
+    `;
 
-    const users = await query({ query: sql, values });
-    return NextResponse.json(users);
+    const countRows = (await query({
+      query: `SELECT COUNT(*) AS total ${fromClause} ${where}`,
+      values,
+    })) as { total: number }[];
+
+    const total = Number(countRows[0]?.total ?? 0);
+
+    const users = await query({
+      query: `
+      SELECT u.id, u.full_name, u.email, u.role, u.status, u.department_id, u.managed_unit_id,
+             d.name AS department,
+             DATE_FORMAT(u.created_at, '%d %b %Y') as created_date
+      ${fromClause}
+      ${where}
+      ORDER BY u.id ASC
+      LIMIT ${limit} OFFSET ${offset}`,
+      values,
+    });
+
+    return NextResponse.json({
+      users,
+      total,
+      page,
+      pageSize: limit,
+      totalPages: Math.max(1, Math.ceil(total / limit)),
+    });
   } catch (error) {
     console.error('Error fetching users:', error);
     return NextResponse.json(

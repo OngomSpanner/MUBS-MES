@@ -43,6 +43,8 @@ export default function UsersView() {
     const router = useRouter();
     const handledEditIdRef = useRef<string | null>(null);
     const [users, setUsers] = useState<User[]>([]);
+    const [usersTotal, setUsersTotal] = useState(0);
+    const [usersTotalPages, setUsersTotalPages] = useState(1);
     const [loading, setLoading] = useState(true);
     const [stats, setStats] = useState<UserStats>({ total: 0, active: 0, suspended: 0, definedRoles: 0 });
     const [showCreateModal, setShowCreateModal] = useState(false);
@@ -113,7 +115,9 @@ export default function UsersView() {
     // Reset page when filters change
     useEffect(() => { setCurrentPage(1); }, [searchTerm, roleFilter, activeSubTab, deptSearchTerm]);
 
-    useEffect(() => { fetchUsers(); }, [searchTerm, roleFilter]);
+    useEffect(() => {
+        fetchUsers();
+    }, [searchTerm, roleFilter, currentPage]);
 
     const closeEditModal = useCallback(() => {
         setShowEditModal(false);
@@ -244,12 +248,24 @@ export default function UsersView() {
     };
 
     const fetchUsers = async () => {
+        setLoading(true);
         try {
             const params = new URLSearchParams();
+            params.append('page', String(currentPage));
+            params.append('limit', String(PAGE_SIZE));
             if (searchTerm) params.append('search', searchTerm);
             if (roleFilter) params.append('role', roleFilter);
-            const response = await axios.get(`/api/users?${params.toString()}`);
-            setUsers(response.data);
+            const { data } = await axios.get<{
+                users: User[];
+                total: number;
+                totalPages: number;
+            }>(`/api/users?${params.toString()}`);
+            setUsers(Array.isArray(data.users) ? data.users : []);
+            setUsersTotal(data.total ?? 0);
+            setUsersTotalPages(data.totalPages ?? 1);
+            if (currentPage > (data.totalPages ?? 1)) {
+                setCurrentPage(Math.max(1, data.totalPages ?? 1));
+            }
         } catch (error) {
             console.error('Error fetching users:', error);
         } finally {
@@ -479,9 +495,21 @@ export default function UsersView() {
                 role === 'Head of Department' || role === 'Unit Head' || role === 'HOD' ? 'corporate_fare' :
                     role === 'Ambassador' ? 'verified_user' : 'assignment_ind';
 
-    // Client-side pagination
-    const totalPages = Math.max(1, Math.ceil(users.length / PAGE_SIZE));
-    const paginatedUsers = users.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+    const totalPages = usersTotalPages;
+    const rangeStart = usersTotal === 0 ? 0 : (currentPage - 1) * PAGE_SIZE + 1;
+    const rangeEnd = Math.min(currentPage * PAGE_SIZE, usersTotal);
+
+    const visiblePages = (() => {
+        if (totalPages <= 7) {
+            return Array.from({ length: totalPages }, (_, i) => i + 1);
+        }
+        const pages = new Set<number>([1, totalPages, currentPage]);
+        if (currentPage > 1) pages.add(currentPage - 1);
+        if (currentPage < totalPages) pages.add(currentPage + 1);
+        if (currentPage > 2) pages.add(currentPage - 2);
+        if (currentPage < totalPages - 1) pages.add(currentPage + 2);
+        return Array.from(pages).sort((a, b) => a - b);
+    })();
 
     return (
         <Layout>
@@ -591,12 +619,12 @@ export default function UsersView() {
                                         </div>
                                     </td>
                                 </tr>
-                            ) : paginatedUsers.length === 0 ? (
+                            ) : users.length === 0 ? (
                                 <tr>
                                     <td colSpan={5} className="text-center py-4 text-muted">No users found</td>
                                 </tr>
                             ) : (
-                                paginatedUsers.map((user) => {
+                                users.map((user) => {
                                     const roleStyle = getRoleBadge(user.role);
                                     const statusStyle = getStatusBadge(user.status);
                                     return (
@@ -661,18 +689,28 @@ export default function UsersView() {
                 </div>
                 <div className="table-card-footer">
                     <span className="footer-label">
-                        Showing {users.length === 0 ? 0 : (currentPage - 1) * PAGE_SIZE + 1}–{Math.min(currentPage * PAGE_SIZE, users.length)} of {users.length} users
+                        Showing {rangeStart}–{rangeEnd} of {usersTotal} users
+                        {totalPages > 1 ? ` · Page ${currentPage} of ${totalPages}` : ''}
                     </span>
-                    <div className="d-flex gap-1">
-                        <button className="page-btn" disabled={currentPage === 1} onClick={() => setCurrentPage(p => p - 1)}>‹</button>
-                        {Array.from({ length: totalPages }, (_, i) => i + 1).map(pg => (
-                            <button
-                                key={pg}
-                                className={`page-btn ${pg === currentPage ? 'active' : ''}`}
-                                onClick={() => setCurrentPage(pg)}
-                            >{pg}</button>
-                        ))}
-                        <button className="page-btn" disabled={currentPage === totalPages} onClick={() => setCurrentPage(p => p + 1)}>›</button>
+                    <div className="d-flex gap-1 align-items-center flex-wrap">
+                        <button className="page-btn" disabled={currentPage === 1 || loading} onClick={() => setCurrentPage(1)} title="First page">«</button>
+                        <button className="page-btn" disabled={currentPage === 1 || loading} onClick={() => setCurrentPage(p => p - 1)}>‹</button>
+                        {visiblePages.map((pg, idx) => {
+                            const prev = visiblePages[idx - 1];
+                            const showEllipsis = prev != null && pg - prev > 1;
+                            return (
+                                <span key={pg} className="d-flex gap-1">
+                                    {showEllipsis && <span className="px-1 text-muted">…</span>}
+                                    <button
+                                        className={`page-btn ${pg === currentPage ? 'active' : ''}`}
+                                        disabled={loading}
+                                        onClick={() => setCurrentPage(pg)}
+                                    >{pg}</button>
+                                </span>
+                            );
+                        })}
+                        <button className="page-btn" disabled={currentPage === totalPages || loading} onClick={() => setCurrentPage(p => p + 1)}>›</button>
+                        <button className="page-btn" disabled={currentPage === totalPages || loading} onClick={() => setCurrentPage(totalPages)} title="Last page">»</button>
                     </div>
                 </div>
             </div>
