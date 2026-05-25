@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import axios from 'axios';
 import StaffProfileModal from '@/components/Staff/StaffProfileModal';
 import { StaffProfileData } from '@/lib/staff-biodata';
@@ -83,6 +83,7 @@ function parseSectionsResponse(payload: unknown): {
 
 export default function DepartmentStaff() {
     const router = useRouter();
+    const searchParams = useSearchParams();
     const [data, setData] = useState<StaffData | null>(null);
     const [sections, setSections] = useState<Section[]>([]);
     const [defaultDepartmentId, setDefaultDepartmentId] = useState<number | null>(null);
@@ -91,7 +92,7 @@ export default function DepartmentStaff() {
     const [error, setError] = useState<string | null>(null);
     const [searchTerm, setSearchTerm] = useState('');
     const [profileStaff, setProfileStaff] = useState<StaffProfileData | null>(null);
-    const [activeTab, setActiveTab] = useState<'staff' | 'sections'>('sections');
+    const [activeTab, setActiveTab] = useState<'staff' | 'sections'>('staff');
     const [showCreateSection, setShowCreateSection] = useState(false);
     const [createSectionName, setCreateSectionName] = useState('');
     const [createSectionHead, setCreateSectionHead] = useState<string>('');
@@ -117,6 +118,12 @@ export default function DepartmentStaff() {
             setLoadingSections(false);
         }
     };
+
+    useEffect(() => {
+        const tab = searchParams.get('tab');
+        if (tab === 'sections') setActiveTab('sections');
+        else if (tab === 'staff') setActiveTab('staff');
+    }, [searchParams]);
 
     useEffect(() => {
         const fetchData = async () => {
