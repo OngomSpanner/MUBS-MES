@@ -228,12 +228,17 @@ export function buildStaffProfileRows(staff: StaffProfileData): Array<{ label: s
   const yearsInOffice = yearsSince(staff.date_office_assignment);
   const rows: Array<{ label: string; value: string }> = [
     { label: 'Department / unit', value: staff.department || '—' },
-    { label: 'Faculty / office', value: staff.faculty_office || '—' },
+  ];
+  const facultyOffice = staff.faculty_office?.trim();
+  if (facultyOffice) {
+    rows.push({ label: 'Faculty / office', value: facultyOffice });
+  }
+  rows.push(
     { label: 'Gender', value: staff.gender || '—' },
     { label: 'Nationality', value: staff.nationality || '—' },
     { label: 'Date of birth', value: formatDisplayDate(staff.date_of_birth) || '—' },
-    { label: 'Disability status', value: staff.disability_status || '—' },
-  ];
+    { label: 'Disability status', value: staff.disability_status || '—' }
+  );
   if (staff.disability_status === 'Yes') {
     rows.push(
       { label: 'Disability type', value: staff.disability_type || '—' },

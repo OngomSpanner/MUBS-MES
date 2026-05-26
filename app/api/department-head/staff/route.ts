@@ -35,6 +35,7 @@ type StaffRow = {
     disability_type?: string | null;
     workplace_accommodation?: string | null;
     special_support_needs?: string | null;
+    faculty_office?: string | null;
     active_tasks: number;
     sections_concat?: string | null;
 };
@@ -90,6 +91,7 @@ export async function GET() {
                     u.disability_type,
                     u.workplace_accommodation,
                     u.special_support_needs,
+                    u.faculty_office,
                     GROUP_CONCAT(DISTINCT CONCAT(ds.id, ':', ds.name) ORDER BY ds.name SEPARATOR '||') AS sections_concat,
                     (
                         (
@@ -132,7 +134,8 @@ export async function GET() {
                     u.disability_status,
                     u.disability_type,
                     u.workplace_accommodation,
-                    u.special_support_needs
+                    u.special_support_needs,
+                    u.faculty_office
                 ORDER BY u.full_name ASC
             `,
             values: [...departmentIds]

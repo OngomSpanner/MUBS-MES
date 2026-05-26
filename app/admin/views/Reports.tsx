@@ -23,6 +23,7 @@ interface StaffEvaluation {
     name: string;
     email: string;
     department: string;
+    faculty_office?: string | null;
     gender?: string | null;
     staff_category?: string | null;
     designation_grade?: string | null;
@@ -224,6 +225,7 @@ export default function ReportsView() {
         full_name: s.name,
         email: s.email,
         department: s.department,
+        faculty_office: s.faculty_office,
         gender: s.gender,
         nationality: s.nationality,
         position: s.position,

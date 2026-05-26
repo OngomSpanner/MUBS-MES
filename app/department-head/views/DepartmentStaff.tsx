@@ -31,6 +31,7 @@ interface Staff {
     disability_type?: string | null;
     workplace_accommodation?: string | null;
     special_support_needs?: string | null;
+    faculty_office?: string | null;
     sections?: Array<{ id: number; name: string }>;
 }
 
