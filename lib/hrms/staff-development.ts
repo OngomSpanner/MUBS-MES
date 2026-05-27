@@ -203,7 +203,7 @@ async function loadDevelopmentEntries(
     })) as typeof rows;
   } catch {
     try {
-      rows = (await query({
+      const legacyRows = (await query({
         query: `
           SELECT user_id, academic_year_key, education_level, programme, is_recommended
           FROM staff_development_entries
@@ -217,7 +217,7 @@ async function loadDevelopmentEntries(
         programme: string | null;
         is_recommended: number;
       }[];
-      rows = rows.map((r) => ({ ...r, training_status: null }));
+      rows = legacyRows.map((r) => ({ ...r, training_status: null }));
     } catch {
       return new Map();
     }

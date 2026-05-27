@@ -124,11 +124,11 @@ export default function StaffPaymentsPanel() {
 
     const head = [
       [
-        { content: 'Designation', rowSpan: 2, styles: { valign: 'middle' } },
+        { content: 'Designation', rowSpan: 2, styles: { valign: 'middle' as const } },
         ...report.yearKeys.map((key) => ({
           content: report.years[key] ?? key,
           colSpan: 3,
-          styles: { halign: 'center' },
+          styles: { halign: 'center' as const },
         })),
       ],
       [...report.yearKeys.flatMap(() => GENDER_HEADERS)],

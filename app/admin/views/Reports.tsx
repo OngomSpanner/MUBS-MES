@@ -102,7 +102,25 @@ export default function ReportsView() {
     const [dateFrom, setDateFrom] = useState('');
     const [dateTo, setDateTo] = useState('');
     const [activeTab, setActiveTab] = useState<
-        'summary' | 'staff' | 'establishment' | 'promotion' | 'retention' | 'recruitment' | 'turnover' | 'development' | 'payments' | 'benefits' | 'trends' | 'workforce-assessments' | 'employment-skill-status' | 'miscellaneous'
+        | 'summary'
+        | 'staff'
+        | 'establishment'
+        | 'promotion'
+        | 'retention'
+        | 'recruitment'
+        | 'turnover'
+        | 'development'
+        | 'payments'
+        | 'benefits'
+        | 'trends'
+        | 'workforce-assessments'
+        | 'employment-skill-status'
+        | 'strategic-priority'
+        | 'job-description-workplans'
+        | 'staff-student-ratio'
+        | 'programme-enrollment'
+        | 'course-unit-enrollment'
+        | 'miscellaneous'
     >('summary');
 
     const [departmentsList, setDepartmentsList] = useState<string[]>([]);
