@@ -3,6 +3,22 @@ import { query } from '@/lib/db';
 import { cookies } from 'next/headers';
 import { verifyToken } from '@/lib/auth';
 import { STRATEGIC_PILLARS_2025_2030, PILLAR_LABELS } from '@/lib/strategic-plan';
+import { generateStaffEstablishmentReport } from '@/lib/hrms/staff-establishment';
+import { generateStaffPromotionReport } from '@/lib/hrms/staff-promotion';
+import { generateStaffRetentionReport } from '@/lib/hrms/staff-retention';
+import { generateStaffRecruitmentReport } from '@/lib/hrms/staff-recruitment';
+import { generateStaffTurnoverReport } from '@/lib/hrms/staff-turnover';
+import { generateStaffDevelopmentReport } from '@/lib/hrms/staff-development';
+import { generateStaffPaymentsReport } from '@/lib/hrms/staff-payments';
+import { generateStaffBenefitsReport } from '@/lib/hrms/staff-benefits';
+import { generateStaffMiscellaneousReport } from '@/lib/hrms/staff-miscellaneous';
+import { generateStaffWorkforceAssessmentsReport } from '@/lib/hrms/staff-workforce-assessments';
+import { generateStaffEmploymentSkillStatusReport } from '@/lib/hrms/staff-employment-skill-status';
+import { generateStaffStrategicPriorityReport } from '@/lib/hrms/staff-strategic-priority';
+import { generateStaffJobDescriptionWorkplansReport } from '@/lib/hrms/staff-job-description-workplans';
+import { generateStaffStudentRatioReport } from '@/lib/hrms/staff-student-ratio';
+import { generateStaffProgrammeEnrollmentReport } from '@/lib/hrms/staff-programme-enrollment';
+import { generateStaffCourseUnitEnrollmentReport } from '@/lib/hrms/staff-course-unit-enrollment';
 
 export async function GET(request: Request) {
   try {
@@ -90,8 +106,18 @@ export async function GET(request: Request) {
 
       case 'staff-evaluation': {
         const vals: any[] = [];
-        let whereClause = 'WHERE u.status = ?';
-        vals.push('Active');
+        /** HR-synced staff in M&E; exclude separated employment (aligned with staff establishment) */
+        let whereClause = `WHERE u.hrms_staff_id IS NOT NULL
+          AND (
+            u.employment_status IS NULL
+            OR (
+              LOWER(u.employment_status) NOT LIKE '%terminated%'
+              AND LOWER(u.employment_status) NOT LIKE '%resign%'
+              AND LOWER(u.employment_status) NOT LIKE '%retir%'
+              AND LOWER(u.employment_status) NOT LIKE '%deceas%'
+              AND LOWER(u.employment_status) NOT LIKE '%dismiss%'
+            )
+          )`;
         if (department && department !== 'All Departments') {
           whereClause += ' AND d.name = ?';
           vals.push(department);
@@ -175,7 +201,7 @@ export async function GET(request: Request) {
             ) compl ON compl.assigned_to_user_id = u.id
             ${whereClause}
             ORDER BY d.name ASC, u.full_name ASC
-            LIMIT 500
+            LIMIT 10000
           `,
           values: vals
         })) as any[];
@@ -183,17 +209,29 @@ export async function GET(request: Request) {
         const summaryRows = (await query({
           query: `
             SELECT
-              COUNT(*) AS total_active,
+              COUNT(*) AS total_synced,
+              SUM(CASE WHEN u.status = 'Active' THEN 1 ELSE 0 END) AS active_accounts,
               SUM(CASE WHEN u.disability_status = 'Yes' THEN 1 ELSE 0 END) AS pwd_count
             FROM users u
-            WHERE u.status = 'Active'
+            WHERE u.hrms_staff_id IS NOT NULL
+              AND (
+                u.employment_status IS NULL
+                OR (
+                  LOWER(u.employment_status) NOT LIKE '%terminated%'
+                  AND LOWER(u.employment_status) NOT LIKE '%resign%'
+                  AND LOWER(u.employment_status) NOT LIKE '%retir%'
+                  AND LOWER(u.employment_status) NOT LIKE '%deceas%'
+                  AND LOWER(u.employment_status) NOT LIKE '%dismiss%'
+                )
+              )
           `,
           values: []
         })) as any[];
 
-        const totalActive = Number(summaryRows[0]?.total_active ?? 0);
+        const totalSynced = Number(summaryRows[0]?.total_synced ?? 0);
+        const activeAccounts = Number(summaryRows[0]?.active_accounts ?? 0);
         const pwdCount = Number(summaryRows[0]?.pwd_count ?? 0);
-        const pwdPct = totalActive > 0 ? Math.round((pwdCount * 1000) / totalActive) / 10 : 0;
+        const pwdPct = totalSynced > 0 ? Math.round((pwdCount * 1000) / totalSynced) / 10 : 0;
 
         data = {
           rows: (rows || []).map((r: any) => ({
@@ -228,7 +266,8 @@ export async function GET(request: Request) {
             rate: Number(r.rate ?? 0),
           })),
           summary: {
-            total_active: totalActive,
+            total_synced: totalSynced,
+            active_accounts: activeAccounts,
             pwd_count: pwdCount,
             pwd_pct: pwdPct,
             filtered_count: (rows || []).length,
@@ -384,6 +423,203 @@ export async function GET(request: Request) {
             ORDER BY sa.end_date ASC
           `,
           values: vals
+        });
+        break;
+      }
+
+      case 'staff-establishment': {
+        const faculty = searchParams.get('faculty');
+        const dept = searchParams.get('department');
+        const establishmentPwd = searchParams.get('pwd');
+        data = await generateStaffEstablishmentReport({
+          faculty:
+            faculty && faculty !== 'All Faculties' ? faculty : null,
+          department:
+            dept && dept !== 'All Departments' ? dept : null,
+          pwd: establishmentPwd,
+        });
+        break;
+      }
+
+      case 'staff-promotion': {
+        const faculty = searchParams.get('faculty');
+        const dept = searchParams.get('department');
+        const promotionPwd = searchParams.get('pwd');
+        data = await generateStaffPromotionReport({
+          faculty:
+            faculty && faculty !== 'All Faculties' ? faculty : null,
+          department:
+            dept && dept !== 'All Departments' ? dept : null,
+          pwd: promotionPwd,
+        });
+        break;
+      }
+
+      case 'staff-retention': {
+        const faculty = searchParams.get('faculty');
+        const dept = searchParams.get('department');
+        const retentionPwd = searchParams.get('pwd');
+        data = await generateStaffRetentionReport({
+          faculty:
+            faculty && faculty !== 'All Faculties' ? faculty : null,
+          department:
+            dept && dept !== 'All Departments' ? dept : null,
+          pwd: retentionPwd,
+        });
+        break;
+      }
+
+      case 'staff-recruitment': {
+        const faculty = searchParams.get('faculty');
+        const dept = searchParams.get('department');
+        const recruitmentPwd = searchParams.get('pwd');
+        data = await generateStaffRecruitmentReport({
+          faculty:
+            faculty && faculty !== 'All Faculties' ? faculty : null,
+          department:
+            dept && dept !== 'All Departments' ? dept : null,
+          pwd: recruitmentPwd,
+        });
+        break;
+      }
+
+      case 'staff-turnover': {
+        const faculty = searchParams.get('faculty');
+        const dept = searchParams.get('department');
+        const turnoverPwd = searchParams.get('pwd');
+        const turnoverReason = searchParams.get('reason');
+        data = await generateStaffTurnoverReport({
+          faculty:
+            faculty && faculty !== 'All Faculties' ? faculty : null,
+          department:
+            dept && dept !== 'All Departments' ? dept : null,
+          pwd: turnoverPwd,
+          reason: turnoverReason,
+        });
+        break;
+      }
+
+      case 'staff-development': {
+        const faculty = searchParams.get('faculty');
+        const dept = searchParams.get('department');
+        const devStaffType = searchParams.get('staff_type');
+        const devPwd = searchParams.get('pwd');
+        const academicYear = searchParams.get('academic_year');
+        data = await generateStaffDevelopmentReport({
+          faculty:
+            faculty && faculty !== 'All Faculties' ? faculty : null,
+          department:
+            dept && dept !== 'All Departments' ? dept : null,
+          staff_type: devStaffType,
+          pwd: devPwd,
+          academic_year: academicYear,
+        });
+        break;
+      }
+
+      case 'staff-payments': {
+        const faculty = searchParams.get('faculty');
+        const dept = searchParams.get('department');
+        const pwd = searchParams.get('pwd');
+        const paymentType = searchParams.get('payment_type');
+        data = await generateStaffPaymentsReport({
+          faculty: faculty && faculty !== 'All Faculties' ? faculty : null,
+          department: dept && dept !== 'All Departments' ? dept : null,
+          pwd,
+          payment_type: paymentType,
+        });
+        break;
+      }
+
+      case 'staff-benefits': {
+        const faculty = searchParams.get('faculty');
+        const dept = searchParams.get('department');
+        const benefitsPwd = searchParams.get('pwd');
+        data = await generateStaffBenefitsReport({
+          faculty: faculty && faculty !== 'All Faculties' ? faculty : null,
+          department: dept && dept !== 'All Departments' ? dept : null,
+          pwd: benefitsPwd,
+        });
+        break;
+      }
+
+      case 'staff-miscellaneous': {
+        data = await generateStaffMiscellaneousReport();
+        break;
+      }
+
+      case 'staff-workforce-assessments': {
+        data = await generateStaffWorkforceAssessmentsReport();
+        break;
+      }
+
+      case 'staff-employment-skill-status': {
+        data = await generateStaffEmploymentSkillStatusReport();
+        break;
+      }
+
+      case 'staff-strategic-priority': {
+        const faculty = searchParams.get('faculty');
+        const dept = searchParams.get('department');
+        const priorityGender = searchParams.get('gender');
+        const priorityPwd = searchParams.get('pwd');
+        data = await generateStaffStrategicPriorityReport({
+          faculty: faculty && faculty !== 'All Faculties' ? faculty : null,
+          department: dept && dept !== 'All Departments' ? dept : null,
+          gender: priorityGender,
+          pwd: priorityPwd,
+        });
+        break;
+      }
+
+      case 'staff-job-description-workplans': {
+        const faculty = searchParams.get('faculty');
+        const dept = searchParams.get('department');
+        const g = searchParams.get('gender');
+        const p = searchParams.get('pwd');
+        data = await generateStaffJobDescriptionWorkplansReport({
+          faculty: faculty && faculty !== 'All Faculties' ? faculty : null,
+          department: dept && dept !== 'All Departments' ? dept : null,
+          gender: g,
+          pwd: p,
+        });
+        break;
+      }
+
+      case 'staff-student-ratio': {
+        const faculty = searchParams.get('faculty');
+        const dept = searchParams.get('department');
+        const programme = searchParams.get('programme');
+        const courseUnit = searchParams.get('course_unit');
+        const g = searchParams.get('gender');
+        const p = searchParams.get('pwd');
+        data = await generateStaffStudentRatioReport({
+          faculty: faculty && faculty !== 'All Faculties' ? faculty : null,
+          department: dept && dept !== 'All Departments' ? dept : null,
+          programme: programme && programme !== 'All Programmes' ? programme : null,
+          course_unit: courseUnit && courseUnit !== 'All Course Units' ? courseUnit : null,
+          gender: g,
+          pwd: p,
+        });
+        break;
+      }
+
+      case 'staff-programme-enrollment': {
+        const enrollmentGender = searchParams.get('gender');
+        const enrollmentPwd = searchParams.get('pwd');
+        data = await generateStaffProgrammeEnrollmentReport({
+          gender: enrollmentGender,
+          pwd: enrollmentPwd,
+        });
+        break;
+      }
+
+      case 'staff-course-unit-enrollment': {
+        const g = searchParams.get('gender');
+        const p = searchParams.get('pwd');
+        data = await generateStaffCourseUnitEnrollmentReport({
+          gender: g,
+          pwd: p,
         });
         break;
       }

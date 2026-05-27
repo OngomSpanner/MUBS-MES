@@ -5,6 +5,22 @@ import Layout from '@/components/Layout';
 import axios from 'axios';
 import * as XLSX from 'xlsx';
 import StaffProfileModal from '@/components/Staff/StaffProfileModal';
+import StaffEstablishmentPanel from '@/components/Reports/StaffEstablishmentPanel';
+import StaffPromotionPanel from '@/components/Reports/StaffPromotionPanel';
+import StaffRetentionPanel from '@/components/Reports/StaffRetentionPanel';
+import StaffRecruitmentPanel from '@/components/Reports/StaffRecruitmentPanel';
+import StaffTurnoverPanel from '@/components/Reports/StaffTurnoverPanel';
+import StaffDevelopmentPanel from '@/components/Reports/StaffDevelopmentPanel';
+import StaffPaymentsPanel from '@/components/Reports/StaffPaymentsPanel';
+import StaffBenefitsPanel from '@/components/Reports/StaffBenefitsPanel';
+import StaffMiscellaneousPanel from '@/components/Reports/StaffMiscellaneousPanel';
+import StaffWorkforceAssessmentsPanel from '@/components/Reports/StaffWorkforceAssessmentsPanel';
+import StaffEmploymentSkillStatusPanel from '@/components/Reports/StaffEmploymentSkillStatusPanel';
+import StaffStrategicPriorityPanel from '@/components/Reports/StaffStrategicPriorityPanel';
+import StaffJobDescriptionWorkplansPanel from '@/components/Reports/StaffJobDescriptionWorkplansPanel';
+import StaffStudentRatioPanel from '@/components/Reports/StaffStudentRatioPanel';
+import StaffProgrammeEnrollmentPanel from '@/components/Reports/StaffProgrammeEnrollmentPanel';
+import StaffCourseUnitEnrollmentPanel from '@/components/Reports/StaffCourseUnitEnrollmentPanel';
 import { GENDER_OPTIONS, StaffProfileData } from '@/lib/staff-biodata';
 import { STAFF_CATEGORIES } from '@/lib/staff-categories';
 
@@ -52,7 +68,8 @@ interface StaffEvaluation {
 }
 
 interface StaffReportSummary {
-    total_active: number;
+    total_synced: number;
+    active_accounts: number;
     pwd_count: number;
     pwd_pct: number;
     filtered_count: number;
@@ -84,7 +101,9 @@ export default function ReportsView() {
     const [profileStaff, setProfileStaff] = useState<StaffProfileData | null>(null);
     const [dateFrom, setDateFrom] = useState('');
     const [dateTo, setDateTo] = useState('');
-    const [activeTab, setActiveTab] = useState<'summary' | 'staff' | 'trends'>('summary');
+    const [activeTab, setActiveTab] = useState<
+        'summary' | 'staff' | 'establishment' | 'promotion' | 'retention' | 'recruitment' | 'turnover' | 'development' | 'payments' | 'benefits' | 'trends' | 'workforce-assessments' | 'employment-skill-status' | 'miscellaneous'
+    >('summary');
 
     const [departmentsList, setDepartmentsList] = useState<string[]>([]);
 
@@ -94,7 +113,7 @@ export default function ReportsView() {
 
     // Pagination — Staff Evaluations
     const [staffPage, setStaffPage] = useState(1);
-    const STAFF_PAGE_SIZE = 5;
+    const STAFF_PAGE_SIZE = 10;
 
     useEffect(() => { setUnitPage(1); }, [summaryUnitFilter]);
     useEffect(() => { setStaffPage(1); }, [selectedUnit, pwdFilter, genderFilter, categoryFilter]);
@@ -154,6 +173,7 @@ export default function ReportsView() {
                     name: r.name,
                     email: r.email || '',
                     department: r.department ?? '—',
+                    faculty_office: r.faculty_office ?? null,
                     gender: r.gender ?? null,
                     staff_category: r.staff_category ?? null,
                     designation_grade: r.designation_grade ?? null,
@@ -359,15 +379,46 @@ export default function ReportsView() {
         { title: 'Delayed Activities Report', description: 'All overdue items with escalation log', icon: 'report', color: 'var(--mubs-red)', dataset: 'departments' }
     ];
 
-    const Paginator = ({ page, total, onPrev, onNext, onPage }: { page: number; total: number; onPrev: () => void; onNext: () => void; onPage: (p: number) => void }) => (
-        <div className="d-flex gap-1">
-            <button className="page-btn" disabled={page === 1} onClick={onPrev}>‹</button>
-            {Array.from({ length: total }, (_, i) => i + 1).map(pg => (
-                <button key={pg} className={`page-btn ${pg === page ? 'active' : ''}`} onClick={() => onPage(pg)}>{pg}</button>
-            ))}
-            <button className="page-btn" disabled={page === total} onClick={onNext}>›</button>
-        </div>
-    );
+    const getPageNumbers = (current: number, totalPages: number): (number | 'ellipsis')[] => {
+        if (totalPages <= 7) {
+            return Array.from({ length: totalPages }, (_, i) => i + 1);
+        }
+        const pages = new Set<number>([1, totalPages, current, current - 1, current + 1]);
+        const sorted = Array.from(pages).filter((p) => p >= 1 && p <= totalPages).sort((a, b) => a - b);
+        const items: (number | 'ellipsis')[] = [];
+        for (let i = 0; i < sorted.length; i++) {
+            if (i > 0 && sorted[i] - sorted[i - 1] > 1) items.push('ellipsis');
+            items.push(sorted[i]);
+        }
+        return items;
+    };
+
+    const Paginator = ({ page, total, onPrev, onNext, onPage }: { page: number; total: number; onPrev: () => void; onNext: () => void; onPage: (p: number) => void }) => {
+        if (total <= 1) return null;
+        const pageItems = getPageNumbers(page, total);
+        return (
+            <div className="d-flex gap-1 align-items-center flex-wrap">
+                <button type="button" className="page-btn" disabled={page === 1} onClick={onPrev} aria-label="Previous page">‹</button>
+                {pageItems.map((item, idx) =>
+                    item === 'ellipsis' ? (
+                        <span key={`ellipsis-${idx}`} className="px-1 text-muted" style={{ fontSize: '.8rem' }}>…</span>
+                    ) : (
+                        <button
+                            key={item}
+                            type="button"
+                            className={`page-btn ${item === page ? 'active' : ''}`}
+                            onClick={() => onPage(item)}
+                            aria-label={`Page ${item}`}
+                            aria-current={item === page ? 'page' : undefined}
+                        >
+                            {item}
+                        </button>
+                    )
+                )}
+                <button type="button" className="page-btn" disabled={page === total} onClick={onNext} aria-label="Next page">›</button>
+            </div>
+        );
+    };
 
     // Performance Trends: status overview (donut-style counts) + progress by pillar (horizontal bars)
     const StatusDonut = ({ status }: { status: { completed: number; in_progress: number; delayed: number; pending: number } }) => {
@@ -488,41 +539,6 @@ export default function ReportsView() {
 
     return (
         <Layout>
-            {/* Custom Report Builder Panel */}
-            <div className="table-card mb-4 p-4">
-                <div className="d-flex justify-content-between align-items-center mb-3">
-                    <h6 className="fw-bold m-0 d-flex align-items-center gap-2">
-                        <span className="material-symbols-outlined" style={{ color: 'var(--mubs-blue)' }}>tune</span>
-                        Custom Report Filters
-                    </h6>
-                    <button className="btn btn-sm btn-light border" onClick={() => { setDateFrom(''); setDateTo(''); setSummaryUnitFilter('All Departments'); }}>
-                        Reset Filters
-                    </button>
-                </div>
-                <div className="row g-3">
-                    <div className="col-md-3">
-                        <label className="fw-bold small mb-1">From Date</label>
-                        <input type="date" className="form-control form-control-sm" value={dateFrom} onChange={e => setDateFrom(e.target.value)} />
-                    </div>
-                    <div className="col-md-3">
-                        <label className="fw-bold small mb-1">To Date</label>
-                        <input type="date" className="form-control form-control-sm" value={dateTo} onChange={e => setDateTo(e.target.value)} />
-                    </div>
-                    <div className="col-md-3">
-                        <label className="fw-bold small mb-1">Impact Department</label>
-                        <select className="form-select form-select-sm" value={summaryUnitFilter} onChange={e => setSummaryUnitFilter(e.target.value)}>
-                            <option>All Departments</option>
-                            {departmentsList.map(name => <option key={name} value={name}>{name}</option>)}
-                        </select>
-                    </div>
-                    <div className="col-md-3 d-flex align-items-end">
-                        <button className="btn btn-sm btn-primary w-100 fw-bold" style={{ background: 'var(--mubs-blue)' }} onClick={fetchActivitySummary}>
-                            Apply Filters
-                        </button>
-                    </div>
-                </div>
-            </div>
-
             {/* Nav Tabs */}
             <ul className="nav nav-tabs border-0 mb-4 gap-2">
                 <li className="nav-item">
@@ -536,8 +552,88 @@ export default function ReportsView() {
                     </button>
                 </li>
                 <li className="nav-item">
+                    <button className={`nav-link border rounded-pill px-4 fw-bold ${activeTab === 'establishment' ? 'active bg-primary text-white border-primary' : 'text-muted'}`} onClick={() => setActiveTab('establishment')}>
+                        Staff Establishment
+                    </button>
+                </li>
+                <li className="nav-item">
+                    <button className={`nav-link border rounded-pill px-4 fw-bold ${activeTab === 'promotion' ? 'active bg-primary text-white border-primary' : 'text-muted'}`} onClick={() => setActiveTab('promotion')}>
+                        Staff Promotions
+                    </button>
+                </li>
+                <li className="nav-item">
+                    <button className={`nav-link border rounded-pill px-4 fw-bold ${activeTab === 'retention' ? 'active bg-primary text-white border-primary' : 'text-muted'}`} onClick={() => setActiveTab('retention')}>
+                        Staff Retention
+                    </button>
+                </li>
+                <li className="nav-item">
+                    <button className={`nav-link border rounded-pill px-4 fw-bold ${activeTab === 'recruitment' ? 'active bg-primary text-white border-primary' : 'text-muted'}`} onClick={() => setActiveTab('recruitment')}>
+                        Staff Recruitment
+                    </button>
+                </li>
+                <li className="nav-item">
+                    <button className={`nav-link border rounded-pill px-4 fw-bold ${activeTab === 'turnover' ? 'active bg-primary text-white border-primary' : 'text-muted'}`} onClick={() => setActiveTab('turnover')}>
+                        Staff Turnover
+                    </button>
+                </li>
+                <li className="nav-item">
+                    <button className={`nav-link border rounded-pill px-4 fw-bold ${activeTab === 'development' ? 'active bg-primary text-white border-primary' : 'text-muted'}`} onClick={() => setActiveTab('development')}>
+                        Staff Development
+                    </button>
+                </li>
+                <li className="nav-item">
+                    <button className={`nav-link border rounded-pill px-4 fw-bold ${activeTab === 'payments' ? 'active bg-primary text-white border-primary' : 'text-muted'}`} onClick={() => setActiveTab('payments')}>
+                        Staff Payments
+                    </button>
+                </li>
+                <li className="nav-item">
+                    <button className={`nav-link border rounded-pill px-4 fw-bold ${activeTab === 'benefits' ? 'active bg-primary text-white border-primary' : 'text-muted'}`} onClick={() => setActiveTab('benefits')}>
+                        Staff Benefits
+                    </button>
+                </li>
+                <li className="nav-item">
                     <button className={`nav-link border rounded-pill px-4 fw-bold ${activeTab === 'trends' ? 'active bg-primary text-white border-primary' : 'text-muted'}`} onClick={() => setActiveTab('trends')}>
                         Performance Trends
+                    </button>
+                </li>
+                <li className="nav-item">
+                    <button className={`nav-link border rounded-pill px-4 fw-bold ${activeTab === 'workforce-assessments' ? 'active bg-primary text-white border-primary' : 'text-muted'}`} onClick={() => setActiveTab('workforce-assessments')}>
+                        Workforce Assessments
+                    </button>
+                </li>
+                <li className="nav-item">
+                    <button className={`nav-link border rounded-pill px-4 fw-bold ${activeTab === 'employment-skill-status' ? 'active bg-primary text-white border-primary' : 'text-muted'}`} onClick={() => setActiveTab('employment-skill-status')} title="No of annual employment & skill status report produced">
+                        Employment &amp; Skills
+                    </button>
+                </li>
+                <li className="nav-item">
+                    <button className={`nav-link border rounded-pill px-4 fw-bold ${activeTab === 'strategic-priority' ? 'active bg-primary text-white border-primary' : 'text-muted'}`} onClick={() => setActiveTab('strategic-priority')} title="% of staff in strategic priority areas">
+                        Strategic Priority
+                    </button>
+                </li>
+                <li className="nav-item">
+                    <button className={`nav-link border rounded-pill px-4 fw-bold ${activeTab === 'job-description-workplans' ? 'active bg-primary text-white border-primary' : 'text-muted'}`} onClick={() => setActiveTab('job-description-workplans')} title="% of staff with updated job description and workplans">
+                        Job Descriptions
+                    </button>
+                </li>
+                <li className="nav-item">
+                    <button className={`nav-link border rounded-pill px-4 fw-bold ${activeTab === 'staff-student-ratio' ? 'active bg-primary text-white border-primary' : 'text-muted'}`} onClick={() => setActiveTab('staff-student-ratio')} title="Teaching staff list for staff:student ratio">
+                        Staff-Student Ratio
+                    </button>
+                </li>
+                <li className="nav-item">
+                    <button className={`nav-link border rounded-pill px-4 fw-bold ${activeTab === 'programme-enrollment' ? 'active bg-primary text-white border-primary' : 'text-muted'}`} onClick={() => setActiveTab('programme-enrollment')} title="Number of students in each programme">
+                        Programme Enrollment
+                    </button>
+                </li>
+                <li className="nav-item">
+                    <button className={`nav-link border rounded-pill px-4 fw-bold ${activeTab === 'course-unit-enrollment' ? 'active bg-primary text-white border-primary' : 'text-muted'}`} onClick={() => setActiveTab('course-unit-enrollment')} title="Number of students enrolled per course unit">
+                        Course Unit Enrollment
+                    </button>
+                </li>
+                <li className="nav-item">
+                    <button className={`nav-link border rounded-pill px-4 fw-bold ${activeTab === 'miscellaneous' ? 'active bg-primary text-white border-primary' : 'text-muted'}`} onClick={() => setActiveTab('miscellaneous')}>
+                        Miscellaneous
                     </button>
                 </li>
             </ul>
@@ -581,13 +677,56 @@ export default function ReportsView() {
 
             {activeTab === 'summary' && (
                 /* Activity Progress Summary */
-                <div className="table-card mb-4">
-                    <div className="table-card-header">
+                <>
+                    <div className="table-card mb-4">
+                        <div className="table-card-header">
                         <h5>
                             <span className="material-symbols-outlined me-2" style={{ color: 'var(--mubs-blue)' }}>summarize</span>
                             Activity Progress Summary
                         </h5>
-                        <div className="d-flex gap-2">
+                        <div className="d-flex gap-2 flex-wrap align-items-center">
+                            <input
+                                type="date"
+                                className="form-control form-control-sm"
+                                style={{ width: '160px' }}
+                                value={dateFrom}
+                                onChange={e => setDateFrom(e.target.value)}
+                                aria-label="From date"
+                                title="From date"
+                            />
+                            <input
+                                type="date"
+                                className="form-control form-control-sm"
+                                style={{ width: '160px' }}
+                                value={dateTo}
+                                onChange={e => setDateTo(e.target.value)}
+                                aria-label="To date"
+                                title="To date"
+                            />
+                            <select
+                                className="form-select form-select-sm"
+                                style={{ width: '220px' }}
+                                value={summaryUnitFilter}
+                                onChange={e => setSummaryUnitFilter(e.target.value)}
+                                aria-label="Impact department"
+                                title="Impact department"
+                            >
+                                <option>All Departments</option>
+                                {departmentsList.map(name => <option key={name} value={name}>{name}</option>)}
+                            </select>
+                            <button
+                                className="btn btn-sm btn-primary fw-bold"
+                                style={{ background: 'var(--mubs-blue)' }}
+                                onClick={fetchActivitySummary}
+                            >
+                                Apply
+                            </button>
+                            <button
+                                className="btn btn-sm btn-light border fw-bold"
+                                onClick={() => { setDateFrom(''); setDateTo(''); setSummaryUnitFilter('All Departments'); }}
+                            >
+                                Reset
+                            </button>
                             <button className="btn btn-sm btn-success fw-bold" onClick={() => exportExcel('departments', 'Activity Progress Summary')}>
                                 <span className="material-symbols-outlined me-1" style={{ fontSize: '16px' }}>download</span>
                                 Export Current View
@@ -660,6 +799,71 @@ export default function ReportsView() {
                         <Paginator page={departmentPage} total={totalUnitPages} onPrev={() => setUnitPage(p => p - 1)} onNext={() => setUnitPage(p => p + 1)} onPage={setUnitPage} />
                     </div>
                 </div>
+                </>
+            )}
+
+            {activeTab === 'establishment' && (
+                <StaffEstablishmentPanel />
+            )}
+
+            {activeTab === 'promotion' && (
+                <StaffPromotionPanel />
+            )}
+
+            {activeTab === 'retention' && (
+                <StaffRetentionPanel />
+            )}
+
+            {activeTab === 'recruitment' && (
+                <StaffRecruitmentPanel />
+            )}
+
+            {activeTab === 'turnover' && (
+                <StaffTurnoverPanel />
+            )}
+
+            {activeTab === 'development' && (
+                <StaffDevelopmentPanel />
+            )}
+
+            {activeTab === 'payments' && (
+                <StaffPaymentsPanel />
+            )}
+
+            {activeTab === 'benefits' && (
+                <StaffBenefitsPanel />
+            )}
+
+            {activeTab === 'workforce-assessments' && (
+                <StaffWorkforceAssessmentsPanel />
+            )}
+
+            {activeTab === 'employment-skill-status' && (
+                <StaffEmploymentSkillStatusPanel />
+            )}
+
+            {activeTab === 'strategic-priority' && (
+                <StaffStrategicPriorityPanel />
+            )}
+
+            {activeTab === 'job-description-workplans' && (
+                <StaffJobDescriptionWorkplansPanel />
+            )}
+
+            {activeTab === 'staff-student-ratio' && (
+                <StaffStudentRatioPanel />
+            )}
+
+            {activeTab === 'programme-enrollment' && (
+                <StaffProgrammeEnrollmentPanel />
+            )}
+
+            {activeTab === 'course-unit-enrollment' && (
+                <StaffCourseUnitEnrollmentPanel />
+            )}
+
+            {activeTab === 'miscellaneous' && (
+                <StaffMiscellaneousPanel />
             )}
 
             {activeTab === 'staff' && (
@@ -726,8 +930,13 @@ export default function ReportsView() {
                     </div>
                     {staffSummary && (
                         <div className="px-4 py-2 border-bottom bg-light small d-flex flex-wrap gap-3">
-                            <span><strong>{staffSummary.pwd_count}</strong> PwD staff of <strong>{staffSummary.total_active}</strong> active ({staffSummary.pwd_pct}%)</span>
-                            <span className="text-muted">Showing {filteredStaff.length} in current filter</span>
+                            <span>
+                                <strong>{staffSummary.pwd_count}</strong> PwD of{' '}
+                                <strong>{staffSummary.total_synced.toLocaleString()}</strong> HR-synced staff (
+                                {staffSummary.pwd_pct}%) ·{' '}
+                                <strong>{staffSummary.active_accounts.toLocaleString()}</strong> active M&E accounts
+                            </span>
+                            <span className="text-muted">Showing {filteredStaff.length.toLocaleString()} in current filter</span>
                         </div>
                     )}
                     <div className="table-responsive">

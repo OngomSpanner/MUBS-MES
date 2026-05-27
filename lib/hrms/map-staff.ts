@@ -11,7 +11,7 @@ function mapGender(sex: string | null | undefined): string | null {
   if (s.toLowerCase() === 'm') return 'Male';
   if (s.toLowerCase() === 'f') return 'Female';
   if (isGender(s)) return s;
-  return 'Other';
+  return null;
 }
 
 function mapEmploymentStatus(accStatus: string | null | undefined): string {

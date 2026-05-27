@@ -21,6 +21,7 @@
   word-wrap: normal;
   direction: ltr;
   -webkit-font-feature-settings: 'liga';
+  font-feature-settings: 'liga';
   -webkit-font-smoothing: antialiased;
 }
 
@@ -32,6 +33,8 @@
   --mubs-yellow: #ffcd00;
   --mubs-bg: #004a82;
   --sidebar-w: 270px;
+  /* UI scale (set to 0.8 to match ~80% browser zoom). */
+  --ui-scale: 0.8;
 }
 
 *,
@@ -60,8 +63,11 @@ body {
 
 .app-shell {
   display: flex;
-  height: 100vh;
+  height: calc(100vh / var(--ui-scale));
   overflow: hidden;
+  transform: scale(var(--ui-scale));
+  transform-origin: top left;
+  width: calc(100% / var(--ui-scale));
 }
 
 /* Sidebar */
@@ -418,6 +424,235 @@ body {
   letter-spacing: 0.02em;
   font-weight: 700;
   font-size: 0.72rem;
+}
+
+/* Reports — Staff Establishment matrix table */
+.staff-establishment-table th {
+  text-transform: none;
+  letter-spacing: 0.02em;
+  font-weight: 700;
+  font-size: 0.72rem;
+  vertical-align: middle;
+}
+
+.staff-establishment-table thead tr:first-child th.establishment-year-band-prev {
+  font-size: 0.85rem;
+  font-weight: 800;
+  color: var(--mubs-blue);
+  background: rgba(0, 86, 150, 0.1);
+  border-bottom: 2px solid rgba(0, 86, 150, 0.2);
+}
+
+.staff-establishment-table thead tr:first-child th.establishment-year-band-current {
+  font-size: 0.85rem;
+  font-weight: 800;
+  color: #0f172a;
+  background: #f1f5f9;
+  border-bottom: 2px solid #e2e8f0;
+}
+
+.staff-establishment-table .establishment-year-divider {
+  border-left: 3px solid var(--mubs-blue) !important;
+  box-shadow: inset 3px 0 0 rgba(0, 86, 150, 0.06);
+}
+
+.staff-establishment-table th.establishment-year-prev,
+.staff-establishment-table td.establishment-year-prev {
+  background: rgba(0, 86, 150, 0.04);
+}
+
+.staff-establishment-table th.establishment-year-current,
+.staff-establishment-table td.establishment-year-current {
+  background: #f8fafc;
+}
+
+.staff-establishment-table tbody tr:hover td.establishment-year-prev {
+  background: rgba(0, 86, 150, 0.09);
+}
+
+.staff-establishment-table tbody tr:hover td.establishment-year-current {
+  background: #f1f5f9;
+}
+
+.staff-establishment-table tbody tr.establishment-total-row td {
+  font-weight: 800;
+  border-top: 2px solid #e2e8f0;
+}
+
+.staff-establishment-table tbody tr.establishment-total-row td.establishment-year-prev {
+  background: rgba(0, 86, 150, 0.08);
+}
+
+.staff-establishment-table tbody tr.establishment-total-row td.establishment-year-current {
+  background: #f1f5f9;
+}
+
+/* Reports — Staff Retention list table */
+.staff-retention-table th {
+  text-transform: none;
+  letter-spacing: 0.02em;
+  font-weight: 700;
+  font-size: 0.72rem;
+  vertical-align: middle;
+}
+
+/* Reports — Staff Turnover list table */
+.staff-turnover-table th {
+  text-transform: none;
+  letter-spacing: 0.02em;
+  font-weight: 700;
+  font-size: 0.72rem;
+  vertical-align: middle;
+}
+
+.staff-turnover-table .turnover-category-col {
+  width: 120px;
+  min-width: 120px;
+}
+
+.staff-turnover-table td.turnover-category-cell {
+  background: #f8fafc;
+  color: var(--mubs-blue);
+  font-size: 0.8rem;
+  vertical-align: top;
+}
+
+.staff-retention-table thead tr:first-child th.staff-retention-years-header {
+  font-size: 0.85rem;
+  font-weight: 800;
+  color: var(--mubs-blue);
+  background: rgba(0, 86, 150, 0.1);
+  border-bottom: 2px solid rgba(0, 86, 150, 0.2);
+}
+
+/* Reports — Staff Development matrix */
+.staff-development-table th {
+  text-transform: none;
+  letter-spacing: 0.02em;
+  font-weight: 700;
+  font-size: 0.72rem;
+  vertical-align: middle;
+}
+
+.staff-development-table .staff-dev-name-col {
+  min-width: 180px;
+}
+
+.staff-development-table .staff-dev-type-col {
+  min-width: 110px;
+}
+
+.staff-development-table .staff-dev-year-header {
+  font-size: 0.8rem;
+  font-weight: 800;
+  color: var(--mubs-blue);
+  background: rgba(0, 86, 150, 0.08);
+  border-bottom: 2px solid rgba(0, 86, 150, 0.15);
+}
+
+.staff-development-table .staff-dev-subhead {
+  font-size: 0.68rem;
+  white-space: nowrap;
+}
+
+.staff-development-table .staff-dev-year-divider {
+  border-left: 2px solid rgba(0, 86, 150, 0.2);
+}
+
+.staff-development-training-table th {
+  font-size: 0.75rem;
+  background: rgba(0, 86, 150, 0.08);
+  color: var(--mubs-blue);
+}
+
+/* Reports — Staff Payments matrix */
+.staff-payments-table th {
+  text-transform: none;
+  letter-spacing: 0.02em;
+  font-weight: 700;
+  font-size: 0.72rem;
+  vertical-align: middle;
+}
+
+/* Reports — Staff Benefits matrix */
+.staff-benefits-table th {
+  text-transform: none;
+  letter-spacing: 0.02em;
+  font-weight: 700;
+  font-size: 0.72rem;
+  vertical-align: middle;
+}
+
+/* Reports — Staff Strategic Priority */
+.staff-strategic-priority-table th {
+  text-transform: none;
+  letter-spacing: 0.02em;
+  font-weight: 700;
+  font-size: 0.72rem;
+  vertical-align: middle;
+}
+
+/* Reports — Job description & workplans */
+.staff-job-description-workplans-table th {
+  text-transform: none;
+  letter-spacing: 0.02em;
+  font-weight: 700;
+  font-size: 0.72rem;
+  vertical-align: middle;
+}
+
+/* Reports — Staff-student ratio */
+.staff-student-ratio-table th {
+  text-transform: none;
+  letter-spacing: 0.02em;
+  font-weight: 700;
+  font-size: 0.72rem;
+  vertical-align: middle;
+}
+
+/* Reports — Programme student enrollment */
+.staff-programme-enrollment-table th {
+  text-transform: none;
+  letter-spacing: 0.02em;
+  font-weight: 700;
+  font-size: 0.72rem;
+  vertical-align: middle;
+}
+
+/* Reports — Course unit student enrollment */
+.staff-course-unit-enrollment-table th {
+  text-transform: none;
+  letter-spacing: 0.02em;
+  font-weight: 700;
+  font-size: 0.72rem;
+  vertical-align: middle;
+}
+
+/* Reports — Staff Miscellaneous */
+.staff-miscellaneous-table th {
+  text-transform: none;
+  letter-spacing: 0.02em;
+  font-weight: 700;
+  font-size: 0.72rem;
+  vertical-align: middle;
+}
+
+/* Reports — Workforce Assessments */
+.staff-workforce-assessments-table th {
+  text-transform: none;
+  letter-spacing: 0.02em;
+  font-weight: 700;
+  font-size: 0.72rem;
+  vertical-align: middle;
+}
+
+/* Reports — Employment & skill status */
+.staff-employment-skill-table th {
+  text-transform: none;
+  letter-spacing: 0.02em;
+  font-weight: 700;
+  font-size: 0.72rem;
+  vertical-align: middle;
 }
 
 .table td {

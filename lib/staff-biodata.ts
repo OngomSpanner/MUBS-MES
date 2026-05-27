@@ -2,7 +2,7 @@
  * Staff biodata constants and helpers (Phase 1 HR fields on users table).
  */
 
-export const GENDER_OPTIONS = ['Male', 'Female', 'Other', 'Prefer not to say'] as const;
+export const GENDER_OPTIONS = ['Male', 'Female'] as const;
 export type Gender = (typeof GENDER_OPTIONS)[number];
 
 export const EMPLOYMENT_STATUSES = [

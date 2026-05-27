@@ -58,3 +58,63 @@ export function todayYmd(): string {
   return toYmd(new Date());
 }
 
+/** Entry for matrix reports (establishment, promotions): previous + current FY. */
+export type FinancialYearWindowEntry = {
+  key: string;
+  label: FinancialYearLabel;
+  start: string;
+  end: string;
+};
+
+export function fyStartYearFromDate(d: Date = new Date()): number {
+  const m = d.getMonth() + 1;
+  const y = d.getFullYear();
+  return m >= 7 ? y : y - 1;
+}
+
+export function fyKey(startYear: number): string {
+  const endShort = String(startYear + 1).slice(-2);
+  return `${startYear}_${endShort}`;
+}
+
+export function buildFinancialYearWindowEntry(startYear: number): FinancialYearWindowEntry {
+  const range = fyRangeJulyJune(`${startYear}/${String(startYear + 1).slice(-2)}`)!;
+  return {
+    key: fyKey(startYear),
+    label: range.label,
+    start: range.startYmd,
+    end: range.endYmd,
+  };
+}
+
+/** Previous + current financial year (oldest first) for HR matrix reports. */
+export function getRollingReportFyWindow(asOf: Date = new Date()): FinancialYearWindowEntry[] {
+  const currentStart = fyStartYearFromDate(asOf);
+  return [
+    buildFinancialYearWindowEntry(currentStart - 1),
+    buildFinancialYearWindowEntry(currentStart),
+  ];
+}
+
+export function labelsFromFyWindow(window: FinancialYearWindowEntry[]): Record<string, string> {
+  return Object.fromEntries(window.map((y) => [y.key, y.label]));
+}
+
+/** Three academic years for staff development matrix (oldest first). */
+export function getStaffDevelopmentAyWindow(asOf: Date = new Date()): FinancialYearWindowEntry[] {
+  return getPastFinancialYearWindow(3, asOf);
+}
+
+/** Last N financial years including current (oldest first). Default 5 for recruitment report. */
+export function getPastFinancialYearWindow(
+  count = 5,
+  asOf: Date = new Date()
+): FinancialYearWindowEntry[] {
+  const currentStart = fyStartYearFromDate(asOf);
+  const years: FinancialYearWindowEntry[] = [];
+  for (let i = count - 1; i >= 0; i--) {
+    years.push(buildFinancialYearWindowEntry(currentStart - i));
+  }
+  return years;
+}
+
