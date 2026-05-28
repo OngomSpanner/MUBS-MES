@@ -44,3 +44,7 @@ next-env.d.ts
 /public/screenshots/*
 /public/system-manual.html
 /public/user-manual.html
+
+# database dumps — never commit these (contain PII and credentials)
+*.sql
+!sql/**/*.sql
