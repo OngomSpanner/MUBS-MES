@@ -473,12 +473,17 @@ export async function GET(request: Request) {
         const faculty = searchParams.get('faculty');
         const dept = searchParams.get('department');
         const recruitmentPwd = searchParams.get('pwd');
+        const managedUnitId = searchParams.get('managed_unit_id');
         data = await generateStaffRecruitmentReport({
           faculty:
             faculty && faculty !== 'All Faculties' ? faculty : null,
           department:
             dept && dept !== 'All Departments' ? dept : null,
           pwd: recruitmentPwd,
+          managedUnitId:
+            managedUnitId && Number.isFinite(Number(managedUnitId))
+              ? Number(managedUnitId)
+              : null,
         });
         break;
       }
@@ -549,12 +554,18 @@ export async function GET(request: Request) {
       }
 
       case 'staff-workforce-assessments': {
-        data = await generateStaffWorkforceAssessmentsReport();
+        const managedUnitId = searchParams.get('managed_unit_id');
+        data = await generateStaffWorkforceAssessmentsReport({
+          managedUnitId: managedUnitId ? Number(managedUnitId) : null,
+        });
         break;
       }
 
       case 'staff-employment-skill-status': {
-        data = await generateStaffEmploymentSkillStatusReport();
+        const managedUnitId = searchParams.get('managed_unit_id');
+        data = await generateStaffEmploymentSkillStatusReport({
+          managedUnitId: managedUnitId ? Number(managedUnitId) : null,
+        });
         break;
       }
 

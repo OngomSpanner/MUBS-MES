@@ -7,7 +7,6 @@ import StaffDashboard from './views/StaffDashboard';
 import StaffTasks from './views/StaffTasks';
 import StaffUpdates from './views/StaffUpdates';
 import StaffSubmissions from './views/StaffSubmissions';
-import StaffFeedback from './views/StaffFeedback';
 import StaffProcessTasks from './views/StaffProcessTasks';
 
 function StaffContent() {

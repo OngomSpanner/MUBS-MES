@@ -47,7 +47,7 @@ export default function Topbar({ pageTitle, toggleSidebar }: TopbarProps) {
         const data = await res.json().catch(() => ({}));
         const canonicalRole = normalizeRoleForCookie(data.activeRole || newRole);
         const redirectPath = dashboardPathForRole(canonicalRole) || '/staff';
-        window.location.href = redirectPath;
+        router.replace(redirectPath);
       } else {
         alert('Failed to switch role');
         setLoadingRole(null);

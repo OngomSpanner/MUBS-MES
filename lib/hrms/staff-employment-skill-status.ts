@@ -14,7 +14,10 @@ export type StaffEmploymentSkillStatusReport = {
   byYear: EmploymentSkillYearCell[];
 };
 
-async function loadYearCounts(yearKeys: string[]): Promise<Map<string, { reportsProduced: number; skillsMissing: number }>> {
+async function loadYearCounts(
+  yearKeys: string[],
+  managedUnitId?: number | null
+): Promise<Map<string, { reportsProduced: number; skillsMissing: number }>> {
   const result = new Map<string, { reportsProduced: number; skillsMissing: number }>();
   for (const key of yearKeys) {
     result.set(key, { reportsProduced: 0, skillsMissing: 0 });
@@ -22,14 +25,21 @@ async function loadYearCounts(yearKeys: string[]): Promise<Map<string, { reports
   if (yearKeys.length === 0) return result;
 
   const placeholders = yearKeys.map(() => '?').join(',');
+  const unitClause =
+    managedUnitId != null
+      ? ' AND managed_unit_id = ?'
+      : ' AND managed_unit_id IS NULL';
+  const values: (string | number)[] = [...yearKeys];
+  if (managedUnitId != null) values.push(managedUnitId);
+
   try {
     const rows = (await query({
       query: `
         SELECT financial_year_key, reports_produced, skills_missing
         FROM staff_employment_skill_status
-        WHERE financial_year_key IN (${placeholders})
+        WHERE financial_year_key IN (${placeholders})${unitClause}
       `,
-      values: yearKeys,
+      values,
     })) as { financial_year_key: string; reports_produced: number; skills_missing: number }[];
 
     for (const r of rows) {
@@ -44,11 +54,13 @@ async function loadYearCounts(yearKeys: string[]): Promise<Map<string, { reports
   return result;
 }
 
-export async function generateStaffEmploymentSkillStatusReport(): Promise<StaffEmploymentSkillStatusReport> {
+export async function generateStaffEmploymentSkillStatusReport(options?: {
+  managedUnitId?: number | null;
+}): Promise<StaffEmploymentSkillStatusReport> {
   const window = getRollingReportFyWindow();
   const yearKeys = window.map((y) => y.key);
   const years = labelsFromFyWindow(window);
-  const counts = await loadYearCounts(yearKeys);
+  const counts = await loadYearCounts(yearKeys, options?.managedUnitId);
 
   const byYear: EmploymentSkillYearCell[] = window.map((y) => {
     const c = counts.get(y.key) ?? { reportsProduced: 0, skillsMissing: 0 };

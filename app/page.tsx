@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, Suspense } from 'react';
+import { useState, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Image from 'next/image';
 import { GoogleOAuthProvider, GoogleLogin } from '@react-oauth/google';
@@ -205,7 +205,7 @@ function LoginFormContent() {
         >
           <div className="text-center mb-4">
             <div className="mb-2 d-flex justify-content-center">
-              <Image src="/logo.png" alt="MUBS Logo" width={65} height={65} style={{ objectFit: 'contain' }} priority />
+              <Image src="/logo.webp" alt="MUBS Logo" width={65} height={65} style={{ objectFit: 'contain' }} priority />
             </div>
             <h3 className="fw-bold mb-0" style={{ color: '#003d6b', letterSpacing: '-0.02em', fontSize: '1.5rem' }}>MUBS Monitoring & Evaluation System</h3>
           </div>

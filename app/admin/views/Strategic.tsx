@@ -5,7 +5,6 @@ import Layout from '@/components/Layout';
 import CreateActivityModal from '@/components/Modals/CreateActivityModal';
 import { Modal, Button, Form, Badge } from 'react-bootstrap';
 import axios from 'axios';
-import { linkify } from '@/lib/linkify';
 import { 
   BarChart, 
   Bar, 

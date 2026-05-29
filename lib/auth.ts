@@ -26,7 +26,7 @@ export function verifyToken(token: string) {
   try {
     ensureSecret();
     return jwt.verify(token, JWT_SECRET);
-  } catch (error) {
+  } catch {
     return null;
   }
 }

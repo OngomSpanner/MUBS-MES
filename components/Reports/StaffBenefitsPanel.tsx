@@ -4,24 +4,35 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import axios from 'axios';
 import * as XLSX from 'xlsx';
 import type { StaffBenefitsReport } from '@/lib/hrms/staff-benefits';
+import type { ReportPanelScopeProps } from '@/components/Reports/report-panel-scope';
 
 const GENDER_METRICS = ['male', 'female', 'pwd'] as const;
 const GENDER_HEADERS = ['Male', 'Female', 'PWD'] as const;
 
-export default function StaffBenefitsPanel() {
+export default function StaffBenefitsPanel({
+  scopeFaculty,
+  lockFaculty = false,
+  embedded = false,
+}: ReportPanelScopeProps & { embedded?: boolean } = {}) {
   const [report, setReport] = useState<StaffBenefitsReport | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [facultyFilter, setFacultyFilter] = useState('All Faculties');
+  const [facultyFilter, setFacultyFilter] = useState(scopeFaculty ?? 'All Faculties');
   const [departmentFilter, setDepartmentFilter] = useState('All Departments');
   const [pwdFilter, setPwdFilter] = useState('all');
+
+  useEffect(() => {
+    if (scopeFaculty) setFacultyFilter(scopeFaculty);
+  }, [scopeFaculty]);
+
+  const effectiveFaculty = lockFaculty && scopeFaculty ? scopeFaculty : facultyFilter;
 
   const fetchReport = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
       const params = new URLSearchParams({ type: 'staff-benefits' });
-      if (facultyFilter !== 'All Faculties') params.set('faculty', facultyFilter);
+      if (effectiveFaculty !== 'All Faculties') params.set('faculty', effectiveFaculty);
       if (departmentFilter !== 'All Departments') params.set('department', departmentFilter);
       if (pwdFilter !== 'all') params.set('pwd', pwdFilter);
       const { data } = await axios.get(`/api/reports?${params.toString()}`);
@@ -33,7 +44,7 @@ export default function StaffBenefitsPanel() {
     } finally {
       setLoading(false);
     }
-  }, [facultyFilter, departmentFilter, pwdFilter]);
+  }, [effectiveFaculty, departmentFilter, pwdFilter]);
 
   useEffect(() => {
     fetchReport();
@@ -41,20 +52,20 @@ export default function StaffBenefitsPanel() {
 
   const departmentOptions = useMemo(() => {
     if (!report) return ['All Departments'];
-    if (facultyFilter === 'All Faculties') {
+    if (effectiveFaculty === 'All Faculties') {
       return report.filterOptions.departments;
     }
-    const underFaculty = report.filterOptions.departmentsByFaculty[facultyFilter] ?? [];
+    const underFaculty = report.filterOptions.departmentsByFaculty[effectiveFaculty] ?? [];
     return ['All Departments', ...underFaculty];
-  }, [report, facultyFilter]);
+  }, [report, effectiveFaculty]);
 
   useEffect(() => {
-    if (facultyFilter === 'All Faculties') return;
+    if (effectiveFaculty === 'All Faculties') return;
     if (departmentFilter === 'All Departments') return;
     if (!departmentOptions.includes(departmentFilter)) {
       setDepartmentFilter('All Departments');
     }
-  }, [facultyFilter, departmentFilter, departmentOptions]);
+  }, [effectiveFaculty, departmentFilter, departmentOptions]);
 
   const handleFacultyChange = (value: string) => {
     setFacultyFilter(value);
@@ -62,13 +73,16 @@ export default function StaffBenefitsPanel() {
   };
 
   const resetFilters = () => {
-    setFacultyFilter('All Faculties');
+    if (!lockFaculty) setFacultyFilter('All Faculties');
+    else if (scopeFaculty) setFacultyFilter(scopeFaculty);
     setDepartmentFilter('All Departments');
     setPwdFilter('all');
   };
 
   const filtersAtDefault =
-    facultyFilter === 'All Faculties' && departmentFilter === 'All Departments' && pwdFilter === 'all';
+    (lockFaculty || facultyFilter === 'All Faculties') &&
+    departmentFilter === 'All Departments' &&
+    pwdFilter === 'all';
 
   const formatCount = (n: number) => (n > 0 ? String(n) : '—');
   const yearKeys = report?.yearKeys ?? [];
@@ -159,28 +173,32 @@ export default function StaffBenefitsPanel() {
   const faculties = report?.filterOptions.faculties ?? ['All Faculties'];
 
   return (
-    <div className="table-card">
-      <div className="table-card-header">
-        <h5>
-          <span className="material-symbols-outlined me-2" style={{ color: 'var(--mubs-blue)' }}>
-            card_giftcard
-          </span>
-          Staff Benefits
-        </h5>
+    <div className={embedded ? 'border-0 shadow-none bg-transparent' : 'table-card'}>
+      <div className={embedded ? 'px-3 pt-3 pb-2 border-bottom d-flex justify-content-end flex-wrap gap-2' : 'table-card-header'}>
+        {!embedded && (
+          <h5>
+            <span className="material-symbols-outlined me-2" style={{ color: 'var(--mubs-blue)' }}>
+              card_giftcard
+            </span>
+            Staff Benefits
+          </h5>
+        )}
         <div className="d-flex gap-2 flex-wrap align-items-center">
-          <select
-            className="form-select form-select-sm"
-            style={{ width: '180px' }}
-            value={facultyFilter}
-            onChange={(e) => handleFacultyChange(e.target.value)}
-            aria-label="Faculty or office"
-          >
-            {faculties.map((f) => (
-              <option key={f} value={f}>
-                {f}
-              </option>
-            ))}
-          </select>
+          {!lockFaculty && (
+            <select
+              className="form-select form-select-sm"
+              style={{ width: '180px' }}
+              value={facultyFilter}
+              onChange={(e) => handleFacultyChange(e.target.value)}
+              aria-label="Faculty or office"
+            >
+              {faculties.map((f) => (
+                <option key={f} value={f}>
+                  {f}
+                </option>
+              ))}
+            </select>
+          )}
           <select
             className="form-select form-select-sm"
             style={{ width: '200px' }}

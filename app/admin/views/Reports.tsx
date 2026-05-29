@@ -561,7 +561,7 @@ export default function ReportsView() {
             <ul className="nav nav-tabs border-0 mb-4 gap-2">
                 <li className="nav-item">
                     <button className={`nav-link border rounded-pill px-4 fw-bold ${activeTab === 'summary' ? 'active bg-primary text-white border-primary' : 'text-muted'}`} onClick={() => setActiveTab('summary')}>
-                        Overview
+                        Activity Monitoring
                     </button>
                 </li>
                 <li className="nav-item">
@@ -873,11 +873,23 @@ export default function ReportsView() {
             )}
 
             {activeTab === 'programme-enrollment' && (
-                <StaffProgrammeEnrollmentPanel />
+                <>
+                    <div className="alert alert-secondary py-2 small mb-3">
+                        Data entry is performed by the Strategic Plan Ambassador assigned to the{' '}
+                        <strong>School Registrar&apos;s Office</strong>. This view is read-only for administrators.
+                    </div>
+                    <StaffProgrammeEnrollmentPanel />
+                </>
             )}
 
             {activeTab === 'course-unit-enrollment' && (
-                <StaffCourseUnitEnrollmentPanel />
+                <>
+                    <div className="alert alert-secondary py-2 small mb-3">
+                        Data entry is performed by the Strategic Plan Ambassador assigned to the{' '}
+                        <strong>School Registrar&apos;s Office</strong>. This view is read-only for administrators.
+                    </div>
+                    <StaffCourseUnitEnrollmentPanel />
+                </>
             )}
 
             {activeTab === 'miscellaneous' && (

@@ -3,7 +3,6 @@
 import { useState, useEffect } from 'react';
 import { Modal, Button, Form } from 'react-bootstrap';
 import { formatRoleForDisplay } from '@/lib/role-routing';
-import { COMMITTEE_TYPES } from '@/lib/committee-types';
 import { STAFF_CATEGORIES } from '@/lib/staff-categories';
 import {
   EMPLOYMENT_STATUSES,

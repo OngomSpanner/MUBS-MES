@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server';
 import { query } from '@/lib/db';
-import bcrypt from 'bcryptjs';
 import { cookies } from 'next/headers';
 import { verifyToken } from '@/lib/auth';
 import { normalizeStaffCategory } from '@/lib/staff-categories';

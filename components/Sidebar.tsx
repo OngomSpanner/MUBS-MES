@@ -1,7 +1,10 @@
 "use client";
 
+import Image from 'next/image';
 import Link from 'next/link';
+import { useEffect, useMemo, useState } from 'react';
 import { usePathname, useSearchParams } from 'next/navigation';
+import axios from 'axios';
 
 
 interface SidebarProps {
@@ -14,8 +17,13 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen, onLogoutClick }: 
   const pathname = usePathname();
   const searchParams = useSearchParams();
 
+  const ambassadorPg = pathname.startsWith('/ambassador') ? (searchParams.get('pg') || 'dashboard') : null;
+  const ambassadorTab = ambassadorPg === 'reports' ? (searchParams.get('tab') || 'compliance') : null;
+
   const currentKey = (pathname.startsWith('/admin') || pathname.startsWith('/department-head') || pathname.startsWith('/ambassador'))
-    ? (searchParams.get('pg') || (pathname.startsWith('/ambassador') ? 'dashboard' : 'dashboard'))
+    ? (pathname.startsWith('/ambassador') && ambassadorPg === 'reports'
+        ? `reports-${ambassadorTab}`
+        : (searchParams.get('pg') || (pathname.startsWith('/ambassador') ? 'dashboard' : 'dashboard')))
     : (pathname.substring(1) || 'dashboard');
 
   const adminMenuItems = [
@@ -37,10 +45,34 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen, onLogoutClick }: 
     { key: 'reports', href: '/department-head?pg=reports', icon: 'analytics', label: 'Performance & Reports' },
   ];
   
-  const ambassadorMenuItems = [
-    { key: 'dashboard', href: '/ambassador', icon: 'dashboard', label: 'Faculty Dashboard' },
-    { key: 'reports', href: '/ambassador?pg=reports', icon: 'bar_chart', label: 'Faculty Reports' },
-  ];
+  const [canManageEnrollment, setCanManageEnrollment] = useState(false);
+
+  useEffect(() => {
+    if (!pathname.startsWith('/ambassador')) return;
+    axios
+      .get('/api/ambassador/reports/staff-options')
+      .then((res) => setCanManageEnrollment(Boolean(res.data.canManageEnrollment)))
+      .catch(() => setCanManageEnrollment(false));
+  }, [pathname]);
+
+  const ambassadorMenuItems = useMemo(() => {
+    const items = [
+      { key: 'dashboard', href: '/ambassador', icon: 'dashboard', label: 'Faculty Dashboard' },
+      { key: 'reports-compliance', href: '/ambassador?pg=reports&tab=compliance', icon: 'fact_check', label: 'Dept. Compliance Tracker' },
+      { key: 'reports-staff-profiles', href: '/ambassador?pg=reports&tab=staff-profiles', icon: 'badge', label: 'Staff Profiles' },
+      { key: 'reports-recruitment', href: '/ambassador?pg=reports&tab=recruitment', icon: 'person_add', label: 'Staff Recruitment' },
+      { key: 'reports-benefits', href: '/ambassador?pg=reports&tab=benefits', icon: 'card_giftcard', label: 'Staff Benefits' },
+      { key: 'reports-workforce-assessments', href: '/ambassador?pg=reports&tab=workforce-assessments', icon: 'groups', label: 'Workforce Assessments' },
+      { key: 'reports-employment-skill-status', href: '/ambassador?pg=reports&tab=employment-skill-status', icon: 'school', label: 'Skills Assessments' },
+    ];
+    if (canManageEnrollment) {
+      items.push(
+        { key: 'reports-programme-enrollment', href: '/ambassador?pg=reports&tab=programme-enrollment', icon: 'school', label: 'Programme Enrollment' },
+        { key: 'reports-course-unit-enrollment', href: '/ambassador?pg=reports&tab=course-unit-enrollment', icon: 'menu_book', label: 'Course Unit Enrollment' }
+      );
+    }
+    return items;
+  }, [canManageEnrollment]);
 
   const staffMenuItems = [
     { key: 'dashboard', href: '/staff?pg=dashboard', icon: 'dashboard', label: 'Dashboard' },
@@ -67,9 +99,13 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen, onLogoutClick }: 
       <aside className={`sidebar ${sidebarOpen ? 'show' : ''}`}>
         <div className="sidebar-brand d-flex align-items-center gap-3">
           <div className="logo-box">
-            <img
-              src="logo.png"
+            <Image
+              src="/logo.webp"
               alt="MUBS"
+              width={44}
+              height={44}
+              priority
+              style={{ width: '100%', height: '100%', objectFit: 'contain' }}
             />
           </div>
           <div>
@@ -122,7 +158,7 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen, onLogoutClick }: 
               <span style={{ fontSize: '.78rem', fontWeight: 700 }}>Need Help?</span>
             </div>
             <p style={{ fontSize: '.7rem', color: '#93c5fd', margin: 0 }}>
-              Contact IT support or check the admin guide.
+              Contact IT support at mubsme@mubs.ac.ug.
             </p>
           </div>
         </div>

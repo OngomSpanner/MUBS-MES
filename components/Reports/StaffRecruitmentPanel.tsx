@@ -4,6 +4,11 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import axios from 'axios';
 import * as XLSX from 'xlsx';
 import type { StaffRecruitmentReport } from '@/lib/hrms/staff-recruitment';
+import type { ReportPanelScopeProps } from '@/components/Reports/report-panel-scope';
+import AmbassadorReportViewToggle, {
+  type AmbassadorTableView,
+} from '@/components/Ambassador/reports/AmbassadorReportViewToggle';
+import StatCard from '@/components/StatCard';
 
 const GENDER_METRICS = ['male', 'female', 'pwd'] as const;
 const GENDER_HEADERS = ['Male', 'Female', 'PWD'] as const;
@@ -17,20 +22,32 @@ function yearCellClass(index: number): string {
   return index % 2 === 0 ? 'establishment-year-prev' : 'establishment-year-current';
 }
 
-export default function StaffRecruitmentPanel() {
+export default function StaffRecruitmentPanel({
+  scopeFaculty,
+  lockFaculty = false,
+  managedUnitId,
+}: ReportPanelScopeProps = {}) {
   const [report, setReport] = useState<StaffRecruitmentReport | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [facultyFilter, setFacultyFilter] = useState('All Faculties');
+  const [facultyFilter, setFacultyFilter] = useState(scopeFaculty ?? 'All Faculties');
   const [departmentFilter, setDepartmentFilter] = useState('All Departments');
   const [pwdFilter, setPwdFilter] = useState('all');
+  const [tableView, setTableView] = useState<AmbassadorTableView>('summary');
+
+  useEffect(() => {
+    if (scopeFaculty) setFacultyFilter(scopeFaculty);
+  }, [scopeFaculty]);
+
+  const effectiveFaculty = lockFaculty && scopeFaculty ? scopeFaculty : facultyFilter;
 
   const fetchReport = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
       const params = new URLSearchParams({ type: 'staff-recruitment' });
-      if (facultyFilter !== 'All Faculties') params.set('faculty', facultyFilter);
+      if (managedUnitId) params.set('managed_unit_id', String(managedUnitId));
+      else if (effectiveFaculty !== 'All Faculties') params.set('faculty', effectiveFaculty);
       if (departmentFilter !== 'All Departments') params.set('department', departmentFilter);
       if (pwdFilter !== 'all') params.set('pwd', pwdFilter);
       const { data } = await axios.get(`/api/reports?${params.toString()}`);
@@ -42,7 +59,7 @@ export default function StaffRecruitmentPanel() {
     } finally {
       setLoading(false);
     }
-  }, [facultyFilter, departmentFilter, pwdFilter]);
+  }, [effectiveFaculty, departmentFilter, pwdFilter, managedUnitId]);
 
   useEffect(() => {
     fetchReport();
@@ -50,20 +67,20 @@ export default function StaffRecruitmentPanel() {
 
   const departmentOptions = useMemo(() => {
     if (!report) return ['All Departments'];
-    if (facultyFilter === 'All Faculties') {
+    if (effectiveFaculty === 'All Faculties') {
       return report.filterOptions.departments;
     }
-    const underFaculty = report.filterOptions.departmentsByFaculty[facultyFilter] ?? [];
+    const underFaculty = report.filterOptions.departmentsByFaculty[effectiveFaculty] ?? [];
     return ['All Departments', ...underFaculty];
-  }, [report, facultyFilter]);
+  }, [report, effectiveFaculty]);
 
   useEffect(() => {
-    if (facultyFilter === 'All Faculties') return;
+    if (effectiveFaculty === 'All Faculties') return;
     if (departmentFilter === 'All Departments') return;
     if (!departmentOptions.includes(departmentFilter)) {
       setDepartmentFilter('All Departments');
     }
-  }, [facultyFilter, departmentFilter, departmentOptions]);
+  }, [effectiveFaculty, departmentFilter, departmentOptions]);
 
   const handleFacultyChange = (value: string) => {
     setFacultyFilter(value);
@@ -71,13 +88,14 @@ export default function StaffRecruitmentPanel() {
   };
 
   const resetFilters = () => {
-    setFacultyFilter('All Faculties');
+    if (!lockFaculty) setFacultyFilter('All Faculties');
+    else if (scopeFaculty) setFacultyFilter(scopeFaculty);
     setDepartmentFilter('All Departments');
     setPwdFilter('all');
   };
 
   const filtersAtDefault =
-    facultyFilter === 'All Faculties' &&
+    (lockFaculty || facultyFilter === 'All Faculties') &&
     departmentFilter === 'All Departments' &&
     pwdFilter === 'all';
 
@@ -196,8 +214,67 @@ export default function StaffRecruitmentPanel() {
   const faculties = report?.filterOptions.faculties ?? ['All Faculties'];
   const colSpan = 1 + yearKeys.length * 3;
 
+  const recruitmentStats = useMemo(() => {
+    if (!report) return null;
+    let totalMale = 0;
+    let totalFemale = 0;
+    let totalPwd = 0;
+    for (const key of report.yearKeys) {
+      totalMale += report.totals[key]?.male ?? 0;
+      totalFemale += report.totals[key]?.female ?? 0;
+      totalPwd += report.totals[key]?.pwd ?? 0;
+    }
+    const latestKey = report.yearKeys[report.yearKeys.length - 1];
+    const latest = latestKey ? report.totals[latestKey] : null;
+    const latestRecruited = latest ? latest.male + latest.female : 0;
+    const deptCount =
+      lockFaculty || managedUnitId
+        ? (report.filterOptions.departmentsByFaculty[effectiveFaculty]?.length ??
+          Math.max(0, report.filterOptions.departments.length - 1))
+        : Math.max(0, report.filterOptions.departments.length - 1);
+
+    return {
+      recruited: report.numberOfStaff,
+      designations: report.rows.length,
+      totalMale,
+      totalFemale,
+      totalPwd,
+      latestYear: latestKey ? report.years[latestKey] : '—',
+      latestRecruited,
+      departments: deptCount,
+    };
+  }, [report, lockFaculty, managedUnitId, effectiveFaculty]);
+
   return (
-    <div className="table-card">
+    <>
+      {report && !loading && !error && recruitmentStats && (
+        <div className="row g-3 mb-4">
+          <div className="col-6 col-md-4 col-xl-2">
+            <StatCard label="Staff recruited (5 yr)" value={recruitmentStats.recruited} color="blue" />
+          </div>
+          <div className="col-6 col-md-4 col-xl-2">
+            <StatCard label="Designations" value={recruitmentStats.designations} color="blue" />
+          </div>
+          <div className="col-6 col-md-4 col-xl-2">
+            <StatCard
+              label={`Recruited in ${recruitmentStats.latestYear}`}
+              value={recruitmentStats.latestRecruited}
+              color="green"
+            />
+          </div>
+          <div className="col-6 col-md-4 col-xl-2">
+            <StatCard label="Male (all years)" value={recruitmentStats.totalMale} color="blue" />
+          </div>
+          <div className="col-6 col-md-4 col-xl-2">
+            <StatCard label="Female (all years)" value={recruitmentStats.totalFemale} color="blue" />
+          </div>
+          <div className="col-6 col-md-4 col-xl-2">
+            <StatCard label="PwD (all years)" value={recruitmentStats.totalPwd} color="yellow" />
+          </div>
+        </div>
+      )}
+
+      <div className="table-card">
       <div className="table-card-header">
         <h5>
           <span className="material-symbols-outlined me-2" style={{ color: 'var(--mubs-blue)' }}>
@@ -206,19 +283,27 @@ export default function StaffRecruitmentPanel() {
           Staff Recruitment
         </h5>
         <div className="d-flex gap-2 flex-wrap align-items-center">
-          <select
-            className="form-select form-select-sm"
-            style={{ width: '180px' }}
-            value={facultyFilter}
-            onChange={(e) => handleFacultyChange(e.target.value)}
-            aria-label="Faculty or office"
-          >
-            {faculties.map((f) => (
-              <option key={f} value={f}>
-                {f}
-              </option>
-            ))}
-          </select>
+          <AmbassadorReportViewToggle
+            view={tableView}
+            onChange={setTableView}
+            entriesLabel="Staff list"
+            summaryLabel="Summary"
+          />
+          {!lockFaculty && (
+            <select
+              className="form-select form-select-sm"
+              style={{ width: '180px' }}
+              value={facultyFilter}
+              onChange={(e) => handleFacultyChange(e.target.value)}
+              aria-label="Faculty or office"
+            >
+              {faculties.map((f) => (
+                <option key={f} value={f}>
+                  {f}
+                </option>
+              ))}
+            </select>
+          )}
           <select
             className="form-select form-select-sm"
             style={{ width: '200px' }}
@@ -309,110 +394,172 @@ export default function StaffRecruitmentPanel() {
       )}
 
       <div className="table-responsive">
-        <table className="table mb-0 staff-establishment-table staff-recruitment-table">
-          <thead>
-            <tr>
-              <th rowSpan={2} className="text-start ps-4" style={{ minWidth: '180px' }}>
-                Designation
-              </th>
-              {yearKeys.map((key, i) => (
-                <th
-                  key={key}
-                  colSpan={3}
-                  className={`text-center ${yearBandClass(i)} ${
-                    i > 0 ? 'establishment-year-divider' : ''
-                  }`}
-                >
-                  {report?.years[key] ?? key}
+        {tableView === 'summary' ? (
+          <table className="table mb-0 staff-establishment-table staff-recruitment-table">
+            <thead>
+              <tr>
+                <th rowSpan={2} className="text-start ps-4" style={{ minWidth: '180px' }}>
+                  Designation
                 </th>
-              ))}
-            </tr>
-            <tr>
-              {yearKeys.map((key, i) =>
-                GENDER_HEADERS.map((label, j) => (
+                {yearKeys.map((key, i) => (
                   <th
-                    key={`${key}-${label}`}
-                    className={`text-center ${yearCellClass(i)} ${
-                      i > 0 && j === 0 ? 'establishment-year-divider' : ''
+                    key={key}
+                    colSpan={3}
+                    className={`text-center ${yearBandClass(i)} ${
+                      i > 0 ? 'establishment-year-divider' : ''
                     }`}
                   >
-                    {label}
+                    {report?.years[key] ?? key}
                   </th>
-                ))
-              )}
-            </tr>
-          </thead>
-          <tbody>
-            {loading ? (
-              <tr>
-                <td colSpan={colSpan} className="text-center py-4">
-                  <div className="spinner-border text-primary" role="status">
-                    <span className="visually-hidden">Loading...</span>
-                  </div>
-                </td>
+                ))}
               </tr>
-            ) : error ? (
               <tr>
-                <td colSpan={colSpan} className="p-0">
-                  <div className="alert alert-danger m-3 mb-3">{error}</div>
-                </td>
+                {yearKeys.map((key, i) =>
+                  GENDER_HEADERS.map((label, j) => (
+                    <th
+                      key={`${key}-${label}`}
+                      className={`text-center ${yearCellClass(i)} ${
+                        i > 0 && j === 0 ? 'establishment-year-divider' : ''
+                      }`}
+                    >
+                      {label}
+                    </th>
+                  ))
+                )}
               </tr>
-            ) : !report || report.rows.length === 0 ? (
-              <tr>
-                <td colSpan={colSpan} className="text-center py-4 text-muted">
-                  No recruitment records match the selected filters for the past five years.
-                </td>
-              </tr>
-            ) : (
-              <>
-                {report.rows.map((row) => (
-                  <tr key={row.designation}>
-                    <td className="fw-bold text-dark ps-4" style={{ fontSize: '.85rem' }}>
-                      {row.designation}
+            </thead>
+            <tbody>
+              {loading ? (
+                <tr>
+                  <td colSpan={colSpan} className="text-center py-4">
+                    <div className="spinner-border text-primary" role="status">
+                      <span className="visually-hidden">Loading...</span>
+                    </div>
+                  </td>
+                </tr>
+              ) : error ? (
+                <tr>
+                  <td colSpan={colSpan} className="p-0">
+                    <div className="alert alert-danger m-3 mb-3">{error}</div>
+                  </td>
+                </tr>
+              ) : !report || report.rows.length === 0 ? (
+                <tr>
+                  <td colSpan={colSpan} className="text-center py-4 text-muted">
+                    No recruitment records match the selected filters for the past five years.
+                  </td>
+                </tr>
+              ) : (
+                <>
+                  {report.rows.map((row) => (
+                    <tr key={row.designation}>
+                      <td className="fw-bold text-dark ps-4" style={{ fontSize: '.85rem' }}>
+                        {row.designation}
+                      </td>
+                      {report.yearKeys.map((key, i) =>
+                        GENDER_METRICS.map((m, j) => (
+                          <td
+                            key={`${key}-${m}`}
+                            className={`text-center ${yearCellClass(i)} ${
+                              i > 0 && j === 0 ? 'establishment-year-divider' : ''
+                            }`}
+                            style={{ fontSize: '.83rem' }}
+                          >
+                            {row.byYear[key]?.[m] || '—'}
+                          </td>
+                        ))
+                      )}
+                    </tr>
+                  ))}
+                  <tr className="establishment-total-row">
+                    <td className="ps-4" style={{ color: 'var(--mubs-blue)' }}>
+                      TOTAL
                     </td>
                     {report.yearKeys.map((key, i) =>
                       GENDER_METRICS.map((m, j) => (
                         <td
-                          key={`${key}-${m}`}
+                          key={`total-${key}-${m}`}
                           className={`text-center ${yearCellClass(i)} ${
                             i > 0 && j === 0 ? 'establishment-year-divider' : ''
                           }`}
-                          style={{ fontSize: '.83rem' }}
                         >
-                          {row.byYear[key]?.[m] || '—'}
+                          {report.totals[key]?.[m] || '—'}
                         </td>
                       ))
                     )}
                   </tr>
-                ))}
-                <tr className="establishment-total-row">
-                  <td className="ps-4" style={{ color: 'var(--mubs-blue)' }}>
-                    TOTAL
+                </>
+              )}
+            </tbody>
+          </table>
+        ) : (
+          <table className="table table-hover mb-0 align-middle">
+            <thead className="table-light">
+              <tr>
+                <th className="ps-4 py-3 border-0 small fw-bold">NAME</th>
+                <th className="py-3 border-0 small fw-bold">DESIGNATION</th>
+                <th className="py-3 border-0 small fw-bold">DEPARTMENT</th>
+                <th className="py-3 border-0 small fw-bold">GENDER</th>
+                <th className="py-3 border-0 small fw-bold">APPOINTMENT DATE</th>
+                <th className="pe-4 py-3 border-0 small fw-bold">YEAR RECRUITED</th>
+              </tr>
+            </thead>
+            <tbody>
+              {loading ? (
+                <tr>
+                  <td colSpan={6} className="text-center py-4">
+                    <div className="spinner-border text-primary" role="status">
+                      <span className="visually-hidden">Loading...</span>
+                    </div>
                   </td>
-                  {report.yearKeys.map((key, i) =>
-                    GENDER_METRICS.map((m, j) => (
-                      <td
-                        key={`total-${key}-${m}`}
-                        className={`text-center ${yearCellClass(i)} ${
-                          i > 0 && j === 0 ? 'establishment-year-divider' : ''
-                        }`}
-                      >
-                        {report.totals[key]?.[m] || '—'}
-                      </td>
-                    ))
-                  )}
                 </tr>
-              </>
-            )}
-          </tbody>
-        </table>
+              ) : error ? (
+                <tr>
+                  <td colSpan={6} className="p-0">
+                    <div className="alert alert-danger m-3 mb-3">{error}</div>
+                  </td>
+                </tr>
+              ) : !report || report.staffList.length === 0 ? (
+                <tr>
+                  <td colSpan={6} className="text-center py-4 text-muted">
+                    No recruited staff match the selected filters for the past five years.
+                  </td>
+                </tr>
+              ) : (
+                report.staffList.map((row, index) => (
+                  <tr key={`${row.staffId}-${index}`}>
+                    <td className="ps-4 fw-semibold small">{row.fullName}</td>
+                    <td className="small">{row.designation}</td>
+                    <td className="small">{row.department}</td>
+                    <td className="small">{row.gender}</td>
+                    <td className="small">
+                      {row.dateFirstAppointment
+                        ? new Date(row.dateFirstAppointment).toLocaleDateString()
+                        : '—'}
+                    </td>
+                    <td className="pe-4 small fw-bold">{row.recruitmentYear}</td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        )}
       </div>
 
       {report && !loading && !error && (
         <div className="table-card-footer d-flex flex-wrap justify-content-between gap-2">
           <span className="footer-label">
-            {report.rows.length} designation{report.rows.length === 1 ? '' : 's'} ·{' '}
-            {report.numberOfStaff.toLocaleString()} staff recruited in current filter
+            {tableView === 'summary' ? (
+              <>
+                {report.rows.length} designation{report.rows.length === 1 ? '' : 's'} ·{' '}
+                {report.numberOfStaff.toLocaleString()} staff recruited in current filter
+              </>
+            ) : (
+              <>
+                {report.staffList.length.toLocaleString()} staff in list ·{' '}
+                {report.numberOfStaff.toLocaleString()} recruited in current filter
+              </>
+            )}
           </span>
           <span className="text-muted" style={{ fontSize: '.72rem' }}>
             Recruited = first appointment date (HR sync) within each calendar year (Jan–Dec).
@@ -420,5 +567,6 @@ export default function StaffRecruitmentPanel() {
         </div>
       )}
     </div>
+    </>
   );
 }

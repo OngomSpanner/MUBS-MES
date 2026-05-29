@@ -2,7 +2,7 @@ import { query } from '@/lib/db';
 import { normalizeHrmsEmail } from './parse-date';
 import { getHrmsRoster } from './roster-cache';
 import { syncUserFromHrmsRecord } from './sync-user';
-import type { HrmsStaffRecord, HrmsSyncResult } from './types';
+import type { HrmsSyncResult } from './types';
 
 export type ImportNewSummary = {
   totalInRoster: number;

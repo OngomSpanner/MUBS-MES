@@ -2,7 +2,6 @@ import { query } from '@/lib/db';
 import {
   getRollingReportFyWindow,
   labelsFromFyWindow,
-  type FinancialYearWindowEntry,
 } from '@/lib/financial-year';
 import { normalizePositionLabel, POSITION_NOT_SPECIFIED } from '@/lib/hrms/staff-establishment';
 

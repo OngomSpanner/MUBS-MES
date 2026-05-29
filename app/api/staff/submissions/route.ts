@@ -179,7 +179,7 @@ export async function POST(req: Request) {
 
         if (!taskId) throw new Error('Task ID is required');
 
-        let assignmentId = parseInt(taskId);
+        const assignmentId = parseInt(taskId);
         
         // Validate assignment based on type
         if (assignmentType === 'process_subtask') {

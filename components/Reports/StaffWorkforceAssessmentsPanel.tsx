@@ -5,7 +5,13 @@ import axios from 'axios';
 import * as XLSX from 'xlsx';
 import type { StaffWorkforceAssessmentsReport } from '@/lib/hrms/staff-workforce-assessments';
 
-export default function StaffWorkforceAssessmentsPanel() {
+export default function StaffWorkforceAssessmentsPanel({
+  ambassadorManagedUnitId,
+  embedded = false,
+}: {
+  ambassadorManagedUnitId?: number;
+  embedded?: boolean;
+} = {}) {
   const [report, setReport] = useState<StaffWorkforceAssessmentsReport | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -14,7 +20,9 @@ export default function StaffWorkforceAssessmentsPanel() {
     setLoading(true);
     setError(null);
     try {
-      const { data } = await axios.get('/api/reports?type=staff-workforce-assessments');
+      const params = new URLSearchParams({ type: 'staff-workforce-assessments' });
+      if (ambassadorManagedUnitId) params.set('managed_unit_id', String(ambassadorManagedUnitId));
+      const { data } = await axios.get(`/api/reports?${params.toString()}`);
       setReport(data.data as StaffWorkforceAssessmentsReport);
     } catch (e) {
       console.error('staff-workforce-assessments error', e);
@@ -23,7 +31,7 @@ export default function StaffWorkforceAssessmentsPanel() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [ambassadorManagedUnitId]);
 
   useEffect(() => {
     fetchReport();
@@ -68,8 +76,8 @@ export default function StaffWorkforceAssessmentsPanel() {
   };
 
   return (
-    <div className="table-card">
-      <div className="table-card-header justify-content-end">
+    <div className={embedded ? 'border-0 shadow-none bg-transparent' : 'table-card'}>
+      <div className={embedded ? 'px-3 pt-3 pb-2 border-bottom d-flex justify-content-end' : 'table-card-header justify-content-end'}>
         <div className="d-flex gap-2 flex-wrap align-items-center">
           <button type="button" className="btn btn-sm btn-outline-secondary fw-bold" onClick={fetchReport} disabled={loading}>
             Refresh

@@ -236,7 +236,7 @@ export default function StaffDashboard() {
                                 }}>
                                     <span className="material-symbols-outlined text-white" style={{ fontSize: '22px' }}>rocket_launch</span>
                                 </div>
-                                <h5 className="mb-0 fw-black" style={{ color: 'var(--mubs-navy)', fontSize: '1.1rem' }}>Today's Focus Areas</h5>
+                                <h5 className="mb-0 fw-black" style={{ color: 'var(--mubs-navy)', fontSize: '1.1rem' }}>Today&apos;s Focus Areas</h5>
                             </div>
                             <Link href="/staff?pg=tasks" className="btn btn-sm btn-link text-decoration-none fw-black p-0" style={{ fontSize: '.8rem', color: 'var(--mubs-blue)' }}>View All <span className="material-symbols-outlined align-middle" style={{ fontSize: '16px' }}>arrow_forward</span></Link>
                         </div>
@@ -302,7 +302,7 @@ export default function StaffDashboard() {
                             {deadlines.length === 0 && (
                                 <div className="text-center py-4">
                                     <span className="material-symbols-outlined text-muted" style={{ fontSize: '48px' }}>eco</span>
-                                    <p className="text-muted mt-2">No focus areas for today. You're all caught up!</p>
+                                    <p className="text-muted mt-2">No focus areas for today. You&apos;re all caught up!</p>
                                 </div>
                             )}
                         </div>

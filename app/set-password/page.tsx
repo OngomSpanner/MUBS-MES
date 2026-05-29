@@ -90,7 +90,7 @@ export default function SetPasswordPage() {
         <div className="text-center mb-4">
           <div className="mb-3 d-flex justify-content-center">
             <Image
-              src="/logo.png"
+              src="/logo.webp"
               alt="MUBS Logo"
               width={100}
               height={100}

@@ -60,11 +60,7 @@ export default function AdminDashboard() {
     const [showCreateUserModal, setShowCreateUserModal] = useState(false);
     const [showCreateActivityModal, setShowCreateActivityModal] = useState(false);
 
-    useEffect(() => {
-        fetchDashboardData();
-    }, []);
-
-    const fetchDashboardData = async () => {
+    async function fetchDashboardData() {
         try {
             const response = await axios.get('/api/dashboard/stats');
             setStats(response.data.stats);
@@ -74,7 +70,11 @@ export default function AdminDashboard() {
         } catch (error) {
             console.error('Error fetching dashboard data:', error);
         }
-    };
+    }
+
+    useEffect(() => {
+        void fetchDashboardData();
+    }, []);
 
     return (
         <Layout>

@@ -8,7 +8,6 @@ import { Modal, Button } from "react-bootstrap";
 import StatCard from "@/components/StatCard";
 import TaskSubmissionModal, { type StaffTaskSubmissionContext } from "@/components/Staff/TaskSubmissionModal";
 import SubmissionDetailModal from "@/components/Staff/SubmissionDetailModal";
-import TaskCardQueue from "@/components/Staff/TaskCardQueue";
 
 interface Task extends StaffTaskSubmissionContext {
   id: number;

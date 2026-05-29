@@ -7,17 +7,8 @@ import CreateActivityModal from '@/components/Modals/CreateActivityModal';
 import axios from 'axios';
 import Link from 'next/link';
 import { 
-  AreaChart, 
-  Area, 
-  XAxis, 
-  YAxis, 
-  CartesianGrid, 
   Tooltip, 
-  ResponsiveContainer, 
-  Legend,
-  Line,
-  BarChart,
-  Bar,
+  ResponsiveContainer,
   PieChart,
   Pie,
   Cell
@@ -58,27 +49,30 @@ export default function Dashboard() {
     delayedActivities: 0
   });
   const [departmentPerformance, setUnitPerformance] = useState<DepartmentPerformance[]>([]);
-  const [recentActivities, setRecentActivities] = useState<RecentActivity[]>([]);
+  const [, setRecentActivities] = useState<RecentActivity[]>([]);
   const [showCreateActivityModal, setShowCreateActivityModal] = useState(false);
 
-  useEffect(() => {
-    fetchDashboardData();
-  }, []);
-
-  const fetchDashboardData = async () => {
+  async function fetchDashboardData() {
     try {
       const response = await axios.get('/api/dashboard/stats');
       setStats(response.data.stats);
-      const perf = Array.isArray(response.data.departmentPerformance) ? response.data.departmentPerformance : [];
-      // Highest progress first (top performing)
-      perf.sort((a: any, b: any) => Number(b?.progress ?? 0) - Number(a?.progress ?? 0));
+      const perf = Array.isArray(response.data.departmentPerformance)
+        ? response.data.departmentPerformance
+        : [];
+      perf.sort(
+        (a: { progress?: number }, b: { progress?: number }) =>
+          Number(b?.progress ?? 0) - Number(a?.progress ?? 0)
+      );
       setUnitPerformance(perf);
       setRecentActivities(response.data.recentActivities);
-
     } catch (error) {
       console.error('Error fetching dashboard data:', error);
     }
-  };
+  }
+
+  useEffect(() => {
+    void fetchDashboardData();
+  }, []);
 
   return (
     <Layout>

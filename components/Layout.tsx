@@ -10,17 +10,29 @@ function LayoutContent({ children, sidebarOpen, setSidebarOpen }: any) {
   const searchParams = useSearchParams();
 
   const getPageKey = () => {
-    // When under /admin or /principal, prefer the pg query parameter
-    if (pathname.startsWith('/admin')) {
+    if (pathname.startsWith('/admin') || pathname.startsWith('/ambassador') || pathname.startsWith('/department-head') || pathname.startsWith('/staff')) {
       return searchParams.get('pg') || 'dashboard';
     }
-    // For other routes, derive from the path segment
     const trimmed = pathname.substring(1);
     return trimmed || 'dashboard';
   };
 
   const getPageTitle = () => {
     const key = getPageKey();
+    if (pathname.startsWith('/ambassador') && key === 'reports') {
+      const ambassadorReportTitles: Record<string, string> = {
+        compliance: 'Departmental Compliance Tracker',
+        'staff-profiles': 'Staff Profiles',
+        recruitment: 'Staff Recruitment',
+        benefits: 'Staff Benefits',
+        'workforce-assessments': 'Workforce Assessments',
+        'employment-skill-status': 'Skills Assessments',
+        'programme-enrollment': 'Programme Enrollment',
+        'course-unit-enrollment': 'Course Unit Enrollment',
+      };
+      const tab = searchParams.get('tab') || 'compliance';
+      return ambassadorReportTitles[tab] ?? 'Faculty Reports & Monitoring';
+    }
     if (key === 'strategic' && pathname.startsWith('/admin')) {
       return 'Standard and Activities';
     }
@@ -30,7 +42,9 @@ function LayoutContent({ children, sidebarOpen, setSidebarOpen }: any) {
       'standards': 'Standards & Objectives',
       'tracking': 'Activity Tracking',
       'users': 'User Management',
-      'reports': 'Reports & Analytics',
+      'reports': pathname.startsWith('/ambassador')
+        ? 'Faculty Reports & Monitoring'
+        : 'Reports & Analytics',
 
       // HOD specific
       'activities': 'Assigned Activities',

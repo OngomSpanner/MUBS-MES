@@ -4,7 +4,6 @@ import { useState, useEffect } from 'react';
 import Layout from '@/components/Layout';
 import { Modal, Button } from 'react-bootstrap';
 import axios from 'axios';
-import ComplianceGrid from '@/components/Tracking/ComplianceGrid';
 import { 
   BarChart, 
   Bar, 
@@ -14,11 +13,8 @@ import {
   Tooltip, 
   Legend, 
   ResponsiveContainer,
-  LineChart,
-  Line,
   AreaChart,
-  Area,
-  Cell
+  Area
 } from 'recharts';
 
 interface DepartmentProgress {
