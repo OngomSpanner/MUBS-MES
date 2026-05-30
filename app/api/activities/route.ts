@@ -200,15 +200,16 @@ export async function POST(request: Request) {
     const deptIds = Array.isArray(rawDeptIds) ? rawDeptIds.map((x: unknown) => Number(x)).filter((x) => !Number.isNaN(x) && x > 0) : [];
     const dbStatus = mapStatusToDb(status);
 
-    let createdBy: number | null = null;
-    try {
-      const cookieStore = await cookies();
-      const token = cookieStore.get('token')?.value;
-      if (token) {
-        const decoded = verifyToken(token) as { userId?: number };
-        if (decoded?.userId) createdBy = decoded.userId;
-      }
-    } catch (_) {}
+    const cookieStore = await cookies();
+    const token = cookieStore.get('token')?.value;
+    if (!token) {
+      return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
+    }
+    const decoded = verifyToken(token) as { userId?: number } | null;
+    if (!decoded?.userId) {
+      return NextResponse.json({ message: 'Invalid token' }, { status: 401 });
+    }
+    const createdBy: number = decoded.userId;
 
     const runInsert = async () => {
       const pillarVal = pillar && String(pillar).trim() ? pillar : null;

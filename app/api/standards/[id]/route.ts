@@ -15,6 +15,8 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
     const cookieStore = await cookies();
     const token = cookieStore.get('token')?.value;
     if (!token) return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
+    const decoded = verifyToken(token);
+    if (!decoded) return NextResponse.json({ message: 'Invalid token' }, { status: 401 });
 
     let standard: Record<string, unknown>[];
     try {
