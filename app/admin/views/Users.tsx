@@ -28,6 +28,8 @@ interface User {
     department_id: number | null;
     managed_unit_id: number | null;
     department: string;
+    managed_unit: string | null;
+    managed_unit_parent: string | null;
     status: string;
     created_date: string;
 }
@@ -497,6 +499,18 @@ export default function UsersView() {
         return styles[role] || { bg: '#f1f5f9', color: '#475569' };
     };
 
+    const userHasAmbassadorRole = (role: string) =>
+        (role || '').split(',').some((r) => r.trim().toLowerCase().replace(/\s+/g, '_') === 'ambassador');
+
+    const formatAmbassadorOversight = (user: User) => {
+        if (!userHasAmbassadorRole(user.role)) return null;
+        if (!user.managed_unit) return 'Not assigned';
+        if (user.managed_unit_parent) {
+            return `${user.managed_unit} (${user.managed_unit_parent})`;
+        }
+        return user.managed_unit;
+    };
+
     const getRoleIcon = (role: string) =>
         role === 'System Administrator' ? 'shield' :
             role === 'Strategy Manager' ? 'manage_accounts' :
@@ -627,6 +641,7 @@ export default function UsersView() {
                                 <th>Email</th>
                                 <th>Role</th>
                                 <th>Department/Unit</th>
+                                <th>Ambassador Oversight</th>
                                 <th>Account Status</th>
                                 <th>Actions</th>
                             </tr>
@@ -634,7 +649,7 @@ export default function UsersView() {
                         <tbody>
                             {loading ? (
                                 <tr>
-                                    <td colSpan={6} className="text-center py-4">
+                                    <td colSpan={7} className="text-center py-4">
                                         <div className="spinner-border text-primary" role="status">
                                             <span className="visually-hidden">Loading...</span>
                                         </div>
@@ -642,12 +657,12 @@ export default function UsersView() {
                                 </tr>
                             ) : users.length === 0 ? (
                                 <tr>
-                                    <td colSpan={6} className="text-center py-4 text-muted">No users found</td>
+                                    <td colSpan={7} className="text-center py-4 text-muted">No users found</td>
                                 </tr>
                             ) : (
                                 users.map((user) => {
-                                    const roleStyle = getRoleBadge(user.role);
                                     const statusStyle = getStatusBadge(user.status);
+                                    const ambassadorOversight = formatAmbassadorOversight(user);
                                     return (
                                         <tr key={user.id}>
                                             <td>
@@ -677,7 +692,21 @@ export default function UsersView() {
                                                     })}
                                                 </div>
                                             </td>
-                                            <td style={{ fontSize: '.83rem' }}>{user.department}</td>
+                                            <td style={{ fontSize: '.83rem' }}>{user.department || '—'}</td>
+                                            <td style={{ fontSize: '.83rem' }}>
+                                                {ambassadorOversight ? (
+                                                    <span
+                                                        className="d-inline-flex align-items-center gap-1 fw-semibold"
+                                                        style={{ color: '#ea580c', fontSize: '.8rem' }}
+                                                        title="Department/unit this ambassador oversees"
+                                                    >
+                                                        <span className="material-symbols-outlined" style={{ fontSize: '15px' }}>verified_user</span>
+                                                        {ambassadorOversight}
+                                                    </span>
+                                                ) : (
+                                                    <span className="text-muted">—</span>
+                                                )}
+                                            </td>
                                             <td>
                                                 <span
                                                     className="badge rounded-pill fw-semibold"

@@ -55,6 +55,8 @@ export async function GET(request: Request) {
     const fromClause = `
       FROM users u
       LEFT JOIN departments d ON u.department_id = d.id
+      LEFT JOIN departments mu ON u.managed_unit_id = mu.id
+      LEFT JOIN departments mp ON mu.parent_id = mp.id
     `;
 
     const countRows = (await query({
@@ -68,6 +70,8 @@ export async function GET(request: Request) {
       query: `
       SELECT u.id, u.full_name, u.email, u.role, u.status, u.department_id, u.managed_unit_id,
              d.name AS department,
+             COALESCE(NULLIF(TRIM(mu.external_name), ''), mu.name) AS managed_unit,
+             mp.name AS managed_unit_parent,
              DATE_FORMAT(u.created_at, '%d %b %Y') as created_date
       ${fromClause}
       ${where}
