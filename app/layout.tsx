@@ -9,6 +9,7 @@ import '@fontsource/dm-sans/700.css';
 import '@fontsource/dm-sans/800.css';
 import IdleTimeout from '@/components/IdleTimeout';
 import BootstrapClient from '@/components/BootstrapClient';
+import TawkToWidget from '@/components/TawkToWidget';
 
 export const metadata: Metadata = {
   title: "MUBS M&E System",
@@ -27,6 +28,7 @@ export default function RootLayout({
         <IdleTimeout />
         <BootstrapClient />
         {children}
+        <TawkToWidget />
       </body>
     </html>
   );

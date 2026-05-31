@@ -30,6 +30,7 @@ export async function GET(request: Request) {
     const role = searchParams.get('role');
     const search = searchParams.get('search');
     const statusParam = searchParams.get('status');
+    const departmentIdParam = searchParams.get('department_id');
     const page = Math.max(parseInt(searchParams.get('page') || '1', 10) || 1, 1);
     const limit = Math.min(Math.max(parseInt(searchParams.get('limit') || '10', 10) || 10, 1), 100);
     const offset = (page - 1) * limit;
@@ -50,6 +51,14 @@ export async function GET(request: Request) {
     if (statusParam && statusParam !== 'All Statuses') {
       where += ' AND u.status = ?';
       values.push(normalizeUserAccountStatus(statusParam));
+    }
+
+    if (departmentIdParam) {
+      const departmentId = Number(departmentIdParam);
+      if (Number.isFinite(departmentId) && departmentId > 0) {
+        where += ' AND u.department_id = ?';
+        values.push(departmentId);
+      }
     }
 
     const fromClause = `

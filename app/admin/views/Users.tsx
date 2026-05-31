@@ -54,7 +54,11 @@ export default function UsersView() {
     const [searchTerm, setSearchTerm] = useState('');
     const [roleFilter, setRoleFilter] = useState('');
     const [statusFilter, setStatusFilter] = useState('');
+    const [departmentFilter, setDepartmentFilter] = useState('');
     const [rolesList, setRolesList] = useState<string[]>([]);
+    const [filterDepartments, setFilterDepartments] = useState<
+        { id: number; name: string; external_name?: string; parent_name?: string }[]
+    >([]);
 
     // Edit modal state
     const [selectedUser, setSelectedUser] = useState<User | null>(null);
@@ -118,11 +122,11 @@ export default function UsersView() {
     const [deptToDelete, setDeptToDelete] = useState<any | null>(null);
 
     // Reset page when filters change
-    useEffect(() => { setCurrentPage(1); }, [searchTerm, roleFilter, statusFilter, activeSubTab, deptSearchTerm]);
+    useEffect(() => { setCurrentPage(1); }, [searchTerm, roleFilter, statusFilter, departmentFilter, activeSubTab, deptSearchTerm]);
 
     useEffect(() => {
         fetchUsers();
-    }, [searchTerm, roleFilter, statusFilter, currentPage]);
+    }, [searchTerm, roleFilter, statusFilter, departmentFilter, currentPage]);
 
     const closeEditModal = useCallback(() => {
         setShowEditModal(false);
@@ -214,14 +218,16 @@ export default function UsersView() {
     useEffect(() => {
         const loadDepartments = async () => {
             try {
-                const [deptRes, parentRes, ambassadorRes] = await Promise.all([
+                const [deptRes, parentRes, ambassadorRes, filterDeptRes] = await Promise.all([
                     axios.get('/api/departments?units_only=true'),
                     axios.get('/api/departments?parents_only=true'),
                     axios.get('/api/departments?children_only=true'),
+                    axios.get('/api/departments?active_only=true'),
                 ]);
                 setDepartments(Array.isArray(deptRes.data) ? deptRes.data : []);
                 setFaculties(Array.isArray(parentRes.data) ? parentRes.data : []);
                 setAmbassadorUnits(Array.isArray(ambassadorRes.data) ? ambassadorRes.data : []);
+                setFilterDepartments(Array.isArray(filterDeptRes.data) ? filterDeptRes.data : []);
             } catch (e) {
                 console.error('Error loading departments', e);
             }
@@ -265,6 +271,7 @@ export default function UsersView() {
             if (searchTerm) params.append('search', searchTerm);
             if (roleFilter) params.append('role', roleFilter);
             if (statusFilter) params.append('status', statusFilter);
+            if (departmentFilter) params.append('department_id', departmentFilter);
             const { data } = await axios.get<{
                 users: User[];
                 total: number;
@@ -446,14 +453,16 @@ export default function UsersView() {
             setShowDeptModal(false);
             fetchDepartmentsList();
             // Also reload parent list for dropdowns
-            const [deptRes, parentRes, ambassadorRes] = await Promise.all([
+            const [deptRes, parentRes, ambassadorRes, filterDeptRes] = await Promise.all([
                 axios.get('/api/departments?units_only=true'),
                 axios.get('/api/departments?parents_only=true'),
                 axios.get('/api/departments?children_only=true'),
+                axios.get('/api/departments?active_only=true'),
             ]);
             setDepartments(Array.isArray(deptRes.data) ? deptRes.data : []);
             setFaculties(Array.isArray(parentRes.data) ? parentRes.data : []);
             setAmbassadorUnits(Array.isArray(ambassadorRes.data) ? ambassadorRes.data : []);
+            setFilterDepartments(Array.isArray(filterDeptRes.data) ? filterDeptRes.data : []);
         } catch (error: any) {
             console.error('Error saving department:', error);
             const msg = error.response?.data?.error || error.response?.data?.message || 'Failed to save department.';
@@ -477,6 +486,15 @@ export default function UsersView() {
         } finally {
             setDeleting(false);
         }
+    };
+
+    const formatDepartmentFilterLabel = (d: {
+        name: string;
+        external_name?: string;
+        parent_name?: string;
+    }) => {
+        const label = (d.external_name?.trim() || d.name) || '—';
+        return d.parent_name ? `${label} (${d.parent_name})` : label;
     };
 
     const getStatusBadge = (status: string) => {
@@ -609,6 +627,20 @@ export default function UsersView() {
                             <option value="">All Roles</option>
                             {rolesList.map((r) => (
                                 <option key={r} value={r}>{formatRoleForDisplay(r)}</option>
+                            ))}
+                        </select>
+                        <select
+                            className="form-select form-select-sm"
+                            style={{ width: '220px' }}
+                            value={departmentFilter}
+                            onChange={(e) => setDepartmentFilter(e.target.value)}
+                            aria-label="Filter by department or unit"
+                        >
+                            <option value="">All Departments/Units</option>
+                            {filterDepartments.map((d) => (
+                                <option key={d.id} value={String(d.id)}>
+                                    {formatDepartmentFilterLabel(d)}
+                                </option>
                             ))}
                         </select>
                         <select

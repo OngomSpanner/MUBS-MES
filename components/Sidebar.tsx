@@ -150,7 +150,11 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen, onLogoutClick }: 
         </nav>
 
         <div className="sidebar-footer">
-          <div className="help-card">
+          <a
+            href="mailto:mubsme@mubs.ac.ug?subject=MUBS%20M%26E%20System%20Support"
+            className="help-card"
+            title="Email IT support"
+          >
             <div className="d-flex align-items-center gap-2 mb-1">
               <div className="help-avatar">
                 <span className="material-symbols-outlined ms-icon">support_agent</span>
@@ -158,9 +162,11 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen, onLogoutClick }: 
               <span style={{ fontSize: '.78rem', fontWeight: 700 }}>Need Help?</span>
             </div>
             <p style={{ fontSize: '.7rem', color: '#93c5fd', margin: 0 }}>
-              Contact IT support at mubsme@mubs.ac.ug.
+              Email{' '}
+              <span style={{ color: '#fff', fontWeight: 600 }}>mubsme@mubs.ac.ug</span>
+              {' '}or use live chat (bottom-right).
             </p>
-          </div>
+          </a>
         </div>
       </aside>
 

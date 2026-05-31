@@ -431,12 +431,14 @@ export async function GET(request: Request) {
         const faculty = searchParams.get('faculty');
         const dept = searchParams.get('department');
         const establishmentPwd = searchParams.get('pwd');
+        const employmentStatus = searchParams.get('employment_status');
         data = await generateStaffEstablishmentReport({
           faculty:
             faculty && faculty !== 'All Faculties' ? faculty : null,
           department:
             dept && dept !== 'All Departments' ? dept : null,
           pwd: establishmentPwd,
+          employment_status: employmentStatus,
         });
         break;
       }
@@ -601,14 +603,12 @@ export async function GET(request: Request) {
         const faculty = searchParams.get('faculty');
         const dept = searchParams.get('department');
         const programme = searchParams.get('programme');
-        const courseUnit = searchParams.get('course_unit');
         const g = searchParams.get('gender');
         const p = searchParams.get('pwd');
         data = await generateStaffStudentRatioReport({
           faculty: faculty && faculty !== 'All Faculties' ? faculty : null,
           department: dept && dept !== 'All Departments' ? dept : null,
           programme: programme && programme !== 'All Programmes' ? programme : null,
-          course_unit: courseUnit && courseUnit !== 'All Course Units' ? courseUnit : null,
           gender: g,
           pwd: p,
         });

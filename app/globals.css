@@ -178,10 +178,20 @@ body {
 }
 
 .help-card {
+  display: block;
   background: rgba(0, 86, 150, 0.35);
   border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: 10px;
   padding: 0.9rem;
+  color: inherit;
+  text-decoration: none;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.help-card:hover {
+  background: rgba(0, 86, 150, 0.5);
+  border-color: rgba(255, 255, 255, 0.2);
+  color: inherit;
 }
 
 .help-avatar {
@@ -1047,6 +1057,40 @@ body {
 /* --- Standard details modal sizing --- */
 .modal-standard-view .modal-dialog {
   max-width: 640px;
+}
+
+/* --- Tawk.to live chat: smaller launcher bubble + chat panel --- */
+:root {
+  --tawk-bubble-scale: 0.72;
+  --tawk-panel-scale: 0.82;
+}
+
+#tawk-bubble-container,
+.tawk-min-container,
+div[class*='tawk-min-container'] {
+  transform: scale(var(--tawk-bubble-scale)) !important;
+  transform-origin: bottom right !important;
+}
+
+iframe[title='chat widget'],
+iframe[title='Chat widget'],
+iframe#tawkchatiframe {
+  transform: scale(var(--tawk-panel-scale)) !important;
+  transform-origin: bottom right !important;
+  max-height: 72vh !important;
+}
+
+@media (max-width: 767.98px) {
+  :root {
+    --tawk-bubble-scale: 0.68;
+    --tawk-panel-scale: 0.9;
+  }
+
+  iframe[title='chat widget'],
+  iframe[title='Chat widget'],
+  iframe#tawkchatiframe {
+    max-height: 65vh !important;
+  }
 }
 
 

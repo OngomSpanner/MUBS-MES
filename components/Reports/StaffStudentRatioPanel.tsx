@@ -12,7 +12,6 @@ export default function StaffStudentRatioPanel() {
   const [facultyFilter, setFacultyFilter] = useState('All Faculties');
   const [departmentFilter, setDepartmentFilter] = useState('All Departments');
   const [programmeFilter, setProgrammeFilter] = useState('All Programmes');
-  const [courseUnitFilter, setCourseUnitFilter] = useState('All Course Units');
   const [genderFilter, setGenderFilter] = useState('all');
   const [pwdFilter, setPwdFilter] = useState('all');
 
@@ -24,7 +23,6 @@ export default function StaffStudentRatioPanel() {
       if (facultyFilter !== 'All Faculties') params.set('faculty', facultyFilter);
       if (departmentFilter !== 'All Departments') params.set('department', departmentFilter);
       if (programmeFilter !== 'All Programmes') params.set('programme', programmeFilter);
-      if (courseUnitFilter !== 'All Course Units') params.set('course_unit', courseUnitFilter);
       if (genderFilter !== 'all') params.set('gender', genderFilter);
       if (pwdFilter !== 'all') params.set('pwd', pwdFilter);
       const { data } = await axios.get(`/api/reports?${params.toString()}`);
@@ -36,7 +34,7 @@ export default function StaffStudentRatioPanel() {
     } finally {
       setLoading(false);
     }
-  }, [facultyFilter, departmentFilter, programmeFilter, courseUnitFilter, genderFilter, pwdFilter]);
+  }, [facultyFilter, departmentFilter, programmeFilter, genderFilter, pwdFilter]);
 
   useEffect(() => {
     fetchReport();
@@ -49,40 +47,21 @@ export default function StaffStudentRatioPanel() {
     return ['All Departments', ...underFaculty];
   }, [report, facultyFilter]);
 
-  const courseUnitOptions = useMemo(() => {
-    if (!report) return ['All Course Units'];
-    if (programmeFilter === 'All Programmes') return report.filterOptions.courseUnits;
-    const underProgramme = report.filterOptions.courseUnitsByProgramme[programmeFilter] ?? [];
-    return ['All Course Units', ...underProgramme];
-  }, [report, programmeFilter]);
-
   useEffect(() => {
     if (facultyFilter === 'All Faculties') return;
     if (departmentFilter === 'All Departments') return;
     if (!departmentOptions.includes(departmentFilter)) setDepartmentFilter('All Departments');
   }, [facultyFilter, departmentFilter, departmentOptions]);
 
-  useEffect(() => {
-    if (programmeFilter === 'All Programmes') return;
-    if (courseUnitFilter === 'All Course Units') return;
-    if (!courseUnitOptions.includes(courseUnitFilter)) setCourseUnitFilter('All Course Units');
-  }, [programmeFilter, courseUnitFilter, courseUnitOptions]);
-
   const handleFacultyChange = (value: string) => {
     setFacultyFilter(value);
     setDepartmentFilter('All Departments');
-  };
-
-  const handleProgrammeChange = (value: string) => {
-    setProgrammeFilter(value);
-    setCourseUnitFilter('All Course Units');
   };
 
   const resetFilters = () => {
     setFacultyFilter('All Faculties');
     setDepartmentFilter('All Departments');
     setProgrammeFilter('All Programmes');
-    setCourseUnitFilter('All Course Units');
     setGenderFilter('all');
     setPwdFilter('all');
   };
@@ -91,7 +70,6 @@ export default function StaffStudentRatioPanel() {
     facultyFilter === 'All Faculties' &&
     departmentFilter === 'All Departments' &&
     programmeFilter === 'All Programmes' &&
-    courseUnitFilter === 'All Course Units' &&
     genderFilter === 'all' &&
     pwdFilter === 'all';
 
@@ -102,53 +80,77 @@ export default function StaffStudentRatioPanel() {
     const doc = new jsPDF({ orientation: 'landscape' });
 
     doc.setFontSize(14);
-    doc.text('Percentage of staff to student ratio', 14, 15);
+    doc.text('Staff to student ratio by programme', 14, 15);
     doc.setFontSize(9);
     let metaY = 22;
-    doc.text(`Faculty Name: ${report.facultyName}`, 14, metaY);
+    doc.text(`Programmes: ${report.totals.programmeCount}`, 14, metaY);
     metaY += 6;
-    doc.text(`Department/Unit Name: ${report.departmentName}`, 14, metaY);
+    doc.text(`Teaching staff (distinct): ${report.totals.staffCount}`, 14, metaY);
     metaY += 6;
-    doc.text(`Programme Name: ${report.programmeName}`, 14, metaY);
+    doc.text(`Students: ${report.totals.studentCount.toLocaleString()}`, 14, metaY);
     metaY += 6;
-    doc.text(`Course Unit Name: ${report.courseUnitName}`, 14, metaY);
-    metaY += 6;
-    doc.text(`Number of Lecturers: ${report.numberOfLecturers}`, 14, metaY);
+    doc.text(`Overall ratio: ${report.totals.ratioLabel}`, 14, metaY);
     metaY += 6;
 
     autoTable(doc, {
       startY: metaY + 4,
-      head: [['Name of the Lecturer', 'Gender', 'PWD details', 'Qualification', 'Qualification details']],
-      body: report.rows.map((r) => [r.lecturerName, r.gender ?? '—', r.pwdDetails ?? '—', r.qualification ?? '—', r.qualificationDetails ?? '—']),
+      head: [['Programme', 'Faculty', 'Department/Unit', 'Teaching staff', 'Students', 'Ratio (staff : students)']],
+      body: report.rows.map((r) => [
+        r.programmeName,
+        r.facultyName,
+        r.departmentName,
+        String(r.staffCount),
+        String(r.studentCount),
+        r.ratioLabel,
+      ]),
+      foot: [
+        [
+          'TOTAL',
+          '',
+          '',
+          String(report.totals.staffCount),
+          String(report.totals.studentCount),
+          report.totals.ratioLabel,
+        ],
+      ],
       styles: { fontSize: 7, cellPadding: 2 },
       headStyles: { fillColor: [30, 92, 164], textColor: 255, fontStyle: 'bold' },
+      footStyles: { fillColor: [241, 245, 249], fontStyle: 'bold' },
     });
 
-    doc.save('Staff_Student_Ratio.pdf');
+    doc.save('Staff_Student_Ratio_By_Programme.pdf');
   };
 
   const exportExcel = () => {
     if (!report) return;
     const ws = XLSX.utils.aoa_to_sheet([
-      ['Percentage of staff to student ratio'],
-      ['Faculty Name', report.facultyName],
-      ['Department/Unit Name', report.departmentName],
-      ['Programme Name', report.programmeName],
-      ['Course Unit Name', report.courseUnitName],
-      ['Number of Lecturers', report.numberOfLecturers],
+      ['Staff to student ratio by programme'],
+      ['Programmes', report.totals.programmeCount],
+      ['Teaching staff (distinct)', report.totals.staffCount],
+      ['Students', report.totals.studentCount],
+      ['Overall ratio (staff : students)', report.totals.ratioLabel],
       [],
-      ['Name of the Lecturer', 'Gender', 'PWD details', 'Qualification', 'Qualification details'],
-      ...report.rows.map((r) => [r.lecturerName, r.gender ?? '—', r.pwdDetails ?? '—', r.qualification ?? '—', r.qualificationDetails ?? '—']),
+      ['Programme', 'Faculty', 'Department/Unit', 'Teaching staff', 'Students', 'Ratio (staff : students)'],
+      ...report.rows.map((r) => [
+        r.programmeName,
+        r.facultyName,
+        r.departmentName,
+        r.staffCount,
+        r.studentCount,
+        r.ratioLabel,
+      ]),
+      [],
+      ['TOTAL', '', '', report.totals.staffCount, report.totals.studentCount, report.totals.ratioLabel],
     ]);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Staff-Student Ratio');
-    XLSX.writeFile(wb, 'Staff_Student_Ratio.xlsx');
+    XLSX.writeFile(wb, 'Staff_Student_Ratio_By_Programme.xlsx');
   };
 
   const faculties = report?.filterOptions.faculties ?? ['All Faculties'];
   const programmes = report?.filterOptions.programmes ?? ['All Programmes'];
 
-  const colSpan = 5;
+  const colSpan = 6;
 
   return (
     <div className="table-card">
@@ -157,7 +159,7 @@ export default function StaffStudentRatioPanel() {
           <span className="material-symbols-outlined me-2" style={{ color: 'var(--mubs-blue)' }}>
             school
           </span>
-          Percentage of staff to student ratio
+          Staff to student ratio by programme
         </h5>
         <div className="d-flex gap-2 flex-wrap align-items-center">
           <select
@@ -187,27 +189,14 @@ export default function StaffStudentRatioPanel() {
           </select>
           <select
             className="form-select form-select-sm"
-            style={{ width: '200px' }}
+            style={{ width: '220px' }}
             value={programmeFilter}
-            onChange={(e) => handleProgrammeChange(e.target.value)}
+            onChange={(e) => setProgrammeFilter(e.target.value)}
             aria-label="Programme"
           >
             {programmes.map((p) => (
               <option key={p} value={p}>
                 {p}
-              </option>
-            ))}
-          </select>
-          <select
-            className="form-select form-select-sm"
-            style={{ width: '200px' }}
-            value={courseUnitFilter}
-            onChange={(e) => setCourseUnitFilter(e.target.value)}
-            aria-label="Course unit"
-          >
-            {courseUnitOptions.map((cu) => (
-              <option key={cu} value={cu}>
-                {cu}
               </option>
             ))}
           </select>
@@ -261,20 +250,21 @@ export default function StaffStudentRatioPanel() {
       {report && !loading && !error && (
         <div className="px-4 py-2 border-bottom bg-light small d-flex flex-wrap gap-3">
           <span>
-            <span className="text-muted">Faculty:</span> <strong>{report.facultyName}</strong>
+            <span className="text-muted">Programmes:</span>{' '}
+            <strong>{report.totals.programmeCount.toLocaleString()}</strong>
           </span>
           <span>
-            <span className="text-muted">Department/Unit:</span> <strong>{report.departmentName}</strong>
+            <span className="text-muted">Teaching staff:</span>{' '}
+            <strong>{report.totals.staffCount.toLocaleString()}</strong>
+            <span className="text-muted"> (distinct)</span>
           </span>
           <span>
-            <span className="text-muted">Programme:</span> <strong>{report.programmeName}</strong>
+            <span className="text-muted">Students:</span>{' '}
+            <strong>{report.totals.studentCount.toLocaleString()}</strong>
           </span>
           <span>
-            <span className="text-muted">Course unit:</span> <strong>{report.courseUnitName}</strong>
-          </span>
-          <span>
-            <span className="text-muted">Lecturers in report:</span>{' '}
-            <strong>{report.numberOfLecturers.toLocaleString()}</strong>
+            <span className="text-muted">Overall ratio:</span> <strong>{report.totals.ratioLabel}</strong>
+            <span className="text-muted"> (1 staff member per N students)</span>
           </span>
         </div>
       )}
@@ -284,19 +274,22 @@ export default function StaffStudentRatioPanel() {
           <thead>
             <tr>
               <th className="text-start ps-4" style={{ minWidth: '220px' }}>
-                Name of the Lecturer
+                Programme
               </th>
-              <th className="text-center" style={{ minWidth: '90px' }}>
-                Gender
+              <th className="text-start" style={{ minWidth: '180px' }}>
+                Faculty
               </th>
-              <th className="text-center" style={{ minWidth: '180px' }}>
-                PWD details
+              <th className="text-start" style={{ minWidth: '180px' }}>
+                Department/Unit
               </th>
-              <th className="text-center" style={{ minWidth: '140px' }}>
-                Qualification
+              <th className="text-center" style={{ minWidth: '110px' }}>
+                Teaching staff
               </th>
-              <th className="text-center" style={{ minWidth: '260px' }}>
-                Qualification details
+              <th className="text-center" style={{ minWidth: '100px' }}>
+                Students
+              </th>
+              <th className="text-center pe-4" style={{ minWidth: '140px' }}>
+                Ratio (1 : N)
               </th>
             </tr>
           </thead>
@@ -318,29 +311,42 @@ export default function StaffStudentRatioPanel() {
             ) : !report || report.rows.length === 0 ? (
               <tr>
                 <td colSpan={colSpan} className="text-center py-4 text-muted">
-                  No data available.
+                  No programme data for the selected filters. Add programme enrollment (Registrar) and lecturer programme assignments.
                 </td>
               </tr>
             ) : (
-              report.rows.map((r, idx) => (
-                <tr key={`${r.lecturerName}-${idx}`}>
-                  <td className="text-start ps-4 fw-semibold" style={{ fontSize: '.85rem' }}>
-                    {r.lecturerName}
+              <>
+                {report.rows.map((r) => (
+                  <tr key={r.programmeName}>
+                    <td className="text-start ps-4 fw-semibold" style={{ fontSize: '.85rem' }}>
+                      {r.programmeName}
+                    </td>
+                    <td className="text-start" style={{ fontSize: '.85rem' }}>
+                      {r.facultyName}
+                    </td>
+                    <td className="text-start" style={{ fontSize: '.85rem' }}>
+                      {r.departmentName}
+                    </td>
+                    <td className="text-center fw-bold" style={{ fontSize: '.85rem' }}>
+                      {r.staffCount.toLocaleString()}
+                    </td>
+                    <td className="text-center fw-bold" style={{ fontSize: '.85rem' }}>
+                      {r.studentCount.toLocaleString()}
+                    </td>
+                    <td className="text-center pe-4" style={{ fontSize: '.85rem' }}>
+                      {r.ratioLabel}
+                    </td>
+                  </tr>
+                ))}
+                <tr className="table-light fw-bold">
+                  <td className="text-start ps-4" colSpan={3}>
+                    Total
                   </td>
-                  <td className="text-center" style={{ fontSize: '.85rem' }}>
-                    {r.gender ?? '—'}
-                  </td>
-                  <td className="text-center" style={{ fontSize: '.85rem' }}>
-                    {r.pwdDetails ?? '—'}
-                  </td>
-                  <td className="text-center" style={{ fontSize: '.85rem' }}>
-                    {r.qualification ?? '—'}
-                  </td>
-                  <td className="text-center" style={{ fontSize: '.85rem' }}>
-                    {r.qualificationDetails ?? '—'}
-                  </td>
+                  <td className="text-center">{report.totals.staffCount.toLocaleString()}</td>
+                  <td className="text-center">{report.totals.studentCount.toLocaleString()}</td>
+                  <td className="text-center pe-4">{report.totals.ratioLabel}</td>
                 </tr>
-              ))
+              </>
             )}
           </tbody>
         </table>
@@ -348,4 +354,3 @@ export default function StaffStudentRatioPanel() {
     </div>
   );
 }
-

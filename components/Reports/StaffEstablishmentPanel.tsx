@@ -15,6 +15,7 @@ export default function StaffEstablishmentPanel() {
   const [facultyFilter, setFacultyFilter] = useState('All Faculties');
   const [departmentFilter, setDepartmentFilter] = useState('All Departments');
   const [pwdFilter, setPwdFilter] = useState('all');
+  const [employmentStatusFilter, setEmploymentStatusFilter] = useState('in_service');
 
   const fetchReport = useCallback(async () => {
     setLoading(true);
@@ -24,6 +25,9 @@ export default function StaffEstablishmentPanel() {
       if (facultyFilter !== 'All Faculties') params.set('faculty', facultyFilter);
       if (departmentFilter !== 'All Departments') params.set('department', departmentFilter);
       if (pwdFilter !== 'all') params.set('pwd', pwdFilter);
+      if (employmentStatusFilter !== 'in_service') {
+        params.set('employment_status', employmentStatusFilter);
+      }
       const { data } = await axios.get(`/api/reports?${params.toString()}`);
       setReport(data.data as StaffEstablishmentReport);
     } catch (e) {
@@ -33,7 +37,7 @@ export default function StaffEstablishmentPanel() {
     } finally {
       setLoading(false);
     }
-  }, [facultyFilter, departmentFilter, pwdFilter]);
+  }, [facultyFilter, departmentFilter, pwdFilter, employmentStatusFilter]);
 
   useEffect(() => {
     fetchReport();
@@ -65,12 +69,14 @@ export default function StaffEstablishmentPanel() {
     setFacultyFilter('All Faculties');
     setDepartmentFilter('All Departments');
     setPwdFilter('all');
+    setEmploymentStatusFilter('in_service');
   };
 
   const filtersAtDefault =
     facultyFilter === 'All Faculties' &&
     departmentFilter === 'All Departments' &&
-    pwdFilter === 'all';
+    pwdFilter === 'all' &&
+    employmentStatusFilter === 'in_service';
 
   const formatCount = (n: number) => (n > 0 ? String(n) : '—');
 
@@ -107,6 +113,8 @@ export default function StaffEstablishmentPanel() {
     doc.text(`Department/Unit Name: ${report.departmentName}`, 14, metaY);
     metaY += 6;
     doc.text(`Number of Staff: ${report.numberOfStaff}`, 14, metaY);
+    metaY += 6;
+    doc.text(`Employment status: ${report.employmentStatusLabel}`, 14, metaY);
     metaY += 6;
     if (pwdFilter !== 'all') {
       const pwdLabel =
@@ -174,6 +182,7 @@ export default function StaffEstablishmentPanel() {
     const ws = XLSX.utils.aoa_to_sheet([
       ['Faculty Name', report.facultyName],
       ['Department/Unit Name', report.departmentName],
+      ['Employment status', report.employmentStatusLabel],
       ['Number of Staff', report.numberOfStaff],
       [],
       headerRow1,
@@ -185,6 +194,11 @@ export default function StaffEstablishmentPanel() {
   };
 
   const faculties = report?.filterOptions.faculties ?? ['All Faculties'];
+  const employmentStatusOptions =
+    report?.filterOptions.employmentStatuses ?? [
+      { value: 'in_service', label: 'In service (excl. retired, resigned, etc.)' },
+      { value: 'active', label: 'Active' },
+    ];
 
   const colSpan = 1 + yearKeys.length * 3;
 
@@ -220,6 +234,19 @@ export default function StaffEstablishmentPanel() {
             {departmentOptions.map((d) => (
               <option key={d} value={d}>
                 {d === 'All Departments' ? 'All Departments' : d}
+              </option>
+            ))}
+          </select>
+          <select
+            className="form-select form-select-sm"
+            style={{ width: '220px' }}
+            value={employmentStatusFilter}
+            onChange={(e) => setEmploymentStatusFilter(e.target.value)}
+            aria-label="Employment status"
+          >
+            {employmentStatusOptions.map((opt) => (
+              <option key={opt.value} value={opt.value}>
+                {opt.label}
               </option>
             ))}
           </select>
@@ -283,6 +310,10 @@ export default function StaffEstablishmentPanel() {
           <span>
             <span className="text-muted">Department/Unit:</span>{' '}
             <strong>{report.departmentName}</strong>
+          </span>
+          <span>
+            <span className="text-muted">Employment status:</span>{' '}
+            <strong>{report.employmentStatusLabel}</strong>
           </span>
           <span>
             <span className="text-muted">Staff in report:</span>{' '}

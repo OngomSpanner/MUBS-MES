@@ -635,7 +635,7 @@ export default function ReportsView() {
                     </button>
                 </li>
                 <li className="nav-item">
-                    <button className={`nav-link border rounded-pill px-4 fw-bold ${activeTab === 'staff-student-ratio' ? 'active bg-primary text-white border-primary' : 'text-muted'}`} onClick={() => setActiveTab('staff-student-ratio')} title="Teaching staff list for staff:student ratio">
+                    <button className={`nav-link border rounded-pill px-4 fw-bold ${activeTab === 'staff-student-ratio' ? 'active bg-primary text-white border-primary' : 'text-muted'}`} onClick={() => setActiveTab('staff-student-ratio')} title="Teaching staff and student counts per programme with ratio">
                         Staff-Student Ratio
                     </button>
                 </li>
