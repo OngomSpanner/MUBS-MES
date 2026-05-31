@@ -34,9 +34,13 @@ export async function GET(
                      DATE_FORMAT(u.retirement_date, '%Y-%m-%d') AS retirement_date,
                      u.disability_status, u.disability_type, u.workplace_accommodation, u.special_support_needs,
                      u.faculty_office,
-                     COALESCE(d.name, '') AS department
+                     COALESCE(d.name, '') AS department,
+                     COALESCE(NULLIF(TRIM(mu.external_name), ''), mu.name) AS managed_unit,
+                     mp.name AS managed_unit_parent
               FROM users u
               LEFT JOIN departments d ON u.department_id = d.id
+              LEFT JOIN departments mu ON u.managed_unit_id = mu.id
+              LEFT JOIN departments mp ON mu.parent_id = mp.id
               WHERE u.id = ?`,
       values: [id]
     });

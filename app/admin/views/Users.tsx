@@ -151,6 +151,8 @@ export default function UsersView() {
                     department_id: data.department_id,
                     managed_unit_id: data.managed_unit_id,
                     department: data.department || '',
+                    managed_unit: data.managed_unit ?? null,
+                    managed_unit_parent: data.managed_unit_parent ?? null,
                     status: data.status,
                     created_date: '',
                 });
