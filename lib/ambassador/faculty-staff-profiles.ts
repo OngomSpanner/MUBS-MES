@@ -20,7 +20,7 @@ function parseSectionsConcat(raw: string | null | undefined): Array<{ id: number
     .filter((s): s is { id: number; name: string } => s !== null);
 }
 
-/** All HR-synced staff under the ambassador's faculty/office (by department tree). */
+/** All HR-synced staff in the ambassador's assigned department/unit. */
 export async function listFacultyStaffProfiles(
   managedUnitId: number
 ): Promise<FacultyStaffProfileRow[]> {

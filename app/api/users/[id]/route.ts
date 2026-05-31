@@ -11,6 +11,7 @@ import {
   normalizeOptionalDate,
   normalizeOptionalString,
 } from '@/lib/staff-biodata';
+import { normalizeUserAccountStatus } from '@/lib/user-account-status';
 
 export async function GET(
   request: Request,
@@ -152,6 +153,7 @@ export async function PUT(
     const roleStr = typeof role === 'string' ? role : (Array.isArray(role) ? role.join(',') : '');
     const departmentId = department_id !== undefined && department_id !== '' ? Number(department_id) : null;
     const managedUnitId = managed_unit_id !== undefined && managed_unit_id !== '' ? Number(managed_unit_id) : null;
+    const accountStatus = normalizeUserAccountStatus(status);
 
     const updateSql = `
       UPDATE users 
@@ -171,7 +173,7 @@ export async function PUT(
     `;
     const updateValues = [
       finalFullName, email.trim(), roleStr, departmentId, managedUnitId, 
-      status || 'Active', first_name || null, surname || null, other_names || null,
+      accountStatus, first_name || null, surname || null, other_names || null,
       employee_id || null, contract_terms || null, contract_type || null, staffCategoryDb,
       position || null, contractStart, contractEnd,
       contractStart, contractEnd,
@@ -264,10 +266,11 @@ export async function PATCH(
   const { id } = await params;
   try {
     const { status } = await request.json();
+    const accountStatus = normalizeUserAccountStatus(status);
 
     await query({
       query: 'UPDATE users SET status = ? WHERE id = ?',
-      values: [status, id]
+      values: [accountStatus, id]
     });
 
     return NextResponse.json({ message: 'User status updated successfully' });

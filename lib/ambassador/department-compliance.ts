@@ -76,7 +76,7 @@ export async function getDepartmentComplianceBundle(managedUnitId: number, manag
           END), 0) AS delayed_count
         FROM departments d
         LEFT JOIN strategic_activities sa ON d.id = sa.department_id AND ${MAIN_ACTIVITY_FILTER}
-        WHERE d.parent_id = ? AND d.is_active = 1
+        WHERE d.id = ? AND d.is_active = 1
         GROUP BY d.id, d.name, d.external_name
         ORDER BY COALESCE(NULLIF(TRIM(d.external_name), ''), d.name) ASC
       `,
@@ -106,7 +106,7 @@ export async function getDepartmentComplianceBundle(managedUnitId: number, manag
           END), 0) AS delayed_count
         FROM strategic_activities sa
         JOIN departments d ON sa.department_id = d.id
-        WHERE d.parent_id = ? AND ${MAIN_ACTIVITY_FILTER}
+        WHERE d.id = ? AND ${MAIN_ACTIVITY_FILTER}
       `,
       values: [managedUnitId],
     }) as Promise<
@@ -129,7 +129,7 @@ export async function getDepartmentComplianceBundle(managedUnitId: number, manag
         JOIN users u ON sr.submitted_by = u.id
         JOIN departments d ON u.department_id = d.id
         WHERE sr.status = 'submitted'
-          AND d.parent_id = ?
+          AND u.department_id = ?
           AND sr.submitted_at >= DATE_SUB(CURDATE(), INTERVAL 6 MONTH)
         GROUP BY u.department_id, YEAR(sr.submitted_at), MONTH(sr.submitted_at)
       `,
@@ -141,7 +141,7 @@ export async function getDepartmentComplianceBundle(managedUnitId: number, manag
         FROM staff_reports sr
         JOIN users u ON sr.submitted_by = u.id
         JOIN departments d ON u.department_id = d.id
-        WHERE sr.status = 'submitted' AND d.parent_id = ?
+        WHERE sr.status = 'submitted' AND u.department_id = ?
         GROUP BY u.department_id
       `,
       values: [managedUnitId],
@@ -163,7 +163,7 @@ export async function getDepartmentComplianceBundle(managedUnitId: number, manag
           END AS statusLabel
         FROM strategic_activities sa
         JOIN departments d ON sa.department_id = d.id
-        WHERE d.parent_id = ? AND ${MAIN_ACTIVITY_FILTER}
+        WHERE d.id = ? AND ${MAIN_ACTIVITY_FILTER}
           AND (
             sa.status = 'overdue'
             OR (sa.end_date IS NOT NULL AND sa.end_date < CURDATE())
@@ -276,9 +276,13 @@ export async function getDepartmentActivitiesForAmbassador(
   managedUnitId: number,
   departmentId: number
 ) {
+  if (departmentId !== managedUnitId) {
+    return null;
+  }
+
   const deptCheck = (await query({
-    query: 'SELECT id, name FROM departments WHERE id = ? AND parent_id = ? AND is_active = 1',
-    values: [departmentId, managedUnitId],
+    query: 'SELECT id, name FROM departments WHERE id = ? AND is_active = 1',
+    values: [managedUnitId],
   })) as Array<{ id: number; name: string }>;
 
   if (!deptCheck.length) {
@@ -346,7 +350,7 @@ export type ManagedUnitActivityRow = {
   endDate: string | null;
 };
 
-/** All strategic activities under departments in the managed faculty/office. */
+/** All strategic activities for the ambassador's department/unit. */
 export async function listAllManagedUnitActivities(
   managedUnitId: number
 ): Promise<ManagedUnitActivityRow[]> {
@@ -368,7 +372,7 @@ export async function listAllManagedUnitActivities(
         END AS statusLabel
       FROM strategic_activities sa
       JOIN departments d ON sa.department_id = d.id
-      WHERE d.parent_id = ? AND ${MAIN_ACTIVITY_FILTER}
+      WHERE sa.department_id = ? AND ${MAIN_ACTIVITY_FILTER}
       ORDER BY department ASC, sa.end_date ASC, sa.title ASC
     `,
     values: [managedUnitId],

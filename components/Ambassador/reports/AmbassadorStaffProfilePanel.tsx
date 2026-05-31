@@ -26,7 +26,7 @@ export default function AmbassadorStaffProfilePanel() {
         setStaff(res.data.staff ?? []);
         setDepartmentOptions(res.data.departmentOptions ?? ['All Departments']);
       } catch {
-        setError('Failed to load faculty staff profiles.');
+        setError('Failed to load unit staff profiles.');
         setStaff([]);
       } finally {
         setLoading(false);
@@ -139,7 +139,7 @@ export default function AmbassadorStaffProfilePanel() {
               ) : filteredStaff.length === 0 ? (
                 <tr>
                   <td colSpan={6} className="text-center py-5 text-muted small">
-                    No staff match your search in this faculty.
+                    No staff match your search in this unit.
                   </td>
                 </tr>
               ) : (

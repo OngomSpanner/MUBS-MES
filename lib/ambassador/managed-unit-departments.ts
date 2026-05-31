@@ -1,6 +1,6 @@
 import { query } from '@/lib/db';
 
-/** Active departments and units directly under the ambassador's faculty/office. */
+/** The ambassador's assigned department/unit. */
 export type ManagedUnitDepartment = {
   id: number;
   /** Canonical name (matches users.department / HR dept). */
@@ -17,8 +17,7 @@ export async function listManagedUnitDepartments(managedUnitId: number): Promise
         name,
         COALESCE(NULLIF(TRIM(external_name), ''), name) AS display_name
       FROM departments
-      WHERE parent_id = ? AND is_active = 1
-      ORDER BY COALESCE(NULLIF(TRIM(external_name), ''), name) ASC
+      WHERE id = ? AND is_active = 1
     `,
     values: [managedUnitId],
   })) as { id: number; name: string; display_name: string }[];
@@ -30,15 +29,11 @@ export async function listManagedUnitDepartments(managedUnitId: number): Promise
   }));
 }
 
-/** Department ids the ambassador may oversee (child departments + the faculty/office unit itself). */
+/** Department ids the ambassador may access (their assigned unit only). */
 export async function getManagedUnitDepartmentIds(managedUnitId: number): Promise<number[]> {
   const rows = (await query({
-    query: `
-      SELECT id
-      FROM departments
-      WHERE is_active = 1 AND (id = ? OR parent_id = ?)
-    `,
-    values: [managedUnitId, managedUnitId],
+    query: `SELECT id FROM departments WHERE id = ? AND is_active = 1`,
+    values: [managedUnitId],
   })) as { id: number }[];
 
   return rows.map((r) => r.id);

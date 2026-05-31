@@ -6,18 +6,17 @@ import { BENEFIT_TYPES, type BenefitType } from '@/lib/hrms/staff-benefits';
 
 const VALID_TYPES = new Set(BENEFIT_TYPES.map((b) => b.value));
 
-async function getOwnedEntry(id: number, managedUnitId: number, managedUnitName: string) {
+async function getOwnedEntry(id: number, managedUnitId: number) {
   const rows = (await query({
     query: `
       SELECT e.id, e.user_id, e.financial_year_key, e.benefit_type, e.received
       FROM staff_benefit_entries e
       INNER JOIN users u ON u.id = e.user_id
-      LEFT JOIN departments d ON d.id = u.department_id
       WHERE e.id = ?
-        AND (d.parent_id = ? OR (TRIM(COALESCE(u.faculty_office, '')) <> '' AND LOWER(TRIM(u.faculty_office)) = LOWER(?)))
+        AND u.department_id = ?
       LIMIT 1
     `,
-    values: [id, managedUnitId, managedUnitName],
+    values: [id, managedUnitId],
   })) as { id: number; user_id: number; financial_year_key: string; benefit_type: BenefitType; received: number }[];
   return rows[0] ?? null;
 }
@@ -30,7 +29,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   const id = Number(idParam);
   if (!id) return NextResponse.json({ message: 'Invalid id' }, { status: 400 });
 
-  const existing = await getOwnedEntry(id, auth.managedUnitId, auth.managedUnitName);
+  const existing = await getOwnedEntry(id, auth.managedUnitId);
   if (!existing) return NextResponse.json({ message: 'Record not found' }, { status: 404 });
 
   const body = await request.json();
@@ -45,7 +44,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
 
   const inFaculty = await isStaffInFaculty(userId, auth.managedUnitId, auth.managedUnitName);
   if (!inFaculty) {
-    return NextResponse.json({ message: 'Staff member is not in your faculty' }, { status: 403 });
+    return NextResponse.json({ message: 'Staff member is not in your department or unit' }, { status: 403 });
   }
 
   try {
@@ -78,7 +77,7 @@ export async function DELETE(_request: Request, { params }: { params: Promise<{ 
   const id = Number(idParam);
   if (!id) return NextResponse.json({ message: 'Invalid id' }, { status: 400 });
 
-  const existing = await getOwnedEntry(id, auth.managedUnitId, auth.managedUnitName);
+  const existing = await getOwnedEntry(id, auth.managedUnitId);
   if (!existing) return NextResponse.json({ message: 'Record not found' }, { status: 404 });
 
   await query({ query: 'DELETE FROM staff_benefit_entries WHERE id = ?', values: [id] });

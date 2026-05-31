@@ -20,6 +20,7 @@ export async function GET(request: Request) {
         const { searchParams } = new URL(request.url);
         const unitsOnly = searchParams.get('units_only') === 'true' || searchParams.get('units_only') === '1';
         const parentsOnly = searchParams.get('parents_only') === 'true' || searchParams.get('parents_only') === '1';
+        const childrenOnly = searchParams.get('children_only') === 'true' || searchParams.get('children_only') === '1';
         
         let departments: any[];
         try {
@@ -32,6 +33,8 @@ export async function GET(request: Request) {
             
             if (parentsOnly) {
                 sql += " WHERE d.is_active = 1 AND d.parent_id IS NULL";
+            } else if (childrenOnly) {
+                sql += " WHERE d.is_active = 1 AND d.parent_id IS NOT NULL";
             } else if (unitsOnly) {
                 sql += " WHERE d.is_active = 1 AND d.unit_type IN ('department', 'unit')";
             }

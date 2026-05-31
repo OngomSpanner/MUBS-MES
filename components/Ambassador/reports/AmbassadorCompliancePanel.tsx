@@ -453,7 +453,7 @@ export default function AmbassadorCompliancePanel() {
   return (
     <>
       <p className="text-muted small mb-4">
-        Monitor strategic plan activities and monthly staff reporting across departments in your faculty.
+        Monitor strategic plan activities and monthly staff reporting for your department or unit.
       </p>
 
       <div className="row g-4 mb-4">

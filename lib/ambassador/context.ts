@@ -37,7 +37,7 @@ export async function requireAmbassador(): Promise<AmbassadorContext | { error: 
   if (!managedUnitId) {
     return {
       error: NextResponse.json(
-        { message: 'Ambassador is not assigned to a faculty or office' },
+        { message: 'Ambassador is not assigned to a department or unit' },
         { status: 403 }
       ),
     };
@@ -46,6 +46,6 @@ export async function requireAmbassador(): Promise<AmbassadorContext | { error: 
   return {
     userId: decoded.userId,
     managedUnitId,
-    managedUnitName: rows[0].unit_name || 'Unknown Faculty/Office',
+    managedUnitName: rows[0].unit_name || 'Unknown Department/Unit',
   };
 }

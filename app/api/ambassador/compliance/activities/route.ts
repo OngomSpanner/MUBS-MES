@@ -23,7 +23,7 @@ export async function GET(request: NextRequest) {
 
     const data = await getDepartmentActivitiesForAmbassador(ctx.managedUnitId, departmentId);
     if (!data) {
-      return NextResponse.json({ message: 'Department not found in your faculty' }, { status: 404 });
+      return NextResponse.json({ message: 'Department not found in your assigned unit' }, { status: 404 });
     }
 
     return NextResponse.json(data);

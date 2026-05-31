@@ -135,7 +135,7 @@ export default function AmbassadorBenefitsDataPanel({ scopeFaculty, lockFaculty 
             <StatCard label="Financial years" value={benefitStats.financialYears} color="yellow" />
           </div>
           <div className="col-6 col-md-4 col-xl-2">
-            <StatCard label="Faculty staff (HR)" value={benefitStats.facultyStaff} color="green" />
+            <StatCard label="Unit staff (HR)" value={benefitStats.facultyStaff} color="green" />
           </div>
         </div>
       )}
@@ -196,7 +196,7 @@ export default function AmbassadorBenefitsDataPanel({ scopeFaculty, lockFaculty 
                 ) : records.length === 0 ? (
                   <tr>
                     <td colSpan={6} className="text-center py-4 text-muted small">
-                      No benefit entries yet. Click <strong>Add entry</strong> to record data for your faculty.
+                      No benefit entries yet. Click <strong>Add entry</strong> to record data for your unit.
                     </td>
                   </tr>
                 ) : (

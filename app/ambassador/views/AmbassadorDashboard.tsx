@@ -93,7 +93,7 @@ export default function AmbassadorDashboard() {
                                     {stats.overallProgress}
                                     <span style={{ fontSize: '2rem', color: '#93c5fd' }}>%</span>
                                 </div>
-                                <div className="kpi-hero-label">Faculty Strategic Progress</div>
+                                <div className="kpi-hero-label">Unit Strategic Progress</div>
                                 <div
                                     className="progress mt-2"
                                     style={{
@@ -205,7 +205,7 @@ export default function AmbassadorDashboard() {
                                 <span className="material-symbols-outlined" style={{ color: 'var(--mubs-blue)', fontSize: '22px' }}>bar_chart</span>
                             </div>
                             <div className="min-w-0">
-                                <div className="fw-black text-dark" style={{ fontSize: '.95rem', lineHeight: 1.25 }}>Faculty reports</div>
+                                <div className="fw-black text-dark" style={{ fontSize: '.95rem', lineHeight: 1.25 }}>Unit reports</div>
                                 <div className="text-muted small" style={{ fontSize: '.78rem' }}>Department activities & reporting</div>
                             </div>
                         </div>

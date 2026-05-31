@@ -134,7 +134,7 @@ export default function AmbassadorSkillsDataPanel({ managedUnitId }: ScopeProps)
             <h5 className="mb-0 fw-bold">Skills Assessments</h5>
             <p className="text-muted small mb-0 mt-1">
               {tableView === 'entries'
-                ? 'Annual reports produced and skills missing counts for your faculty.'
+                ? 'Annual reports produced and skills missing counts for your unit.'
                 : 'Reports produced and skills missing by financial year.'}
             </p>
           </div>

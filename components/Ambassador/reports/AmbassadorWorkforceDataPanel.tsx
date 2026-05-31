@@ -127,7 +127,7 @@ export default function AmbassadorWorkforceDataPanel({ managedUnitId }: ScopePro
             <h5 className="mb-0 fw-bold">Workforce Assessments</h5>
             <p className="text-muted small mb-0 mt-1">
               {tableView === 'entries'
-                ? 'Enter assessment details and counts per financial year for your faculty.'
+                ? 'Enter assessment details and counts per financial year for your unit.'
                 : 'Assessment details with headcounts rolled up by financial year.'}
             </p>
           </div>

@@ -17,6 +17,7 @@ import {
     DISABILITY_STATUS_OPTIONS,
     DISABILITY_TYPE_OPTIONS,
 } from '@/lib/staff-biodata';
+import { USER_ACCOUNT_STATUSES } from '@/lib/user-account-status';
 import axios from 'axios';
 
 interface User {
@@ -50,6 +51,7 @@ export default function UsersView() {
     const [showCreateModal, setShowCreateModal] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
     const [roleFilter, setRoleFilter] = useState('');
+    const [statusFilter, setStatusFilter] = useState('');
     const [rolesList, setRolesList] = useState<string[]>([]);
 
     // Edit modal state
@@ -89,6 +91,7 @@ export default function UsersView() {
     });
     const [departments, setDepartments] = useState<{ id: number; name: string }[]>([]);
     const [faculties, setFaculties] = useState<{ id: number; name: string }[]>([]);
+    const [ambassadorUnits, setAmbassadorUnits] = useState<{ id: number; name: string; parent_name?: string }[]>([]);
     const [saving, setSaving] = useState(false);
 
     // Delete modal state
@@ -113,11 +116,11 @@ export default function UsersView() {
     const [deptToDelete, setDeptToDelete] = useState<any | null>(null);
 
     // Reset page when filters change
-    useEffect(() => { setCurrentPage(1); }, [searchTerm, roleFilter, activeSubTab, deptSearchTerm]);
+    useEffect(() => { setCurrentPage(1); }, [searchTerm, roleFilter, statusFilter, activeSubTab, deptSearchTerm]);
 
     useEffect(() => {
         fetchUsers();
-    }, [searchTerm, roleFilter, currentPage]);
+    }, [searchTerm, roleFilter, statusFilter, currentPage]);
 
     const closeEditModal = useCallback(() => {
         setShowEditModal(false);
@@ -207,12 +210,14 @@ export default function UsersView() {
     useEffect(() => {
         const loadDepartments = async () => {
             try {
-                const [deptRes, facRes] = await Promise.all([
+                const [deptRes, parentRes, ambassadorRes] = await Promise.all([
                     axios.get('/api/departments?units_only=true'),
-                    axios.get('/api/departments?parents_only=true')
+                    axios.get('/api/departments?parents_only=true'),
+                    axios.get('/api/departments?children_only=true'),
                 ]);
                 setDepartments(Array.isArray(deptRes.data) ? deptRes.data : []);
-                setFaculties(Array.isArray(facRes.data) ? facRes.data : []);
+                setFaculties(Array.isArray(parentRes.data) ? parentRes.data : []);
+                setAmbassadorUnits(Array.isArray(ambassadorRes.data) ? ambassadorRes.data : []);
             } catch (e) {
                 console.error('Error loading departments', e);
             }
@@ -255,6 +260,7 @@ export default function UsersView() {
             params.append('limit', String(PAGE_SIZE));
             if (searchTerm) params.append('search', searchTerm);
             if (roleFilter) params.append('role', roleFilter);
+            if (statusFilter) params.append('status', statusFilter);
             const { data } = await axios.get<{
                 users: User[];
                 total: number;
@@ -436,12 +442,14 @@ export default function UsersView() {
             setShowDeptModal(false);
             fetchDepartmentsList();
             // Also reload parent list for dropdowns
-            const [deptRes, facRes] = await Promise.all([
+            const [deptRes, parentRes, ambassadorRes] = await Promise.all([
                 axios.get('/api/departments?units_only=true'),
-                axios.get('/api/departments?parents_only=true')
+                axios.get('/api/departments?parents_only=true'),
+                axios.get('/api/departments?children_only=true'),
             ]);
             setDepartments(Array.isArray(deptRes.data) ? deptRes.data : []);
-            setFaculties(Array.isArray(facRes.data) ? facRes.data : []);
+            setFaculties(Array.isArray(parentRes.data) ? parentRes.data : []);
+            setAmbassadorUnits(Array.isArray(ambassadorRes.data) ? ambassadorRes.data : []);
         } catch (error: any) {
             console.error('Error saving department:', error);
             const msg = error.response?.data?.error || error.response?.data?.message || 'Failed to save department.';
@@ -587,6 +595,18 @@ export default function UsersView() {
                                 <option key={r} value={r}>{formatRoleForDisplay(r)}</option>
                             ))}
                         </select>
+                        <select
+                            className="form-select form-select-sm"
+                            style={{ width: '150px' }}
+                            value={statusFilter}
+                            onChange={(e) => setStatusFilter(e.target.value)}
+                            aria-label="Filter by account status"
+                        >
+                            <option value="">All Statuses</option>
+                            {USER_ACCOUNT_STATUSES.map((s) => (
+                                <option key={s} value={s}>{s}</option>
+                            ))}
+                        </select>
                         <HrSyncControl
                             onSynced={() => {
                                 fetchUsers();
@@ -607,13 +627,14 @@ export default function UsersView() {
                                 <th>Email</th>
                                 <th>Role</th>
                                 <th>Department/Unit</th>
+                                <th>Account Status</th>
                                 <th>Actions</th>
                             </tr>
                         </thead>
                         <tbody>
                             {loading ? (
                                 <tr>
-                                    <td colSpan={5} className="text-center py-4">
+                                    <td colSpan={6} className="text-center py-4">
                                         <div className="spinner-border text-primary" role="status">
                                             <span className="visually-hidden">Loading...</span>
                                         </div>
@@ -621,7 +642,7 @@ export default function UsersView() {
                                 </tr>
                             ) : users.length === 0 ? (
                                 <tr>
-                                    <td colSpan={5} className="text-center py-4 text-muted">No users found</td>
+                                    <td colSpan={6} className="text-center py-4 text-muted">No users found</td>
                                 </tr>
                             ) : (
                                 users.map((user) => {
@@ -657,6 +678,18 @@ export default function UsersView() {
                                                 </div>
                                             </td>
                                             <td style={{ fontSize: '.83rem' }}>{user.department}</td>
+                                            <td>
+                                                <span
+                                                    className="badge rounded-pill fw-semibold"
+                                                    style={{
+                                                        background: statusStyle.bg,
+                                                        color: statusStyle.color,
+                                                        fontSize: '.72rem',
+                                                    }}
+                                                >
+                                                    {user.status || '—'}
+                                                </span>
+                                            </td>
                                             <td>
                                                 <div className="d-flex gap-1">
                                                     <button
@@ -1220,18 +1253,18 @@ export default function UsersView() {
                         </div>
                         {editForm.role && editForm.role.split(',').map((r: string) => r.trim()).filter(Boolean).includes('ambassador') && (
                             <div className="col-12">
-                                <Form.Label className="fw-bold small text-primary">Managed Faculty/Office Oversight</Form.Label>
+                                <Form.Label className="fw-bold small text-primary">Managed Department/Unit</Form.Label>
                                 <Form.Select
                                     value={editForm.managed_unit_id === '' ? '' : String(editForm.managed_unit_id)}
                                     onChange={e => setEditForm({ ...editForm, managed_unit_id: e.target.value === '' ? '' : Number(e.target.value) })}
                                     className="border-primary"
                                 >
-                                    <option value="">Select faculty/office to oversee</option>
-                                    {faculties.map((f) => (
-                                        <option key={f.id} value={f.id}>{f.name}</option>
+                                    <option value="">Select department/unit to oversee</option>
+                                    {ambassadorUnits.map((f) => (
+                                        <option key={f.id} value={f.id}>{f.name}{f.parent_name ? ` (${f.parent_name})` : ''}</option>
                                     ))}
                                 </Form.Select>
-                                <Form.Text className="text-primary small">This user will have ambassador oversight for the selected unit.</Form.Text>
+                                <Form.Text className="text-primary small">Ambassador oversees this department or unit only.</Form.Text>
                             </div>
                         )}
                         {editForm.role && editForm.role.split(',').map((r: string) => r.trim()).filter(Boolean).some((r: string) => r === 'committee_member' || formatRoleForDisplay(r) === 'Committee Member') && (

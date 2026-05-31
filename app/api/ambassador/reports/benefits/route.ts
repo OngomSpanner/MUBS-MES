@@ -25,11 +25,10 @@ export async function GET() {
       FROM staff_benefit_entries e
       INNER JOIN users u ON u.id = e.user_id
       LEFT JOIN departments d ON d.id = u.department_id
-      WHERE d.parent_id = ?
-         OR (TRIM(COALESCE(u.faculty_office, '')) <> '' AND LOWER(TRIM(u.faculty_office)) = LOWER(?))
+      WHERE u.department_id = ?
       ORDER BY e.updated_at DESC, e.id DESC
     `,
-    values: [auth.managedUnitId, auth.managedUnitName],
+    values: [auth.managedUnitId],
   })) as {
     id: number;
     user_id: number;
@@ -79,7 +78,7 @@ export async function POST(request: Request) {
 
   const inFaculty = await isStaffInFaculty(userId, auth.managedUnitId, auth.managedUnitName);
   if (!inFaculty) {
-    return NextResponse.json({ message: 'Staff member is not in your faculty' }, { status: 403 });
+    return NextResponse.json({ message: 'Staff member is not in your department or unit' }, { status: 403 });
   }
 
   try {

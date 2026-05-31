@@ -13,6 +13,7 @@ import {
   normalizeOptionalDate,
   normalizeOptionalString,
 } from '@/lib/staff-biodata';
+import { normalizeUserAccountStatus, USER_ACCOUNT_STATUSES } from '@/lib/user-account-status';
 
 export async function GET(request: Request) {
   try {
@@ -28,6 +29,7 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const role = searchParams.get('role');
     const search = searchParams.get('search');
+    const statusParam = searchParams.get('status');
     const page = Math.max(parseInt(searchParams.get('page') || '1', 10) || 1, 1);
     const limit = Math.min(Math.max(parseInt(searchParams.get('limit') || '10', 10) || 10, 1), 100);
     const offset = (page - 1) * limit;
@@ -43,6 +45,11 @@ export async function GET(request: Request) {
     if (search) {
       where += ' AND (u.full_name LIKE ? OR u.email LIKE ?)';
       values.push(`%${search}%`, `%${search}%`);
+    }
+
+    if (statusParam && statusParam !== 'All Statuses') {
+      where += ' AND u.status = ?';
+      values.push(normalizeUserAccountStatus(statusParam));
     }
 
     const fromClause = `
@@ -103,7 +110,10 @@ export async function POST(request: Request) {
       gender, nationality, date_of_birth, date_first_appointment, date_current_appointment,
       date_office_assignment, retirement_date, designation_grade, employment_status, leave_status,
       disability_status, disability_type, workplace_accommodation, special_support_needs,
+      status: statusBody,
     } = body;
+
+    const accountStatus = normalizeUserAccountStatus(statusBody);
 
     const finalFullName = full_name || `${first_name || ''} ${surname || ''}`.trim();
 
@@ -201,7 +211,7 @@ export async function POST(request: Request) {
                  ) VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         values: [
           finalFullName, email, hashedPassword, roleStr, departmentId, managedUnitId, 
-          'Active', first_name || null, surname || null, other_names || null, 
+          accountStatus, first_name || null, surname || null, other_names || null, 
           employee_id || null, contract_terms || null, contract_type || null, staffCategoryDb,
           position || null, contractStart, contractEnd, contractStart, contractEnd,
           genderDb,
@@ -233,7 +243,7 @@ export async function POST(request: Request) {
                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
           values: [
             finalFullName, email, hashedPassword, roleStr, departmentId, managedUnitId, 
-            'Active', first_name || null, surname || null, other_names || null, 
+            accountStatus, first_name || null, surname || null, other_names || null, 
             employee_id || null, contract_terms || null, contract_type || null, staffCategoryDb,
             position || null, contractStart, contractEnd
           ]

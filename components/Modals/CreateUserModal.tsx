@@ -22,6 +22,7 @@ interface CreateUserModalProps {
 interface Department {
   id: number;
   name: string;
+  parent_name?: string;
 }
 
 export default function CreateUserModal({ show, onHide, onUserCreated }: CreateUserModalProps) {
@@ -74,7 +75,7 @@ export default function CreateUserModal({ show, onHide, onUserCreated }: CreateU
         const [rolesRes, deptRes, facRes] = await Promise.all([
           fetch('/api/users/roles'),
           fetch('/api/departments?units_only=true'),
-          fetch('/api/departments?parents_only=true')
+          fetch('/api/departments?children_only=true')
         ]);
         if (rolesRes.ok) {
           const data = await rolesRes.json();
@@ -116,6 +117,7 @@ export default function CreateUserModal({ show, onHide, onUserCreated }: CreateU
           email: formData.email,
           password: formData.password || undefined,
           role: roleList.join(','),
+          status: 'Active',
           department_id: departmentId,
           managed_unit_id: hasAmbassadorRole && formData.managed_unit_id !== '' ? Number(formData.managed_unit_id) : null,
           employee_id: formData.employee_id,
@@ -521,18 +523,18 @@ export default function CreateUserModal({ show, onHide, onUserCreated }: CreateU
             </div>
             {hasAmbassadorRole && (
               <div className="col-md-6">
-                <Form.Label className="fw-bold small">Managed Faculty / Office Oversight</Form.Label>
+                <Form.Label className="fw-bold small">Managed Department / Unit</Form.Label>
                 <Form.Select
                   value={formData.managed_unit_id === '' ? '' : String(formData.managed_unit_id)}
                   onChange={(e) => setFormData({ ...formData, managed_unit_id: e.target.value === '' ? '' : Number(e.target.value) })}
                   className="border-primary"
                 >
-                  <option value="">Select faculty/office to oversee</option>
+                  <option value="">Select department/unit to oversee</option>
                   {faculties.map((f) => (
-                    <option key={f.id} value={f.id}>{f.name}</option>
+                    <option key={f.id} value={f.id}>{f.name}{f.parent_name ? ` (${f.parent_name})` : ''}</option>
                   ))}
                 </Form.Select>
-                <Form.Text className="text-primary small">This user will oversee all units under this Faculty/Office.</Form.Text>
+                <Form.Text className="text-primary small">Ambassador oversees this department or unit only.</Form.Text>
               </div>
             )}
             <div className="col-12">

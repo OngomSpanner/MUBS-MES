@@ -6,8 +6,8 @@ export type FacultyStaffOption = {
   department: string;
 };
 
-/** Staff linked to departments under the ambassador's managed faculty/office unit. */
-export async function listFacultyStaff(managedUnitId: number, managedUnitName: string): Promise<FacultyStaffOption[]> {
+/** Staff in the ambassador's assigned department/unit. */
+export async function listFacultyStaff(managedUnitId: number, _managedUnitName?: string): Promise<FacultyStaffOption[]> {
   const rows = (await query({
     query: `
       SELECT u.id,
@@ -16,13 +16,10 @@ export async function listFacultyStaff(managedUnitId: number, managedUnitName: s
       FROM users u
       LEFT JOIN departments d ON d.id = u.department_id
       WHERE u.hrms_staff_id IS NOT NULL
-        AND (
-          d.parent_id = ?
-          OR (TRIM(COALESCE(u.faculty_office, '')) <> '' AND LOWER(TRIM(u.faculty_office)) = LOWER(?))
-        )
+        AND u.department_id = ?
       ORDER BY u.surname ASC, u.first_name ASC
     `,
-    values: [managedUnitId, managedUnitName],
+    values: [managedUnitId],
   })) as { id: number; full_name: string; department: string }[];
 
   return rows.map((r) => ({
@@ -35,22 +32,18 @@ export async function listFacultyStaff(managedUnitId: number, managedUnitName: s
 export async function isStaffInFaculty(
   userId: number,
   managedUnitId: number,
-  managedUnitName: string
+  _managedUnitName?: string
 ): Promise<boolean> {
   const rows = (await query({
     query: `
       SELECT u.id
       FROM users u
-      LEFT JOIN departments d ON d.id = u.department_id
       WHERE u.id = ?
         AND u.hrms_staff_id IS NOT NULL
-        AND (
-          d.parent_id = ?
-          OR (TRIM(COALESCE(u.faculty_office, '')) <> '' AND LOWER(TRIM(u.faculty_office)) = LOWER(?))
-        )
+        AND u.department_id = ?
       LIMIT 1
     `,
-    values: [userId, managedUnitId, managedUnitName],
+    values: [userId, managedUnitId],
   })) as { id: number }[];
   return rows.length > 0;
 }
