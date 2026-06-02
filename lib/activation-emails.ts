@@ -36,8 +36,29 @@ function buildActivationHtml(args: { fullName: string; role: ActivationRole }): 
       After login, you can access your dashboard here:
       <a href="${dashboardUrl}" style="color:#005696;text-decoration:none;">${dashboardUrl}</a>
     </p>
-    <p style="color:#666;font-size:13px;line-height:1.6;margin:14px 0 0;">
-      If this is your first login and you don’t know your password, please use the <strong>Forgot password</strong> option on the login page.
+    <p style="color:#333;font-size:15px;line-height:1.6;margin:0 0 10px;">
+      If this is your first time logging in, use:
+    </p>
+    <div style="margin:0 0 12px; padding: 12px 14px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px;">
+      <div style="color:#0f172a;font-size:14px;line-height:1.6;">
+        <div><strong>Email:</strong> (your MUBS email)</div>
+        <div><strong>One-time password:</strong> <strong>password</strong></div>
+      </div>
+    </div>
+    <p style="color:#333;font-size:15px;line-height:1.6;margin:0 0 12px;">
+      You will be prompted to create a new password immediately after login.
+    </p>
+    <p style="color:#333;font-size:14px;line-height:1.6;margin:0 0 8px;">
+      If you forgot your password, click <strong>Forgot password</strong> on the login page to reset it.
+    </p>
+    <p style="color:#333;font-size:14px;line-height:1.6;margin:0 0 8px;">
+      Alternatively, you can sign in using your <strong>MUBS email</strong> (Google sign-in), if enabled.
+    </p>
+    <p style="color:#666;font-size:13px;line-height:1.6;margin:0 0 8px;">
+      If you already have an account and have been using the system, please ignore this message.
+    </p>
+    <p style="color:#666;font-size:13px;line-height:1.6;margin:0;">
+      If you have multiple rights/roles, you can switch roles after login using the <strong>Switch Role</strong> option in your profile/menu.
     </p>
   `);
 }
