@@ -258,12 +258,32 @@ export async function PUT(
     const shouldSendActivationEmail = Boolean(send_activation_email);
     if (shouldSendActivationEmail) {
       const rolesToNotify = extractActivationRolesFromRoleField(roleStr);
+      let departmentUnitLabel = '';
+      try {
+        if (managedUnitId && Number.isFinite(managedUnitId)) {
+          const rows = (await query({
+            query: `SELECT COALESCE(NULLIF(TRIM(external_name), ''), name) AS name FROM departments WHERE id = ? LIMIT 1`,
+            values: [managedUnitId],
+          })) as any[];
+          departmentUnitLabel = String(rows?.[0]?.name || '').trim();
+        }
+        if (!departmentUnitLabel && departmentId && Number.isFinite(departmentId)) {
+          const rows = (await query({
+            query: `SELECT COALESCE(NULLIF(TRIM(external_name), ''), name) AS name FROM departments WHERE id = ? LIMIT 1`,
+            values: [departmentId],
+          })) as any[];
+          departmentUnitLabel = String(rows?.[0]?.name || '').trim();
+        }
+      } catch (e) {
+        console.warn('Activation email dept/unit lookup failed:', e);
+      }
       const sent: Record<string, boolean> = {};
       for (const r of rolesToNotify) {
         const res = await sendRoleActivationEmail({
           to: email.trim(),
           fullName: finalFullName,
           role: r,
+          departmentUnit: r === 'Ambassador' ? departmentUnitLabel : undefined,
         });
         sent[r] = Boolean(res.sent);
       }

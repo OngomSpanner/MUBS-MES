@@ -17,17 +17,20 @@ function roleDisplayName(role: ActivationRole): string {
   return 'Strategic Plan Ambassador';
 }
 
-function buildActivationHtml(args: { fullName: string; role: ActivationRole }): string {
+function buildActivationHtml(args: { fullName: string; role: ActivationRole; departmentUnit?: string }): string {
   const appBase = baseUrl();
   const name = escapeHtml(args.fullName || 'Colleague');
   const roleLabel = escapeHtml(roleDisplayName(args.role));
+  const deptUnitLabel = escapeHtml(args.departmentUnit || '');
   const loginUrl = `${appBase}/`;
   const dashboardUrl = `${appBase}${roleToDashboardPath(args.role)}`;
 
   return brandEmailWrapper(`
     <p style="color:#333;font-size:16px;line-height:1.6;margin:0 0 12px;">Hello ${name},</p>
     <p style="color:#333;font-size:15px;line-height:1.6;margin:0 0 12px;">
-      You have been assigned the <strong>${roleLabel}</strong> role in the MUBS Strategic Plan M&amp;E System.
+      ${args.role === 'Ambassador' && deptUnitLabel
+        ? `You have been assigned the <strong>${roleLabel}</strong> role in the MUBS M&amp;E System for department/unit <strong>${deptUnitLabel}</strong>.`
+        : `You have been assigned the <strong>${roleLabel}</strong> role in the MUBS M&amp;E System.`}
     </p>
     <p style="color:#333;font-size:15px;line-height:1.6;margin:0 0 12px;">
       Login here: <a href="${loginUrl}" style="color:#005696;text-decoration:none;">${loginUrl}</a>
@@ -67,13 +70,18 @@ export async function sendRoleActivationEmail(args: {
   to: string;
   fullName: string;
   role: ActivationRole;
+  departmentUnit?: string;
 }): Promise<{ sent: boolean; skipped: boolean }> {
   const toClean = String(args.to || '').trim();
   if (!toClean) return { sent: false, skipped: true };
   if (!isSmtpConfigured()) return { sent: false, skipped: true };
 
   const subject = `Role assignment: ${roleDisplayName(args.role)}`;
-  const html = buildActivationHtml({ fullName: args.fullName, role: args.role });
+  const html = buildActivationHtml({
+    fullName: args.fullName,
+    role: args.role,
+    departmentUnit: args.departmentUnit,
+  });
 
   const sent = await sendTransactionalMail({
     to: toClean,
