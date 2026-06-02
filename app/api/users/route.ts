@@ -188,7 +188,10 @@ export async function POST(request: Request) {
       );
     }
 
-    const passwordToHash = password || 'Welcome@2025';
+    // Default temporary password for new users (if none is provided explicitly).
+    // NOTE: This is a simple, non-random value intended only for first login,
+    // and users are forced to change it immediately afterwards.
+    const passwordToHash = password || 'password';
     const hashedPassword = await bcrypt.hash(passwordToHash, 10);
 
     const roleStr = typeof role === 'string' ? role : (Array.isArray(role) ? role.join(',') : '');

@@ -10,7 +10,6 @@ import { verifyToken } from '@/lib/auth';
 const ASSIGNABLE_ROLES = [
   'strategy_manager',
   'hod',
-  'unit_head',
   'staff',
   'system_admin',
   'ambassador'
@@ -34,7 +33,8 @@ export async function GET() {
     }) as { role: string }[];
 
     const fromDb = rows.map((r) => r.role);
-    const rolesToExclude = ['viewer', 'department_head', 'committee_member', 'principal'];
+    // Exclude legacy / deprecated roles so UI only shows the consolidated HOD role.
+    const rolesToExclude = ['viewer', 'department_head', 'unit_head', 'committee_member', 'principal'];
     
     // Use a Set to track seen roles (lowercase for case-insensitive uniqueness)
     const seen = new Set<string>();

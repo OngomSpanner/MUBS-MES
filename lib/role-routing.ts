@@ -1,8 +1,6 @@
 export type UserRole =
   | 'System Administrator'
   | 'Strategy Manager'
-  | 'Department Head'
-  | 'Unit Head'
   | 'HOD'
   | 'Staff'
   | 'Viewer'
@@ -30,8 +28,6 @@ export function pickDefaultActiveRole(roles: string[]): string {
   const normalized = roles.map((r) => normalizeRoleForCookie(r));
   if (normalized.includes('System Administrator')) return 'System Administrator';
   if (normalized.includes('Strategy Manager')) return 'Strategy Manager';
-  if (normalized.includes('Department Head')) return 'Department Head';
-  if (normalized.includes('Unit Head')) return 'Unit Head';
   if (normalized.includes('HOD')) return 'HOD';
   if (normalized.includes('Staff')) return 'Staff';
   if (normalized.includes('Viewer')) return 'Viewer';
@@ -41,7 +37,7 @@ export function pickDefaultActiveRole(roles: string[]): string {
 
 export function dashboardPathForRole(role: string | undefined): '/admin' | '/comm' | '/principal' | '/department-head' | '/ambassador' | '/staff' {
   if (role === 'System Administrator' || role === 'Strategy Manager') return '/admin';
-  if (role === 'Department Head' || role === 'Unit Head' || role === 'HOD') return '/department-head';
+  if (role === 'HOD') return '/department-head';
   if (role === 'Ambassador') return '/ambassador';
   return '/staff';
 }
@@ -50,8 +46,6 @@ export function dashboardPathForRole(role: string | undefined): '/admin' | '/com
 const CANONICAL_ROLES = [
   'System Administrator',
   'Strategy Manager',
-  'Department Head',
-  'Unit Head',
   'HOD',
   'Staff',
   'Viewer',
@@ -62,8 +56,9 @@ const CANONICAL_ROLES = [
 const SNAKE_TO_CANONICAL: Record<string, string> = {
   system_admin: 'System Administrator',
   strategy_manager: 'Strategy Manager',
-  department_head: 'Department Head',
-  unit_head: 'Unit Head',
+  // Consolidate HOD/Unit Head/Department Head to a single canonical role.
+  department_head: 'HOD',
+  unit_head: 'HOD',
   hod: 'HOD',
   staff: 'Staff',
   viewer: 'Viewer',
@@ -79,6 +74,7 @@ export function normalizeRoleForCookie(role: string | undefined): string {
   const r = role.trim();
   if (!r) return 'Staff';
   const lower = r.toLowerCase();
+  if (lower === 'department head' || lower === 'unit head') return 'HOD';
   const fromSnake = SNAKE_TO_CANONICAL[lower];
   if (fromSnake) return fromSnake;
   const found = CANONICAL_ROLES.find((c) => c.toLowerCase() === lower);
@@ -105,7 +101,7 @@ export function getCanonicalRole(userRoles: string[], selectedRole: string): str
 export function formatRoleForDisplay(role: string | undefined): string {
   if (!role || typeof role !== 'string') return 'Staff';
   const canonical = normalizeRoleForCookie(role);
-  if (canonical === 'HOD') return 'Head of Department';
+  if (canonical === 'HOD') return 'Head of Department (HOD) / Unit Head';
   return canonical;
 }
 

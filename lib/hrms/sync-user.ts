@@ -7,7 +7,9 @@ import type { HrmsStaffRecord, HrmsSyncResult } from './types';
 
 type DbUserRow = { id: number; email: string; hrms_staff_id?: number | null };
 
-const DEFAULT_PASSWORD = process.env.HRMS_SYNC_DEFAULT_PASSWORD || 'Welcome@2025';
+// Default temporary password for HR-synced staff who are created in M&E.
+// Can be overridden via HRMS_SYNC_DEFAULT_PASSWORD in the environment.
+const DEFAULT_PASSWORD = process.env.HRMS_SYNC_DEFAULT_PASSWORD || 'password';
 
 async function findExistingUser(
   hrmsStaffId: number,
