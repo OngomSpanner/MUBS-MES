@@ -60,12 +60,23 @@ export async function GET() {
             // user_committee_assignments may not exist yet
         }
 
+        // Normalize + dedupe roles (avoid duplicates like hod/unit_head/department_head -> HOD).
+        const normalizedRoles: string[] = [];
+        const seen = new Set<string>();
+        for (const r of rolesArray) {
+            const canonical = normalizeRoleForCookie(r);
+            if (!seen.has(canonical)) {
+                seen.add(canonical);
+                normalizedRoles.push(canonical);
+            }
+        }
+
         // Determine active role: cookie (if valid) → token role (if valid) → priority pick
         // Accept both canonical ("Strategy Manager") and DB form ("strategy_manager")
         let activeRole = activeRoleCookie || decoded.role;
-        const cookieValid = activeRole && (rolesArray.includes(activeRole) || roleMatches(rolesArray, activeRole));
+        const cookieValid = activeRole && (normalizedRoles.includes(normalizeRoleForCookie(activeRole)) || roleMatches(normalizedRoles, activeRole));
         if (!cookieValid) {
-            activeRole = pickDefaultActiveRole(rolesArray);
+            activeRole = pickDefaultActiveRole(normalizedRoles);
         } else {
             activeRole = normalizeRoleForCookie(activeRole);
         }
@@ -77,7 +88,7 @@ export async function GET() {
                 email: user.email,
                 position: user.position ?? null,
             },
-            roles: rolesArray,
+            roles: normalizedRoles,
             activeRole: activeRole,
             committees,
         });
