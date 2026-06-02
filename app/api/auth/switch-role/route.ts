@@ -46,6 +46,21 @@ export async function POST(request: Request) {
 
         const rolesArray = parseRoles(user.role);
 
+        // Also include roles from user_roles table (same as /api/auth/me)
+        try {
+            const roleRows = await query({
+                query: 'SELECT role FROM user_roles WHERE user_id = ?',
+                values: [user.id]
+            }) as any[];
+            for (const r of roleRows) {
+                if (r.role && !rolesArray.includes(r.role)) {
+                    rolesArray.push(r.role);
+                }
+            }
+        } catch {
+            // user_roles table may not exist on older installs; continue with users.role
+        }
+
         if (!roleMatches(rolesArray, newRoleInput)) {
             return NextResponse.json({ message: 'User does not have permission for this role' }, { status: 403 });
         }

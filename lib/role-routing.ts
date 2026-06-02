@@ -81,16 +81,24 @@ export function normalizeRoleForCookie(role: string | undefined): string {
   return found ?? 'Staff';
 }
 
-/** Check if a role string matches one of the user's roles (case-insensitive). */
+/** Check if a role string matches one of the user's roles (case-insensitive, canonical-aware). */
 export function roleMatches(userRoles: string[], selectedRole: string): boolean {
-  const s = selectedRole.trim().toLowerCase();
-  return userRoles.some((r) => r.trim().toLowerCase() === s);
+  const sLower = selectedRole.trim().toLowerCase();
+  const sCanonical = normalizeRoleForCookie(selectedRole);
+  return userRoles.some((r) => {
+    if (r.trim().toLowerCase() === sLower) return true;
+    if (normalizeRoleForCookie(r) === sCanonical) return true;
+    return false;
+  });
 }
 
 /** Get the canonical role from user's list that matches the selected role. */
 export function getCanonicalRole(userRoles: string[], selectedRole: string): string {
-  const s = selectedRole.trim().toLowerCase();
-  const found = userRoles.find((r) => r.trim().toLowerCase() === s);
+  const sCanonical = normalizeRoleForCookie(selectedRole);
+  const sLower = selectedRole.trim().toLowerCase();
+  const found = userRoles.find(
+    (r) => r.trim().toLowerCase() === sLower || normalizeRoleForCookie(r) === sCanonical
+  );
   return normalizeRoleForCookie(found ?? selectedRole);
 }
 
