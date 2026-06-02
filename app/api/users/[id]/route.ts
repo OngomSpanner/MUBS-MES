@@ -12,6 +12,7 @@ import {
   normalizeOptionalString,
 } from '@/lib/staff-biodata';
 import { normalizeUserAccountStatus } from '@/lib/user-account-status';
+import { extractActivationRolesFromRoleField, sendRoleActivationEmail } from '@/lib/activation-emails';
 
 export async function GET(
   request: Request,
@@ -91,13 +92,14 @@ export async function PUT(
     }
 
     const body = await request.json();
-    const { 
+    const {
       full_name, email, role, department_id, managed_unit_id, status, committee_types,
       first_name, surname, other_names, employee_id, contract_terms, contract_type, staff_category,
       position, contract_start, contract_end,
       gender, nationality, date_of_birth, date_first_appointment, date_current_appointment,
       date_office_assignment, retirement_date, designation_grade, employment_status, leave_status,
       disability_status, disability_type, workplace_accommodation, special_support_needs,
+      send_activation_email,
     } = body;
 
     const finalFullName = full_name || `${first_name || ''} ${surname || ''}`.trim();
@@ -253,7 +255,29 @@ export async function PUT(
       }
     }
 
-    return NextResponse.json({ message: 'User updated successfully' });
+    const shouldSendActivationEmail = Boolean(send_activation_email);
+    if (shouldSendActivationEmail) {
+      const rolesToNotify = extractActivationRolesFromRoleField(roleStr);
+      const sent: Record<string, boolean> = {};
+      for (const r of rolesToNotify) {
+        const res = await sendRoleActivationEmail({
+          to: email.trim(),
+          fullName: finalFullName,
+          role: r,
+        });
+        sent[r] = Boolean(res.sent);
+      }
+      return NextResponse.json({
+        message: 'User updated successfully',
+        activationEmail: {
+          requested: true,
+          roles: rolesToNotify,
+          sent,
+        },
+      });
+    }
+
+    return NextResponse.json({ message: 'User updated successfully', activationEmail: { requested: false } });
   } catch (error) {
     console.error('Error updating user:', error);
     return NextResponse.json(

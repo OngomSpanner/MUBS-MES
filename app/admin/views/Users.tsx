@@ -99,6 +99,7 @@ export default function UsersView() {
     const [faculties, setFaculties] = useState<{ id: number; name: string }[]>([]);
     const [ambassadorUnits, setAmbassadorUnits] = useState<{ id: number; name: string; parent_name?: string }[]>([]);
     const [saving, setSaving] = useState(false);
+    const [sendActivationEmail, setSendActivationEmail] = useState(false);
 
     // Delete modal state
     const [userToDelete, setUserToDelete] = useState<User | null>(null);
@@ -131,6 +132,7 @@ export default function UsersView() {
     const closeEditModal = useCallback(() => {
         setShowEditModal(false);
         handledEditIdRef.current = null;
+        setSendActivationEmail(false);
         if (searchParams.get('edit')) {
             router.replace('/admin?pg=users');
         }
@@ -292,6 +294,7 @@ export default function UsersView() {
 
     const openEditModal = async (user: User) => {
         setSelectedUser(user);
+        setSendActivationEmail(false);
         try {
             const { data } = await axios.get(`/api/users/${user.id}`);
             setEditForm({
@@ -398,6 +401,7 @@ export default function UsersView() {
                 disability_type: editForm.disability_type,
                 workplace_accommodation: editForm.workplace_accommodation,
                 special_support_needs: editForm.special_support_needs,
+                send_activation_email: sendActivationEmail,
             };
             await axios.put(`/api/users/${selectedUser.id}`, payload);
             closeEditModal();
@@ -1354,6 +1358,19 @@ export default function UsersView() {
                                 </div>
                             </div>
                         )}
+
+                        <div className="col-12">
+                            <Form.Check
+                                type="checkbox"
+                                id="edit-send-activation-email"
+                                checked={sendActivationEmail}
+                                onChange={(e) => setSendActivationEmail(e.target.checked)}
+                                label={<span className="fw-bold small">Send activation email (HOD/Ambassador only)</span>}
+                            />
+                            <Form.Text className="text-muted small">
+                                Sends an email with login and dashboard link if the user has HOD and/or Ambassador role.
+                            </Form.Text>
+                        </div>
                     </div>
                 </Modal.Body>
                 <Modal.Footer>
