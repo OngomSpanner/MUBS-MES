@@ -93,7 +93,7 @@ export default function AmbassadorDashboard() {
                                     {stats.overallProgress}
                                     <span style={{ fontSize: '2rem', color: '#93c5fd' }}>%</span>
                                 </div>
-                                <div className="kpi-hero-label">Unit Strategic Progress</div>
+                                <div className="kpi-hero-label">Dept. / Unit Strategic Progress</div>
                                 <div
                                     className="progress mt-2"
                                     style={{
