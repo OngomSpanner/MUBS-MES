@@ -13,6 +13,14 @@ import {
 } from '@/lib/staff-biodata';
 import { normalizeUserAccountStatus } from '@/lib/user-account-status';
 import { extractActivationRolesFromRoleField, sendRoleActivationEmail } from '@/lib/activation-emails';
+import { normalizeRoleForCookie } from '@/lib/role-routing';
+
+const ADMIN_ROLES = new Set(['System Administrator', 'Strategy Manager']);
+
+function isAdminRole(role: string | undefined): boolean {
+  if (!role) return false;
+  return ADMIN_ROLES.has(normalizeRoleForCookie(role));
+}
 
 export async function GET(
   request: Request,
@@ -20,6 +28,16 @@ export async function GET(
 ) {
   const { id } = await params;
   try {
+    const cookieStore = await cookies();
+    const token = cookieStore.get('token')?.value;
+    if (!token) {
+      return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
+    }
+    const decoded = verifyToken(token);
+    if (!decoded) {
+      return NextResponse.json({ message: 'Invalid token' }, { status: 401 });
+    }
+
     const userRows = await query({
       query: `SELECT u.id, u.full_name, u.email, u.role, u.department_id, u.managed_unit_id, u.status,
                      u.first_name, u.surname, u.other_names, u.employee_id, u.contract_terms, 
@@ -313,6 +331,19 @@ export async function PATCH(
 ) {
   const { id } = await params;
   try {
+    const cookieStore = await cookies();
+    const token = cookieStore.get('token')?.value;
+    if (!token) {
+      return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
+    }
+    const decoded = verifyToken(token) as any;
+    if (!decoded) {
+      return NextResponse.json({ message: 'Invalid token' }, { status: 401 });
+    }
+    if (!isAdminRole(decoded.role)) {
+      return NextResponse.json({ message: 'Forbidden: admin role required' }, { status: 403 });
+    }
+
     const { status } = await request.json();
     const accountStatus = normalizeUserAccountStatus(status);
 
@@ -337,6 +368,22 @@ export async function DELETE(
 ) {
   const { id } = await params;
   try {
+    const cookieStore = await cookies();
+    const token = cookieStore.get('token')?.value;
+    if (!token) {
+      return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
+    }
+    const decoded = verifyToken(token) as any;
+    if (!decoded) {
+      return NextResponse.json({ message: 'Invalid token' }, { status: 401 });
+    }
+    if (!isAdminRole(decoded.role)) {
+      return NextResponse.json({ message: 'Forbidden: admin role required' }, { status: 403 });
+    }
+    if (String(decoded.userId) === String(id)) {
+      return NextResponse.json({ message: 'Cannot delete your own account' }, { status: 400 });
+    }
+
     await query({
       query: 'DELETE FROM users WHERE id = ?',
       values: [id]
