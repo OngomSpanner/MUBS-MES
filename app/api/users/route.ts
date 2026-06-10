@@ -56,8 +56,9 @@ export async function GET(request: Request) {
     if (departmentIdParam) {
       const departmentId = Number(departmentIdParam);
       if (Number.isFinite(departmentId) && departmentId > 0) {
-        where += ' AND u.department_id = ?';
-        values.push(departmentId);
+        // Match the unit itself and any child units (staff are usually on child department rows).
+        where += ' AND (u.department_id = ? OR u.department_id IN (SELECT id FROM departments WHERE parent_id = ?))';
+        values.push(departmentId, departmentId);
       }
     }
 
@@ -78,7 +79,7 @@ export async function GET(request: Request) {
     const users = await query({
       query: `
       SELECT u.id, u.full_name, u.email, u.role, u.status, u.department_id, u.managed_unit_id,
-             d.name AS department,
+             COALESCE(NULLIF(TRIM(d.external_name), ''), d.name) AS department,
              COALESCE(NULLIF(TRIM(mu.external_name), ''), mu.name) AS managed_unit,
              mp.name AS managed_unit_parent,
              DATE_FORMAT(u.created_at, '%d %b %Y') as created_date

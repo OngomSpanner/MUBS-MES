@@ -224,7 +224,7 @@ export default function UsersView() {
                     axios.get('/api/departments?units_only=true'),
                     axios.get('/api/departments?parents_only=true'),
                     axios.get('/api/departments?children_only=true'),
-                    axios.get('/api/departments?active_only=true'),
+                    axios.get('/api/departments?units_only=true'),
                 ]);
                 setDepartments(Array.isArray(deptRes.data) ? deptRes.data : []);
                 setFaculties(Array.isArray(parentRes.data) ? parentRes.data : []);
@@ -461,7 +461,7 @@ export default function UsersView() {
                 axios.get('/api/departments?units_only=true'),
                 axios.get('/api/departments?parents_only=true'),
                 axios.get('/api/departments?children_only=true'),
-                axios.get('/api/departments?active_only=true'),
+                axios.get('/api/departments?units_only=true'),
             ]);
             setDepartments(Array.isArray(deptRes.data) ? deptRes.data : []);
             setFaculties(Array.isArray(parentRes.data) ? parentRes.data : []);
