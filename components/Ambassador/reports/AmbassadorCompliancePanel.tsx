@@ -5,7 +5,7 @@ import axios from 'axios';
 import * as XLSX from 'xlsx';
 import StatCard from '@/components/StatCard';
 
-const REPORT_TITLE = 'Departmental Compliance Tracker';
+const REPORT_TITLE = 'Dept. / Unit Activity Progress';
 
 type ComplianceSummary = {
   managedUnitName: string;
@@ -531,7 +531,7 @@ export default function AmbassadorCompliancePanel() {
       <div className="table-card shadow-sm border-0 bg-white" style={{ borderRadius: '16px', overflow: 'hidden' }}>
         <div className="table-card-header flex-wrap gap-2">
           <div>
-            <h5 className="mb-0 fw-bold">Departmental Compliance Tracker</h5>
+            <h5 className="mb-0 fw-bold">Dept. / Unit Activity Progress</h5>
             <p className="mb-0 small text-muted mt-1">Strategic activities and monthly reporting by department</p>
           </div>
           <div className="d-flex gap-2 flex-wrap align-items-center">

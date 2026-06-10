@@ -58,7 +58,7 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen, onLogoutClick }: 
   const ambassadorMenuItems = useMemo(() => {
     const items = [
       { key: 'dashboard', href: '/ambassador', icon: 'dashboard', label: 'Dept. / Unit Dashboard' },
-      { key: 'reports-compliance', href: '/ambassador?pg=reports&tab=compliance', icon: 'fact_check', label: 'Dept. Compliance Tracker' },
+      { key: 'reports-compliance', href: '/ambassador?pg=reports&tab=compliance', icon: 'fact_check', label: 'Dept. / Unit Activity Progress' },
       { key: 'reports-staff-profiles', href: '/ambassador?pg=reports&tab=staff-profiles', icon: 'badge', label: 'Staff Profiles' },
       { key: 'reports-recruitment', href: '/ambassador?pg=reports&tab=recruitment', icon: 'person_add', label: 'Staff Recruitment' },
       { key: 'reports-benefits', href: '/ambassador?pg=reports&tab=benefits', icon: 'card_giftcard', label: 'Staff Benefits' },

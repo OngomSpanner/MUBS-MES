@@ -222,7 +222,7 @@ export default function AmbassadorDashboard() {
                                 <span className="material-symbols-outlined" style={{ color: '#10b981', fontSize: '22px' }}>fact_check</span>
                             </div>
                             <div className="min-w-0">
-                                <div className="fw-black text-dark" style={{ fontSize: '.95rem', lineHeight: 1.25 }}>Dept. compliance tracker</div>
+                                <div className="fw-black text-dark" style={{ fontSize: '.95rem', lineHeight: 1.25 }}>Dept. / Unit Activity Progress</div>
                                 <div className="text-muted small" style={{ fontSize: '.78rem' }}>Monitor activities & submissions</div>
                             </div>
                         </div>

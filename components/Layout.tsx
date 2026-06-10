@@ -21,7 +21,7 @@ function LayoutContent({ children, sidebarOpen, setSidebarOpen }: any) {
     const key = getPageKey();
     if (pathname.startsWith('/ambassador') && key === 'reports') {
       const ambassadorReportTitles: Record<string, string> = {
-        compliance: 'Departmental Compliance Tracker',
+        compliance: 'Dept. / Unit Activity Progress',
         'staff-profiles': 'Staff Profiles',
         recruitment: 'Staff Recruitment',
         benefits: 'Staff Benefits',
