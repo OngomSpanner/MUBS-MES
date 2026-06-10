@@ -2,21 +2,25 @@ import { NextResponse } from 'next/server';
 import { query } from '@/lib/db';
 import { requireAmbassador } from '@/lib/ambassador/context';
 import { isStaffInFaculty } from '@/lib/ambassador/faculty-staff';
+import { getManagedUnitDepartmentIds } from '@/lib/ambassador/managed-unit-departments';
+import { inPlaceholders } from '@/lib/department-head';
 import { BENEFIT_TYPES, type BenefitType } from '@/lib/hrms/staff-benefits';
 
 const VALID_TYPES = new Set(BENEFIT_TYPES.map((b) => b.value));
 
-async function getOwnedEntry(id: number, managedUnitId: number) {
+async function getOwnedEntry(id: number, departmentIds: number[]) {
+  if (departmentIds.length === 0) return null;
+  const deptPlaceholders = inPlaceholders(departmentIds.length);
   const rows = (await query({
     query: `
       SELECT e.id, e.user_id, e.financial_year_key, e.benefit_type, e.received
       FROM staff_benefit_entries e
       INNER JOIN users u ON u.id = e.user_id
       WHERE e.id = ?
-        AND u.department_id = ?
+        AND u.department_id IN (${deptPlaceholders})
       LIMIT 1
     `,
-    values: [id, managedUnitId],
+    values: [id, ...departmentIds],
   })) as { id: number; user_id: number; financial_year_key: string; benefit_type: BenefitType; received: number }[];
   return rows[0] ?? null;
 }
@@ -29,7 +33,8 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   const id = Number(idParam);
   if (!id) return NextResponse.json({ message: 'Invalid id' }, { status: 400 });
 
-  const existing = await getOwnedEntry(id, auth.managedUnitId);
+  const departmentIds = await getManagedUnitDepartmentIds(auth.managedUnitId);
+  const existing = await getOwnedEntry(id, departmentIds);
   if (!existing) return NextResponse.json({ message: 'Record not found' }, { status: 404 });
 
   const body = await request.json();
@@ -77,7 +82,8 @@ export async function DELETE(_request: Request, { params }: { params: Promise<{ 
   const id = Number(idParam);
   if (!id) return NextResponse.json({ message: 'Invalid id' }, { status: 400 });
 
-  const existing = await getOwnedEntry(id, auth.managedUnitId);
+  const departmentIds = await getManagedUnitDepartmentIds(auth.managedUnitId);
+  const existing = await getOwnedEntry(id, departmentIds);
   if (!existing) return NextResponse.json({ message: 'Record not found' }, { status: 404 });
 
   await query({ query: 'DELETE FROM staff_benefit_entries WHERE id = ?', values: [id] });

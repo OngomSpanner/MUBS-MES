@@ -9,9 +9,17 @@ import BenefitEntryModal, { type BenefitRecord, type ReportMeta } from '@/compon
 import AmbassadorReportViewToggle, { type AmbassadorTableView } from '@/components/Ambassador/reports/AmbassadorReportViewToggle';
 import StatCard from '@/components/StatCard';
 
-type ScopeProps = { scopeFaculty?: string | null; lockFaculty?: boolean };
+type ScopeProps = {
+  scopeFaculty?: string | null;
+  lockFaculty?: boolean;
+  managedUnitId?: number;
+};
 
-export default function AmbassadorBenefitsDataPanel({ scopeFaculty, lockFaculty }: ScopeProps) {
+export default function AmbassadorBenefitsDataPanel({
+  scopeFaculty,
+  lockFaculty,
+  managedUnitId,
+}: ScopeProps) {
   const [tableView, setTableView] = useState<AmbassadorTableView>('entries');
   const [records, setRecords] = useState<BenefitRecord[]>([]);
   const [meta, setMeta] = useState<ReportMeta | null>(null);
@@ -232,7 +240,12 @@ export default function AmbassadorBenefitsDataPanel({ scopeFaculty, lockFaculty 
           </div>
         ) : (
           <div className="p-0 border-0">
-            <StaffBenefitsPanel scopeFaculty={scopeFaculty} lockFaculty={lockFaculty} embedded />
+            <StaffBenefitsPanel
+              scopeFaculty={scopeFaculty}
+              lockFaculty={lockFaculty}
+              managedUnitId={managedUnitId}
+              embedded
+            />
           </div>
         )}
       </div>

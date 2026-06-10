@@ -3,6 +3,7 @@
 import {
   buildStaffProfileRows,
   StaffProfileData,
+  type StaffProfileViewMode,
 } from '@/lib/staff-biodata';
 
 function getInitials(name: string) {
@@ -11,18 +12,10 @@ function getInitials(name: string) {
   return parts.map((n) => n[0]).join('').toUpperCase().slice(0, 3);
 }
 
-function leaveBadgeStyle(status: string | null | undefined) {
-  const s = (status || '').toLowerCase();
-  if (s === 'on duty') return { bg: '#dcfce7', color: '#15803d' };
-  if (s.includes('sick')) return { bg: '#fee2e2', color: '#b91c1c' };
-  if (s.includes('study') || s.includes('sabbatical')) return { bg: '#e0e7ff', color: '#3730a3' };
-  return { bg: '#fef3c7', color: '#b45309' };
-}
-
 export interface StaffProfileModalProps {
   staff: StaffProfileData | null;
   onClose: () => void;
-  mode: 'hod' | 'admin';
+  mode: StaffProfileViewMode;
   onEvaluations?: () => void;
   onViewTasks?: () => void;
   onEditUser?: () => void;
@@ -38,7 +31,7 @@ export default function StaffProfileModal({
 }: StaffProfileModalProps) {
   if (!staff) return null;
 
-  const rows = buildStaffProfileRows(staff);
+  const rows = buildStaffProfileRows(staff, mode);
 
   return (
     <div
@@ -81,30 +74,8 @@ export default function StaffProfileModal({
                 <h6 className="fw-black text-dark mb-1" style={{ fontSize: '1.15rem' }}>
                   {staff.full_name}
                 </h6>
-                <div className="text-muted mb-2" style={{ fontSize: '0.88rem' }}>
+                <div className="text-muted" style={{ fontSize: '0.88rem' }}>
                   {staff.email}
-                </div>
-                <div className="d-flex flex-wrap gap-2 align-items-center">
-                  <span
-                    className="status-badge"
-                    style={{
-                      background: leaveBadgeStyle(staff.leave_status).bg,
-                      color: leaveBadgeStyle(staff.leave_status).color,
-                      fontSize: '0.72rem',
-                    }}
-                  >
-                    Leave Status: {staff.leave_status || '—'}
-                  </span>
-                  {staff.account_status ? (
-                    <span className="badge bg-light text-dark border" style={{ fontSize: '0.7rem' }}>
-                      Account: {staff.account_status}
-                    </span>
-                  ) : null}
-                  {staff.disability_status === 'Yes' ? (
-                    <span className="badge bg-info text-dark border" style={{ fontSize: '0.7rem' }}>
-                      PwD
-                    </span>
-                  ) : null}
                 </div>
               </div>
             </div>

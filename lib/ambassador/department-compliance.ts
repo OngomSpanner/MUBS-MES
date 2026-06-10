@@ -1,4 +1,9 @@
 import { query } from '@/lib/db';
+import { inPlaceholders } from '@/lib/department-head';
+import {
+  getManagedUnitDepartmentIds,
+  isDepartmentInManagedScope,
+} from '@/lib/ambassador/managed-unit-departments';
 
 const MAIN_ACTIVITY_FILTER = `
   sa.parent_id IS NULL
@@ -59,6 +64,28 @@ export async function getDepartmentComplianceBundle(managedUnitId: number, manag
   const currentMonth = new Date().getMonth() + 1;
   const currentYear = new Date().getFullYear();
 
+  const scopedDepartmentIds = await getManagedUnitDepartmentIds(managedUnitId);
+  if (scopedDepartmentIds.length === 0) {
+    return {
+      summary: {
+        managedUnitName,
+        totalDepartments: 0,
+        totalActivities: 0,
+        overallProgress: 0,
+        onTrack: 0,
+        inProgress: 0,
+        delayed: 0,
+        monthlyReportingRate: 0,
+        departmentsReportedThisMonth: 0,
+      },
+      departments: [],
+      riskAlerts: [],
+      submissionMonths: months.map((m) => m.name),
+    };
+  }
+
+  const deptPlaceholders = inPlaceholders(scopedDepartmentIds.length);
+
   const [deptRows, kpiRow, submissions, lastSubmissions, riskRows] = await Promise.all([
     query({
       query: `
@@ -76,11 +103,11 @@ export async function getDepartmentComplianceBundle(managedUnitId: number, manag
           END), 0) AS delayed_count
         FROM departments d
         LEFT JOIN strategic_activities sa ON d.id = sa.department_id AND ${MAIN_ACTIVITY_FILTER}
-        WHERE d.id = ? AND d.is_active = 1
+        WHERE d.id IN (${deptPlaceholders}) AND d.is_active = 1
         GROUP BY d.id, d.name, d.external_name
         ORDER BY COALESCE(NULLIF(TRIM(d.external_name), ''), d.name) ASC
       `,
-      values: [managedUnitId],
+      values: scopedDepartmentIds,
     }) as Promise<
       Array<{
         id: number;
@@ -106,9 +133,9 @@ export async function getDepartmentComplianceBundle(managedUnitId: number, manag
           END), 0) AS delayed_count
         FROM strategic_activities sa
         JOIN departments d ON sa.department_id = d.id
-        WHERE d.id = ? AND ${MAIN_ACTIVITY_FILTER}
+        WHERE d.id IN (${deptPlaceholders}) AND ${MAIN_ACTIVITY_FILTER}
       `,
-      values: [managedUnitId],
+      values: scopedDepartmentIds,
     }) as Promise<
       Array<{
         totalActivities: number;
@@ -129,11 +156,11 @@ export async function getDepartmentComplianceBundle(managedUnitId: number, manag
         JOIN users u ON sr.submitted_by = u.id
         JOIN departments d ON u.department_id = d.id
         WHERE sr.status = 'submitted'
-          AND u.department_id = ?
+          AND u.department_id IN (${deptPlaceholders})
           AND sr.submitted_at >= DATE_SUB(CURDATE(), INTERVAL 6 MONTH)
         GROUP BY u.department_id, YEAR(sr.submitted_at), MONTH(sr.submitted_at)
       `,
-      values: [managedUnitId],
+      values: scopedDepartmentIds,
     }) as Promise<Array<{ department_id: number; month: number; year: number; count: number }>>,
     query({
       query: `
@@ -141,10 +168,10 @@ export async function getDepartmentComplianceBundle(managedUnitId: number, manag
         FROM staff_reports sr
         JOIN users u ON sr.submitted_by = u.id
         JOIN departments d ON u.department_id = d.id
-        WHERE sr.status = 'submitted' AND u.department_id = ?
+        WHERE sr.status = 'submitted' AND u.department_id IN (${deptPlaceholders})
         GROUP BY u.department_id
       `,
-      values: [managedUnitId],
+      values: scopedDepartmentIds,
     }) as Promise<Array<{ department_id: number; last_submission: string }>>,
     query({
       query: `
@@ -152,7 +179,7 @@ export async function getDepartmentComplianceBundle(managedUnitId: number, manag
           sa.id,
           sa.title,
           d.id AS departmentId,
-          d.name AS department,
+          COALESCE(NULLIF(TRIM(d.external_name), ''), d.name) AS department,
           sa.status,
           sa.progress,
           sa.end_date,
@@ -163,7 +190,7 @@ export async function getDepartmentComplianceBundle(managedUnitId: number, manag
           END AS statusLabel
         FROM strategic_activities sa
         JOIN departments d ON sa.department_id = d.id
-        WHERE d.id = ? AND ${MAIN_ACTIVITY_FILTER}
+        WHERE d.id IN (${deptPlaceholders}) AND ${MAIN_ACTIVITY_FILTER}
           AND (
             sa.status = 'overdue'
             OR (sa.end_date IS NOT NULL AND sa.end_date < CURDATE())
@@ -172,7 +199,7 @@ export async function getDepartmentComplianceBundle(managedUnitId: number, manag
         ORDER BY sa.end_date ASC
         LIMIT 8
       `,
-      values: [managedUnitId],
+      values: scopedDepartmentIds,
     }) as Promise<
       Array<{
         id: number;
@@ -276,13 +303,15 @@ export async function getDepartmentActivitiesForAmbassador(
   managedUnitId: number,
   departmentId: number
 ) {
-  if (departmentId !== managedUnitId) {
+  const scopedDepartmentIds = await getManagedUnitDepartmentIds(managedUnitId);
+  if (!isDepartmentInManagedScope(departmentId, scopedDepartmentIds)) {
     return null;
   }
 
   const deptCheck = (await query({
-    query: 'SELECT id, name FROM departments WHERE id = ? AND is_active = 1',
-    values: [managedUnitId],
+    query: `SELECT id, COALESCE(NULLIF(TRIM(external_name), ''), name) AS name
+            FROM departments WHERE id = ? AND is_active = 1`,
+    values: [departmentId],
   })) as Array<{ id: number; name: string }>;
 
   if (!deptCheck.length) {
@@ -354,6 +383,11 @@ export type ManagedUnitActivityRow = {
 export async function listAllManagedUnitActivities(
   managedUnitId: number
 ): Promise<ManagedUnitActivityRow[]> {
+  const scopedDepartmentIds = await getManagedUnitDepartmentIds(managedUnitId);
+  if (scopedDepartmentIds.length === 0) return [];
+
+  const deptPlaceholders = inPlaceholders(scopedDepartmentIds.length);
+
   const rows = (await query({
     query: `
       SELECT
@@ -372,10 +406,10 @@ export async function listAllManagedUnitActivities(
         END AS statusLabel
       FROM strategic_activities sa
       JOIN departments d ON sa.department_id = d.id
-      WHERE sa.department_id = ? AND ${MAIN_ACTIVITY_FILTER}
+      WHERE sa.department_id IN (${deptPlaceholders}) AND ${MAIN_ACTIVITY_FILTER}
       ORDER BY department ASC, sa.end_date ASC, sa.title ASC
     `,
-    values: [managedUnitId],
+    values: scopedDepartmentIds,
   })) as Array<{
     id: number;
     title: string;

@@ -204,7 +204,7 @@ export default function CreateUserModal({ show, onHide, onUserCreated }: CreateU
               <Form.Label className="fw-bold small">First Name</Form.Label>
               <Form.Control
                 type="text"
-                placeholder="e.g. Joan"
+                placeholder="first name"
                 value={formData.first_name}
                 onChange={(e) => setFormData({ ...formData, first_name: e.target.value })}
                 required
@@ -214,7 +214,7 @@ export default function CreateUserModal({ show, onHide, onUserCreated }: CreateU
               <Form.Label className="fw-bold small">Surname</Form.Label>
               <Form.Control
                 type="text"
-                placeholder="e.g. Namutebi"
+                placeholder="surname"
                 value={formData.surname}
                 onChange={(e) => setFormData({ ...formData, surname: e.target.value })}
                 required
@@ -233,7 +233,7 @@ export default function CreateUserModal({ show, onHide, onUserCreated }: CreateU
               <Form.Label className="fw-bold small">Email Address</Form.Label>
               <Form.Control
                 type="email"
-                placeholder="j.namutebi@mubs.ac.ug"
+                placeholder=" e.g username@mubs.ac.ug"
                 value={formData.email}
                 onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                 required

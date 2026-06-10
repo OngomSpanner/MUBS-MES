@@ -223,48 +223,39 @@ export function formatSectionNames(staff: { sections?: Array<{ name: string }> }
   return list.length ? list.join(', ') : 'Unassigned';
 }
 
-export function buildStaffProfileRows(staff: StaffProfileData): Array<{ label: string; value: string }> {
-  const yearsInPosition = yearsSince(staff.date_current_appointment);
-  const yearsInOffice = yearsSince(staff.date_office_assignment);
-  const rows: Array<{ label: string; value: string }> = [
-    { label: 'Department / unit', value: staff.department || '—' },
-  ];
+export type StaffProfileViewMode = 'hod' | 'admin' | 'ambassador';
+
+export function formatDesignationPosition(staff: StaffProfileData): string {
+  const parts = [staff.position?.trim(), staff.designation_grade?.trim()].filter(Boolean) as string[];
+  const unique = [...new Set(parts)];
+  return unique.length ? unique.join(' · ') : '—';
+}
+
+/** Non-sensitive staff profile fields for modal display (admin, ambassador, HOD). */
+export function buildStaffProfileRows(
+  staff: StaffProfileData,
+  mode: StaffProfileViewMode = 'admin'
+): Array<{ label: string; value: string }> {
+  const rows: Array<{ label: string; value: string }> = [];
+
   const facultyOffice = staff.faculty_office?.trim();
   if (facultyOffice) {
-    rows.push({ label: 'Faculty / office', value: facultyOffice });
+    rows.push({ label: 'Office / faculty', value: facultyOffice });
   }
+
   rows.push(
+    { label: 'Department / unit', value: staff.department || '—' },
     { label: 'Gender', value: staff.gender || '—' },
-    { label: 'Nationality', value: staff.nationality || '—' },
-    { label: 'Date of birth', value: formatDisplayDate(staff.date_of_birth) || '—' },
-    { label: 'Disability status', value: staff.disability_status || '—' }
+    { label: 'Designation / position', value: formatDesignationPosition(staff) },
+    { label: 'Staff category', value: staff.staff_category || '—' }
   );
-  if (staff.disability_status === 'Yes') {
+
+  if (mode === 'hod') {
     rows.push(
-      { label: 'Disability type', value: staff.disability_type || '—' },
-      { label: 'Workplace accommodation', value: staff.workplace_accommodation || '—' },
-      { label: 'Special support needs', value: staff.special_support_needs || '—' }
+      { label: 'Sections', value: formatSectionNames(staff) },
+      { label: 'Open assignments', value: String(staff.active_tasks ?? 0) }
     );
   }
-  rows.push(
-    { label: 'Position', value: staff.position || '—' },
-    { label: 'Designation / grade', value: staff.designation_grade || '—' },
-    { label: 'Sections', value: formatSectionNames(staff) },
-    { label: 'Staff category', value: staff.staff_category || '—' },
-    { label: 'Contract type', value: staff.contract_type || '—' },
-    { label: 'Employment status', value: formatEmploymentStatus(staff.employment_status) },
-    { label: 'First appointment', value: formatDisplayDate(staff.date_first_appointment) || '—' },
-    { label: 'Current position since', value: formatDisplayDate(staff.date_current_appointment) || '—' },
-    { label: 'Years in current position', value: formatYears(yearsInPosition) },
-    { label: 'Current office since', value: formatDisplayDate(staff.date_office_assignment) || '—' },
-    { label: 'Years in current office', value: formatYears(yearsInOffice) },
-    { label: 'Retirement date', value: formatDisplayDate(staff.retirement_date) || '—' },
-    { label: 'Contract start', value: formatDisplayDate(staff.contract_start_date) || '—' },
-    {
-      label: 'Contract end',
-      value: formatDisplayDate(staff.contract_end_date) || 'No end date on file',
-    },
-    { label: 'Open assignments', value: String(staff.active_tasks ?? 0) }
-  );
+
   return rows;
 }

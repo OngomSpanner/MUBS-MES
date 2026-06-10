@@ -1,12 +1,12 @@
 import { NextResponse } from 'next/server';
-import { requireAmbassador } from '@/lib/ambassador/context';
+import { requireHrAmbassador } from '@/lib/ambassador/hr-unit';
 import { listFacultyStaffProfiles } from '@/lib/ambassador/faculty-staff-profiles';
 import { listManagedUnitDepartments } from '@/lib/ambassador/managed-unit-departments';
 import { ensureDepartmentSectionTables } from '@/lib/department-sections';
 
 export async function GET() {
   try {
-    const ctx = await requireAmbassador();
+    const ctx = await requireHrAmbassador();
     if ('error' in ctx) return ctx.error;
 
     await ensureDepartmentSectionTables();

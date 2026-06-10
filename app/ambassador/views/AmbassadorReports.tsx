@@ -49,6 +49,7 @@ export default function AmbassadorReports() {
     const [managedUnitName, setManagedUnitName] = useState<string | null>(null);
     const [managedUnitId, setManagedUnitId] = useState<number | null>(null);
     const [canManageEnrollment, setCanManageEnrollment] = useState(false);
+    const [canViewStaffProfiles, setCanViewStaffProfiles] = useState(false);
 
     const scopeProps = useMemo(
         () => ({
@@ -66,6 +67,7 @@ export default function AmbassadorReports() {
                 setManagedUnitName(metaRes.data.managedUnitName ?? null);
                 setManagedUnitId(metaRes.data.managedUnitId ?? null);
                 setCanManageEnrollment(Boolean(metaRes.data.canManageEnrollment));
+                setCanViewStaffProfiles(Boolean(metaRes.data.canViewStaffProfiles));
             } catch (err: unknown) {
                 console.error('Ambassador reports meta error:', err);
             }
@@ -75,6 +77,8 @@ export default function AmbassadorReports() {
 
     const enrollmentTabDenied =
         REGISTRAR_ONLY_TABS.has(activeTab) && !canManageEnrollment;
+    const staffProfilesTabDenied =
+        activeTab === 'staff-profiles' && !canViewStaffProfiles;
 
     return (
         <div className="page-section active-page">
@@ -85,9 +89,16 @@ export default function AmbassadorReports() {
                 </div>
             )}
 
+            {staffProfilesTabDenied && (
+                <div className="alert alert-warning">
+                    Full staff profiles are only available to the Strategic Plan Ambassador assigned to the{' '}
+                    <strong>Human Resources</strong> unit.
+                </div>
+            )}
+
             {activeTab === 'compliance' && <AmbassadorCompliancePanel />}
 
-            {activeTab === 'staff-profiles' && <AmbassadorStaffProfilePanel />}
+            {activeTab === 'staff-profiles' && canViewStaffProfiles && <AmbassadorStaffProfilePanel />}
 
             {activeTab === 'recruitment' && (
                 <StaffRecruitmentPanel {...scopeProps} />

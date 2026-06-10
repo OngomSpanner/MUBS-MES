@@ -12,6 +12,7 @@ const GENDER_HEADERS = ['Male', 'Female', 'PWD'] as const;
 export default function StaffBenefitsPanel({
   scopeFaculty,
   lockFaculty = false,
+  managedUnitId,
   embedded = false,
 }: ReportPanelScopeProps & { embedded?: boolean } = {}) {
   const [report, setReport] = useState<StaffBenefitsReport | null>(null);
@@ -35,6 +36,7 @@ export default function StaffBenefitsPanel({
       if (effectiveFaculty !== 'All Faculties') params.set('faculty', effectiveFaculty);
       if (departmentFilter !== 'All Departments') params.set('department', departmentFilter);
       if (pwdFilter !== 'all') params.set('pwd', pwdFilter);
+      if (managedUnitId) params.set('managed_unit_id', String(managedUnitId));
       const { data } = await axios.get(`/api/reports?${params.toString()}`);
       setReport(data.data as StaffBenefitsReport);
     } catch (e) {
@@ -44,7 +46,7 @@ export default function StaffBenefitsPanel({
     } finally {
       setLoading(false);
     }
-  }, [effectiveFaculty, departmentFilter, pwdFilter]);
+  }, [effectiveFaculty, departmentFilter, pwdFilter, managedUnitId]);
 
   useEffect(() => {
     fetchReport();

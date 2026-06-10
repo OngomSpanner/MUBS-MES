@@ -180,7 +180,7 @@ export default function AmbassadorStaffProfilePanel() {
         )}
       </div>
 
-      <StaffProfileModal staff={profileStaff} onClose={() => setProfileStaff(null)} mode="hod" />
+      <StaffProfileModal staff={profileStaff} onClose={() => setProfileStaff(null)} mode="ambassador" />
     </div>
   );
 }

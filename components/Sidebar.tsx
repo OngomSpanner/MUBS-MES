@@ -46,25 +46,41 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen, onLogoutClick }: 
   ];
   
   const [canManageEnrollment, setCanManageEnrollment] = useState(false);
+  const [canViewStaffProfiles, setCanViewStaffProfiles] = useState(false);
 
   useEffect(() => {
     if (!pathname.startsWith('/ambassador')) return;
     axios
       .get('/api/ambassador/reports/staff-options')
-      .then((res) => setCanManageEnrollment(Boolean(res.data.canManageEnrollment)))
-      .catch(() => setCanManageEnrollment(false));
+      .then((res) => {
+        setCanManageEnrollment(Boolean(res.data.canManageEnrollment));
+        setCanViewStaffProfiles(Boolean(res.data.canViewStaffProfiles));
+      })
+      .catch(() => {
+        setCanManageEnrollment(false);
+        setCanViewStaffProfiles(false);
+      });
   }, [pathname]);
 
   const ambassadorMenuItems = useMemo(() => {
     const items = [
       { key: 'dashboard', href: '/ambassador', icon: 'dashboard', label: 'Dept. / Unit Dashboard' },
       { key: 'reports-compliance', href: '/ambassador?pg=reports&tab=compliance', icon: 'fact_check', label: 'Dept. / Unit Activity Progress' },
-      { key: 'reports-staff-profiles', href: '/ambassador?pg=reports&tab=staff-profiles', icon: 'badge', label: 'Staff Profiles' },
+    ];
+    if (canViewStaffProfiles) {
+      items.push({
+        key: 'reports-staff-profiles',
+        href: '/ambassador?pg=reports&tab=staff-profiles',
+        icon: 'badge',
+        label: 'Staff Profiles',
+      });
+    }
+    items.push(
       { key: 'reports-recruitment', href: '/ambassador?pg=reports&tab=recruitment', icon: 'person_add', label: 'Staff Recruitment' },
       { key: 'reports-benefits', href: '/ambassador?pg=reports&tab=benefits', icon: 'card_giftcard', label: 'Staff Benefits' },
       { key: 'reports-workforce-assessments', href: '/ambassador?pg=reports&tab=workforce-assessments', icon: 'groups', label: 'Workforce Assessments' },
       { key: 'reports-employment-skill-status', href: '/ambassador?pg=reports&tab=employment-skill-status', icon: 'school', label: 'Skills Assessments' },
-    ];
+    );
     if (canManageEnrollment) {
       items.push(
         { key: 'reports-programme-enrollment', href: '/ambassador?pg=reports&tab=programme-enrollment', icon: 'school', label: 'Programme Enrollment' },
@@ -72,7 +88,7 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen, onLogoutClick }: 
       );
     }
     return items;
-  }, [canManageEnrollment]);
+  }, [canManageEnrollment, canViewStaffProfiles]);
 
   const staffMenuItems = [
     { key: 'dashboard', href: '/staff?pg=dashboard', icon: 'dashboard', label: 'Dashboard' },

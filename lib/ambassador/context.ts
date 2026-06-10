@@ -2,12 +2,40 @@ import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { verifyToken } from '@/lib/auth';
 import { query } from '@/lib/db';
+import { normalizeRoleForCookie, parseRoles } from '@/lib/role-routing';
 
 export type AmbassadorContext = {
   userId: number;
   managedUnitId: number;
   managedUnitName: string;
 };
+
+async function userHasAmbassadorRole(userId: number): Promise<boolean> {
+  const roles = new Set<string>();
+
+  const userRows = (await query({
+    query: 'SELECT role FROM users WHERE id = ?',
+    values: [userId],
+  })) as { role: string | null }[];
+
+  for (const r of parseRoles(userRows[0]?.role)) {
+    roles.add(normalizeRoleForCookie(r));
+  }
+
+  try {
+    const roleRows = (await query({
+      query: 'SELECT role FROM user_roles WHERE user_id = ?',
+      values: [userId],
+    })) as { role: string }[];
+    for (const row of roleRows) {
+      if (row.role) roles.add(normalizeRoleForCookie(row.role));
+    }
+  } catch {
+    // user_roles may not exist
+  }
+
+  return roles.has('Ambassador');
+}
 
 export async function requireAmbassador(): Promise<AmbassadorContext | { error: NextResponse }> {
   const cookieStore = await cookies();
@@ -21,8 +49,19 @@ export async function requireAmbassador(): Promise<AmbassadorContext | { error: 
     return { error: NextResponse.json({ message: 'Invalid token' }, { status: 401 }) };
   }
 
+  const hasAmbassador = await userHasAmbassadorRole(decoded.userId);
+  if (!hasAmbassador) {
+    return {
+      error: NextResponse.json(
+        { message: 'Ambassador role required for this action' },
+        { status: 403 }
+      ),
+    };
+  }
+
   const rows = (await query({
-    query: `SELECT u.managed_unit_id, d.name AS unit_name
+    query: `SELECT u.managed_unit_id,
+                   COALESCE(NULLIF(TRIM(d.external_name), ''), d.name) AS unit_name
             FROM users u
             LEFT JOIN departments d ON d.id = u.managed_unit_id
             WHERE u.id = ?`,

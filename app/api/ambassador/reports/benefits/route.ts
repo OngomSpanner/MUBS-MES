@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server';
 import { query } from '@/lib/db';
 import { requireAmbassador } from '@/lib/ambassador/context';
 import { isStaffInFaculty } from '@/lib/ambassador/faculty-staff';
+import { getManagedUnitDepartmentIds } from '@/lib/ambassador/managed-unit-departments';
+import { inPlaceholders } from '@/lib/department-head';
 import { BENEFIT_TYPES, type BenefitType } from '@/lib/hrms/staff-benefits';
 import { labelsFromFyWindow, getPastFinancialYearWindow } from '@/lib/financial-year';
 
@@ -16,19 +18,25 @@ export async function GET() {
   const auth = await requireAmbassador();
   if ('error' in auth) return auth.error;
 
+  const departmentIds = await getManagedUnitDepartmentIds(auth.managedUnitId);
+  if (departmentIds.length === 0) {
+    return NextResponse.json({ records: [] });
+  }
+  const deptPlaceholders = inPlaceholders(departmentIds.length);
+
   const rows = (await query({
     query: `
       SELECT e.id, e.user_id, e.financial_year_key, e.benefit_type, e.received,
              e.created_at, e.updated_at,
              TRIM(CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(u.surname, ''))) AS staff_name,
-             COALESCE(d.name, '') AS department_name
+             COALESCE(NULLIF(TRIM(d.external_name), ''), d.name, '') AS department_name
       FROM staff_benefit_entries e
       INNER JOIN users u ON u.id = e.user_id
       LEFT JOIN departments d ON d.id = u.department_id
-      WHERE u.department_id = ?
+      WHERE u.department_id IN (${deptPlaceholders})
       ORDER BY e.updated_at DESC, e.id DESC
     `,
-    values: [auth.managedUnitId],
+    values: departmentIds,
   })) as {
     id: number;
     user_id: number;

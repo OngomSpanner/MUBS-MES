@@ -36,6 +36,7 @@ type StaffRow = {
     workplace_accommodation?: string | null;
     special_support_needs?: string | null;
     faculty_office?: string | null;
+    department?: string;
     active_tasks: number;
     sections_concat?: string | null;
 };
@@ -92,6 +93,7 @@ export async function GET() {
                     u.workplace_accommodation,
                     u.special_support_needs,
                     u.faculty_office,
+                    COALESCE(NULLIF(TRIM(d.external_name), ''), d.name, '') AS department,
                     GROUP_CONCAT(DISTINCT CONCAT(ds.id, ':', ds.name) ORDER BY ds.name SEPARATOR '||') AS sections_concat,
                     (
                         (
@@ -106,6 +108,7 @@ export async function GET() {
                         )
                     ) AS active_tasks
                 FROM users u
+                LEFT JOIN departments d ON d.id = u.department_id
                 LEFT JOIN department_section_staff dss ON dss.staff_user_id = u.id
                 LEFT JOIN department_sections ds ON ds.id = dss.section_id
                 WHERE u.department_id IN (${placeholders})
@@ -135,7 +138,8 @@ export async function GET() {
                     u.disability_type,
                     u.workplace_accommodation,
                     u.special_support_needs,
-                    u.faculty_office
+                    u.faculty_office,
+                    department
                 ORDER BY u.full_name ASC
             `,
             values: [...departmentIds]
@@ -162,8 +166,10 @@ export async function GET() {
                     .filter((s): s is { id: number; name: string } => s != null);
             }
 
+            const typed = row as StaffRow;
             return {
-                ...(row as StaffRow),
+                ...typed,
+                department: (typed.department || '').trim() || '—',
                 sections,
             };
         });

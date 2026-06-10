@@ -19,6 +19,21 @@ import { generateStaffJobDescriptionWorkplansReport } from '@/lib/hrms/staff-job
 import { generateStaffStudentRatioReport } from '@/lib/hrms/staff-student-ratio';
 import { generateStaffProgrammeEnrollmentReport } from '@/lib/hrms/staff-programme-enrollment';
 import { generateStaffCourseUnitEnrollmentReport } from '@/lib/hrms/staff-course-unit-enrollment';
+import { resolveAmbassadorReportScope } from '@/lib/ambassador/reports-scope';
+import { getManagedUnitDepartmentIds } from '@/lib/ambassador/managed-unit-departments';
+
+const AMBASSADOR_ALLOWED_REPORT_TYPES = new Set([
+  'staff-recruitment',
+  'staff-benefits',
+  'staff-workforce-assessments',
+  'staff-employment-skill-status',
+]);
+
+function parseManagedUnitParam(value: string | null): number | null {
+  if (!value) return null;
+  const n = Number(value);
+  return Number.isFinite(n) && n > 0 ? n : null;
+}
 
 export async function GET(request: Request) {
   try {
@@ -27,13 +42,28 @@ export async function GET(request: Request) {
     if (!token) {
       return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
     }
-    const decoded = verifyToken(token);
+    const decoded = verifyToken(token) as { userId?: number } | null;
     if (!decoded) {
+      return NextResponse.json({ message: 'Invalid token' }, { status: 401 });
+    }
+
+    const userId = decoded.userId;
+    if (!userId) {
       return NextResponse.json({ message: 'Invalid token' }, { status: 401 });
     }
 
     const { searchParams } = new URL(request.url);
     const type = searchParams.get('type');
+
+    if (type) {
+      const ambassadorScope = await resolveAmbassadorReportScope(userId, null);
+      if (ambassadorScope.restricted && !AMBASSADOR_ALLOWED_REPORT_TYPES.has(type)) {
+        return NextResponse.json(
+          { message: 'This report is not available for your ambassador unit scope' },
+          { status: 403 }
+        );
+      }
+    }
     const from = searchParams.get('from');
     const to = searchParams.get('to');
     const department = searchParams.get('department');
@@ -475,17 +505,18 @@ export async function GET(request: Request) {
         const faculty = searchParams.get('faculty');
         const dept = searchParams.get('department');
         const recruitmentPwd = searchParams.get('pwd');
-        const managedUnitId = searchParams.get('managed_unit_id');
+        const requestedUnitId = parseManagedUnitParam(searchParams.get('managed_unit_id'));
+        const recruitmentScope = await resolveAmbassadorReportScope(userId, requestedUnitId);
+        if (recruitmentScope.restricted && !recruitmentScope.managedUnitId) {
+          return NextResponse.json({ message: 'Forbidden' }, { status: 403 });
+        }
         data = await generateStaffRecruitmentReport({
           faculty:
             faculty && faculty !== 'All Faculties' ? faculty : null,
           department:
             dept && dept !== 'All Departments' ? dept : null,
           pwd: recruitmentPwd,
-          managedUnitId:
-            managedUnitId && Number.isFinite(Number(managedUnitId))
-              ? Number(managedUnitId)
-              : null,
+          managedUnitId: recruitmentScope.managedUnitId,
         });
         break;
       }
@@ -542,10 +573,20 @@ export async function GET(request: Request) {
         const faculty = searchParams.get('faculty');
         const dept = searchParams.get('department');
         const benefitsPwd = searchParams.get('pwd');
+        const requestedUnitId = parseManagedUnitParam(searchParams.get('managed_unit_id'));
+        const benefitsScope = await resolveAmbassadorReportScope(userId, requestedUnitId);
+        if (benefitsScope.restricted && !benefitsScope.managedUnitId) {
+          return NextResponse.json({ message: 'Forbidden' }, { status: 403 });
+        }
+        const departmentIds =
+          benefitsScope.restricted && benefitsScope.managedUnitId
+            ? await getManagedUnitDepartmentIds(benefitsScope.managedUnitId)
+            : undefined;
         data = await generateStaffBenefitsReport({
           faculty: faculty && faculty !== 'All Faculties' ? faculty : null,
           department: dept && dept !== 'All Departments' ? dept : null,
           pwd: benefitsPwd,
+          departmentIds,
         });
         break;
       }
@@ -556,17 +597,25 @@ export async function GET(request: Request) {
       }
 
       case 'staff-workforce-assessments': {
-        const managedUnitId = searchParams.get('managed_unit_id');
+        const requestedUnitId = parseManagedUnitParam(searchParams.get('managed_unit_id'));
+        const workforceScope = await resolveAmbassadorReportScope(userId, requestedUnitId);
+        if (workforceScope.restricted && !workforceScope.managedUnitId) {
+          return NextResponse.json({ message: 'Forbidden' }, { status: 403 });
+        }
         data = await generateStaffWorkforceAssessmentsReport({
-          managedUnitId: managedUnitId ? Number(managedUnitId) : null,
+          managedUnitId: workforceScope.managedUnitId,
         });
         break;
       }
 
       case 'staff-employment-skill-status': {
-        const managedUnitId = searchParams.get('managed_unit_id');
+        const requestedUnitId = parseManagedUnitParam(searchParams.get('managed_unit_id'));
+        const skillsScope = await resolveAmbassadorReportScope(userId, requestedUnitId);
+        if (skillsScope.restricted && !skillsScope.managedUnitId) {
+          return NextResponse.json({ message: 'Forbidden' }, { status: 403 });
+        }
         data = await generateStaffEmploymentSkillStatusReport({
-          managedUnitId: managedUnitId ? Number(managedUnitId) : null,
+          managedUnitId: skillsScope.managedUnitId,
         });
         break;
       }

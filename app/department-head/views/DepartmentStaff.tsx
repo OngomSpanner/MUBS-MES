@@ -8,6 +8,7 @@ import { StaffProfileData } from '@/lib/staff-biodata';
 interface Staff {
     id: number;
     department_id: number;
+    department?: string;
     full_name: string;
     email: string;
     position: string | null;
@@ -522,7 +523,7 @@ export default function DepartmentStaff() {
                                                         type="button"
                                                         className="btn btn-sm btn-outline-primary fw-bold d-inline-flex align-items-center gap-1 px-3 py-1"
                                                         style={{ fontSize: '.75rem', borderRadius: '8px' }}
-                                                        onClick={() => setProfileStaff({ ...s, id: s.id, full_name: s.full_name, email: s.email })}
+                                                        onClick={() => setProfileStaff({ ...s, department: s.department || '—' })}
                                                     >
                                                         <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>person_search</span>
                                                         View details

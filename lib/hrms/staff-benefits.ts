@@ -205,12 +205,25 @@ export async function generateStaffBenefitsReport(options: {
   faculty?: string | null;
   department?: string | null;
   pwd?: string | null;
+  /** When set, limits benefit rows to staff in these department ids (ambassador scope). */
+  departmentIds?: number[];
 }): Promise<StaffBenefitsReport> {
   const window = getRollingReportFyWindow();
   const yearKeys = window.map((y) => y.key);
   const years = labelsFromFyWindow(window);
 
-  const entries = await loadBenefitEntries(yearKeys);
+  let entries = await loadBenefitEntries(yearKeys);
+
+  if (options.departmentIds && options.departmentIds.length > 0) {
+    const placeholders = options.departmentIds.map(() => '?').join(',');
+    const allowedRows = (await query({
+      query: `SELECT id FROM users WHERE department_id IN (${placeholders})`,
+      values: options.departmentIds,
+    })) as { id: number }[];
+    const allowedIds = new Set(allowedRows.map((r) => r.id));
+    entries = entries.filter((e) => allowedIds.has(e.user_id));
+  }
+
   const allUserIds = Array.from(new Set(entries.map((e) => e.user_id)));
   const staffList = await loadStaffByIds(allUserIds);
 
