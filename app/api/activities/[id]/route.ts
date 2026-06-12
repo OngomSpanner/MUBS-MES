@@ -4,6 +4,7 @@ import { cookies } from 'next/headers';
 import { verifyToken } from '@/lib/auth';
 import { ensureParentIsStrategicActivity } from '@/lib/strategic-performance-types';
 import { normalizeActivityUnitOfMeasure } from '@/lib/activity-unit-of-measure';
+import { canManageStrategicStandards } from '@/lib/role-routing';
 
 export async function GET(
   request: Request,
@@ -250,6 +251,19 @@ export async function DELETE(
 ) {
   const { id } = await params;
   try {
+    const cookieStore = await cookies();
+    const token = cookieStore.get('token')?.value;
+    if (!token) {
+      return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
+    }
+    const decoded = verifyToken(token) as { userId?: number; role?: string } | null;
+    if (!decoded?.userId) {
+      return NextResponse.json({ message: 'Invalid token' }, { status: 401 });
+    }
+    if (!canManageStrategicStandards(decoded.role)) {
+      return NextResponse.json({ message: 'Forbidden: insufficient permissions' }, { status: 403 });
+    }
+
     const row = await query({
       query: 'SELECT id, parent_id FROM strategic_activities WHERE id = ?',
       values: [id]
