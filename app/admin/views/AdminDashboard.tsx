@@ -5,6 +5,7 @@ import Layout from '@/components/Layout';
 import StatCard from '@/components/StatCard';
 import CreateUserModal from '@/components/Modals/CreateUserModal';
 import CreateActivityModal from '@/components/Modals/CreateActivityModal';
+import EnrollmentFacultyBreakdown from '@/components/Enrollment/EnrollmentFacultyBreakdown';
 import axios from 'axios';
 
 interface DashboardStats {
@@ -17,6 +18,17 @@ interface DashboardStats {
     pendingProposals: number;
     delayedActivities: number;
     hrAlertCount: number;
+    enrollmentProgrammes?: number;
+    enrollmentProgrammeStudents?: number;
+    enrollmentCourseUnits?: number;
+    enrollmentCourseUnitStudents?: number;
+    enrollmentPwdStudents?: number;
+    rfIndicators?: number;
+    rfAssessed?: number;
+    rfUnderperformance?: number;
+    rfAchievement?: number;
+    rfOverachievement?: number;
+    rfNarrativesMissing?: number;
 }
 
 interface HRAlert {
@@ -127,6 +139,94 @@ export default function AdminDashboard() {
                     />
                 </div>
             </div>
+
+            {(stats.rfIndicators ?? 0) > 0 ? (
+                <div className="row g-3 mb-4">
+                    <div className="col-12">
+                        <div className="d-flex align-items-center justify-content-between flex-wrap gap-2">
+                            <h6 className="fw-bold text-dark mb-0">Results Framework (university-wide)</h6>
+                            <a href="/admin?pg=reports&tab=results-framework" className="small fw-bold text-decoration-none">
+                                View details →
+                            </a>
+                        </div>
+                    </div>
+                    <div className="col-6 col-md-3">
+                        <StatCard icon="analytics" label="RF indicators" value={stats.rfIndicators ?? 0} badge="FY" badgeIcon="calendar_today" color="blue" />
+                    </div>
+                    <div className="col-6 col-md-3">
+                        <StatCard icon="trending_down" label="Underperformance" value={stats.rfUnderperformance ?? 0} badge="Watch" badgeIcon="warning" color="red" />
+                    </div>
+                    <div className="col-6 col-md-3">
+                        <StatCard icon="task_alt" label="Achievement" value={stats.rfAchievement ?? 0} badge="On target" badgeIcon="check" color="green" />
+                    </div>
+                    <div className="col-6 col-md-3">
+                        <StatCard
+                            icon="edit_note"
+                            label="Missing narratives"
+                            value={stats.rfNarrativesMissing ?? 0}
+                            badge="Ambassador"
+                            badgeIcon="rate_review"
+                            color="yellow"
+                        />
+                    </div>
+                </div>
+            ) : null}
+
+            {(stats.enrollmentProgrammes ?? 0) > 0 || (stats.enrollmentCourseUnits ?? 0) > 0 ? (
+                <>
+                    <div className="row g-3 mb-4">
+                        <div className="col-12">
+                            <div className="d-flex align-items-center justify-content-between flex-wrap gap-2">
+                                <h6 className="fw-bold text-dark mb-0">Student enrollment indicators</h6>
+                                <a href="/reports" className="small fw-bold text-decoration-none">
+                                    View reports →
+                                </a>
+                            </div>
+                        </div>
+                        <div className="col-6 col-md-3">
+                            <StatCard
+                                icon="school"
+                                label="Programmes"
+                                value={stats.enrollmentProgrammes ?? 0}
+                                badge={`${stats.enrollmentProgrammeStudents ?? 0} students`}
+                                badgeIcon="groups"
+                                color="blue"
+                            />
+                        </div>
+                        <div className="col-6 col-md-3">
+                            <StatCard
+                                icon="library_books"
+                                label="Course units"
+                                value={stats.enrollmentCourseUnits ?? 0}
+                                badge={`${stats.enrollmentCourseUnitStudents ?? 0} students`}
+                                badgeIcon="menu_book"
+                                color="green"
+                            />
+                        </div>
+                        <div className="col-6 col-md-3">
+                            <StatCard
+                                icon="groups"
+                                label="Programme students"
+                                value={stats.enrollmentProgrammeStudents ?? 0}
+                                badge="Total"
+                                badgeIcon="analytics"
+                                color="yellow"
+                            />
+                        </div>
+                        <div className="col-6 col-md-3">
+                            <StatCard
+                                icon="accessible"
+                                label="PwD (programme + CU)"
+                                value={stats.enrollmentPwdStudents ?? 0}
+                                badge="Recorded"
+                                badgeIcon="verified"
+                                color="red"
+                            />
+                        </div>
+                    </div>
+                    <EnrollmentFacultyBreakdown />
+                </>
+            ) : null}
 
             <div className="row g-4">
                 {/* Quick Actions */}

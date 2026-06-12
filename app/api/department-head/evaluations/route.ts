@@ -10,6 +10,13 @@ import {
 } from '@/lib/evaluation-scoring';
 import { autoOpenNextProcessStepAfterCompletion } from '@/lib/process-auto-open';
 import { brandEmailWrapper, escapeHtml, sendTransactionalMail } from '@/lib/mail';
+import { ensureStaffReportsRfColumns } from '@/lib/staff-reports-rf-schema';
+import { computePerformanceStatus } from '@/lib/results-framework';
+import {
+    applyMilestoneProgressToStrategicActivity,
+    parentActivityHasMilestoneTemplate,
+} from '@/lib/milestone-progress';
+import { rollupKpiActualForStrategicActivity } from '@/lib/kpi-actual-rollup';
 
 async function appendSubmissionFeedbackLog(staffReportId: number, authorUserId: number, body: string) {
     const text = String(body || '').trim();
@@ -32,6 +39,8 @@ export async function GET(req: Request) {
 
         const decoded = verifyToken(token) as any;
         if (!decoded || !decoded.userId) throw new Error('Invalid token');
+
+        await ensureStaffReportsRfColumns();
 
         const departmentIds = await getVisibleDepartmentIds(decoded.userId);
         if (departmentIds.length === 0) {
@@ -67,7 +76,11 @@ export async function GET(req: Request) {
                     e.qualitative_feedback as reviewer_notes,
                     e.rating,
                     COALESCE(sa.task_type, 'process') as task_type,
-                    sr.kpi_actual_value
+                    sr.kpi_actual_value,
+                    sr.performance_status,
+                    sr.outcome_reason,
+                    sr.practice_type,
+                    COALESCE(sa.kpi_target_value, p.kpi_target_value, psa_sa.kpi_target_value) as kpi_target_value
                 FROM staff_reports sr
                 LEFT JOIN activity_assignments aa ON sr.activity_assignment_id = aa.id
                 LEFT JOIN strategic_activities sa ON aa.activity_id = sa.id
@@ -169,6 +182,8 @@ export async function PUT(req: Request) {
         if (!decoded || !decoded.userId) throw new Error('Invalid token');
         const userId = decoded.userId;
 
+        await ensureStaffReportsRfColumns();
+
         let departmentIds = await getVisibleDepartmentIds(userId);
         if (departmentIds.length === 0) {
             return NextResponse.json({ message: 'No department assigned' }, { status: 403 });
@@ -225,13 +240,16 @@ export async function PUT(req: Request) {
                     COALESCE(sa.parent_id, psa_sa.parent_id) as strategic_activity_id,
                     COALESCE(sr.submitted_at, sr.updated_at) as staff_submitted_at,
                     COALESCE(aa.end_date, spa.end_date) as assignment_end_date,
-                    spa.id as resolved_process_assignment_id
+                    spa.id as resolved_process_assignment_id,
+                    COALESCE(sa.kpi_target_value, parent_sa.kpi_target_value, psa_sa.kpi_target_value, parent_psa.kpi_target_value) as kpi_target_value
                 FROM staff_reports sr
                 LEFT JOIN activity_assignments aa ON sr.activity_assignment_id = aa.id
                 LEFT JOIN strategic_activities sa ON aa.activity_id = sa.id
+                LEFT JOIN strategic_activities parent_sa ON sa.parent_id = parent_sa.id
                 LEFT JOIN staff_process_subtasks sps ON sr.process_subtask_id = sps.id
                 LEFT JOIN staff_process_assignments spa ON COALESCE(sr.process_assignment_id, sps.process_assignment_id) = spa.id
                 LEFT JOIN strategic_activities psa_sa ON spa.activity_id = psa_sa.id
+                LEFT JOIN strategic_activities parent_psa ON psa_sa.parent_id = parent_psa.id
                 WHERE sr.id = ?
                   AND (sa.department_id IN (${placeholders}) OR psa_sa.department_id IN (${placeholders}))
             `,
@@ -359,15 +377,14 @@ export async function PUT(req: Request) {
         else if (status === 'Complete') {
             // Complete path: set staff_reports.status = 'evaluated', store kpi_actual_value if KPI-Driver, update parent Strategic Activity actuals
             const kpiActualNum = isKpiDriver && kpi_actual_value != null && kpi_actual_value !== '' ? Number(kpi_actual_value) : null;
+            const kpiTargetNum = row.kpi_target_value != null ? Number(row.kpi_target_value) : null;
+            const evaluatedPerformanceStatus = computePerformanceStatus(kpiTargetNum, kpiActualNum);
             if (kpiActualNum != null && !Number.isNaN(kpiActualNum) && parentId != null) {
                 await query({
-                    query: 'UPDATE staff_reports SET status = ?, kpi_actual_value = ? WHERE id = ?',
-                    values: ['evaluated', kpiActualNum, staffReportId]
+                    query: 'UPDATE staff_reports SET status = ?, kpi_actual_value = ?, performance_status = ? WHERE id = ?',
+                    values: ['evaluated', kpiActualNum, evaluatedPerformanceStatus, staffReportId]
                 });
-                await query({
-                    query: 'UPDATE strategic_activities SET actual_value = COALESCE(actual_value, 0) + ? WHERE id = ?',
-                    values: [kpiActualNum, parentId]
-                });
+                await rollupKpiActualForStrategicActivity(Number(parentId));
             } else {
                 await query({
                     query: 'UPDATE staff_reports SET status = ? WHERE id = ?',
@@ -472,27 +489,33 @@ export async function PUT(req: Request) {
         let parentIdForRecalc = parentId;
 
         if (processAssignmentId) {
-            // Standard process assignment: recalculate based on assignments.
-            const assignments = await query({
-                query: 'SELECT status FROM staff_process_assignments WHERE activity_id = ?',
-                values: [taskId]
-            }) as any[];
-            const total = assignments.length || 1;
-            const points = assignments.reduce((acc: number, cur: any) => {
-                if (cur.status === 'evaluated') return acc + 100;
-                if (cur.status === 'incomplete') return acc + 50;
-                return acc;
-            }, 0);
-            const currentProgress = Math.round(points / total);
-            const currentStatus = currentProgress === 100 ? 'completed' : 'in_progress';
-
-            if (taskId) {
-                await query({
-                    query: 'UPDATE strategic_activities SET progress = ?, status = ? WHERE id = ?',
-                    values: [currentProgress, currentStatus, taskId]
-                });
-            }
             parentIdForRecalc = row.strategic_activity_id;
+            const parentForMilestone = parentIdForRecalc != null ? Number(parentIdForRecalc) : null;
+            const useMilestones =
+                parentForMilestone != null &&
+                (await parentActivityHasMilestoneTemplate(parentForMilestone));
+
+            if (!useMilestones) {
+                const assignments = await query({
+                    query: 'SELECT status FROM staff_process_assignments WHERE activity_id = ?',
+                    values: [taskId]
+                }) as any[];
+                const total = assignments.length || 1;
+                const points = assignments.reduce((acc: number, cur: any) => {
+                    if (cur.status === 'evaluated') return acc + 100;
+                    if (cur.status === 'incomplete') return acc + 50;
+                    return acc;
+                }, 0);
+                const currentProgress = Math.round(points / total);
+                const currentStatus = currentProgress === 100 ? 'completed' : 'in_progress';
+
+                if (taskId) {
+                    await query({
+                        query: 'UPDATE strategic_activities SET progress = ?, status = ? WHERE id = ?',
+                        values: [currentProgress, currentStatus, taskId]
+                    });
+                }
+            }
         } else if (updateTaskId) {
             // Fixed outcome for standard tasks
             const taskProgress = status === 'Complete' ? 100 : (status === 'Incomplete' ? 50 : 0);
@@ -539,29 +562,35 @@ export async function PUT(req: Request) {
             }
         }
 
-        // Final step: Recalculate parent goal progress so Activity page correctly reflects child unit completions
+        // Final step: Recalculate parent goal progress (milestone-based when standard steps define weights, else child average)
         let parentProgress = 0;
         let parentUpdated = false;
         if (parentIdForRecalc) {
-            const childCounts = await query({
-                query: `
-                    SELECT 
-                        COUNT(*) as total,
-                        COALESCE(SUM(progress), 0) as total_progress
-                    FROM strategic_activities
-                    WHERE parent_id = ?
-                `,
-                values: [parentIdForRecalc]
-            }) as any[];
-            const totalRec = Number(childCounts[0]?.total ?? 0);
-            const sumProgress = Number(childCounts[0]?.total_progress ?? 0);
-            parentProgress = totalRec > 0 ? Math.round(sumProgress / totalRec) : 0;
-            const parentStatus = parentProgress === 100 ? 'completed' : 'in_progress';
-            const parentResult = await query({
-                query: 'UPDATE strategic_activities SET progress = ?, status = ? WHERE id = ?',
-                values: [parentProgress, parentStatus, parentIdForRecalc]
-            }) as any;
-            parentUpdated = parentResult?.affectedRows > 0;
+            const milestoneResult = await applyMilestoneProgressToStrategicActivity(parentIdForRecalc);
+            if (milestoneResult) {
+                parentProgress = milestoneResult.progress;
+                parentUpdated = milestoneResult.updated;
+            } else {
+                const childCounts = await query({
+                    query: `
+                        SELECT 
+                            COUNT(*) as total,
+                            COALESCE(SUM(progress), 0) as total_progress
+                        FROM strategic_activities
+                        WHERE parent_id = ?
+                    `,
+                    values: [parentIdForRecalc]
+                }) as any[];
+                const totalRec = Number(childCounts[0]?.total ?? 0);
+                const sumProgress = Number(childCounts[0]?.total_progress ?? 0);
+                parentProgress = totalRec > 0 ? Math.round(sumProgress / totalRec) : 0;
+                const parentStatus = parentProgress === 100 ? 'completed' : 'in_progress';
+                const parentResult = await query({
+                    query: 'UPDATE strategic_activities SET progress = ?, status = ? WHERE id = ?',
+                    values: [parentProgress, parentStatus, parentIdForRecalc]
+                }) as any;
+                parentUpdated = parentResult?.affectedRows > 0;
+            }
         }
 
         if (status === 'Complete' && autoOpenAfterProcessAssignmentId != null) {

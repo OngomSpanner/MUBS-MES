@@ -1,6 +1,6 @@
 'use client';
 
-import { Fragment, useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import axios from 'axios';
 import * as XLSX from 'xlsx';
 import StatCard from '@/components/StatCard';
@@ -42,24 +42,17 @@ type RiskAlert = {
   dueDate: string | null;
 };
 
-type DepartmentActivity = {
+type ActivityRow = {
   id: number;
   title: string;
+  department: string;
+  departmentId: number;
   status: string;
   progress: number;
-  startDate: string | null;
   endDate: string | null;
 };
 
-type ExportActivity = DepartmentActivity & { department: string; departmentId: number };
-
-type ActivityFilter =
-  | 'all'
-  | 'with'
-  | 'none'
-  | 'delayed'
-  | 'in-progress'
-  | 'on-track';
+type ActivityFilter = 'all' | 'delayed' | 'in-progress' | 'on-track';
 
 function progressBarColor(progress: number): string {
   if (progress > 70) return '#10b981';
@@ -67,30 +60,26 @@ function progressBarColor(progress: number): string {
   return '#ef4444';
 }
 
-function deptActivityStatusLabel(dept: DepartmentRow): string {
-  const parts: string[] = [];
-  if (dept.onTrack > 0) parts.push(`${dept.onTrack} on track`);
-  if (dept.inProgress > 0) parts.push(`${dept.inProgress} in progress`);
-  if (dept.delayed > 0) parts.push(`${dept.delayed} delayed`);
-  if (parts.length === 0) return dept.activityCount === 0 ? 'No activities' : '—';
-  return parts.join(' · ');
-}
-
-function matchesActivityFilter(dept: DepartmentRow, filter: ActivityFilter): boolean {
+function matchesActivityStatusFilter(status: string, filter: ActivityFilter): boolean {
+  const normalized = status.trim().toLowerCase();
   switch (filter) {
-    case 'with':
-      return dept.activityCount > 0;
-    case 'none':
-      return dept.activityCount === 0;
     case 'delayed':
-      return dept.delayed > 0;
+      return normalized === 'delayed';
     case 'in-progress':
-      return dept.inProgress > 0;
+      return normalized === 'in progress';
     case 'on-track':
-      return dept.onTrack > 0;
+      return normalized === 'on track';
     default:
       return true;
   }
+}
+
+function activityStatusBadgeClass(status: string): string {
+  const normalized = status.trim().toLowerCase();
+  if (normalized === 'on track') return 'bg-success-subtle text-success border border-success';
+  if (normalized === 'in progress') return 'bg-warning-subtle text-warning border border-warning';
+  if (normalized === 'delayed') return 'bg-danger-subtle text-danger border border-danger';
+  return 'bg-light text-muted border';
 }
 
 function submissionHistoryLabel(
@@ -119,11 +108,7 @@ export default function AmbassadorCompliancePanel() {
   const [activityFilter, setActivityFilter] = useState<ActivityFilter>('all');
   const [monthlyReportFilter, setMonthlyReportFilter] = useState<'all' | 'submitted' | 'pending'>('all');
   const [searchTerm, setSearchTerm] = useState('');
-
-  const [expandedDeptId, setExpandedDeptId] = useState<number | null>(null);
-  const [deptActivities, setDeptActivities] = useState<DepartmentActivity[]>([]);
-  const [activitiesLoading, setActivitiesLoading] = useState(false);
-  const [activitiesError, setActivitiesError] = useState<string | null>(null);
+  const [activities, setActivities] = useState<ActivityRow[]>([]);
 
   const reportingCycle = new Date().toLocaleString('en-US', { month: 'long', year: 'numeric' });
 
@@ -131,11 +116,15 @@ export default function AmbassadorCompliancePanel() {
     setLoading(true);
     setError(null);
     try {
-      const compRes = await axios.get('/api/ambassador/compliance');
+      const [compRes, actRes] = await Promise.all([
+        axios.get('/api/ambassador/compliance'),
+        axios.get('/api/ambassador/compliance/activities', { params: { all: 'true' } }),
+      ]);
       setSummary(compRes.data.summary);
       setDepartments(compRes.data.departments ?? []);
       setRiskAlerts(compRes.data.riskAlerts ?? []);
       setSubmissionMonths(compRes.data.submissionMonths ?? []);
+      setActivities(actRes.data.activities ?? []);
     } catch (err: unknown) {
       console.error('Compliance fetch error:', err);
       setError('Failed to load departmental compliance data');
@@ -153,17 +142,35 @@ export default function AmbassadorCompliancePanel() {
     [departments]
   );
 
-  const filteredDepartments = useMemo(() => {
+  const departmentByName = useMemo(
+    () => new Map(departments.map((d) => [d.name, d])),
+    [departments]
+  );
+
+  const filteredActivities = useMemo(() => {
     const q = searchTerm.trim().toLowerCase();
-    return departments.filter((dept) => {
-      if (departmentFilter !== 'All Departments' && dept.name !== departmentFilter) return false;
-      if (!matchesActivityFilter(dept, activityFilter)) return false;
-      if (monthlyReportFilter === 'submitted' && dept.monthlyReportStatus !== 'submitted') return false;
-      if (monthlyReportFilter === 'pending' && dept.monthlyReportStatus !== 'pending') return false;
-      if (q && !dept.name.toLowerCase().includes(q)) return false;
+    return activities.filter((activity) => {
+      if (departmentFilter !== 'All Departments' && activity.department !== departmentFilter) {
+        return false;
+      }
+      if (!matchesActivityStatusFilter(activity.status, activityFilter)) return false;
+      if (monthlyReportFilter !== 'all') {
+        const dept = departmentByName.get(activity.department);
+        if (!dept || dept.monthlyReportStatus !== monthlyReportFilter) return false;
+      }
+      if (q) {
+        const inTitle = activity.title.toLowerCase().includes(q);
+        const inDept = activity.department.toLowerCase().includes(q);
+        if (!inTitle && !inDept) return false;
+      }
       return true;
     });
-  }, [departments, departmentFilter, activityFilter, monthlyReportFilter, searchTerm]);
+  }, [activities, departmentFilter, activityFilter, monthlyReportFilter, searchTerm, departmentByName]);
+
+  const selectedDepartment = useMemo(() => {
+    if (departmentFilter === 'All Departments') return null;
+    return departments.find((d) => d.name === departmentFilter) ?? null;
+  }, [departments, departmentFilter]);
 
   const filteredRiskAlerts = useMemo(() => {
     if (departmentFilter === 'All Departments') return riskAlerts;
@@ -183,74 +190,13 @@ export default function AmbassadorCompliancePanel() {
     setSearchTerm('');
   };
 
-  const loadDepartmentActivities = useCallback(async (departmentId: number) => {
-    if (expandedDeptId === departmentId) {
-      setExpandedDeptId(null);
-      setDeptActivities([]);
-      return;
-    }
-
-    setExpandedDeptId(departmentId);
-    setActivitiesLoading(true);
-    setActivitiesError(null);
-    setDeptActivities([]);
-    try {
-      const res = await axios.get('/api/ambassador/compliance/activities', {
-        params: { departmentId },
-      });
-      setDeptActivities(res.data.activities ?? []);
-    } catch {
-      setActivitiesError('Could not load activities for this department');
-    } finally {
-      setActivitiesLoading(false);
-    }
-  }, [expandedDeptId]);
-
-  const fetchExportActivities = async (): Promise<ExportActivity[]> => {
-    const res = await axios.get('/api/ambassador/compliance/activities', {
-      params: { all: 'true' },
-    });
-    const rows = (res.data.activities ?? []) as Array<{
-      id: number;
-      title: string;
-      department: string;
-      departmentId: number;
-      status: string;
-      progress: number;
-      endDate: string | null;
-    }>;
-    let list: ExportActivity[] = rows.map((a) => ({
-      id: a.id,
-      title: a.title,
-      status: a.status,
-      progress: a.progress,
-      department: a.department,
-      departmentId: a.departmentId,
-      startDate: null,
-      endDate: a.endDate,
-    }));
-    if (departmentFilter !== 'All Departments') {
-      list = list.filter((a) => a.department === departmentFilter);
-    }
-    return list;
-  };
-
-  const buildDeptTableBody = (rows: DepartmentRow[]) =>
-    rows.map((dept) => [
-      dept.name,
-      String(dept.activityCount),
-      `${dept.progress}%`,
-      deptActivityStatusLabel(dept),
-      dept.monthlyReportStatus === 'submitted' ? 'Submitted' : 'Pending',
-      dept.lastSubmission ? new Date(dept.lastSubmission).toLocaleDateString() : '—',
-      submissionHistoryLabel(dept.submissionHistory, submissionMonths),
-    ]);
+  const getExportActivities = (): ActivityRow[] => filteredActivities;
 
   const exportPDF = async () => {
     if (!summary) return;
     setExporting(true);
     try {
-      const allActivities = await fetchExportActivities();
+      const allActivities = getExportActivities();
       const { default: jsPDF } = await import('jspdf');
       const { default: autoTable } = await import('jspdf-autotable');
       const doc = new jsPDF({ orientation: 'landscape' });
@@ -285,26 +231,24 @@ export default function AmbassadorCompliancePanel() {
       }
       doc.text(`Generated: ${new Date().toLocaleString()}`, 14, metaY);
 
-      autoTable(doc, {
-        startY: metaY + 8,
-        head: [
-          [
-            'Department',
-            'Activities',
-            'Progress',
-            'Activity status',
-            'Monthly report',
-            'Last submission',
-            '6-month history',
-          ],
-        ],
-        body: buildDeptTableBody(filteredDepartments),
-        styles: { fontSize: 7, cellPadding: 1.5 },
-        headStyles: { fillColor: [30, 92, 164], textColor: 255, fontStyle: 'bold' },
-      });
+      let nextY = metaY + 8;
 
-      let nextY =
-        (doc as unknown as { lastAutoTable?: { finalY: number } }).lastAutoTable?.finalY ?? metaY + 40;
+      if (allActivities.length > 0) {
+        autoTable(doc, {
+          startY: nextY,
+          head: [['Activity', 'Status', 'Progress', 'Due date']],
+          body: allActivities.map((a) => [
+            a.title,
+            a.status,
+            `${a.progress}%`,
+            a.endDate ? new Date(a.endDate).toLocaleDateString() : '—',
+          ]),
+          styles: { fontSize: 7, cellPadding: 1.5 },
+          headStyles: { fillColor: [30, 92, 164], textColor: 255, fontStyle: 'bold' },
+        });
+        nextY =
+          (doc as unknown as { lastAutoTable?: { finalY: number } }).lastAutoTable?.finalY ?? nextY + 20;
+      }
 
       if (filteredRiskAlerts.length > 0) {
         doc.setFontSize(10);
@@ -326,24 +270,6 @@ export default function AmbassadorCompliancePanel() {
           (doc as unknown as { lastAutoTable?: { finalY: number } }).lastAutoTable?.finalY ?? nextY + 20;
       }
 
-      if (allActivities.length > 0) {
-        doc.setFontSize(10);
-        doc.text('Strategic activities (detail)', 14, nextY + 10);
-        autoTable(doc, {
-          startY: nextY + 14,
-          head: [['Department', 'Activity', 'Status', 'Progress', 'End date']],
-          body: allActivities.map((a) => [
-            a.department,
-            a.title,
-            a.status,
-            `${a.progress}%`,
-            a.endDate ? new Date(a.endDate).toLocaleDateString() : '—',
-          ]),
-          styles: { fontSize: 7, cellPadding: 1.5 },
-          headStyles: { fillColor: [30, 92, 164], textColor: 255, fontStyle: 'bold' },
-        });
-      }
-
       doc.save('Departmental_Compliance_Tracker.pdf');
     } finally {
       setExporting(false);
@@ -354,7 +280,7 @@ export default function AmbassadorCompliancePanel() {
     if (!summary) return;
     setExporting(true);
     try {
-      const allActivities = await fetchExportActivities();
+      const allActivities = getExportActivities();
       const wb = XLSX.utils.book_new();
 
       const summarySheet = XLSX.utils.aoa_to_sheet([
@@ -383,7 +309,7 @@ export default function AmbassadorCompliancePanel() {
           'Last submission',
           ...submissionMonths.map((m) => `${m} submitted`),
         ],
-        ...filteredDepartments.map((dept) => [
+        ...departments.map((dept) => [
           dept.name,
           dept.activityCount,
           dept.progress,
@@ -413,14 +339,8 @@ export default function AmbassadorCompliancePanel() {
 
       if (allActivities.length > 0) {
         const actSheet = XLSX.utils.aoa_to_sheet([
-          ['Department', 'Activity', 'Status', 'Progress %', 'End date'],
-          ...allActivities.map((a) => [
-            a.department,
-            a.title,
-            a.status,
-            a.progress,
-            a.endDate || '',
-          ]),
+          ['Activity', 'Status', 'Progress %', 'Due date'],
+          ...allActivities.map((a) => [a.title, a.status, a.progress, a.endDate || '']),
         ]);
         XLSX.utils.book_append_sheet(wb, actSheet, 'Activities');
       }
@@ -532,17 +452,17 @@ export default function AmbassadorCompliancePanel() {
         <div className="table-card-header flex-wrap gap-2">
           <div>
             <h5 className="mb-0 fw-bold">Dept. / Unit Activity Progress</h5>
-            <p className="mb-0 small text-muted mt-1">Strategic activities and monthly reporting by department</p>
+            <p className="mb-0 small text-muted mt-1">Strategic activities across your managed departments</p>
           </div>
           <div className="d-flex gap-2 flex-wrap align-items-center">
             <input
               type="search"
               className="form-control form-control-sm"
               style={{ width: '160px' }}
-              placeholder="Search department…"
+              placeholder="Search activity…"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              aria-label="Search departments"
+              aria-label="Search activities"
             />
             <select
               className="form-select form-select-sm"
@@ -565,11 +485,9 @@ export default function AmbassadorCompliancePanel() {
               aria-label="Filter by activity status"
             >
               <option value="all">All activity states</option>
-              <option value="with">With activities</option>
-              <option value="none">No activities</option>
-              <option value="on-track">Has on track</option>
-              <option value="in-progress">Has in progress</option>
-              <option value="delayed">Has delayed</option>
+              <option value="on-track">On track</option>
+              <option value="in-progress">In progress</option>
+              <option value="delayed">Delayed</option>
             </select>
             <select
               className="form-select form-select-sm"
@@ -602,7 +520,7 @@ export default function AmbassadorCompliancePanel() {
               type="button"
               className="btn btn-sm btn-outline-danger fw-bold"
               onClick={exportPDF}
-              disabled={exporting || filteredDepartments.length === 0}
+              disabled={exporting || filteredActivities.length === 0}
             >
               PDF
             </button>
@@ -611,7 +529,7 @@ export default function AmbassadorCompliancePanel() {
               className="btn btn-sm btn-primary fw-bold"
               style={{ background: 'var(--mubs-blue)', borderColor: 'var(--mubs-blue)' }}
               onClick={exportExcel}
-              disabled={exporting || filteredDepartments.length === 0}
+              disabled={exporting || filteredActivities.length === 0}
             >
               <span className="material-symbols-outlined me-1" style={{ fontSize: '16px' }}>
                 download
@@ -621,15 +539,48 @@ export default function AmbassadorCompliancePanel() {
           </div>
         </div>
 
+        {selectedDepartment && (
+          <div className="px-4 py-2 border-bottom bg-light d-flex flex-wrap align-items-center gap-3 small">
+            <span className="text-muted">
+              Monthly report ({reportingCycle}):{' '}
+              <span
+                className={`badge rounded-pill ${selectedDepartment.monthlyReportStatus === 'submitted' ? 'bg-success-subtle text-success border border-success' : 'bg-danger-subtle text-danger border border-danger'}`}
+                style={{ fontSize: '.65rem', fontWeight: 800 }}
+              >
+                {selectedDepartment.monthlyReportStatus === 'submitted' ? 'SUBMITTED' : 'PENDING'}
+              </span>
+            </span>
+            {selectedDepartment.lastSubmission && (
+              <span className="text-muted">
+                Last submission: {new Date(selectedDepartment.lastSubmission).toLocaleDateString()}
+              </span>
+            )}
+            <span className="text-muted d-flex align-items-center gap-1" title={submissionMonths.join(' → ')}>
+              6-mo history:
+              {selectedDepartment.submissionHistory.map((h, i) => (
+                <span
+                  key={`${selectedDepartment.id}-hist-${i}`}
+                  style={{
+                    width: 10,
+                    height: 10,
+                    borderRadius: '50%',
+                    background: h.status === 'submitted' ? '#10b981' : '#e2e8f0',
+                    border: h.status === 'submitted' ? 'none' : '1px solid #cbd5e1',
+                    display: 'inline-block',
+                  }}
+                  title={`${h.month} ${h.year}: ${h.status}`}
+                />
+              ))}
+            </span>
+          </div>
+        )}
+
         <div className="table-responsive p-0">
           <table className="table table-hover align-middle mb-0">
             <thead className="table-light">
               <tr>
                 <th className="px-4 py-3 border-0" style={{ fontSize: '.7rem', fontWeight: 800 }}>
-                  DEPARTMENT
-                </th>
-                <th className="py-3 border-0" style={{ fontSize: '.7rem', fontWeight: 800 }}>
-                  ACTIVITIES
+                  ACTIVITY
                 </th>
                 <th className="py-3 border-0" style={{ fontSize: '.7rem', fontWeight: 800 }}>
                   PROGRESS
@@ -637,175 +588,55 @@ export default function AmbassadorCompliancePanel() {
                 <th className="py-3 border-0" style={{ fontSize: '.7rem', fontWeight: 800 }}>
                   STATUS
                 </th>
-                <th className="py-3 border-0" style={{ fontSize: '.7rem', fontWeight: 800 }}>
-                  MONTHLY REPORT
-                </th>
-                <th className="py-3 border-0" style={{ fontSize: '.7rem', fontWeight: 800 }}>
-                  6-MO HISTORY
-                </th>
-                <th className="px-4 py-3 border-0 text-end" style={{ fontSize: '.7rem', fontWeight: 800 }}>
-                  ACTION
+                <th className="px-4 py-3 border-0" style={{ fontSize: '.7rem', fontWeight: 800 }}>
+                  DUE DATE
                 </th>
               </tr>
             </thead>
             <tbody>
-              {filteredDepartments.length === 0 ? (
+              {filteredActivities.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="text-center text-muted py-5 small">
-                    No departments match the selected filters.
+                  <td colSpan={4} className="text-center text-muted py-5 small">
+                    No activities match the selected filters.
                   </td>
                 </tr>
               ) : (
-                filteredDepartments.map((dept) => (
-                  <Fragment key={dept.id}>
-                    <tr>
-                      <td className="px-4">
-                        <div className="fw-bold text-dark" style={{ fontSize: '.9rem' }}>
-                          {dept.name}
-                        </div>
-                        <div className="text-muted" style={{ fontSize: '.65rem' }}>
-                          {deptActivityStatusLabel(dept)}
-                        </div>
-                      </td>
-                      <td>
-                        <span className="fw-bold">{dept.activityCount}</span>
-                      </td>
-                      <td>
-                        <div className="d-flex align-items-center gap-2">
+                filteredActivities.map((activity) => (
+                  <tr key={activity.id}>
+                    <td className="px-4">
+                      <div className="fw-bold text-dark" style={{ fontSize: '.9rem' }}>
+                        {activity.title}
+                      </div>
+                    </td>
+                    <td>
+                      <div className="d-flex align-items-center gap-2">
+                        <div
+                          className="progress flex-fill"
+                          style={{ height: '6px', width: '72px', background: '#f1f5f9' }}
+                        >
                           <div
-                            className="progress flex-fill"
-                            style={{ height: '6px', width: '72px', background: '#f1f5f9' }}
-                          >
-                            <div
-                              className="progress-bar"
-                              style={{
-                                width: `${dept.progress}%`,
-                                background: progressBarColor(dept.progress),
-                              }}
-                            />
-                          </div>
-                          <span className="small fw-bold">{dept.progress}%</span>
+                            className="progress-bar"
+                            style={{
+                              width: `${activity.progress}%`,
+                              background: progressBarColor(activity.progress),
+                            }}
+                          />
                         </div>
-                      </td>
-                      <td>
-                        <div className="d-flex flex-wrap gap-1">
-                          {dept.onTrack > 0 && (
-                            <span
-                              className="badge bg-success-subtle text-success border border-success"
-                              style={{ fontSize: '.6rem' }}
-                            >
-                              {dept.onTrack} on track
-                            </span>
-                          )}
-                          {dept.inProgress > 0 && (
-                            <span
-                              className="badge bg-warning-subtle text-warning border border-warning"
-                              style={{ fontSize: '.6rem' }}
-                            >
-                              {dept.inProgress} active
-                            </span>
-                          )}
-                          {dept.delayed > 0 && (
-                            <span
-                              className="badge bg-danger-subtle text-danger border border-danger"
-                              style={{ fontSize: '.6rem' }}
-                            >
-                              {dept.delayed} delayed
-                            </span>
-                          )}
-                          {dept.activityCount === 0 && (
-                            <span className="badge bg-light text-muted border" style={{ fontSize: '.6rem' }}>
-                              No activities
-                            </span>
-                          )}
-                        </div>
-                      </td>
-                      <td>
-                        <span
-                          className={`badge rounded-pill px-2 py-1 ${dept.monthlyReportStatus === 'submitted' ? 'bg-success-subtle text-success border border-success' : 'bg-danger-subtle text-danger border border-danger'}`}
-                          style={{ fontSize: '.65rem', fontWeight: 800 }}
-                        >
-                          {dept.monthlyReportStatus === 'submitted' ? 'SUBMITTED' : 'PENDING'}
-                        </span>
-                        {dept.lastSubmission && (
-                          <div className="text-muted mt-1" style={{ fontSize: '.6rem' }}>
-                            Last: {new Date(dept.lastSubmission).toLocaleDateString()}
-                          </div>
-                        )}
-                      </td>
-                      <td>
-                        <div className="d-flex gap-1 align-items-center" title={submissionMonths.join(' → ')}>
-                          {dept.submissionHistory.map((h, i) => (
-                            <span
-                              key={`${dept.id}-${i}`}
-                              style={{
-                                width: 10,
-                                height: 10,
-                                borderRadius: '50%',
-                                background: h.status === 'submitted' ? '#10b981' : '#e2e8f0',
-                                border: h.status === 'submitted' ? 'none' : '1px solid #cbd5e1',
-                                display: 'inline-block',
-                              }}
-                              title={`${h.month} ${h.year}: ${h.status}`}
-                            />
-                          ))}
-                        </div>
-                      </td>
-                      <td className="px-4 text-end">
-                        <button
-                          type="button"
-                          className="btn btn-sm btn-outline-primary rounded-pill px-3 fw-bold"
-                          style={{ fontSize: '.65rem' }}
-                          onClick={() => loadDepartmentActivities(dept.id)}
-                        >
-                          {expandedDeptId === dept.id ? 'Hide' : 'View'} Activities
-                        </button>
-                      </td>
-                    </tr>
-                    {expandedDeptId === dept.id && (
-                      <tr>
-                        <td colSpan={7} className="px-4 py-3 bg-light">
-                          {activitiesLoading && (
-                            <div className="text-center py-3">
-                              <div className="spinner-border spinner-border-sm text-primary" role="status" />
-                            </div>
-                          )}
-                          {activitiesError && (
-                            <p className="small text-danger mb-0">{activitiesError}</p>
-                          )}
-                          {!activitiesLoading && !activitiesError && deptActivities.length === 0 && (
-                            <p className="small text-muted mb-0">No strategic activities linked to this department.</p>
-                          )}
-                          {!activitiesLoading && deptActivities.length > 0 && (
-                            <div className="table-responsive">
-                              <table className="table table-sm table-bordered bg-white mb-0">
-                                <thead>
-                                  <tr>
-                                    <th className="small">Activity</th>
-                                    <th className="small">Status</th>
-                                    <th className="small">Progress</th>
-                                    <th className="small">End date</th>
-                                  </tr>
-                                </thead>
-                                <tbody>
-                                  {deptActivities.map((a) => (
-                                    <tr key={a.id}>
-                                      <td className="small fw-semibold">{a.title}</td>
-                                      <td className="small">{a.status}</td>
-                                      <td className="small">{a.progress}%</td>
-                                      <td className="small">
-                                        {a.endDate ? new Date(a.endDate).toLocaleDateString() : '—'}
-                                      </td>
-                                    </tr>
-                                  ))}
-                                </tbody>
-                              </table>
-                            </div>
-                          )}
-                        </td>
-                      </tr>
-                    )}
-                  </Fragment>
+                        <span className="small fw-bold">{activity.progress}%</span>
+                      </div>
+                    </td>
+                    <td>
+                      <span
+                        className={`badge rounded-pill px-2 py-1 ${activityStatusBadgeClass(activity.status)}`}
+                        style={{ fontSize: '.65rem', fontWeight: 800 }}
+                      >
+                        {activity.status.toUpperCase()}
+                      </span>
+                    </td>
+                    <td className="px-4 small">
+                      {activity.endDate ? new Date(activity.endDate).toLocaleDateString() : '—'}
+                    </td>
+                  </tr>
                 ))
               )}
             </tbody>
@@ -814,7 +645,7 @@ export default function AmbassadorCompliancePanel() {
 
         <div className="table-card-footer d-flex flex-wrap justify-content-between gap-2">
           <span className="footer-label">
-            Showing {filteredDepartments.length} of {departments.length} departments
+            Showing {filteredActivities.length} of {activities.length} activities
           </span>
           {!filtersAtDefault && (
             <span className="text-muted small">Filters applied — export uses current view</span>

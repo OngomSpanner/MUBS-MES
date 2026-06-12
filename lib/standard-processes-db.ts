@@ -1,4 +1,5 @@
 import { query } from '@/lib/db';
+import { ensureMilestoneProgressColumn } from '@/lib/milestone-progress';
 
 const ORDER_CLAUSE = 'ORDER BY standard_id, step_order ASC, id ASC';
 
@@ -34,9 +35,11 @@ function withDefaults(
 }
 
 export async function selectStandardProcessesAll(): Promise<Record<string, unknown>[]> {
+  await ensureStandardProcessDurationColumns();
+  await ensureMilestoneProgressColumn();
   try {
     return (await query({
-      query: `SELECT id, standard_id, step_name, step_order, duration_value, duration_unit FROM standard_processes ${ORDER_CLAUSE}`,
+      query: `SELECT id, standard_id, step_name, step_order, duration_value, duration_unit, milestone_progress FROM standard_processes ${ORDER_CLAUSE}`,
     })) as Record<string, unknown>[];
   } catch (e: unknown) {
     const err = e as { code?: string; errno?: number };
@@ -61,9 +64,11 @@ export async function selectStandardProcessesAll(): Promise<Record<string, unkno
 }
 
 export async function selectStandardProcessesForStandard(standardId: string | number): Promise<Record<string, unknown>[]> {
+  await ensureStandardProcessDurationColumns();
+  await ensureMilestoneProgressColumn();
   try {
     return (await query({
-      query: `SELECT id, standard_id, step_name, step_order, duration_value, duration_unit FROM standard_processes WHERE standard_id = ? ORDER BY step_order ASC`,
+      query: `SELECT id, standard_id, step_name, step_order, duration_value, duration_unit, milestone_progress FROM standard_processes WHERE standard_id = ? ORDER BY step_order ASC`,
       values: [standardId],
     })) as Record<string, unknown>[];
   } catch (e: unknown) {
@@ -95,13 +100,15 @@ export async function insertStandardProcessRow(
   stepName: string,
   stepOrder: number,
   durationValue: number | null,
-  durationUnit: string | null
+  durationUnit: string | null,
+  milestoneProgress: number | null = null
 ): Promise<void> {
   try {
     await ensureStandardProcessDurationColumns();
+    await ensureMilestoneProgressColumn();
     await query({
-      query: `INSERT INTO standard_processes (standard_id, step_name, step_order, duration_value, duration_unit) VALUES (?, ?, ?, ?, ?)`,
-      values: [standardId, stepName, stepOrder, durationValue, durationUnit],
+      query: `INSERT INTO standard_processes (standard_id, step_name, step_order, duration_value, duration_unit, milestone_progress) VALUES (?, ?, ?, ?, ?, ?)`,
+      values: [standardId, stepName, stepOrder, durationValue, durationUnit, milestoneProgress],
     });
   } catch (e: unknown) {
     const err = e as { code?: string; errno?: number };

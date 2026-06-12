@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { Modal, Button, Form } from 'react-bootstrap';
 import type { ProgrammeEnrollmentRecord } from '@/lib/ambassador/enrollment-records';
+import FacultySelectField from '@/components/Enrollment/FacultySelectField';
 
 export type { ProgrammeEnrollmentRecord };
 
@@ -14,6 +15,7 @@ type ProgrammeEnrollmentEntryModalProps = {
   error: string | null;
   onHide: () => void;
   onSave: (payload: {
+    facultyName: string;
     programmeName: string;
     totalStudents: number;
     maleCount: number;
@@ -26,6 +28,7 @@ type ProgrammeEnrollmentEntryModalProps = {
 function formDefaults(mode: 'create' | 'edit', record: ProgrammeEnrollmentRecord | null) {
   if (record && mode === 'edit') {
     return {
+      facultyName: record.facultyName,
       programmeName: record.programmeName,
       totalStudents: String(record.totalStudents),
       maleCount: String(record.maleCount),
@@ -35,6 +38,7 @@ function formDefaults(mode: 'create' | 'edit', record: ProgrammeEnrollmentRecord
     };
   }
   return {
+    facultyName: '',
     programmeName: '',
     totalStudents: '0',
     maleCount: '0',
@@ -53,6 +57,7 @@ function ProgrammeEnrollmentForm({
   onSave,
 }: Omit<ProgrammeEnrollmentEntryModalProps, 'show'>) {
   const defaults = formDefaults(mode, record);
+  const [facultyName, setFacultyName] = useState(defaults.facultyName);
   const [programmeName, setProgrammeName] = useState(defaults.programmeName);
   const [totalStudents, setTotalStudents] = useState(defaults.totalStudents);
   const [maleCount, setMaleCount] = useState(defaults.maleCount);
@@ -62,8 +67,9 @@ function ProgrammeEnrollmentForm({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!programmeName.trim()) return;
+    if (!programmeName.trim() || !facultyName.trim()) return;
     onSave({
+      facultyName: facultyName.trim(),
       programmeName: programmeName.trim(),
       totalStudents: Math.max(0, Number(totalStudents) || 0),
       maleCount: Math.max(0, Number(maleCount) || 0),
@@ -77,6 +83,7 @@ function ProgrammeEnrollmentForm({
     <Form onSubmit={handleSubmit}>
       <Modal.Body>
         {error && <div className="alert alert-danger py-2 small">{error}</div>}
+        <FacultySelectField value={facultyName} onChange={setFacultyName} disabled={saving} />
         <Form.Group className="mb-3">
           <Form.Label className="fw-bold small">Programme name</Form.Label>
           <Form.Control value={programmeName} onChange={(e) => setProgrammeName(e.target.value)} required />

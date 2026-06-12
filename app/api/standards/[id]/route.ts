@@ -153,7 +153,9 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
           row.stepName,
           i,
           row.durationValue,
-          row.durationUnit
+          row.durationUnit,
+          row.milestoneProgress ??
+            (parsed.items.length > 1 ? Math.round(((i + 1) / parsed.items.length) * 100) : 100)
         );
       }
     }

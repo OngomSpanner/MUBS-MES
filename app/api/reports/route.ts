@@ -667,9 +667,11 @@ export async function GET(request: Request) {
       case 'staff-programme-enrollment': {
         const enrollmentGender = searchParams.get('gender');
         const enrollmentPwd = searchParams.get('pwd');
+        const enrollmentFaculty = searchParams.get('faculty');
         data = await generateStaffProgrammeEnrollmentReport({
           gender: enrollmentGender,
           pwd: enrollmentPwd,
+          faculty: enrollmentFaculty,
         });
         break;
       }
@@ -677,9 +679,11 @@ export async function GET(request: Request) {
       case 'staff-course-unit-enrollment': {
         const g = searchParams.get('gender');
         const p = searchParams.get('pwd');
+        const f = searchParams.get('faculty');
         data = await generateStaffCourseUnitEnrollmentReport({
           gender: g,
           pwd: p,
+          faculty: f,
         });
         break;
       }

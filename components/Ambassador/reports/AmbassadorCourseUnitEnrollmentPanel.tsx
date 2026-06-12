@@ -21,12 +21,25 @@ export default function AmbassadorCourseUnitEnrollmentPanel() {
   const [editRecord, setEditRecord] = useState<CourseUnitEnrollmentRecord | null>(null);
   const [saving, setSaving] = useState(false);
   const [modalError, setModalError] = useState<string | null>(null);
+  const [facultyFilter, setFacultyFilter] = useState('all');
+  const [facultyOptions, setFacultyOptions] = useState<string[]>([]);
+
+  useEffect(() => {
+    axios
+      .get('/api/enrollment/faculties')
+      .then((res) => {
+        const list = Array.isArray(res.data?.faculties) ? res.data.faculties : [];
+        setFacultyOptions(list);
+      })
+      .catch(() => setFacultyOptions([]));
+  }, []);
 
   const load = useCallback(async () => {
     setLoading(true);
     setListError(null);
     try {
-      const { data } = await axios.get('/api/ambassador/reports/course-unit-enrollment');
+      const params = facultyFilter !== 'all' ? `?faculty=${encodeURIComponent(facultyFilter)}` : '';
+      const { data } = await axios.get(`/api/ambassador/reports/course-unit-enrollment${params}`);
       setRecords(data.records ?? []);
     } catch (e: unknown) {
       const msg = axios.isAxiosError(e) ? e.response?.data?.message : null;
@@ -35,7 +48,7 @@ export default function AmbassadorCourseUnitEnrollmentPanel() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [facultyFilter]);
 
   useEffect(() => {
     load();
@@ -48,6 +61,7 @@ export default function AmbassadorCourseUnitEnrollmentPanel() {
   };
 
   const handleSave = async (payload: {
+    facultyName: string;
     courseUnitName: string;
     totalStudents: number;
     maleCount: number;
@@ -126,6 +140,20 @@ export default function AmbassadorCourseUnitEnrollmentPanel() {
             </p>
           </div>
           <div className="d-flex flex-wrap align-items-center gap-2">
+            <select
+              className="form-select form-select-sm"
+              style={{ width: '180px' }}
+              value={facultyFilter}
+              onChange={(e) => setFacultyFilter(e.target.value)}
+              aria-label="Filter by faculty"
+            >
+              <option value="all">All faculties</option>
+              {facultyOptions.map((f) => (
+                <option key={f} value={f}>
+                  {f}
+                </option>
+              ))}
+            </select>
             <AmbassadorReportViewToggle view={tableView} onChange={setTableView} summaryLabel="Summary report" />
             {tableView === 'entries' && (
               <button
@@ -153,6 +181,9 @@ export default function AmbassadorCourseUnitEnrollmentPanel() {
               <thead className="table-light">
                 <tr>
                   <th className="px-4 py-3 border-0" style={{ fontSize: '.7rem', fontWeight: 800 }}>
+                    FACULTY
+                  </th>
+                  <th className="py-3 border-0" style={{ fontSize: '.7rem', fontWeight: 800 }}>
                     COURSE UNIT
                   </th>
                   <th className="py-3 border-0 text-center" style={{ fontSize: '.7rem', fontWeight: 800 }}>
@@ -175,26 +206,29 @@ export default function AmbassadorCourseUnitEnrollmentPanel() {
               <tbody>
                 {loading ? (
                   <tr>
-                    <td colSpan={6} className="text-center py-4">
+                    <td colSpan={7} className="text-center py-4">
                       <div className="spinner-border text-primary" role="status" />
                     </td>
                   </tr>
                 ) : listError ? (
                   <tr>
-                    <td colSpan={6} className="p-0">
+                    <td colSpan={7} className="p-0">
                       <div className="alert alert-danger m-3 mb-3">{listError}</div>
                     </td>
                   </tr>
                 ) : records.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="text-center py-4 text-muted small">
+                    <td colSpan={7} className="text-center py-4 text-muted small">
                       No course unit enrollment data yet. Click <strong>Add course unit</strong> to enter data.
                     </td>
                   </tr>
                 ) : (
                   records.map((r) => (
                     <tr key={r.id}>
-                      <td className="px-4 fw-bold" style={{ fontSize: '.85rem' }}>
+                      <td className="px-4 small text-muted" style={{ fontSize: '.8rem' }}>
+                        {r.facultyName}
+                      </td>
+                      <td className="fw-bold" style={{ fontSize: '.85rem' }}>
                         {r.courseUnitName}
                       </td>
                       <td className="text-center fw-semibold">{r.totalStudents}</td>
@@ -219,7 +253,7 @@ export default function AmbassadorCourseUnitEnrollmentPanel() {
             </table>
           </div>
         ) : (
-          <StaffCourseUnitEnrollmentPanel key={records.length} />
+          <StaffCourseUnitEnrollmentPanel facultyFilter={facultyFilter} hideFacultyFilter />
         )}
       </div>
 
@@ -239,6 +273,7 @@ export default function AmbassadorCourseUnitEnrollmentPanel() {
         fields={
           viewRecord
             ? [
+                { label: 'Faculty / school', value: viewRecord.facultyName },
                 { label: 'Course unit', value: viewRecord.courseUnitName },
                 { label: 'Total students', value: viewRecord.totalStudents },
                 { label: 'Male', value: viewRecord.maleCount },

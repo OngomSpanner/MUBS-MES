@@ -120,9 +120,9 @@ export async function PUT(
     const dbStatus = mapStatusToDb(status);
 
     const existing = await query({
-      query: 'SELECT id, parent_id FROM strategic_activities WHERE id = ?',
+      query: 'SELECT id, parent_id, target_kpi, kpi_target_value FROM strategic_activities WHERE id = ?',
       values: [id]
-    }) as { id: number; parent_id: number | null }[];
+    }) as { id: number; parent_id: number | null; target_kpi: string | null; kpi_target_value: number | null }[];
     if (!existing.length) {
       return NextResponse.json({ message: 'Activity not found' }, { status: 404 });
     }
@@ -148,10 +148,16 @@ export async function PUT(
     const detailStartIndex = deptIds.length > 1 ? 0 : 1;
     const childDeptIds = deptIds.slice(detailStartIndex);
 
+    const finalTargetKpi = target_kpi !== undefined ? (target_kpi || null) : existing[0].target_kpi;
+    const finalKpiTargetValue =
+      kpi_target_value !== undefined
+        ? kpi_target_value || null
+        : existing[0].kpi_target_value;
+
     const runUpdate = async () => {
       const pillarVal = !pillar || !String(pillar).trim() ? null : pillar;
       const values = [
-        title, desc, pillarVal, mainDeptId, target_kpi || null, kpi_target_value || null, dbStatus,
+        title, desc, pillarVal, mainDeptId, finalTargetKpi, finalKpiTargetValue, dbStatus,
         newParentId, progress ?? 0, start_date || null, end_date || null, objective_id || null, standard_id || null, uom,
         target_fy25_26 || null, target_fy26_27 || null, target_fy27_28 || null, target_fy28_29 || null, target_fy29_30 || null,
         id
@@ -190,8 +196,8 @@ export async function PUT(
                 objective_id || null,
                 standard_id || null,
                 uom,
-                target_kpi || null,
-                kpi_target_value || null,
+                finalTargetKpi,
+                finalKpiTargetValue,
                 target_fy25_26 || null,
                 target_fy26_27 || null,
                 target_fy27_28 || null,
@@ -208,7 +214,7 @@ export async function PUT(
         }
       }
       for (let i = childIds.length; i < childDeptIds.length; i++) {
-        const childInsertValues = [title, desc, pillarVal, childDeptIds[i], target_kpi || null, kpi_target_value || null, dbStatus, mainId, start_date || null, end_date || null, objective_id || null, standard_id || null, uom, target_fy25_26 || null, target_fy26_27 || null, target_fy27_28 || null, target_fy28_29 || null, target_fy29_30 || null];
+        const childInsertValues = [title, desc, pillarVal, childDeptIds[i], finalTargetKpi, finalKpiTargetValue, dbStatus, mainId, start_date || null, end_date || null, objective_id || null, standard_id || null, uom, target_fy25_26 || null, target_fy26_27 || null, target_fy27_28 || null, target_fy28_29 || null, target_fy29_30 || null];
         try {
           await query({
             query: `

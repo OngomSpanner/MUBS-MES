@@ -3,11 +3,18 @@ import { query } from '@/lib/db';
 import { requireAmbassador } from '@/lib/ambassador/context';
 import { getManagedUnitDepartmentIds } from '@/lib/ambassador/managed-unit-departments';
 import { inPlaceholders } from '@/lib/department-head';
-
-const MAIN_ACTIVITY_FILTER = `
-  sa.parent_id IS NULL
-  AND COALESCE(TRIM(sa.source), '') <> ''
-`;
+import { ensureActivityRfNarrativesTable } from '@/lib/activity-rf-narratives';
+import { fyLabelForDateJulyJune } from '@/lib/financial-year';
+import { summarizeEnrollmentIndicators } from '@/lib/enrollment-indicators';
+import {
+  MAIN_STRATEGIC_ACTIVITY_FILTER,
+  RESULTS_FRAMEWORK_KPI_FILTER,
+  RESULTS_FRAMEWORK_NARRATIVE_JOIN,
+  buildResultsFrameworkActivitySelect,
+  mapResultsFrameworkRows,
+  summarizeResultsFramework,
+  type ResultsFrameworkDbRow,
+} from '@/lib/results-framework-query';
 
 export async function GET() {
   try {
@@ -28,7 +35,19 @@ export async function GET() {
           inProgress: 0,
           delayed: 0,
           totalUnits: 0,
+          rfIndicators: 0,
+          rfAssessed: 0,
+          rfUnderperformance: 0,
+          rfAchievement: 0,
+          rfOverachievement: 0,
+          enrollmentProgrammes: 0,
+          enrollmentProgrammeStudents: 0,
+          enrollmentCourseUnits: 0,
+          enrollmentCourseUnitStudents: 0,
         },
+        rfSummary: summarizeResultsFramework([]),
+        enrollment: null,
+        financialYear: fyLabelForDateJulyJune(),
         subUnits: [],
         riskAlerts: [],
       });
@@ -45,7 +64,7 @@ export async function GET() {
           COALESCE(SUM(CASE WHEN sa.status IN ('in_progress', 'pending') THEN 1 ELSE 0 END), 0) as \`inProgress\`,
           COALESCE(SUM(CASE WHEN sa.status = 'overdue' OR (sa.end_date IS NOT NULL AND sa.end_date < CURDATE() AND sa.status != 'completed') THEN 1 ELSE 0 END), 0) as \`delayed\`
         FROM strategic_activities sa
-        WHERE sa.department_id IN (${deptPlaceholders}) AND ${MAIN_ACTIVITY_FILTER}
+        WHERE sa.department_id IN (${deptPlaceholders}) AND ${MAIN_STRATEGIC_ACTIVITY_FILTER}
       `,
       values: scopedDepartmentIds,
     })) as {
@@ -66,7 +85,7 @@ export async function GET() {
           ROUND(IFNULL(AVG(sa.progress), 0)) as progress,
           COUNT(sa.id) as activityCount
         FROM departments d
-        LEFT JOIN strategic_activities sa ON d.id = sa.department_id AND ${MAIN_ACTIVITY_FILTER}
+        LEFT JOIN strategic_activities sa ON d.id = sa.department_id AND ${MAIN_STRATEGIC_ACTIVITY_FILTER}
         WHERE d.id IN (${deptPlaceholders}) AND d.is_active = 1
         GROUP BY d.id, d.name, d.external_name
         ORDER BY department ASC
@@ -101,7 +120,7 @@ export async function GET() {
           CASE WHEN sa.status = 'overdue' OR (sa.end_date IS NOT NULL AND sa.end_date < CURDATE()) THEN 'Critical' ELSE 'Warning' END as statusLabel
         FROM strategic_activities sa
         JOIN departments d ON sa.department_id = d.id
-        WHERE sa.department_id IN (${deptPlaceholders}) AND ${MAIN_ACTIVITY_FILTER}
+        WHERE sa.department_id IN (${deptPlaceholders}) AND ${MAIN_STRATEGIC_ACTIVITY_FILTER}
         AND (sa.status = 'overdue' OR (sa.end_date IS NOT NULL AND sa.end_date < CURDATE()) OR (sa.status != 'completed' AND sa.end_date IS NOT NULL AND DATEDIFF(sa.end_date, CURDATE()) <= 7))
         ORDER BY sa.end_date ASC
         LIMIT 5
@@ -116,6 +135,24 @@ export async function GET() {
       end_date: string | null;
     }[];
 
+    await ensureActivityRfNarrativesTable();
+    const fyKey = fyLabelForDateJulyJune();
+    const rfRows = (await query({
+      query: `
+        SELECT ${buildResultsFrameworkActivitySelect(fyKey)}
+        FROM strategic_activities sa
+        LEFT JOIN standards st ON st.id = sa.standard_id
+        LEFT JOIN departments d ON d.id = sa.department_id
+        ${RESULTS_FRAMEWORK_NARRATIVE_JOIN}
+        WHERE sa.department_id IN (${deptPlaceholders})
+          AND ${MAIN_STRATEGIC_ACTIVITY_FILTER}
+          AND ${RESULTS_FRAMEWORK_KPI_FILTER}
+      `,
+      values: [fyKey, ...scopedDepartmentIds],
+    })) as ResultsFrameworkDbRow[];
+    const rfSummary = summarizeResultsFramework(mapResultsFrameworkRows(rfRows, fyKey));
+    const enrollment = await summarizeEnrollmentIndicators();
+
     return NextResponse.json({
       managedUnitName,
       stats: {
@@ -126,7 +163,19 @@ export async function GET() {
         inProgress: Number(statsRow?.inProgress ?? 0),
         delayed: Number(statsRow?.delayed ?? 0),
         totalUnits,
+        rfIndicators: rfSummary.total,
+        rfAssessed: rfSummary.assessed,
+        rfUnderperformance: rfSummary.underperformance,
+        rfAchievement: rfSummary.achievement,
+        rfOverachievement: rfSummary.overachievement,
+        enrollmentProgrammes: enrollment.programme.programmes,
+        enrollmentProgrammeStudents: enrollment.programme.totalStudents,
+        enrollmentCourseUnits: enrollment.courseUnit.courseUnits,
+        enrollmentCourseUnitStudents: enrollment.courseUnit.totalStudents,
       },
+      rfSummary,
+      enrollment,
+      financialYear: fyKey,
       subUnits: subUnits.map((u) => ({
         id: u.id,
         name: u.department,

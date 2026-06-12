@@ -21,12 +21,25 @@ export default function AmbassadorProgrammeEnrollmentPanel() {
   const [editRecord, setEditRecord] = useState<ProgrammeEnrollmentRecord | null>(null);
   const [saving, setSaving] = useState(false);
   const [modalError, setModalError] = useState<string | null>(null);
+  const [facultyFilter, setFacultyFilter] = useState('all');
+  const [facultyOptions, setFacultyOptions] = useState<string[]>([]);
+
+  useEffect(() => {
+    axios
+      .get('/api/enrollment/faculties')
+      .then((res) => {
+        const list = Array.isArray(res.data?.faculties) ? res.data.faculties : [];
+        setFacultyOptions(list);
+      })
+      .catch(() => setFacultyOptions([]));
+  }, []);
 
   const load = useCallback(async () => {
     setLoading(true);
     setListError(null);
     try {
-      const { data } = await axios.get('/api/ambassador/reports/programme-enrollment');
+      const params = facultyFilter !== 'all' ? `?faculty=${encodeURIComponent(facultyFilter)}` : '';
+      const { data } = await axios.get(`/api/ambassador/reports/programme-enrollment${params}`);
       setRecords(data.records ?? []);
     } catch (e: unknown) {
       const msg = axios.isAxiosError(e) ? e.response?.data?.message : null;
@@ -35,7 +48,7 @@ export default function AmbassadorProgrammeEnrollmentPanel() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [facultyFilter]);
 
   useEffect(() => {
     load();
@@ -48,6 +61,7 @@ export default function AmbassadorProgrammeEnrollmentPanel() {
   };
 
   const handleSave = async (payload: {
+    facultyName: string;
     programmeName: string;
     totalStudents: number;
     maleCount: number;
@@ -127,6 +141,20 @@ export default function AmbassadorProgrammeEnrollmentPanel() {
             </p>
           </div>
           <div className="d-flex flex-wrap align-items-center gap-2">
+            <select
+              className="form-select form-select-sm"
+              style={{ width: '180px' }}
+              value={facultyFilter}
+              onChange={(e) => setFacultyFilter(e.target.value)}
+              aria-label="Filter by faculty"
+            >
+              <option value="all">All faculties</option>
+              {facultyOptions.map((f) => (
+                <option key={f} value={f}>
+                  {f}
+                </option>
+              ))}
+            </select>
             <AmbassadorReportViewToggle view={tableView} onChange={setTableView} summaryLabel="Summary report" />
             {tableView === 'entries' && (
               <button
@@ -154,6 +182,9 @@ export default function AmbassadorProgrammeEnrollmentPanel() {
               <thead className="table-light">
                 <tr>
                   <th className="px-4 py-3 border-0" style={{ fontSize: '.7rem', fontWeight: 800 }}>
+                    FACULTY
+                  </th>
+                  <th className="py-3 border-0" style={{ fontSize: '.7rem', fontWeight: 800 }}>
                     PROGRAMME
                   </th>
                   <th className="py-3 border-0 text-center" style={{ fontSize: '.7rem', fontWeight: 800 }}>
@@ -176,26 +207,29 @@ export default function AmbassadorProgrammeEnrollmentPanel() {
               <tbody>
                 {loading ? (
                   <tr>
-                    <td colSpan={6} className="text-center py-4">
+                    <td colSpan={7} className="text-center py-4">
                       <div className="spinner-border text-primary" role="status" />
                     </td>
                   </tr>
                 ) : listError ? (
                   <tr>
-                    <td colSpan={6} className="p-0">
+                    <td colSpan={7} className="p-0">
                       <div className="alert alert-danger m-3 mb-3">{listError}</div>
                     </td>
                   </tr>
                 ) : records.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="text-center py-4 text-muted small">
+                    <td colSpan={7} className="text-center py-4 text-muted small">
                       No programme enrollment data yet. Click <strong>Add programme</strong> to enter data.
                     </td>
                   </tr>
                 ) : (
                   records.map((r) => (
                     <tr key={r.id}>
-                      <td className="px-4 fw-bold" style={{ fontSize: '.85rem' }}>
+                      <td className="px-4 small text-muted" style={{ fontSize: '.8rem' }}>
+                        {r.facultyName}
+                      </td>
+                      <td className="fw-bold" style={{ fontSize: '.85rem' }}>
                         {r.programmeName}
                       </td>
                       <td className="text-center fw-semibold">{r.totalStudents}</td>
@@ -220,7 +254,7 @@ export default function AmbassadorProgrammeEnrollmentPanel() {
             </table>
           </div>
         ) : (
-          <StaffProgrammeEnrollmentPanel key={records.length} />
+          <StaffProgrammeEnrollmentPanel facultyFilter={facultyFilter} hideFacultyFilter />
         )}
       </div>
 
@@ -240,6 +274,7 @@ export default function AmbassadorProgrammeEnrollmentPanel() {
         fields={
           viewRecord
             ? [
+                { label: 'Faculty / school', value: viewRecord.facultyName },
                 { label: 'Programme', value: viewRecord.programmeName },
                 { label: 'Total students', value: viewRecord.totalStudents },
                 { label: 'Male', value: viewRecord.maleCount },

@@ -20,6 +20,7 @@ interface Activity {
     start_date?: string;
     startDate?: string;
     end_date: string;
+    due_date?: string | null;
     unit_name: string;
     total_tasks: number;
     completed_tasks: number;
@@ -526,7 +527,7 @@ export default function DepartmentStrategicActivities() {
                                 <th>Pillar</th>
                                 <th>Target KPI</th>
                                 <th>Start Date</th>
-                                <th>End Date</th>
+                                <th>Due Date</th>
                                 <th>Processes</th>
                                 <th>Progress</th>
                                 <th>Status</th>
@@ -583,7 +584,9 @@ export default function DepartmentStrategicActivities() {
                                         </td>
                                         <td className="small" style={{ fontSize: '.8rem' }}>{a.kpi_target_value ?? a.target_kpi}</td>
                                         <td className="small" style={{ fontSize: '.8rem' }}>{formatDate(a.start_date || '')}</td>
-                                        <td className="small" style={{ fontSize: '.8rem' }}>{formatDate(a.end_date)}</td>
+                                        <td className="small" style={{ fontSize: '.8rem' }} title={a.due_date ? undefined : `Plan end: ${formatDate(a.end_date)}`}>
+                                            {a.due_date ? formatDate(a.due_date) : '—'}
+                                        </td>
                                         <td className="small" style={{ fontSize: '.8rem' }} title="Process tasks completed (evaluated or completed) / tasks defined on the linked standard">
                                             {(Number(a.process_tasks_total) || 0) > 0 ? (
                                                 <>

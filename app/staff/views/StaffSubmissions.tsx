@@ -23,6 +23,9 @@ interface SubmissionItem {
     evaluated_by_name?: string | null;
     evaluation_date?: string | null;
     assignment_type?: 'legacy' | 'process_task';
+    task_type?: 'process' | 'kpi_driver';
+    kpi_target_value?: number | null;
+    kpi_actual_value?: number | null;
 }
 
 interface Stats {
@@ -122,6 +125,8 @@ export default function StaffSubmissions() {
                     startDate: selectedItem.start_date,
                     dueDate: selectedItem.end_date,
                     assignment_type: selectedItem.assignment_type ?? 'legacy',
+                    task_type: selectedItem.task_type,
+                    kpi_target_value: selectedItem.kpi_target_value,
                 } : null}
                 onSuccess={() => {
                     setShowSubModal(false);

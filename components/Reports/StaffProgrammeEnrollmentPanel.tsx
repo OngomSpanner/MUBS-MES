@@ -9,12 +9,32 @@ function formatCount(n: number): string {
   return n > 0 ? String(n) : '—';
 }
 
-export default function StaffProgrammeEnrollmentPanel() {
+type Props = {
+  facultyFilter?: string;
+  hideFacultyFilter?: boolean;
+};
+
+export default function StaffProgrammeEnrollmentPanel({ facultyFilter: externalFaculty, hideFacultyFilter }: Props = {}) {
   const [report, setReport] = useState<StaffProgrammeEnrollmentReport | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [genderFilter, setGenderFilter] = useState('all');
   const [pwdFilter, setPwdFilter] = useState('all');
+  const [internalFaculty, setInternalFaculty] = useState('all');
+  const [facultyOptions, setFacultyOptions] = useState<string[]>([]);
+
+  const facultyFilter = externalFaculty ?? internalFaculty;
+
+  useEffect(() => {
+    if (hideFacultyFilter) return;
+    axios
+      .get('/api/enrollment/faculties')
+      .then((res) => {
+        const list = Array.isArray(res.data?.faculties) ? res.data.faculties : [];
+        setFacultyOptions(list);
+      })
+      .catch(() => setFacultyOptions([]));
+  }, [hideFacultyFilter]);
 
   const fetchReport = useCallback(async () => {
     setLoading(true);
@@ -23,6 +43,7 @@ export default function StaffProgrammeEnrollmentPanel() {
       const params = new URLSearchParams({ type: 'staff-programme-enrollment' });
       if (genderFilter !== 'all') params.set('gender', genderFilter);
       if (pwdFilter !== 'all') params.set('pwd', pwdFilter);
+      if (facultyFilter !== 'all') params.set('faculty', facultyFilter);
       const { data } = await axios.get(`/api/reports?${params.toString()}`);
       setReport(data.data as StaffProgrammeEnrollmentReport);
     } catch (e) {
@@ -32,7 +53,7 @@ export default function StaffProgrammeEnrollmentPanel() {
     } finally {
       setLoading(false);
     }
-  }, [genderFilter, pwdFilter]);
+  }, [genderFilter, pwdFilter, facultyFilter]);
 
   useEffect(() => {
     fetchReport();
@@ -41,17 +62,16 @@ export default function StaffProgrammeEnrollmentPanel() {
   const resetFilters = () => {
     setGenderFilter('all');
     setPwdFilter('all');
+    if (!hideFacultyFilter) setInternalFaculty('all');
   };
 
-  const filtersAtDefault = genderFilter === 'all' && pwdFilter === 'all';
-  const colSpan = 2;
+  const filtersAtDefault =
+    genderFilter === 'all' && pwdFilter === 'all' && (hideFacultyFilter || facultyFilter === 'all');
+  const colSpan = 3;
 
   const buildExportRows = (r: StaffProgrammeEnrollmentReport) => {
-    const body = r.rows.map((row) => [
-      row.programmeName,
-      formatCount(row.studentCount),
-    ]);
-    body.push(['TOTAL', formatCount(r.totals.studentCount)]);
+    const body = r.rows.map((row) => [row.facultyName, row.programmeName, formatCount(row.studentCount)]);
+    body.push(['', 'TOTAL', formatCount(r.totals.studentCount)]);
     return body;
   };
 
@@ -65,6 +85,10 @@ export default function StaffProgrammeEnrollmentPanel() {
     doc.text('Number of students in each programme', 14, 15);
     doc.setFontSize(9);
     let metaY = 22;
+    if (facultyFilter !== 'all') {
+      doc.text(`Faculty filter: ${facultyFilter}`, 14, metaY);
+      metaY += 6;
+    }
     if (genderFilter !== 'all') {
       doc.text(`Gender filter: ${genderFilter === 'male' ? 'Male' : 'Female'}`, 14, metaY);
       metaY += 6;
@@ -82,7 +106,7 @@ export default function StaffProgrammeEnrollmentPanel() {
 
     autoTable(doc, {
       startY: metaY + 4,
-      head: [['Programme Name', 'No of students']],
+      head: [['Faculty / school', 'Programme Name', 'No of students']],
       body: buildExportRows(report),
       styles: { fontSize: 8, cellPadding: 2 },
       headStyles: { fillColor: [30, 92, 164], textColor: 255, fontStyle: 'bold' },
@@ -96,7 +120,7 @@ export default function StaffProgrammeEnrollmentPanel() {
     const ws = XLSX.utils.aoa_to_sheet([
       ['Number of students in each programme'],
       [],
-      ['Programme Name', 'No of students'],
+      ['Faculty / school', 'Programme Name', 'No of students'],
       ...buildExportRows(report),
     ]);
     const wb = XLSX.utils.book_new();
@@ -114,6 +138,22 @@ export default function StaffProgrammeEnrollmentPanel() {
           Number of students in each programme
         </h5>
         <div className="d-flex gap-2 flex-wrap align-items-center">
+          {!hideFacultyFilter && (
+            <select
+              className="form-select form-select-sm"
+              style={{ width: '180px' }}
+              value={internalFaculty}
+              onChange={(e) => setInternalFaculty(e.target.value)}
+              aria-label="Filter by faculty"
+            >
+              <option value="all">All faculties</option>
+              {facultyOptions.map((f) => (
+                <option key={f} value={f}>
+                  {f}
+                </option>
+              ))}
+            </select>
+          )}
           <select
             className="form-select form-select-sm"
             style={{ width: '120px' }}
@@ -170,7 +210,10 @@ export default function StaffProgrammeEnrollmentPanel() {
         <table className="table mb-0 staff-programme-enrollment-table">
           <thead>
             <tr>
-              <th className="text-start ps-4" style={{ minWidth: '260px' }}>
+              <th className="text-start ps-4" style={{ minWidth: '160px' }}>
+                Faculty / school
+              </th>
+              <th className="text-start" style={{ minWidth: '220px' }}>
                 Programme Name
               </th>
               <th className="text-center" style={{ minWidth: '110px' }}>
@@ -202,8 +245,11 @@ export default function StaffProgrammeEnrollmentPanel() {
             ) : (
               <>
                 {report.rows.map((row) => (
-                  <tr key={row.programmeName}>
-                    <td className="text-start ps-4 fw-semibold" style={{ fontSize: '.85rem' }}>
+                  <tr key={`${row.facultyName}-${row.programmeName}`}>
+                    <td className="text-start ps-4 text-muted" style={{ fontSize: '.8rem' }}>
+                      {row.facultyName}
+                    </td>
+                    <td className="text-start fw-semibold" style={{ fontSize: '.85rem' }}>
                       {row.programmeName}
                     </td>
                     <td className="text-center" style={{ fontSize: '.85rem' }}>
@@ -212,7 +258,8 @@ export default function StaffProgrammeEnrollmentPanel() {
                   </tr>
                 ))}
                 <tr style={{ background: '#f8fafc' }}>
-                  <td className="text-start ps-4 fw-bold" style={{ color: 'var(--mubs-blue)', fontSize: '.85rem' }}>
+                  <td className="text-start ps-4" />
+                  <td className="text-start fw-bold" style={{ color: 'var(--mubs-blue)', fontSize: '.85rem' }}>
                     TOTAL
                   </td>
                   <td className="text-center fw-bold" style={{ fontSize: '.85rem' }}>

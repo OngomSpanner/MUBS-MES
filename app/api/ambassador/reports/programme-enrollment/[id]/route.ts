@@ -1,7 +1,11 @@
 import { NextResponse } from 'next/server';
 import { query } from '@/lib/db';
 import { requireSchoolRegistrarAmbassador } from '@/lib/ambassador/school-registrar';
-import { parseEnrollmentCounts } from '@/lib/ambassador/enrollment-records';
+import {
+  normalizeEnrollmentFacultyName,
+  parseEnrollmentCounts,
+} from '@/lib/ambassador/enrollment-records';
+import { ensureEnrollmentFacultyColumns } from '@/lib/enrollment-indicators';
 
 async function getRecord(id: number) {
   const rows = (await query({
@@ -15,6 +19,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   const auth = await requireSchoolRegistrarAmbassador();
   if ('error' in auth) return auth.error;
 
+  await ensureEnrollmentFacultyColumns();
   const { id: idParam } = await params;
   const id = Number(idParam);
   if (!id) return NextResponse.json({ message: 'Invalid id' }, { status: 400 });
@@ -24,8 +29,12 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
 
   const body = await request.json();
   const programmeName = String(body.programmeName || '').trim();
+  const facultyName = normalizeEnrollmentFacultyName(body.facultyName);
   if (!programmeName) {
     return NextResponse.json({ message: 'Programme name is required' }, { status: 400 });
+  }
+  if (facultyName === 'Unspecified' && !String(body.facultyName || '').trim()) {
+    return NextResponse.json({ message: 'Faculty / school is required' }, { status: 400 });
   }
 
   const counts = parseEnrollmentCounts(body);
@@ -39,10 +48,11 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     await query({
       query: `
         UPDATE staff_programme_enrollment
-        SET programme_name = ?, total_students = ?, male_count = ?, female_count = ?, pwd_count = ?, pwd_details = ?
+        SET faculty_name = ?, programme_name = ?, total_students = ?, male_count = ?, female_count = ?, pwd_count = ?, pwd_details = ?
         WHERE id = ?
       `,
       values: [
+        facultyName,
         programmeName,
         counts.totalStudents,
         counts.maleCount,
@@ -55,8 +65,11 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     return NextResponse.json({ message: 'Programme enrollment updated' });
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : '';
-    if (msg.includes('Duplicate') || msg.includes('uq_programme_enrollment')) {
-      return NextResponse.json({ message: 'This programme name is already used' }, { status: 409 });
+    if (msg.includes('Duplicate') || msg.includes('uq_programme')) {
+      return NextResponse.json(
+        { message: 'This programme already exists for the selected faculty / school' },
+        { status: 409 }
+      );
     }
     throw e;
   }

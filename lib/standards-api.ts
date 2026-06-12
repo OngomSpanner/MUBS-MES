@@ -11,6 +11,8 @@ export type PublicStandardProcess = {
   step_order: number;
   duration_value: number | null;
   duration_unit: string | null;
+  /** Cumulative activity progress % when this process step is complete. */
+  milestone_progress: number | null;
 };
 
 export type PublicStandard = {
@@ -41,6 +43,10 @@ export function toPublicProcessRow(row: Record<string, unknown>): PublicStandard
     duration_unit:
       row.duration_unit != null && String(row.duration_unit).trim() !== ''
         ? String(row.duration_unit).trim().toLowerCase()
+        : null,
+    milestone_progress:
+      row.milestone_progress != null && row.milestone_progress !== '' && Number.isFinite(Number(row.milestone_progress))
+        ? Number(row.milestone_progress)
         : null,
   };
 }

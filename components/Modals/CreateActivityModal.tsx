@@ -24,10 +24,8 @@ interface Activity {
   strategic_objective: string;
   standard_id?: number | null;
   pillar: string;
-  target_kpi: string;
   department_id?: number | null;
   department_ids?: number[];
-  kpi_target_value?: number | string | null;
   target_fy25_26?: string | number | null;
   target_fy26_27?: string | number | null;
   target_fy27_28?: string | number | null;
@@ -44,7 +42,6 @@ type FormState = {
   strategic_objective: string;
   standard_id: string;
   pillar: string;
-  target_kpi: string;
   department_ids: number[];
   status: string;
   parent_id: string;
@@ -66,7 +63,6 @@ const BLANK: FormState = {
   strategic_objective: '',
   standard_id: '',
   pillar: '',
-  target_kpi: '',
   department_ids: [] as number[],
   status: 'pending',
   parent_id: '',
@@ -156,7 +152,6 @@ export default function CreateActivityModal({
         strategic_objective: activity.strategic_objective || '',
         standard_id: activity.standard_id ? String(activity.standard_id) : '',
         pillar: activity.pillar || '',
-        target_kpi: activity.target_kpi || '',
         department_ids: ids,
         status: activity.status || 'pending',
         parent_id: activity.parent_id ? String(activity.parent_id) : '',
@@ -183,23 +178,15 @@ export default function CreateActivityModal({
       for (const { key } of ACTIVITY_FY_TARGET_COLUMNS) fyFields[key] = formData[key];
       const fyPayload = parseFyPayload(fyFields);
 
-      let kpiPreserve: number | null = null;
-      if (isEdit && activity && activity.kpi_target_value != null && activity.kpi_target_value !== '') {
-        const n = Number(activity.kpi_target_value);
-        kpiPreserve = Number.isFinite(n) ? n : null;
-      }
-
       const payload = {
         title: formData.title,
         strategic_objective: formData.strategic_objective,
         standard_id: formData.standard_id ? parseInt(formData.standard_id, 10) : null,
         pillar: formData.pillar,
-        target_kpi: formData.target_kpi,
         department_ids: formData.department_ids,
         status: formData.status,
         parent_id: formData.parent_id || null,
         progress: activity?.progress ?? 0,
-        kpi_target_value: kpiPreserve,
         unit_of_measure: normalizeActivityUnitOfMeasure(formData.unit_of_measure),
         ...fyPayload,
       };
@@ -309,15 +296,6 @@ export default function CreateActivityModal({
                 </div>
               )}
             </div>
-
-            {selectedStandard?.performance_indicator ? (
-              <div className="col-12">
-                <div className="py-2 px-2 bg-light border rounded small text-muted" style={{ fontSize: '0.78rem', lineHeight: 1.35 }}>
-                  <span className="fw-semibold text-dark">Standard completion indicator:</span>{' '}
-                  {selectedStandard.performance_indicator}
-                </div>
-              </div>
-            ) : null}
 
             <div className="col-12">
               <Form.Label className="fw-bold small mb-1">Unit of measure (FY targets)</Form.Label>

@@ -1,4 +1,8 @@
 import { query } from '@/lib/db';
+import {
+  buildAcademicStaffFilterOptions,
+  loadAcademicStaffLocations,
+} from '@/lib/academic-staff-locations';
 
 export type StaffStudentRatioGenderFilter = 'all' | 'male' | 'female';
 export type StaffStudentRatioPwdFilter = 'all' | 'yes' | 'no' | 'not_recorded';
@@ -47,10 +51,6 @@ type EnrollmentRow = {
 };
 
 const SEPARATED_EMPLOYMENT = ['terminated', 'resigned', 'retired', 'deceased', 'dismissed'];
-
-function isTeachingFacultyName(name: string | null | undefined): boolean {
-  return (name || '').trim().toLowerCase().includes('faculty');
-}
 
 function programmeKey(name: string): string {
   return name.trim().toLowerCase();
@@ -123,31 +123,6 @@ function matchesTextFilter(value: string | null, filter: string | null, allLabel
   return (value || '').toLowerCase() === filter.toLowerCase();
 }
 
-function buildOptions(values: Array<string | null | undefined>): string[] {
-  const set = new Set<string>();
-  for (const v of values) {
-    const s = (v || '').trim();
-    if (s) set.add(s);
-  }
-  return Array.from(set).sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
-}
-
-function buildDepartmentsByFaculty(locations: { faculty: string; department: string }[]): Record<string, string[]> {
-  const map = new Map<string, Set<string>>();
-  for (const loc of locations) {
-    const f = loc.faculty.trim();
-    const d = loc.department.trim();
-    if (!f || !d || !isTeachingFacultyName(f)) continue;
-    if (!map.has(f)) map.set(f, new Set());
-    map.get(f)!.add(d);
-  }
-  const out: Record<string, string[]> = {};
-  for (const [f, set] of map) {
-    out[f] = Array.from(set).sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
-  }
-  return out;
-}
-
 function pickDisplayLabel(values: Set<string>): string {
   const list = Array.from(values).filter(Boolean).sort((a, b) =>
     a.localeCompare(b, undefined, { sensitivity: 'base' })
@@ -169,26 +144,6 @@ function formatTotalRatio(staffCount: number, studentCount: number): string {
   if (studentCount <= 0) return 'No students';
   const n = Math.round(studentCount / staffCount);
   return `1 : ${n}`;
-}
-
-async function loadTeachingStaffLocations(): Promise<{ faculty: string; department: string }[]> {
-  const rows = (await query({
-    query: `
-      SELECT u.faculty_office, COALESCE(d.name, '') AS department, u.employment_status
-      FROM users u
-      LEFT JOIN departments d ON d.id = u.department_id
-      WHERE u.hrms_staff_id IS NOT NULL AND u.staff_category = 'Academic'
-    `,
-    values: [],
-  })) as { faculty_office: string | null; department: string | null; employment_status: string | null }[];
-
-  return rows
-    .filter((r) => !isSeparatedEmployment(r.employment_status))
-    .map((r) => ({
-      faculty: (r.faculty_office || '').trim(),
-      department: (r.department || '').trim(),
-    }))
-    .filter((r) => r.faculty && isTeachingFacultyName(r.faculty));
 }
 
 async function loadLecturerRows(): Promise<LecturerRow[]> {
@@ -308,19 +263,16 @@ export async function generateStaffStudentRatioReport(options: {
   const genderFilter = normalizeGenderFilter(options.gender);
   const pwdFilter = normalizePwdFilter(options.pwd);
 
-  const [lecturers, enrollments, teachingLocations] = await Promise.all([
+  const [lecturers, enrollments, academicLocations] = await Promise.all([
     loadLecturerRows(),
     loadProgrammeEnrollment(),
-    loadTeachingStaffLocations(),
+    loadAcademicStaffLocations(),
   ]);
 
-  const teachingFaculties = buildOptions(teachingLocations.map((l) => l.faculty));
-  const faculties = ['All Faculties', ...teachingFaculties];
-  const departmentsByFaculty = buildDepartmentsByFaculty(teachingLocations);
-  const allDepartments = Array.from(new Set(Object.values(departmentsByFaculty).flat())).sort((a, b) =>
-    a.localeCompare(b, undefined, { sensitivity: 'base' })
-  );
-  const departments = ['All Departments', ...allDepartments];
+  const academicFilters = buildAcademicStaffFilterOptions(academicLocations);
+  const faculties = ['All Faculties', ...academicFilters.faculties];
+  const departmentsByFaculty = academicFilters.departmentsByFaculty;
+  const departments = ['All Departments', ...academicFilters.departments];
 
   const buckets = new Map<string, ProgrammeBucket>();
 

@@ -2,6 +2,7 @@ export type ParsedStandardProcess = {
   stepName: string;
   durationValue: number | null;
   durationUnit: string | null;
+  milestoneProgress: number | null;
 };
 
 export function parseStandardProcessesPayload(
@@ -29,7 +30,16 @@ export function parseStandardProcessesPayload(
       };
     }
 
-    items.push({ stepName, durationValue, durationUnit });
+    const rawMilestone =
+      o.milestone_progress != null && o.milestone_progress !== ''
+        ? Number(o.milestone_progress)
+        : null;
+    const milestoneProgress =
+      rawMilestone != null && Number.isFinite(rawMilestone)
+        ? Math.min(100, Math.max(0, Math.round(rawMilestone)))
+        : null;
+
+    items.push({ stepName, durationValue, durationUnit, milestoneProgress });
   }
   if (items.length === 0) {
     return { ok: false, message: 'At least one process is required.' };

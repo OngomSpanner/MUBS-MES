@@ -13,7 +13,7 @@ import {
   normalizeOptionalDate,
   normalizeOptionalString,
 } from '@/lib/staff-biodata';
-import { normalizeUserAccountStatus, USER_ACCOUNT_STATUSES } from '@/lib/user-account-status';
+import { normalizeUserAccountStatus } from '@/lib/user-account-status';
 
 export async function GET(request: Request) {
   try {

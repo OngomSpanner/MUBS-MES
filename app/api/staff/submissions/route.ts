@@ -5,6 +5,8 @@ import { verifyToken } from '@/lib/auth';
 import { writeFile, mkdir } from 'fs/promises';
 import path from 'path';
 import { brandEmailWrapper, escapeHtml, sendTransactionalMail } from '@/lib/mail';
+import { ensureStaffReportsRfColumns } from '@/lib/staff-reports-rf-schema';
+import { parseRfSubmissionFromForm, resolveKpiSubmissionContext } from '@/lib/staff-submission-rf';
 
 export const dynamic = 'force-dynamic';
 
@@ -24,6 +26,8 @@ export async function GET() {
 
         const decoded = verifyToken(token) as any;
         if (!decoded || !decoded.userId) throw new Error('Invalid token');
+
+        await ensureStaffReportsRfColumns();
 
         const ratingToScore: Record<string, number> = { 
             excellent: 5, 
@@ -65,6 +69,11 @@ export async function GET() {
                     e.rating,
                     sr.progress_percentage as progress,
                     sr.kpi_actual_value,
+                    sr.performance_status,
+                    sr.outcome_reason,
+                    sr.practice_type,
+                    COALESCE(sa.kpi_target_value, p.kpi_target_value, psa_sa.kpi_target_value) as kpi_target_value,
+                    COALESCE(sa.task_type, 'process') as task_type,
                     sr.achievements as description,
                     sr.attachments,
                     e.qualitative_feedback as reviewer_notes,
@@ -120,6 +129,11 @@ export async function GET() {
                 score,
                 progress: r.progress,
                 kpi_actual_value: r.kpi_actual_value,
+                kpi_target_value: r.kpi_target_value,
+                task_type: r.task_type,
+                performance_status: r.performance_status,
+                outcome_reason: r.outcome_reason,
+                practice_type: r.practice_type,
                 description: r.description,
                 attachments: r.attachments,
                 reviewer_notes: r.reviewer_notes,
@@ -167,6 +181,8 @@ export async function POST(req: Request) {
 
         const decoded = verifyToken(token) as any;
         if (!decoded || !decoded.userId) throw new Error('Invalid token');
+
+        await ensureStaffReportsRfColumns();
 
         const formData = await req.formData();
         const taskId = formData.get('taskId') as string; // aa.id, spa.id, or subtask id
@@ -277,6 +293,14 @@ export async function POST(req: Request) {
 
         const reportStatus = isDraft ? 'draft' : 'submitted';
 
+        const kpiContext = await resolveKpiSubmissionContext(assignmentType, assignmentId, decoded.userId);
+        const rfParsed = parseRfSubmissionFromForm(formData, kpiContext, isDraft);
+        if (rfParsed.error) {
+            return NextResponse.json({ message: rfParsed.error }, { status: 400 });
+        }
+        const { outcomeReason, practiceType, performanceStatus, kpiActualNum } = rfParsed.data;
+        const kpiActualStored = kpiActualNum != null ? kpiActualNum : (formData.get('kpiActualValue') || null);
+
         // Insert or update staff report
         const filterColumn =
             assignmentType === 'process_subtask'
@@ -298,15 +322,29 @@ export async function POST(req: Request) {
                         achievements = ?, 
                         attachments = ?, 
                         kpi_actual_value = ?,
+                        performance_status = ?,
+                        outcome_reason = ?,
+                        practice_type = ?,
                         updated_at = NOW(),
                         status = ?,
                         submitted_at = IF(? = 'submitted', NOW(), submitted_at)
                     WHERE id = ?
                 `,
-                values: [progress, description || null, combinedEvidence || null, formData.get('kpiActualValue') || null, reportStatus, reportStatus, existingReport[0].id]
+                values: [
+                    progress,
+                    description || null,
+                    combinedEvidence || null,
+                    kpiActualStored,
+                    performanceStatus,
+                    outcomeReason,
+                    practiceType,
+                    reportStatus,
+                    reportStatus,
+                    existingReport[0].id,
+                ],
             });
         } else {
-            const columns = `(activity_assignment_id, process_assignment_id, process_subtask_id, submitted_by, report_date, progress_percentage, achievements, attachments, kpi_actual_value, status, submitted_at)`;
+            const columns = `(activity_assignment_id, process_assignment_id, process_subtask_id, submitted_by, report_date, progress_percentage, achievements, attachments, kpi_actual_value, performance_status, outcome_reason, practice_type, status, submitted_at)`;
             const values =
                 assignmentType === 'process_subtask'
                     ? [null, null, assignmentId]
@@ -318,9 +356,21 @@ export async function POST(req: Request) {
                 query: `
                     INSERT INTO staff_reports 
                     ${columns}
-                    VALUES (?, ?, ?, ?, CURDATE(), ?, ?, ?, ?, ?, IF(? = 'submitted', NOW(), NULL))
+                    VALUES (?, ?, ?, ?, CURDATE(), ?, ?, ?, ?, ?, ?, ?, ?, IF(? = 'submitted', NOW(), NULL))
                 `,
-                values: [...values, decoded.userId, progress, description || null, combinedEvidence || null, formData.get('kpiActualValue') || null, reportStatus, reportStatus]
+                values: [
+                    ...values,
+                    decoded.userId,
+                    progress,
+                    description || null,
+                    combinedEvidence || null,
+                    kpiActualStored,
+                    performanceStatus,
+                    outcomeReason,
+                    practiceType,
+                    reportStatus,
+                    reportStatus,
+                ],
             });
         }
 

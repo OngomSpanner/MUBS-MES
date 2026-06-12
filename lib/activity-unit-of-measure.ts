@@ -39,3 +39,23 @@ export function symbolForActivityUnitOfMeasure(value: string | null | undefined)
       return '#';
   }
 }
+
+/** Display a measured target/actual value with the correct unit suffix (not the raw DB enum). */
+export function formatActivityMeasuredValue(
+  value: number | null | undefined,
+  unit: string | null | undefined
+): string {
+  if (value == null || !Number.isFinite(Number(value))) return '—';
+  const n = Number(value);
+  switch (normalizeActivityUnitOfMeasure(unit)) {
+    case 'percentage':
+      return `${n}%`;
+    case 'currency':
+      return `${n.toLocaleString()} UGX`;
+    case 'ratio':
+      return `${n}:1`;
+    case 'numeric':
+    default:
+      return String(n);
+  }
+}

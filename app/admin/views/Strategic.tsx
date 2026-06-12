@@ -19,12 +19,17 @@ import {
   Cell 
 } from 'recharts';
 import { formatStandardProcessDuration, PROCESS_DURATION_UNIT_OPTIONS } from '@/lib/process-duration';
+import {
+    applyDefaultMilestonesToProcessRows,
+    redistributeMilestonePercents,
+} from '@/lib/milestone-progress-utils';
 import { ACTIVITY_FY_TARGET_COLUMNS } from '@/lib/activity-fy-targets';
 import {
   labelForActivityUnitOfMeasure,
   symbolForActivityUnitOfMeasure,
 } from '@/lib/activity-unit-of-measure';
-import { fyRangeJulyJune, formatFyRangeShort } from '@/lib/financial-year';
+import { fyLabelForDateJulyJune, fyRangeJulyJune, formatFyRangeShort } from '@/lib/financial-year';
+import { resolveRfPerformanceIndicator, resolveRfTargetValue } from '@/lib/rf-activity-targets';
 
 function isUnassigned(a: { department_id?: number | null; department?: string }): boolean {
     return a.department_id == null || !a.department?.trim() || a.department === '-';
@@ -33,10 +38,11 @@ function isUnassigned(a: { department_id?: number | null; department?: string })
 /** Table headers use global uppercase; show department names in normal casing (title-case if DB stored ALL CAPS). */
 type StandardProcessFormRow = {
     step_name: string;
+    milestone_progress: string;
 };
 
 function emptyProcessRow(): StandardProcessFormRow {
-    return { step_name: '' };
+    return { step_name: '', milestone_progress: '' };
 }
 
 function formatResponsibleOfficeLabel(name: string | undefined | null): string {
@@ -264,9 +270,15 @@ export default function StrategicView() {
                     ? String(std.duration_unit).trim().toLowerCase()
                     : 'weeks',
             processes: std?.processes?.length
-                ? std.processes.map((p: any) => ({
-                    step_name: p.step_name || '',
-                }))
+                ? applyDefaultMilestonesToProcessRows(
+                      std.processes.map((p: any) => ({
+                          step_name: p.step_name || '',
+                          milestone_progress:
+                            p.milestone_progress != null && p.milestone_progress !== ''
+                              ? String(p.milestone_progress)
+                              : '',
+                      }))
+                  )
                 : [],
         });
     };
@@ -304,9 +316,19 @@ export default function StrategicView() {
         }
         const namedProcesses = standardForm.processes.filter((p) => p.step_name.trim());
         if (namedProcesses.length === 0) return setStandardError('At least one process is required.');
-        const processesPayload = namedProcesses.map((p) => ({
-            step_name: p.step_name.trim(),
-        }));
+        const processesPayload = namedProcesses.map((p, idx) => {
+            const raw = p.milestone_progress.trim();
+            const milestone =
+              raw !== '' && Number.isFinite(Number(raw))
+                ? Math.min(100, Math.max(0, Math.round(Number(raw))))
+                : namedProcesses.length > 1
+                  ? Math.round(((idx + 1) / namedProcesses.length) * 100)
+                  : 100;
+            return {
+                step_name: p.step_name.trim(),
+                milestone_progress: milestone,
+            };
+        });
         setSavingStandard(true);
         try {
             const payload = {
@@ -412,9 +434,26 @@ export default function StrategicView() {
                     const toInsert = newLines.slice(1).map((s) => ({ ...emptyProcessRow(), step_name: s }));
                     arr.splice(index + 1, 0, ...toInsert);
                 }
-                setStandardForm({ ...standardForm, processes: arr });
+                setStandardForm({
+                    ...standardForm,
+                    processes: redistributeMilestonePercents(arr),
+                });
             }
         }
+    };
+
+    const addProcessRow = () => {
+        setStandardForm({
+            ...standardForm,
+            processes: redistributeMilestonePercents([...standardForm.processes, emptyProcessRow()]),
+        });
+    };
+
+    const removeProcessRow = (idx: number) => {
+        setStandardForm({
+            ...standardForm,
+            processes: redistributeMilestonePercents(standardForm.processes.filter((_, i) => i !== idx)),
+        });
     };
 
     return (
@@ -896,8 +935,11 @@ export default function StrategicView() {
                         <div className="col-12 pt-1"><hr className="opacity-25 my-2" />
                             <div className="d-flex justify-content-between align-items-center mb-1 flex-wrap gap-2">
                                 <h6 className="fw-bold text-primary small mb-0">Processes</h6>
-                                <Button type="button" size="sm" variant="outline-primary" onClick={() => setStandardForm({...standardForm, processes: [...standardForm.processes, emptyProcessRow()]})}>+ Add process</Button>
+                                <Button type="button" size="sm" variant="outline-primary" onClick={addProcessRow}>+ Add process</Button>
                             </div>
+                            <p className="text-muted small mb-2" style={{ fontSize: '0.78rem' }}>
+                                Set cumulative progress % when each step is completed (e.g. 10, 20, … 100). Empty fields auto-fill evenly on save.
+                            </p>
                             <div className="d-flex flex-column gap-1">
                                 {standardForm.processes.map((proc, idx) => (
                                     <div key={idx} className="border rounded p-2 py-1 bg-light bg-opacity-50">
@@ -923,16 +965,27 @@ export default function StrategicView() {
                                                 }}
                                                 onPaste={(e) => handleProcessPaste(e, idx)}
                                             />
+                                            <Form.Control
+                                                size="sm"
+                                                type="number"
+                                                min={0}
+                                                max={100}
+                                                className="flex-shrink-0"
+                                                style={{ width: '72px' }}
+                                                title="Cumulative progress % when this step completes"
+                                                placeholder="%"
+                                                value={proc.milestone_progress}
+                                                onChange={(e) => {
+                                                    const arr = [...standardForm.processes];
+                                                    arr[idx].milestone_progress = e.target.value;
+                                                    setStandardForm({ ...standardForm, processes: arr });
+                                                }}
+                                            />
                                             <Button
                                                 size="sm"
                                                 variant="outline-danger"
                                                 className="flex-shrink-0"
-                                                onClick={() =>
-                                                    setStandardForm({
-                                                        ...standardForm,
-                                                        processes: standardForm.processes.filter((_, i) => i !== idx),
-                                                    })
-                                                }
+                                                onClick={() => removeProcessRow(idx)}
                                                 title="Delete task"
                                             >
                                                 ×
@@ -1054,6 +1107,45 @@ export default function StrategicView() {
                                 </div>
                             </div>
                         </div>
+
+                        {(() => {
+                            const linkedStandard = standards.find((s) => s.id === selectedActivity.standard_id);
+                            const rfRow = {
+                                ...selectedActivity,
+                                performance_indicator: linkedStandard?.performance_indicator ?? null,
+                            };
+                            const rfIndicator = resolveRfPerformanceIndicator(rfRow);
+                            const rfTarget = resolveRfTargetValue(rfRow);
+                            const currentFy = fyLabelForDateJulyJune();
+                            return (
+                                <div className="mt-3 p-3 rounded-3 border" style={{ background: '#f0f9ff' }}>
+                                    <div className="fw-bold text-primary mb-2" style={{ fontSize: '0.85rem' }}>
+                                        Results Framework
+                                    </div>
+                                    <div className="small mb-2">
+                                        <span className="text-muted">Indicator:</span>{' '}
+                                        <span className="text-dark">{rfIndicator || '—'}</span>
+                                        {linkedStandard?.title ? (
+                                            <span className="text-muted"> · from standard: {linkedStandard.title}</span>
+                                        ) : null}
+                                    </div>
+                                    <div className="small">
+                                        <span className="text-muted">Target ({currentFy}):</span>{' '}
+                                        <span className="text-dark fw-semibold">
+                                            {rfTarget != null ? rfTarget : '—'}
+                                            {selectedActivity.unit_of_measure
+                                                ? ` ${symbolForActivityUnitOfMeasure(selectedActivity.unit_of_measure)}`
+                                                : ''}
+                                        </span>
+                                        {selectedActivity.actual_value != null ? (
+                                            <span className="text-muted ms-2">
+                                                · Actual: <strong className="text-dark">{selectedActivity.actual_value}</strong>
+                                            </span>
+                                        ) : null}
+                                    </div>
+                                </div>
+                            );
+                        })()}
 
                         <div className="mt-3">
                             <div className="fw-bold text-primary mb-2" style={{ fontSize: '0.85rem' }}>

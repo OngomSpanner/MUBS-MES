@@ -21,6 +21,7 @@ import StaffJobDescriptionWorkplansPanel from '@/components/Reports/StaffJobDesc
 import StaffStudentRatioPanel from '@/components/Reports/StaffStudentRatioPanel';
 import StaffProgrammeEnrollmentPanel from '@/components/Reports/StaffProgrammeEnrollmentPanel';
 import StaffCourseUnitEnrollmentPanel from '@/components/Reports/StaffCourseUnitEnrollmentPanel';
+import AdminResultsFrameworkPanel from '@/components/Admin/AdminResultsFrameworkPanel';
 import { GENDER_OPTIONS, StaffProfileData } from '@/lib/staff-biodata';
 import { STAFF_CATEGORIES } from '@/lib/staff-categories';
 
@@ -121,6 +122,7 @@ export default function ReportsView() {
         | 'programme-enrollment'
         | 'course-unit-enrollment'
         | 'miscellaneous'
+        | 'results-framework'
     >('summary');
 
     const [departmentsList, setDepartmentsList] = useState<string[]>([]);
@@ -138,7 +140,12 @@ export default function ReportsView() {
 
     useEffect(() => {
         axios.get('/api/departments')
-            .then(({ data }) => setDepartmentsList((Array.isArray(data) ? data : []).map((d: any) => d.name)))
+            .then(({ data }) => {
+                const names = (Array.isArray(data) ? data : [])
+                    .map((d: { name?: string }) => String(d.name || '').trim())
+                    .filter(Boolean);
+                setDepartmentsList([...new Set(names)].sort((a, b) => a.localeCompare(b)));
+            })
             .catch(() => setDepartmentsList([]));
     }, []);
 
@@ -610,6 +617,11 @@ export default function ReportsView() {
                     </button>
                 </li>
                 <li className="nav-item">
+                    <button className={`nav-link border rounded-pill px-4 fw-bold ${activeTab === 'results-framework' ? 'active bg-primary text-white border-primary' : 'text-muted'}`} onClick={() => setActiveTab('results-framework')}>
+                        Results Framework
+                    </button>
+                </li>
+                <li className="nav-item">
                     <button className={`nav-link border rounded-pill px-4 fw-bold ${activeTab === 'trends' ? 'active bg-primary text-white border-primary' : 'text-muted'}`} onClick={() => setActiveTab('trends')}>
                         Performance Trends
                     </button>
@@ -655,6 +667,8 @@ export default function ReportsView() {
                     </button>
                 </li>
             </ul>
+
+            {activeTab === 'results-framework' && <AdminResultsFrameworkPanel />}
 
             {activeTab === 'trends' && (
                 <div className="mb-4">
@@ -730,7 +744,7 @@ export default function ReportsView() {
                                 title="Impact department"
                             >
                                 <option>All Departments</option>
-                                {departmentsList.map(name => <option key={name} value={name}>{name}</option>)}
+                                {departmentsList.map((name, i) => <option key={`${i}-${name}`} value={name}>{name}</option>)}
                             </select>
                             <button
                                 className="btn btn-sm btn-primary fw-bold"
@@ -911,7 +925,7 @@ export default function ReportsView() {
                                 onChange={e => setSelectedUnit(e.target.value)}
                             >
                                 <option>All Departments</option>
-                                {departmentsList.map(name => <option key={name} value={name}>{name}</option>)}
+                                {departmentsList.map((name, i) => <option key={`${i}-${name}`} value={name}>{name}</option>)}
                             </select>
                             <select
                                 className="form-select form-select-sm"

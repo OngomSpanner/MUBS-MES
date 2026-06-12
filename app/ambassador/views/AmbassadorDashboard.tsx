@@ -26,6 +26,15 @@ interface AmbassadorData {
         inProgress: number;
         delayed: number;
         totalUnits: number;
+        rfIndicators?: number;
+        rfAssessed?: number;
+        rfUnderperformance?: number;
+        rfAchievement?: number;
+        rfOverachievement?: number;
+        enrollmentProgrammes?: number;
+        enrollmentProgrammeStudents?: number;
+        enrollmentCourseUnits?: number;
+        enrollmentCourseUnitStudents?: number;
     };
     subUnits: Array<{ id: number; name: string; progress: number; activityCount: number }>;
     riskAlerts: Array<{ id: number; title: string; department: string; status: string; progress: number; dueDate: string | null }>;
@@ -148,6 +157,57 @@ export default function AmbassadorDashboard() {
                 </div>
             </div>
 
+            {/* Results Framework snapshot */}
+            {(stats.rfIndicators ?? 0) > 0 ? (
+                <div className="row g-3 mb-4">
+                    <div className="col-12">
+                        <div className="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-1">
+                            <h6 className="fw-bold text-dark mb-0">Results Framework snapshot</h6>
+                            <Link href="/ambassador?pg=tracking&tab=results" className="small fw-bold text-decoration-none">
+                                View details →
+                            </Link>
+                        </div>
+                    </div>
+                    <div className="col-6 col-md-3">
+                        <StatCard icon="analytics" label="RF indicators" value={stats.rfIndicators ?? 0} badge="FY" badgeIcon="calendar_today" color="blue" />
+                    </div>
+                    <div className="col-6 col-md-3">
+                        <StatCard icon="trending_down" label="Underperformance" value={stats.rfUnderperformance ?? 0} badge="Watch" badgeIcon="warning" color="red" />
+                    </div>
+                    <div className="col-6 col-md-3">
+                        <StatCard icon="task_alt" label="Achievement" value={stats.rfAchievement ?? 0} badge="On target" badgeIcon="check" color="green" />
+                    </div>
+                    <div className="col-6 col-md-3">
+                        <StatCard icon="rocket_launch" label="Overachievement" value={stats.rfOverachievement ?? 0} badge="Above" badgeIcon="north" color="blue" />
+                    </div>
+                </div>
+            ) : null}
+
+            {(stats.enrollmentProgrammes ?? 0) > 0 || (stats.enrollmentCourseUnits ?? 0) > 0 ? (
+                <div className="row g-3 mb-4">
+                    <div className="col-12">
+                        <div className="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-1">
+                            <h6 className="fw-bold text-dark mb-0">Enrollment indicators</h6>
+                            <Link href="/ambassador?pg=reporting&tab=programme-enrollment" className="small fw-bold text-decoration-none">
+                                Enter / view data →
+                            </Link>
+                        </div>
+                    </div>
+                    <div className="col-6 col-md-3">
+                        <StatCard icon="school" label="Programmes" value={stats.enrollmentProgrammes ?? 0} badge={`${stats.enrollmentProgrammeStudents ?? 0} students`} badgeIcon="groups" color="blue" />
+                    </div>
+                    <div className="col-6 col-md-3">
+                        <StatCard icon="library_books" label="Course units" value={stats.enrollmentCourseUnits ?? 0} badge={`${stats.enrollmentCourseUnitStudents ?? 0} students`} badgeIcon="menu_book" color="green" />
+                    </div>
+                    <div className="col-6 col-md-3">
+                        <StatCard icon="groups" label="Programme students" value={stats.enrollmentProgrammeStudents ?? 0} badge="University-wide" badgeIcon="public" color="yellow" />
+                    </div>
+                    <div className="col-6 col-md-3">
+                        <StatCard icon="menu_book" label="CU students" value={stats.enrollmentCourseUnitStudents ?? 0} badge="University-wide" badgeIcon="public" color="blue" />
+                    </div>
+                </div>
+            ) : null}
+
             {/* Stat cards */}
             <div className="row g-4 mb-4">
                 <div className="col-12 col-sm-6 col-xl-3">
@@ -192,27 +252,10 @@ export default function AmbassadorDashboard() {
                 </div>
             </div>
 
-            {/* Quick actions */}
+            {/* Quick actions — Tracking / Reporting / Propose changes */}
             <div className="row g-3">
                 <div className="col-12 col-sm-6 col-xl-3">
-                    <Link href="/ambassador?pg=reports&tab=compliance" className="text-decoration-none h-100">
-                        <div
-                            className="quick-action-card p-3 d-flex align-items-center gap-2 gap-sm-3 bg-white border rounded-4 shadow-sm h-100"
-                            style={{ transition: 'all 0.2s', cursor: 'pointer', minHeight: '92px' }}
-                            {...quickActionHover}
-                        >
-                            <div className="icon-box d-flex align-items-center justify-content-center flex-shrink-0" style={{ width: '48px', height: '48px', borderRadius: '14px', background: 'rgba(0, 86, 150, 0.1)' }}>
-                                <span className="material-symbols-outlined" style={{ color: 'var(--mubs-blue)', fontSize: '22px' }}>bar_chart</span>
-                            </div>
-                            <div className="min-w-0">
-                                <div className="fw-black text-dark" style={{ fontSize: '.95rem', lineHeight: 1.25 }}>Unit reports</div>
-                                <div className="text-muted small" style={{ fontSize: '.78rem' }}>Department activities & reporting</div>
-                            </div>
-                        </div>
-                    </Link>
-                </div>
-                <div className="col-12 col-sm-6 col-xl-3">
-                    <Link href="/ambassador?pg=reports&tab=compliance" className="text-decoration-none h-100">
+                    <Link href="/ambassador?pg=tracking&tab=compliance" className="text-decoration-none h-100">
                         <div
                             className="quick-action-card p-3 d-flex align-items-center gap-2 gap-sm-3 bg-white border rounded-4 shadow-sm h-100"
                             style={{ transition: 'all 0.2s', cursor: 'pointer', minHeight: '92px' }}
@@ -222,31 +265,14 @@ export default function AmbassadorDashboard() {
                                 <span className="material-symbols-outlined" style={{ color: '#10b981', fontSize: '22px' }}>fact_check</span>
                             </div>
                             <div className="min-w-0">
-                                <div className="fw-black text-dark" style={{ fontSize: '.95rem', lineHeight: 1.25 }}>Dept. / Unit Activity Progress</div>
-                                <div className="text-muted small" style={{ fontSize: '.78rem' }}>Monitor activities & submissions</div>
+                                <div className="fw-black text-dark" style={{ fontSize: '.95rem', lineHeight: 1.25 }}>Activity progress</div>
+                                <div className="text-muted small" style={{ fontSize: '.78rem' }}>Tracking · monitor submissions</div>
                             </div>
                         </div>
                     </Link>
                 </div>
                 <div className="col-12 col-sm-6 col-xl-3">
-                    <Link href="/ambassador?pg=reports&tab=benefits" className="text-decoration-none h-100">
-                        <div
-                            className="quick-action-card p-3 d-flex align-items-center gap-2 gap-sm-3 bg-white border rounded-4 shadow-sm h-100"
-                            style={{ transition: 'all 0.2s', cursor: 'pointer', minHeight: '92px' }}
-                            {...quickActionHover}
-                        >
-                            <div className="icon-box d-flex align-items-center justify-content-center flex-shrink-0" style={{ width: '48px', height: '48px', borderRadius: '14px', background: 'rgba(124, 58, 237, 0.1)' }}>
-                                <span className="material-symbols-outlined" style={{ color: '#7c3aed', fontSize: '22px' }}>apartment</span>
-                            </div>
-                            <div className="min-w-0">
-                                <div className="fw-black text-dark" style={{ fontSize: '.95rem', lineHeight: 1.25 }}>Managed departments</div>
-                                <div className="text-muted small" style={{ fontSize: '.78rem' }}>{stats.totalUnits} units under oversight</div>
-                            </div>
-                        </div>
-                    </Link>
-                </div>
-                <div className="col-12 col-sm-6 col-xl-3">
-                    <Link href="/ambassador?pg=reports&tab=recruitment" className="text-decoration-none h-100">
+                    <Link href="/ambassador?pg=tracking&tab=alerts" className="text-decoration-none h-100">
                         <div
                             className="quick-action-card p-3 d-flex align-items-center gap-2 gap-sm-3 bg-white border rounded-4 shadow-sm h-100"
                             style={{ transition: 'all 0.2s', cursor: 'pointer', minHeight: '92px' }}
@@ -258,8 +284,42 @@ export default function AmbassadorDashboard() {
                             <div className="min-w-0">
                                 <div className="fw-black text-dark" style={{ fontSize: '.95rem', lineHeight: 1.25 }}>Risk alerts</div>
                                 <div className="text-muted small" style={{ fontSize: '.78rem' }}>
-                                    {riskAlerts.length > 0 ? `${riskAlerts.length} active alerts` : 'No active alerts'}
+                                    Tracking · {riskAlerts.length > 0 ? `${riskAlerts.length} active` : 'none active'}
                                 </div>
+                            </div>
+                        </div>
+                    </Link>
+                </div>
+                <div className="col-12 col-sm-6 col-xl-3">
+                    <Link href="/ambassador?pg=reporting&tab=recruitment" className="text-decoration-none h-100">
+                        <div
+                            className="quick-action-card p-3 d-flex align-items-center gap-2 gap-sm-3 bg-white border rounded-4 shadow-sm h-100"
+                            style={{ transition: 'all 0.2s', cursor: 'pointer', minHeight: '92px' }}
+                            {...quickActionHover}
+                        >
+                            <div className="icon-box d-flex align-items-center justify-content-center flex-shrink-0" style={{ width: '48px', height: '48px', borderRadius: '14px', background: 'rgba(0, 86, 150, 0.1)' }}>
+                                <span className="material-symbols-outlined" style={{ color: 'var(--mubs-blue)', fontSize: '22px' }}>bar_chart</span>
+                            </div>
+                            <div className="min-w-0">
+                                <div className="fw-black text-dark" style={{ fontSize: '.95rem', lineHeight: 1.25 }}>Unit reporting</div>
+                                <div className="text-muted small" style={{ fontSize: '.78rem' }}>HR & M&E data entry</div>
+                            </div>
+                        </div>
+                    </Link>
+                </div>
+                <div className="col-12 col-sm-6 col-xl-3">
+                    <Link href="/ambassador?pg=propose-changes" className="text-decoration-none h-100">
+                        <div
+                            className="quick-action-card p-3 d-flex align-items-center gap-2 gap-sm-3 bg-white border rounded-4 shadow-sm h-100"
+                            style={{ transition: 'all 0.2s', cursor: 'pointer', minHeight: '92px' }}
+                            {...quickActionHover}
+                        >
+                            <div className="icon-box d-flex align-items-center justify-content-center flex-shrink-0" style={{ width: '48px', height: '48px', borderRadius: '14px', background: 'rgba(124, 58, 237, 0.1)' }}>
+                                <span className="material-symbols-outlined" style={{ color: '#7c3aed', fontSize: '22px' }}>edit_note</span>
+                            </div>
+                            <div className="min-w-0">
+                                <div className="fw-black text-dark" style={{ fontSize: '.95rem', lineHeight: 1.25 }}>Propose changes</div>
+                                <div className="text-muted small" style={{ fontSize: '.78rem' }}>Request setup or structure updates</div>
                             </div>
                         </div>
                     </Link>

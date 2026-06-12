@@ -5,50 +5,35 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import axios from 'axios';
 import StaffProfileModal from '@/components/Staff/StaffProfileModal';
 import { StaffProfileData } from '@/lib/staff-biodata';
+import { workloadStatusStyle, type WorkloadStatus } from '@/lib/hod-workload';
+
 interface Staff {
     id: number;
     department_id: number;
     department?: string;
     full_name: string;
-    email: string;
     position: string | null;
-    leave_status: string;
-    contract_end_date: string | null;
+    designation_grade: string | null;
+    staff_category: string | null;
     active_tasks: number;
-    employment_status?: string | null;
-    contract_type?: string | null;
-    staff_category?: string | null;
-    contract_start_date?: string | null;
-    account_status?: string | null;
-    gender?: string | null;
-    nationality?: string | null;
-    designation_grade?: string | null;
-    date_of_birth?: string | null;
-    date_first_appointment?: string | null;
-    date_current_appointment?: string | null;
-    date_office_assignment?: string | null;
-    retirement_date?: string | null;
-    disability_status?: string | null;
-    disability_type?: string | null;
-    workplace_accommodation?: string | null;
-    special_support_needs?: string | null;
-    faculty_office?: string | null;
     sections?: Array<{ id: number; name: string }>;
+    workloadStatus: WorkloadStatus;
+    workloadLabel: string;
 }
 
-interface Alert {
+interface WorkloadAlert {
     id: number;
     name: string;
-    position: string;
-    type: string;
+    position: string | null;
+    type: WorkloadStatus;
     message: string;
-    daysRemaining: number | null;
     activeTasks: number;
+    workloadLabel: string;
 }
 
 interface StaffData {
     staff: Staff[];
-    alerts: Alert[];
+    workloadAlerts: WorkloadAlert[];
 }
 
 interface Section {
@@ -58,7 +43,7 @@ interface Section {
     head_user_id: number | null;
     head_name: string | null;
     staff_count: number;
-    staff: Pick<Staff, 'id' | 'full_name' | 'email' | 'position'>[];
+    staff: Pick<Staff, 'id' | 'full_name' | 'position' | 'department_id'>[];
 }
 
 const getErrorMessage = (error: unknown, fallback: string) => {
@@ -175,7 +160,8 @@ export default function DepartmentStaff() {
     const filteredStaff = data.staff.filter(s =>
         s.full_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
         (s.position || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-        s.email.toLowerCase().includes(searchTerm.toLowerCase())
+        (s.position || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (s.designation_grade || '').toLowerCase().includes(searchTerm.toLowerCase())
     );
 
     const getInitials = (name: string) => {
@@ -186,8 +172,7 @@ export default function DepartmentStaff() {
 
     const effectiveCreateDepartmentId = (): number | null => {
         if (defaultDepartmentId != null) return defaultDepartmentId;
-        const fromStaff = data.staff[0]?.department_id;
-        return typeof fromStaff === 'number' && fromStaff > 0 ? fromStaff : null;
+        return sections[0]?.department_id ?? null;
     };
 
     const toggleStaffInSection = (staffId: number) => {
@@ -292,15 +277,6 @@ export default function DepartmentStaff() {
         } catch (createError: unknown) {
             setSectionModalError(getErrorMessage(createError, 'Failed to create section.'));
         }
-    };
-
-    const leaveBadgeStyle = (leave: string) => {
-        const s = (leave || '').toLowerCase();
-        if (s === 'on duty')
-            return { bg: '#dcfce7', color: '#15803d' };
-        if (s.includes('leave') || s.includes('sick') || s.includes('annual'))
-            return { bg: '#fef3c7', color: '#b45309' };
-        return { bg: '#f1f5f9', color: '#475569' };
     };
 
     const staffSectionsToggle = (
@@ -443,21 +419,20 @@ export default function DepartmentStaff() {
                                 <thead className="bg-light">
                                     <tr>
                                         <th className="ps-4" style={{ fontSize: '.75rem', textTransform: 'uppercase', color: '#64748b' }}>Staff Member</th>
-                                        <th style={{ fontSize: '.75rem', textTransform: 'uppercase', color: '#64748b' }}>Position</th>
-                                        <th style={{ fontSize: '.75rem', textTransform: 'uppercase', color: '#64748b' }}>Leave Status</th>
-                                        <th style={{ fontSize: '.75rem', textTransform: 'uppercase', color: '#64748b' }}>Contract End</th>
+                                        <th style={{ fontSize: '.75rem', textTransform: 'uppercase', color: '#64748b' }}>Designation</th>
                                         <th style={{ fontSize: '.75rem', textTransform: 'uppercase', color: '#64748b' }}>Open assignments</th>
+                                        <th style={{ fontSize: '.75rem', textTransform: 'uppercase', color: '#64748b' }}>Workload</th>
                                         <th className="pe-4 text-end" style={{ fontSize: '.75rem', textTransform: 'uppercase', color: '#64748b' }}>Actions</th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     {filteredStaff.length === 0 ? (
                                         <tr>
-                                            <td colSpan={6} className="text-center py-5 text-muted">No staff found matching your criteria.</td>
+                                            <td colSpan={5} className="text-center py-5 text-muted">No staff found matching your criteria.</td>
                                         </tr>
                                     ) : (
                                         filteredStaff.map((s) => (
-                                            <tr key={s.id} className={(s.leave_status || '').toLowerCase() !== 'on duty' ? 'bg-light bg-opacity-50' : ''}>
+                                            <tr key={s.id}>
                                                 <td className="ps-4">
                                                     <div className="d-flex align-items-center gap-3 py-1">
                                                         <div className="staff-avatar" style={{
@@ -478,55 +453,57 @@ export default function DepartmentStaff() {
                                                             <div className="fw-bold text-dark" style={{ fontSize: '.85rem' }}>
                                                                 {s.full_name}
                                                             </div>
-                                                            <div className="text-muted small" style={{ fontSize: '.72rem' }}>{s.email}</div>
+                                                            <div className="text-muted small" style={{ fontSize: '.72rem' }}>{s.staff_category || 'Staff'}</div>
                                                         </div>
                                                     </div>
                                                 </td>
-                                                <td><span className="small text-dark fw-medium">{s.position || '—'}</span></td>
                                                 <td>
-                                                    <span
-                                                        className="status-badge"
-                                                        style={{
-                                                            background: leaveBadgeStyle(s.leave_status).bg,
-                                                            color: leaveBadgeStyle(s.leave_status).color,
-                                                            fontSize: '0.65rem',
-                                                        }}
-                                                    >
-                                                        <span className="material-symbols-outlined me-1" style={{ fontSize: '10px' }}>event_available</span>
-                                                        {s.leave_status || '—'}
+                                                    <span className="small text-dark fw-medium">
+                                                        {[s.position, s.designation_grade].filter(Boolean).join(' · ') || '—'}
                                                     </span>
                                                 </td>
                                                 <td>
-                                                    {s.contract_end_date ? (
-                                                        <span className="small text-dark" style={{ fontSize: '.8rem' }}>
-                                                            {new Date(s.contract_end_date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
-                                                        </span>
-                                                    ) : (
-                                                        <span className="text-muted small">—</span>
-                                                    )}
+                                                    <span
+                                                        className={`fw-black ${Number(s.active_tasks) > 5 ? 'text-danger' : 'text-primary'}`}
+                                                        style={{ fontSize: '.9rem' }}
+                                                    >
+                                                        {s.active_tasks ?? 0}
+                                                    </span>
                                                 </td>
                                                 <td>
-                                                    <div className="d-flex align-items-center gap-2">
-                                                        <span
-                                                            className={`fw-black ${Number(s.active_tasks) > 5 ? 'text-danger' : 'text-primary'}`}
-                                                            style={{ fontSize: '.9rem' }}
-                                                        >
-                                                            {s.active_tasks ?? 0}
-                                                        </span>
-                                                        <span className="text-muted small" style={{ fontSize: '.72rem' }}>
-                                                            processes
-                                                        </span>
-                                                    </div>
+                                                    {(() => {
+                                                        const wl = workloadStatusStyle(s.workloadStatus);
+                                                        return (
+                                                            <span
+                                                                className="badge rounded-pill"
+                                                                style={{ background: wl.bg, color: wl.color, fontSize: '0.65rem' }}
+                                                            >
+                                                                {s.workloadLabel}
+                                                            </span>
+                                                        );
+                                                    })()}
                                                 </td>
                                                 <td className="pe-4 text-end">
                                                     <button
                                                         type="button"
                                                         className="btn btn-sm btn-outline-primary fw-bold d-inline-flex align-items-center gap-1 px-3 py-1"
                                                         style={{ fontSize: '.75rem', borderRadius: '8px' }}
-                                                        onClick={() => setProfileStaff({ ...s, department: s.department || '—' })}
+                                                        onClick={() =>
+                                                            setProfileStaff({
+                                                                id: s.id,
+                                                                full_name: s.full_name,
+                                                                email: '',
+                                                                position: s.position,
+                                                                designation_grade: s.designation_grade,
+                                                                staff_category: s.staff_category,
+                                                                active_tasks: s.active_tasks,
+                                                                sections: s.sections,
+                                                                department: s.department || '—',
+                                                            })
+                                                        }
                                                     >
                                                         <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>person_search</span>
-                                                        View details
+                                                        View profile
                                                     </button>
                                                 </td>
                                             </tr>
@@ -541,29 +518,31 @@ export default function DepartmentStaff() {
                     </div>
                 </div>}
 
-                {/* HR Action Required — below roster */}
+                {/* Workload alerts — strategic-plan assignments only */}
                 {activeTab === 'staff' && <div className="col-12">
-                    <div className="table-card shadow-sm" style={{ borderTop: '4px solid var(--mubs-red)' }}>
-                        <div className="table-card-header" style={{ background: '#fff1f2', borderBottom: '1px solid #fee2e2' }}>
-                            <h5 className="mb-0 fw-black text-danger d-flex align-items-center gap-2">
-                                <span className="material-symbols-outlined">assignment_late</span>
-                                HR Action Required
+                    <div className="table-card shadow-sm" style={{ borderTop: '4px solid var(--mubs-blue)' }}>
+                        <div className="table-card-header" style={{ background: '#eff6ff', borderBottom: '1px solid #dbeafe' }}>
+                            <h5 className="mb-0 fw-black text-primary d-flex align-items-center gap-2">
+                                <span className="material-symbols-outlined">balance</span>
+                                Workload alerts
                             </h5>
                         </div>
                         <div className="p-3">
-                            {data.alerts.length === 0 ? (
+                            {!data.workloadAlerts?.length ? (
                                 <div className="text-center py-4 text-muted small">
-                                    No HR alerts at this time.
+                                    All staff are within normal workload for strategic-plan assignments.
                                 </div>
                             ) : (
                                 <div className="row g-3">
-                                    {data.alerts.map((alert, idx) => (
-                                        <div key={idx} className="col-12 col-md-6 col-lg-4">
-                                            <div className={`warn-card p-3 rounded-3 border-start border-4 h-100 ${alert.type === 'Leave' ? 'bg-danger-subtle border-danger' : 'bg-warning-subtle border-warning'}`}>
+                                    {data.workloadAlerts.map((alert) => {
+                                        const wl = workloadStatusStyle(alert.type);
+                                        return (
+                                        <div key={alert.id} className="col-12 col-md-6 col-lg-4">
+                                            <div className="warn-card p-3 rounded-3 border-start border-4 h-100 bg-light" style={{ borderColor: wl.color }}>
                                                 <div className="d-flex justify-content-between align-items-start mb-2">
                                                     <div className="fw-bold text-dark d-flex align-items-center gap-2">
                                                         <div className="staff-avatar" style={{
-                                                            background: alert.type === 'Leave' ? '#dc2626' : '#d97706',
+                                                            background: wl.color,
                                                             width: '28px',
                                                             height: '28px',
                                                             fontSize: '.7rem',
@@ -578,18 +557,18 @@ export default function DepartmentStaff() {
                                                         </div>
                                                         <span style={{ fontSize: '.9rem' }}>{alert.name}</span>
                                                     </div>
-                                                    <span className={`badge ${alert.type === 'Leave' ? 'bg-danger text-white' : 'bg-warning text-dark'}`} style={{ fontSize: '.6rem' }}>
-                                                        {alert.type.toUpperCase()}
+                                                    <span className="badge" style={{ fontSize: '.6rem', background: wl.bg, color: wl.color }}>
+                                                        {alert.workloadLabel.toUpperCase()}
                                                     </span>
                                                 </div>
                                                 <div className="text-dark fw-bold mb-1" style={{ fontSize: '.8rem' }}>{alert.message}</div>
                                                 <div className="text-muted mb-3" style={{ fontSize: '.75rem', lineHeight: '1.4' }}>
-                                                    Position: {alert.position}<br />
-                                                    Impact: {alert.activeTasks} active tasks assigned.
+                                                    {alert.position ? <>Role: {alert.position}<br /></> : null}
+                                                    Open assignments: {alert.activeTasks}
                                                 </div>
                                                 <button
                                                     type="button"
-                                                    className={`btn btn-sm w-100 fw-bold ${alert.type === 'Leave' ? 'btn-danger' : 'btn-warning'} py-1`}
+                                                    className="btn btn-sm w-100 fw-bold btn-outline-primary py-1"
                                                     style={{ fontSize: '.75rem' }}
                                                     onClick={() =>
                                                         router.push(
@@ -597,11 +576,12 @@ export default function DepartmentStaff() {
                                                         )
                                                     }
                                                 >
-                                                    {alert.type === 'Leave' ? 'View assignments' : 'View details'}
+                                                    View assignments
                                                 </button>
                                             </div>
                                         </div>
-                                    ))}
+                                        );
+                                    })}
                                 </div>
                             )}
                         </div>

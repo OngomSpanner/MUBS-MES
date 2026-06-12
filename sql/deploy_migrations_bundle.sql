@@ -354,8 +354,202 @@ UPDATE users
 SET status = 'Active'
 WHERE status = 'Pending';
 
+-- -----------------------------------------------------------------------------
+-- J) Phase 3 — Results Framework fields on staff_reports
+-- -----------------------------------------------------------------------------
+
+SET @col_exists := (
+  SELECT COUNT(*) FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE()
+    AND TABLE_NAME = 'staff_reports'
+    AND COLUMN_NAME = 'performance_status'
+);
+SET @sql := IF(
+  @col_exists = 0,
+  'ALTER TABLE staff_reports ADD COLUMN performance_status ENUM(''underperformance'', ''achievement'', ''overachievement'') NULL AFTER kpi_actual_value',
+  'SELECT 1'
+);
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @col_exists := (
+  SELECT COUNT(*) FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE()
+    AND TABLE_NAME = 'staff_reports'
+    AND COLUMN_NAME = 'outcome_reason'
+);
+SET @sql := IF(
+  @col_exists = 0,
+  'ALTER TABLE staff_reports ADD COLUMN outcome_reason TEXT NULL AFTER performance_status',
+  'SELECT 1'
+);
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @col_exists := (
+  SELECT COUNT(*) FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE()
+    AND TABLE_NAME = 'staff_reports'
+    AND COLUMN_NAME = 'practice_type'
+);
+SET @sql := IF(
+  @col_exists = 0,
+  'ALTER TABLE staff_reports ADD COLUMN practice_type ENUM(''existing_practice'', ''innovation'') NULL AFTER outcome_reason',
+  'SELECT 1'
+);
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+-- -----------------------------------------------------------------------------
+-- K) Phase 3 — RF narratives, process milestones, change requests
+-- -----------------------------------------------------------------------------
+
+CREATE TABLE IF NOT EXISTS activity_rf_narratives (
+  id INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  activity_id INT NOT NULL,
+  financial_year_key VARCHAR(16) NOT NULL,
+  outcome_reason TEXT NULL,
+  practice_type ENUM('existing_practice', 'innovation') NULL,
+  recorded_by INT NOT NULL,
+  created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  UNIQUE KEY uq_activity_rf_narrative_fy (activity_id, financial_year_key),
+  KEY idx_activity_rf_narrative_user (recorded_by)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS ambassador_change_requests (
+  id INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  user_id INT NOT NULL,
+  managed_unit_id INT NULL,
+  category ENUM('unit_structure', 'indicators', 'activity_templates', 'other') NOT NULL,
+  title VARCHAR(255) NOT NULL,
+  description TEXT NOT NULL,
+  status ENUM('submitted', 'under_review', 'approved', 'rejected', 'completed') NOT NULL DEFAULT 'submitted',
+  admin_notes TEXT NULL,
+  created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  KEY idx_change_requests_user (user_id),
+  KEY idx_change_requests_unit (managed_unit_id),
+  KEY idx_change_requests_status (status)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+SET @col_exists := (
+  SELECT COUNT(*) FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE()
+    AND TABLE_NAME = 'standard_processes'
+    AND COLUMN_NAME = 'milestone_progress'
+);
+SET @sql := IF(
+  @col_exists = 0,
+  'ALTER TABLE standard_processes ADD COLUMN milestone_progress TINYINT UNSIGNED NULL DEFAULT NULL COMMENT ''Cumulative % when step complete'' AFTER duration_unit',
+  'SELECT 1'
+);
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+-- -----------------------------------------------------------------------------
+-- L) Phase 4 Part B — enrollment faculty disaggregation
+-- -----------------------------------------------------------------------------
+
+SET @col_exists := (
+  SELECT COUNT(*) FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE()
+    AND TABLE_NAME = 'staff_programme_enrollment'
+    AND COLUMN_NAME = 'faculty_name'
+);
+SET @sql := IF(
+  @col_exists = 0,
+  'ALTER TABLE staff_programme_enrollment ADD COLUMN faculty_name VARCHAR(255) NOT NULL DEFAULT ''Unspecified'' AFTER id',
+  'SELECT 1'
+);
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @col_exists := (
+  SELECT COUNT(*) FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE()
+    AND TABLE_NAME = 'staff_course_unit_enrollment'
+    AND COLUMN_NAME = 'faculty_name'
+);
+SET @sql := IF(
+  @col_exists = 0,
+  'ALTER TABLE staff_course_unit_enrollment ADD COLUMN faculty_name VARCHAR(255) NOT NULL DEFAULT ''Unspecified'' AFTER id',
+  'SELECT 1'
+);
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @idx_exists := (
+  SELECT COUNT(*) FROM information_schema.STATISTICS
+  WHERE TABLE_SCHEMA = DATABASE()
+    AND TABLE_NAME = 'staff_programme_enrollment'
+    AND INDEX_NAME = 'uq_programme_enrollment_name'
+);
+SET @sql := IF(
+  @idx_exists > 0,
+  'ALTER TABLE staff_programme_enrollment DROP INDEX uq_programme_enrollment_name',
+  'SELECT 1'
+);
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @idx_exists := (
+  SELECT COUNT(*) FROM information_schema.STATISTICS
+  WHERE TABLE_SCHEMA = DATABASE()
+    AND TABLE_NAME = 'staff_programme_enrollment'
+    AND INDEX_NAME = 'uq_programme_faculty_name'
+);
+SET @sql := IF(
+  @idx_exists = 0,
+  'ALTER TABLE staff_programme_enrollment ADD UNIQUE KEY uq_programme_faculty_name (faculty_name, programme_name)',
+  'SELECT 1'
+);
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @idx_exists := (
+  SELECT COUNT(*) FROM information_schema.STATISTICS
+  WHERE TABLE_SCHEMA = DATABASE()
+    AND TABLE_NAME = 'staff_course_unit_enrollment'
+    AND INDEX_NAME = 'uq_course_unit_enrollment_name'
+);
+SET @sql := IF(
+  @idx_exists > 0,
+  'ALTER TABLE staff_course_unit_enrollment DROP INDEX uq_course_unit_enrollment_name',
+  'SELECT 1'
+);
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @idx_exists := (
+  SELECT COUNT(*) FROM information_schema.STATISTICS
+  WHERE TABLE_SCHEMA = DATABASE()
+    AND TABLE_NAME = 'staff_course_unit_enrollment'
+    AND INDEX_NAME = 'uq_course_unit_faculty_name'
+);
+SET @sql := IF(
+  @idx_exists = 0,
+  'ALTER TABLE staff_course_unit_enrollment ADD UNIQUE KEY uq_course_unit_faculty_name (faculty_name, course_unit_name)',
+  'SELECT 1'
+);
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
 -- =============================================================================
 -- Done. Verify:
 --   SHOW TABLES LIKE 'staff_%';
 --   SELECT status, COUNT(*) FROM users GROUP BY status;
+--   SHOW COLUMNS FROM staff_programme_enrollment LIKE 'faculty_name';
 -- =============================================================================

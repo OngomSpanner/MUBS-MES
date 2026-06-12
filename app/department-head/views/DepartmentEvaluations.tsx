@@ -7,12 +7,14 @@ import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import StatCard from '@/components/StatCard';
+import PortalModal from '@/components/PortalModal';
 import EvaluationCardGrid from '@/components/Department/EvaluationCardGrid';
 import EvaluateSubmissionModal, {
     parseEvidenceItems,
     type FeedbackHistoryEntry,
 } from '@/components/Department/EvaluateSubmissionModal';
 import { linkify } from '@/lib/linkify';
+import type { PerformanceStatus, PracticeType } from '@/lib/results-framework';
 
 /** URLs pasted only in report text (not in attachments column). */
 function extractEvidenceUrlsFromSummary(text: string | null | undefined): { label: string; url: string }[] {
@@ -66,6 +68,10 @@ interface Evaluation {
     reviewer_notes?: string;
     task_type?: 'process' | 'kpi_driver';
     kpi_actual_value?: number | null;
+    kpi_target_value?: number | null;
+    performance_status?: PerformanceStatus | null;
+    outcome_reason?: string | null;
+    practice_type?: PracticeType | null;
 }
 
 interface EvaluationData {
@@ -375,13 +381,8 @@ export default function DepartmentEvaluations() {
                 </div>
             </div>
 
-            {/* Modal Backdrop */}
-            {(evaluateModalItem || viewModalItem) && (
-                <div className="modal-backdrop fade show" style={{ zIndex: 1040, background: 'rgba(15, 23, 42, 0.6)', backdropFilter: 'blur(4px)' }}></div>
-            )}
-
             {/* View Details Modal for Completed/Returned evaluations */}
-            <div className={`modal fade ${viewModalItem ? 'show d-block' : ''}`} tabIndex={-1} style={{ zIndex: 1050 }}>
+            <PortalModal show={!!viewModalItem} onHide={() => setViewModalItem(null)} zIndex={1050}>
                 <div className="modal-dialog modal-dialog-centered">
                     <div className="modal-content border-0 shadow-lg" style={{ borderRadius: '12px', overflow: 'hidden' }}>
                         <div className="modal-header border-bottom-0 pb-0 px-4 pt-4">
@@ -508,8 +509,7 @@ export default function DepartmentEvaluations() {
                         })()}
                     </div>
                 </div>
-            </div>
-
+            </PortalModal>
 
             <EvaluateSubmissionModal
                 item={evaluateModalItem}

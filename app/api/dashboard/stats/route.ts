@@ -3,6 +3,18 @@ import { query } from '@/lib/db';
 import { cookies } from 'next/headers';
 import { verifyToken } from '@/lib/auth';
 import { SQL_TOP_STRATEGIC_MAIN_NO_ALIAS } from '@/lib/strategic-activity-sql';
+import { summarizeEnrollmentIndicators } from '@/lib/enrollment-indicators';
+import { ensureActivityRfNarrativesTable } from '@/lib/activity-rf-narratives';
+import { fyLabelForDateJulyJune } from '@/lib/financial-year';
+import {
+  MAIN_STRATEGIC_ACTIVITY_FILTER,
+  RESULTS_FRAMEWORK_KPI_FILTER,
+  RESULTS_FRAMEWORK_NARRATIVE_JOIN,
+  buildResultsFrameworkActivitySelect,
+  mapResultsFrameworkRows,
+  summarizeResultsFramework,
+  type ResultsFrameworkDbRow,
+} from '@/lib/results-framework-query';
 
 export async function GET() {
   try {
@@ -115,6 +127,24 @@ export async function GET() {
       `
     });
 
+    const enrollment = await summarizeEnrollmentIndicators();
+
+    await ensureActivityRfNarrativesTable();
+    const fyKey = fyLabelForDateJulyJune();
+    const rfRows = (await query({
+      query: `
+        SELECT ${buildResultsFrameworkActivitySelect(fyKey)}
+        FROM strategic_activities sa
+        LEFT JOIN standards st ON st.id = sa.standard_id
+        LEFT JOIN departments d ON d.id = sa.department_id
+        ${RESULTS_FRAMEWORK_NARRATIVE_JOIN}
+        WHERE ${MAIN_STRATEGIC_ACTIVITY_FILTER}
+          AND ${RESULTS_FRAMEWORK_KPI_FILTER}
+      `,
+      values: [fyKey],
+    })) as ResultsFrameworkDbRow[];
+    const rfSummary = summarizeResultsFramework(mapResultsFrameworkRows(rfRows, fyKey));
+
     return NextResponse.json({
       stats: {
         totalActivities: (totalActivities as any[])[0]?.count || 0,
@@ -126,8 +156,23 @@ export async function GET() {
         onTrackActivities: (onTrackActivities as any[])[0]?.count || 0,
         inProgressActivities: (inProgressActivities as any[])[0]?.count || 0,
         delayedActivities: (delayedActivities as any[])[0]?.count || 0,
-        hrAlertCount: (hrAlerts as any[]).length
+        hrAlertCount: (hrAlerts as any[]).length,
+        enrollmentProgrammes: enrollment.programme.programmes,
+        enrollmentProgrammeStudents: enrollment.programme.totalStudents,
+        enrollmentCourseUnits: enrollment.courseUnit.courseUnits,
+        enrollmentCourseUnitStudents: enrollment.courseUnit.totalStudents,
+        enrollmentPwdStudents:
+          enrollment.programme.pwdCount + enrollment.courseUnit.pwdCount,
+        rfIndicators: rfSummary.total,
+        rfAssessed: rfSummary.assessed,
+        rfUnderperformance: rfSummary.underperformance,
+        rfAchievement: rfSummary.achievement,
+        rfOverachievement: rfSummary.overachievement,
+        rfNarrativesMissing: rfSummary.narrativesMissing,
       },
+      enrollment,
+      rfSummary,
+      financialYear: fyKey,
       departmentPerformance: (departmentPerformance as any[]).map(department => ({
         name: department.name,
         progress: Math.min(100, Math.max(0, Number(department.progress) || 0))

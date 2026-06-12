@@ -1,8 +1,15 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 import { Modal, Button } from "react-bootstrap";
 import axios from "axios";
+import {
+  PERFORMANCE_STATUS_LABELS,
+  PRACTICE_TYPE_LABELS,
+  computePerformanceStatus,
+  performanceStatusBadgeStyle,
+  type PracticeType,
+} from "@/lib/results-framework";
 
 
 export interface StaffTaskSubmissionContext {
@@ -33,6 +40,8 @@ export default function TaskSubmissionModal({ show, onHide, task, onSuccess }: T
   const [submitting, setSubmitting] = useState(false);
   const [fetching, setFetching] = useState(false);
   const [kpiActualValue, setKpiActualValue] = useState<string>("");
+  const [outcomeReason, setOutcomeReason] = useState("");
+  const [practiceType, setPracticeType] = useState<PracticeType | "">("");
   const [errorMsg, setErrorMsg] = useState("");
   const [successMsg, setSuccessMsg] = useState("");
 
@@ -46,6 +55,8 @@ export default function TaskSubmissionModal({ show, onHide, task, onSuccess }: T
       setExistingAttachments([]);
       setSubmission(null);
       setKpiActualValue("");
+      setOutcomeReason("");
+      setPracticeType("");
       setErrorMsg("");
       setSuccessMsg("");
       
@@ -60,7 +71,9 @@ export default function TaskSubmissionModal({ show, onHide, task, onSuccess }: T
             setSubmission(found);
             setDescription(found.description || "");
             setKpiActualValue(found.kpi_actual_value != null ? found.kpi_actual_value.toString() : "");
-            
+            setOutcomeReason(found.outcome_reason || "");
+            setPracticeType(found.practice_type || "");
+
             if (found.attachments) {
               const parts = found.attachments.split(" | ");
               const files: string[] = [];
@@ -126,6 +139,20 @@ export default function TaskSubmissionModal({ show, onHide, task, onSuccess }: T
       setErrorMsg("Report Details are required to submit.");
       return;
     }
+    if (!isDraft && task.task_type === "kpi_driver") {
+      if (!kpiActualValue.trim()) {
+        setErrorMsg("KPI achieved value is required.");
+        return;
+      }
+      if (!outcomeReason.trim() || outcomeReason.trim().length < 10) {
+        setErrorMsg("Please explain the outcome (at least 10 characters).");
+        return;
+      }
+      if (!practiceType) {
+        setErrorMsg("Please indicate existing practice or new innovation.");
+        return;
+      }
+    }
 
     setSubmitting(true);
     setErrorMsg("");
@@ -138,6 +165,8 @@ export default function TaskSubmissionModal({ show, onHide, task, onSuccess }: T
       formData.append("evidenceLink", evidenceLink);
       formData.append("isDraft", isDraft ? "true" : "false");
       formData.append("kpiActualValue", kpiActualValue);
+      formData.append("outcomeReason", outcomeReason);
+      formData.append("practiceType", practiceType);
       if (attachedFile) {
         formData.append("file", attachedFile);
       }
@@ -157,6 +186,16 @@ export default function TaskSubmissionModal({ show, onHide, task, onSuccess }: T
       setSubmitting(false);
     }
   };
+
+  const previewStatus = useMemo(() => {
+    if (task?.task_type !== "kpi_driver" || !kpiActualValue.trim()) return null;
+    const actual = Number(kpiActualValue);
+    const target = task.kpi_target_value ?? null;
+    if (Number.isNaN(actual)) return null;
+    return computePerformanceStatus(target, actual);
+  }, [task, kpiActualValue]);
+
+  const previewBadge = performanceStatusBadgeStyle(previewStatus);
 
   return (
     <Modal show={show} onHide={() => !submitting && onHide()} centered backdrop="static" keyboard={false} size="lg">
@@ -232,24 +271,73 @@ export default function TaskSubmissionModal({ show, onHide, task, onSuccess }: T
             </div>
 
             {task?.task_type === 'kpi_driver' && (
-              <div className="col-12">
-                <label className="form-label fw-bold text-dark small mb-1">
-                  KPI Value
-                </label>
-                <input
-                  type="text"
-                  className="form-control shadow-sm"
-                  placeholder="Enter achieved value..."
-                  value={kpiActualValue}
-                  onChange={(e) => {
-                    const val = e.target.value;
-                    if (val === '' || /^-?\d*\.?\d*$/.test(val)) {
-                      setKpiActualValue(val);
-                    }
-                  }}
-                  disabled={submitting}
-                />
-              </div>
+              <>
+                <div className="col-12">
+                  <div className="p-3 rounded-3" style={{ background: '#f0f9ff', border: '1px solid #bae6fd' }}>
+                    <div className="small text-muted mb-1">Results Framework</div>
+                    <div className="d-flex flex-wrap gap-4 small">
+                      <div>
+                        <span className="text-muted">Target:</span>{' '}
+                        <strong>{task.kpi_target_value != null ? task.kpi_target_value : '—'}</strong>
+                      </div>
+                      {previewStatus ? (
+                        <div>
+                          <span className="text-muted">Performance:</span>{' '}
+                          <span className="badge" style={{ background: previewBadge.bg, color: previewBadge.color }}>
+                            {PERFORMANCE_STATUS_LABELS[previewStatus]}
+                          </span>
+                        </div>
+                      ) : null}
+                    </div>
+                  </div>
+                </div>
+                <div className="col-12">
+                  <label className="form-label fw-bold text-dark small mb-1">
+                    Achieved value <span className="text-danger">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    className="form-control shadow-sm"
+                    placeholder="Enter achieved value..."
+                    value={kpiActualValue}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      if (val === '' || /^-?\d*\.?\d*$/.test(val)) {
+                        setKpiActualValue(val);
+                      }
+                    }}
+                    disabled={submitting}
+                  />
+                </div>
+                <div className="col-12">
+                  <label className="form-label fw-bold text-dark small">
+                    Reason for outcome <span className="text-danger">*</span>
+                  </label>
+                  <textarea
+                    className="form-control form-control-sm"
+                    rows={3}
+                    placeholder="Explain why the result is under, at, or above target…"
+                    value={outcomeReason}
+                    onChange={(e) => setOutcomeReason(e.target.value)}
+                    disabled={submitting}
+                  />
+                </div>
+                <div className="col-12">
+                  <label className="form-label fw-bold text-dark small">
+                    Result source <span className="text-danger">*</span>
+                  </label>
+                  <select
+                    className="form-select form-select-sm"
+                    value={practiceType}
+                    onChange={(e) => setPracticeType(e.target.value as PracticeType | "")}
+                    disabled={submitting}
+                  >
+                    <option value="">Select…</option>
+                    <option value="existing_practice">{PRACTICE_TYPE_LABELS.existing_practice}</option>
+                    <option value="innovation">{PRACTICE_TYPE_LABELS.innovation}</option>
+                  </select>
+                </div>
+              </>
             )}
             
             <div className="col-12">

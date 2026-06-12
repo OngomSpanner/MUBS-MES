@@ -10,6 +10,18 @@ const MAIN_ACTIVITY_FILTER = `
   AND COALESCE(TRIM(sa.source), '') <> ''
 `;
 
+/** Latest end date HOD set on process steps for this strategic activity (parent or child tasks). */
+const HOD_END_DATE_JOIN = `
+  LEFT JOIN (
+    SELECT
+      COALESCE(act.parent_id, act.id) AS strategic_activity_id,
+      MAX(spa.end_date) AS hod_end_date
+    FROM staff_process_assignments spa
+    INNER JOIN strategic_activities act ON spa.activity_id = act.id
+    GROUP BY COALESCE(act.parent_id, act.id)
+  ) hod ON hod.strategic_activity_id = sa.id
+`;
+
 export type DepartmentHealth = 'Good' | 'Watch' | 'Critical';
 
 export type DepartmentComplianceRow = {
@@ -182,21 +194,24 @@ export async function getDepartmentComplianceBundle(managedUnitId: number, manag
           COALESCE(NULLIF(TRIM(d.external_name), ''), d.name) AS department,
           sa.status,
           sa.progress,
-          sa.end_date,
+          hod.hod_end_date,
           CASE
-            WHEN sa.status = 'overdue' OR (sa.end_date IS NOT NULL AND sa.end_date < CURDATE())
+            WHEN sa.status = 'overdue'
+              OR (hod.hod_end_date IS NOT NULL AND hod.hod_end_date < CURDATE())
             THEN 'Critical'
             ELSE 'Warning'
           END AS statusLabel
         FROM strategic_activities sa
         JOIN departments d ON sa.department_id = d.id
+        ${HOD_END_DATE_JOIN}
         WHERE d.id IN (${deptPlaceholders}) AND ${MAIN_ACTIVITY_FILTER}
+          AND hod.hod_end_date IS NOT NULL
           AND (
             sa.status = 'overdue'
-            OR (sa.end_date IS NOT NULL AND sa.end_date < CURDATE())
-            OR (sa.status != 'completed' AND sa.end_date IS NOT NULL AND DATEDIFF(sa.end_date, CURDATE()) <= 7)
+            OR hod.hod_end_date < CURDATE()
+            OR (sa.status != 'completed' AND DATEDIFF(hod.hod_end_date, CURDATE()) <= 7)
           )
-        ORDER BY sa.end_date ASC
+        ORDER BY hod.hod_end_date ASC
         LIMIT 8
       `,
       values: scopedDepartmentIds,
@@ -208,7 +223,7 @@ export async function getDepartmentComplianceBundle(managedUnitId: number, manag
         department: string;
         statusLabel: 'Critical' | 'Warning';
         progress: number;
-        end_date: string | null;
+        hod_end_date: string | null;
       }>
     >,
   ]);
@@ -288,7 +303,7 @@ export async function getDepartmentComplianceBundle(managedUnitId: number, manag
     departmentId: r.departmentId,
     status: r.statusLabel,
     progress: Number(r.progress || 0),
-    dueDate: r.end_date,
+    dueDate: r.hod_end_date,
   }));
 
   return {
@@ -325,24 +340,28 @@ export async function getDepartmentActivitiesForAmbassador(
         sa.title,
         sa.status,
         sa.progress,
-        sa.end_date,
+        hod.hod_end_date,
         sa.start_date,
         CASE
-          WHEN sa.status = 'overdue' OR (sa.end_date IS NOT NULL AND sa.end_date < CURDATE())
+          WHEN sa.status = 'overdue'
+            OR (hod.hod_end_date IS NOT NULL AND hod.hod_end_date < CURDATE() AND sa.status != 'completed')
           THEN 'Delayed'
           WHEN sa.status = 'completed' THEN 'On Track'
           WHEN sa.status IN ('in_progress', 'pending') THEN 'In Progress'
           ELSE sa.status
         END AS statusLabel
       FROM strategic_activities sa
+      ${HOD_END_DATE_JOIN}
       WHERE sa.department_id = ?
         AND ${MAIN_ACTIVITY_FILTER}
       ORDER BY
         CASE
-          WHEN sa.status = 'overdue' OR (sa.end_date IS NOT NULL AND sa.end_date < CURDATE()) THEN 0
+          WHEN sa.status = 'overdue'
+            OR (hod.hod_end_date IS NOT NULL AND hod.hod_end_date < CURDATE() AND sa.status != 'completed')
+          THEN 0
           ELSE 1
         END,
-        sa.end_date ASC,
+        hod.hod_end_date ASC,
         sa.title ASC
     `,
     values: [departmentId],
@@ -352,7 +371,7 @@ export async function getDepartmentActivitiesForAmbassador(
     status: string;
     statusLabel: string;
     progress: number;
-    end_date: string | null;
+    hod_end_date: string | null;
     start_date: string | null;
   }>;
 
@@ -364,7 +383,7 @@ export async function getDepartmentActivitiesForAmbassador(
       status: a.statusLabel,
       progress: Number(a.progress || 0),
       startDate: a.start_date,
-      endDate: a.end_date,
+      endDate: a.hod_end_date,
     })),
   };
 }
@@ -396,9 +415,10 @@ export async function listAllManagedUnitActivities(
         sa.department_id AS departmentId,
         COALESCE(NULLIF(TRIM(d.external_name), ''), d.name, '') AS department,
         sa.progress,
-        sa.end_date,
+        hod.hod_end_date,
         CASE
-          WHEN sa.status = 'overdue' OR (sa.end_date IS NOT NULL AND sa.end_date < CURDATE())
+          WHEN sa.status = 'overdue'
+            OR (hod.hod_end_date IS NOT NULL AND hod.hod_end_date < CURDATE() AND sa.status != 'completed')
           THEN 'Delayed'
           WHEN sa.status = 'completed' THEN 'On Track'
           WHEN sa.status IN ('in_progress', 'pending') THEN 'In Progress'
@@ -406,8 +426,9 @@ export async function listAllManagedUnitActivities(
         END AS statusLabel
       FROM strategic_activities sa
       JOIN departments d ON sa.department_id = d.id
+      ${HOD_END_DATE_JOIN}
       WHERE sa.department_id IN (${deptPlaceholders}) AND ${MAIN_ACTIVITY_FILTER}
-      ORDER BY department ASC, sa.end_date ASC, sa.title ASC
+      ORDER BY department ASC, hod.hod_end_date ASC, sa.title ASC
     `,
     values: scopedDepartmentIds,
   })) as Array<{
@@ -416,7 +437,7 @@ export async function listAllManagedUnitActivities(
     departmentId: number;
     department: string;
     progress: number;
-    end_date: string | null;
+    hod_end_date: string | null;
     statusLabel: string;
   }>;
 
@@ -427,6 +448,6 @@ export async function listAllManagedUnitActivities(
     department: a.department || '—',
     status: a.statusLabel,
     progress: Number(a.progress || 0),
-    endDate: a.end_date,
+    endDate: a.hod_end_date,
   }));
 }

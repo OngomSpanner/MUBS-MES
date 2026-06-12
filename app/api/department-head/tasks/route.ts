@@ -4,6 +4,7 @@ import { cookies } from 'next/headers';
 import { verifyToken } from '@/lib/auth';
 import { getVisibleDepartmentIds, inPlaceholders } from '@/lib/department-head';
 import { insertStandardProcessRow } from '@/lib/standard-processes-db';
+import { ensureMilestoneProgressColumn } from '@/lib/milestone-progress';
 
 /** System standard: one process step so departmental tasks can use container + subtasks (same model as strategic). */
 const DEPT_WORKFLOW_STANDARD_TITLE = 'Departmental operational workflow (system)';
@@ -59,7 +60,7 @@ async function ensureDepartmentalWorkflowStandard(): Promise<{ standardId: numbe
         if (!Number.isFinite(standardId) || standardId <= 0) {
             throw new Error('Could not create departmental workflow standard');
         }
-        await insertStandardProcessRow(standardId, DEPT_WORKFLOW_STEP_NAME, 1, 1, 'days');
+        await insertStandardProcessRow(standardId, DEPT_WORKFLOW_STEP_NAME, 1, 1, 'days', 100);
     }
 
     let procs = (await query({
@@ -68,7 +69,7 @@ async function ensureDepartmentalWorkflowStandard(): Promise<{ standardId: numbe
     })) as { id: number }[];
 
     if (!procs.length) {
-        await insertStandardProcessRow(standardId, DEPT_WORKFLOW_STEP_NAME, 1, 1, 'days');
+        await insertStandardProcessRow(standardId, DEPT_WORKFLOW_STEP_NAME, 1, 1, 'days', 100);
         procs = (await query({
             query: `SELECT id FROM standard_processes WHERE standard_id = ? ORDER BY step_order ASC, id ASC LIMIT 1`,
             values: [standardId],
@@ -96,6 +97,7 @@ async function getAuthFromToken() {
 export async function GET() {
     try {
         const { departmentIds, userId } = await getAuthFromToken();
+        await ensureMilestoneProgressColumn();
         const placeholders = inPlaceholders(departmentIds.length);
         const isOverdueByDaysLeftLikeStaffView = (dueDate: string | null | undefined): boolean => {
             if (!dueDate) return false;
@@ -187,6 +189,8 @@ export async function GET() {
                     spa.end_date as dueDate,
                     spa.commentary as description,
                     sp.step_order as step_order,
+                    sp.milestone_progress,
+                    COALESCE(sa.parent_id, sa.id) as parent_strategic_activity_id,
                     spa.created_at as spa_created_at,
                     (SELECT sr2.status FROM staff_reports sr2 WHERE sr2.process_assignment_id = spa.id ORDER BY sr2.updated_at DESC LIMIT 1) as latest_report_status,
                     __DURATION_COLS__
@@ -209,22 +213,30 @@ export async function GET() {
         } catch (e: unknown) {
             const err = e as { code?: string; errno?: number };
             if (err?.code === 'ER_BAD_FIELD_ERROR' || err?.errno === 1054) {
+                const withoutMilestone = processAssignBase
+                    .replace('                    sp.milestone_progress,\n', '')
+                    .replace('                    COALESCE(sa.parent_id, sa.id) as parent_strategic_activity_id,\n', '');
                 try {
                     processAssignmentsQuery = (await query({
-                        query: processAssignBase
+                        query: withoutMilestone
                             .replace('__DURATION_COLS__', 'COALESCE(sp.duration_value, st.duration_value) as duration_value,\n                    COALESCE(sp.duration_unit, st.duration_unit) as duration_unit,\n                    ')
                             .replace('__PI_COL__', ''),
                         values: [...departmentIds],
                     })) as any[];
                 } catch {
                     processAssignmentsQuery = (await query({
-                        query: processAssignBase
+                        query: withoutMilestone
                             .replace('__DURATION_COLS__', 'st.duration_value as duration_value,\n                    st.duration_unit as duration_unit,\n                    ')
                             .replace('__PI_COL__', ''),
                         values: [...departmentIds],
                     })) as any[];
                 }
-                processAssignmentsQuery = processAssignmentsQuery.map((row: any) => ({ ...row, performance_indicator: null }));
+                processAssignmentsQuery = processAssignmentsQuery.map((row: any) => ({
+                    ...row,
+                    performance_indicator: null,
+                    milestone_progress: null,
+                    parent_strategic_activity_id: row.parent_strategic_activity_id ?? row.activity_id,
+                }));
             } else {
                 throw e;
             }

@@ -1,12 +1,15 @@
 'use client';
 
 import { Fragment, useEffect, useState, useRef, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import { useRouter, useSearchParams } from 'next/navigation';
 import axios from 'axios';
 
 import StatCard from '@/components/StatCard';
+import PortalModal from '@/components/PortalModal';
 import DepartmentTaskCardGrid from '@/components/Department/DepartmentTaskCardGrid';
 import EvaluateSubmissionModal, { parseEvidenceItems, type FeedbackHistoryEntry } from '@/components/Department/EvaluateSubmissionModal';
+import MilestoneProgressPanel from '@/components/Department/MilestoneProgressPanel';
 import { addDurationToStartDate, formatStandardProcessDuration, PROCESS_DURATION_UNIT_OPTIONS } from '@/lib/process-duration';
 import { PROCESS_REASSIGN_REASONS } from '@/lib/process-reassign-reasons';
 
@@ -36,6 +39,8 @@ interface Task {
     duration_value?: number | null;
     duration_unit?: string | null;
     source?: string | null;
+    milestone_progress?: number | null;
+    parent_strategic_activity_id?: number | null;
 }
 
 type ProcessSubtask = {
@@ -137,7 +142,9 @@ export default function DepartmentTasks({ initialActivity, initialAssignee }: De
         actual_value?: number,
         kpi_target_value?: number,
         target_kpi?: string,
-        status?: string
+        status?: string,
+        progress?: number,
+        standard_id?: number | null,
     }[]>([]);
     const [departmentUsers, setDepartmentUsers] = useState<{ id: number; full_name: string; position: string | null }[]>([]);
     const [loading, setLoading] = useState(true);
@@ -320,7 +327,9 @@ export default function DepartmentTasks({ initialActivity, initialAssignee }: De
                     actual_value: full?.actual_value,
                     kpi_target_value: full?.kpi_target_value ?? fromT?.kpi_target_value,
                     target_kpi: full?.target_kpi || fromT?.target_kpi,
-                    status: full?.status
+                    status: full?.status,
+                    progress: full?.progress != null ? Number(full.progress) : undefined,
+                    standard_id: full?.standard_id,
                 };
             });
 
@@ -489,7 +498,12 @@ export default function DepartmentTasks({ initialActivity, initialAssignee }: De
     }, [reassignSubtaskCtx]);
 
     // Helper to update URL and trigger navigation
-    const navigate = (mode: 'table' | 'grid' | 'activity', activity?: string, status?: string) => {
+    const navigate = (
+        mode: 'table' | 'grid' | 'activity',
+        activity?: string,
+        status?: string,
+        activityId?: number | null
+    ) => {
         const params = new URLSearchParams(searchParams.toString());
         
         // Ensure we preserve the page context
@@ -500,6 +514,12 @@ export default function DepartmentTasks({ initialActivity, initialAssignee }: De
             params.set('activity', activity);
         } else if (mode === 'activity') {
             params.delete('activity');
+        }
+
+        if (activityId != null && Number.isFinite(activityId) && activityId > 0) {
+            params.set('activityId', String(activityId));
+        } else if (mode === 'activity') {
+            params.delete('activityId');
         }
         
         if (status && status !== 'All') {
@@ -1105,6 +1125,19 @@ export default function DepartmentTasks({ initialActivity, initialAssignee }: De
             const avgProgress = Math.round(
                 scopedTasks.reduce((sum, t) => sum + (t.progress || 0), 0) / (total || 1)
             );
+            const parentId =
+                scopedTasks.find((t) => t.parent_strategic_activity_id != null)?.parent_strategic_activity_id ??
+                scopedTasks.find((t) => t.activity_id != null)?.activity_id ??
+                null;
+            const parentMeta =
+                parentId != null ? availableActivities.find((a) => a.id === parentId) : undefined;
+            const hasMilestones = scopedTasks.some(
+                (t) => t.tier === 'process_task' && t.milestone_progress != null
+            );
+            const milestoneParentProgress =
+                parentMeta?.progress != null ? Math.round(Number(parentMeta.progress)) : null;
+            const displayProgress =
+                hasMilestones && milestoneParentProgress != null ? milestoneParentProgress : avgProgress;
             return {
                 ...group,
                 tasks: scopedTasks,
@@ -1113,9 +1146,18 @@ export default function DepartmentTasks({ initialActivity, initialAssignee }: De
                 inProgress,
                 todo,
                 avgProgress,
+                displayProgress,
+                hasMilestones,
+                parentStrategicActivityId: parentId,
             };
         })
-        .filter(Boolean) as typeof activityGroups;
+        .filter(Boolean) as Array<
+            (typeof activityGroups)[number] & {
+                displayProgress: number;
+                hasMilestones: boolean;
+                parentStrategicActivityId: number | null;
+            }
+        >;
 
     // Evaluation Helpers & Handlers
     const handleViewEvaluation = async (taskId: number) => {
@@ -1584,13 +1626,15 @@ export default function DepartmentTasks({ initialActivity, initialAssignee }: De
 
                                             <div className="mt-auto">
                                                 <div className="d-flex justify-content-between align-items-center mb-1">
-                                                    <span className="text-muted small">Completion</span>
-                                                    <span className="fw-bold small">{group.avgProgress}%</span>
+                                                    <span className="text-muted small">
+                                                        {group.hasMilestones ? 'Milestone progress' : 'Completion'}
+                                                    </span>
+                                                    <span className="fw-bold small">{group.displayProgress ?? group.avgProgress}%</span>
                                                 </div>
                                                 <div className="progress mb-3" style={{ height: '8px', borderRadius: '10px' }}>
                                                     <div className="progress-bar" style={{ 
-                                                        width: `${group.avgProgress}%`,
-                                                        background: group.avgProgress > 70 ? '#10b981' : (group.avgProgress > 30 ? '#f59e0b' : '#3b82f6'),
+                                                        width: `${group.displayProgress ?? group.avgProgress}%`,
+                                                        background: (group.displayProgress ?? group.avgProgress) > 70 ? '#10b981' : ((group.displayProgress ?? group.avgProgress) > 30 ? '#f59e0b' : '#3b82f6'),
                                                         borderRadius: '10px'
                                                     }}></div>
                                                 </div>
@@ -1617,7 +1661,14 @@ export default function DepartmentTasks({ initialActivity, initialAssignee }: De
                                                     <div className="ms-2">
                                                         <button 
                                                             className="btn btn-sm fw-bold d-flex align-items-center gap-1"
-                                                            onClick={() => navigate('table', group.title)}
+                                                            onClick={() =>
+                                                                navigate(
+                                                                    'table',
+                                                                    group.title,
+                                                                    undefined,
+                                                                    group.parentStrategicActivityId ?? undefined
+                                                                )
+                                                            }
                                                             style={{ borderRadius: '8px', padding: '6px 12px', background: 'var(--mubs-blue)', color: '#fff', fontSize: '0.75rem' }}
                                                         >
                                                             Details
@@ -1652,7 +1703,13 @@ export default function DepartmentTasks({ initialActivity, initialAssignee }: De
                         />
                     </div>
                 ) : (
-                    <div className="table-responsive bg-white">
+                    <div className="bg-white">
+                        {activityIdFilter != null && activityIdFilter > 0 && (
+                            <div className="px-4 pt-3">
+                                <MilestoneProgressPanel activityId={activityIdFilter} />
+                            </div>
+                        )}
+                    <div className="table-responsive">
                         <table className="table mb-0 align-middle department-tasks-processes-table">
                             <thead className="bg-light">
                             <tr>
@@ -1810,6 +1867,13 @@ export default function DepartmentTasks({ initialActivity, initialAssignee }: De
                                                 </div>
                                                 <span className="small fw-normal text-dark" style={{ fontSize: '.75rem', textTransform: 'none' }}>{task.progress || 0}%</span>
                                             </div>
+                                            {task.tier === 'process_task' &&
+                                                task.milestone_progress != null &&
+                                                task.status === 'Completed' && (
+                                                    <div className="text-muted mt-1" style={{ fontSize: '.65rem' }}>
+                                                        Milestone weight: {task.milestone_progress}%
+                                                    </div>
+                                                )}
                                         </td>
                                         <td
                                             className="small fw-normal"
@@ -1938,6 +2002,7 @@ export default function DepartmentTasks({ initialActivity, initialAssignee }: De
                             </tbody>
                         </table>
                     </div>
+                    </div>
                 )}
                 {/* Footer: pagination (table/grid, staff-style; hidden when no rows) */}
                 {viewMode !== 'activity' && filteredTasks.length > 0 && (
@@ -2033,19 +2098,7 @@ export default function DepartmentTasks({ initialActivity, initialAssignee }: De
                 )}
             </div>
 
-            {tableDetailsTask && (
-                <div
-                    className="modal-backdrop fade show"
-                    style={{ zIndex: 1048, background: 'rgba(15, 23, 42, 0.55)', backdropFilter: 'blur(3px)' }}
-                    onClick={() => setTableDetailsTask(null)}
-                />
-            )}
-            <div
-                className={`modal fade ${tableDetailsTask ? 'show d-block' : ''}`}
-                tabIndex={-1}
-                style={{ zIndex: 1049 }}
-                aria-hidden={!tableDetailsTask}
-            >
+            <PortalModal show={!!tableDetailsTask} onHide={() => setTableDetailsTask(null)} zIndex={1049}>
                 <div className="modal-dialog modal-dialog-centered modal-dialog-scrollable" style={{ maxWidth: '440px' }}>
                     <div className="modal-content border-0 shadow-lg" style={{ borderRadius: '12px' }}>
                         {tableDetailsTask && (
@@ -2154,6 +2207,22 @@ export default function DepartmentTasks({ initialActivity, initialAssignee }: De
                                                 </span>
                                             </div>
                                         </dd>
+                                        {tableDetailsTask.tier === 'process_task' &&
+                                            tableDetailsTask.milestone_progress != null && (
+                                                <>
+                                                    <dt className="col-5 text-muted text-uppercase fw-bold" style={{ fontSize: '0.65rem', letterSpacing: '0.04em' }}>
+                                                        Milestone weight
+                                                    </dt>
+                                                    <dd className="col-7 mb-2 text-dark">
+                                                        {tableDetailsTask.milestone_progress}% cumulative when this process task completes
+                                                        {tableDetailsTask.status === 'Completed' && (
+                                                            <span className="badge bg-success-subtle text-success ms-2" style={{ fontSize: '0.65rem' }}>
+                                                                Achieved
+                                                            </span>
+                                                        )}
+                                                    </dd>
+                                                </>
+                                            )}
                                         <dt className="col-5 text-muted text-uppercase fw-bold" style={{ fontSize: '0.65rem', letterSpacing: '0.04em' }}>
                                             Status
                                         </dt>
@@ -2340,16 +2409,13 @@ export default function DepartmentTasks({ initialActivity, initialAssignee }: De
                         )}
                     </div>
                 </div>
-            </div>
+            </PortalModal>
 
-            {openProcessTask && (
-                <div className="modal-backdrop fade show" style={{ zIndex: 1040 }} onClick={() => !openProcessSaving && setOpenProcessTask(null)} />
-            )}
-            <div
-                className={`modal fade ${openProcessTask ? 'show d-block' : ''}`}
-                tabIndex={-1}
-                style={{ zIndex: 1050 }}
-                aria-hidden={!openProcessTask}
+            <PortalModal
+                show={!!openProcessTask}
+                onHide={() => setOpenProcessTask(null)}
+                zIndex={1050}
+                backdropDismiss={!openProcessSaving}
             >
                 <div className="modal-dialog modal-dialog-centered">
                     <div className="modal-content border-0 shadow-lg" style={{ borderRadius: '12px' }}>
@@ -2489,20 +2555,13 @@ export default function DepartmentTasks({ initialActivity, initialAssignee }: De
                         )}
                     </div>
                 </div>
-            </div>
+            </PortalModal>
 
-            {showBulkOpenModal && (
-                <div
-                    className="modal-backdrop fade show"
-                    style={{ zIndex: 1042 }}
-                    onClick={() => !bulkOpenSaving && setShowBulkOpenModal(false)}
-                />
-            )}
-            <div
-                className={`modal fade ${showBulkOpenModal ? 'show d-block' : ''}`}
-                tabIndex={-1}
-                style={{ zIndex: 1052 }}
-                aria-hidden={!showBulkOpenModal}
+            <PortalModal
+                show={showBulkOpenModal}
+                onHide={() => setShowBulkOpenModal(false)}
+                zIndex={1052}
+                backdropDismiss={!bulkOpenSaving}
             >
                 <div className="modal-dialog modal-dialog-centered">
                     <div className="modal-content border-0 shadow-lg" style={{ borderRadius: '12px' }}>
@@ -2555,16 +2614,13 @@ export default function DepartmentTasks({ initialActivity, initialAssignee }: De
                         </div>
                     </div>
                 </div>
-            </div>
+            </PortalModal>
 
-            {reassignTask && (
-                <div className="modal-backdrop fade show" style={{ zIndex: 1041 }} onClick={() => !reassignSaving && setReassignTask(null)} />
-            )}
-            <div
-                className={`modal fade ${reassignTask ? 'show d-block' : ''}`}
-                tabIndex={-1}
-                style={{ zIndex: 1051 }}
-                aria-hidden={!reassignTask}
+            <PortalModal
+                show={!!reassignTask}
+                onHide={() => setReassignTask(null)}
+                zIndex={1051}
+                backdropDismiss={!reassignSaving}
             >
                 <div className="modal-dialog modal-dialog-centered">
                     <div className="modal-content border-0 shadow-lg" style={{ borderRadius: '12px' }}>
@@ -2671,20 +2727,13 @@ export default function DepartmentTasks({ initialActivity, initialAssignee }: De
                         )}
                     </div>
                 </div>
-            </div>
+            </PortalModal>
 
-            {reassignSubtaskCtx && (
-                <div
-                    className="modal-backdrop fade show"
-                    style={{ zIndex: 1052 }}
-                    onClick={() => !reassignSubtaskSaving && setReassignSubtaskCtx(null)}
-                />
-            )}
-            <div
-                className={`modal fade ${reassignSubtaskCtx ? 'show d-block' : ''}`}
-                tabIndex={-1}
-                style={{ zIndex: 1053 }}
-                aria-hidden={!reassignSubtaskCtx}
+            <PortalModal
+                show={!!reassignSubtaskCtx}
+                onHide={() => setReassignSubtaskCtx(null)}
+                zIndex={1053}
+                backdropDismiss={!reassignSubtaskSaving}
             >
                 <div className="modal-dialog modal-dialog-centered">
                     <div className="modal-content border-0 shadow-lg" style={{ borderRadius: '12px' }}>
@@ -2804,13 +2853,15 @@ export default function DepartmentTasks({ initialActivity, initialAssignee }: De
                         )}
                     </div>
                 </div>
-            </div>
+            </PortalModal>
 
             {/* Bulk Delete Confirmation Modal UI */}
-            {showBulkDeleteModal && (
-                <div className="modal-backdrop fade show" style={{ zIndex: 1040 }}></div>
-            )}
-            <div className={`modal fade ${showBulkDeleteModal ? 'show d-block' : ''}`} tabIndex={-1} style={{ zIndex: 1050 }}>
+            <PortalModal
+                show={showBulkDeleteModal}
+                onHide={() => setShowBulkDeleteModal(false)}
+                zIndex={1050}
+                backdropDismiss={false}
+            >
                 <div className="modal-dialog modal-dialog-centered">
                     <div className="modal-content border-0 shadow-lg" style={{ borderRadius: '12px' }}>
                         <div className="modal-header border-bottom-0 pb-0 px-4 pt-4">
@@ -2843,15 +2894,10 @@ export default function DepartmentTasks({ initialActivity, initialAssignee }: De
                         </div>
                     </div>
                 </div>
-            </div>
-
-            {/* In-Page Evaluation Modals */}
-            {(evaluateModalItem || viewModalItem || isEvaluationLoading) && (
-                <div className="modal-backdrop fade show" style={{ zIndex: 1060, background: 'rgba(15, 23, 42, 0.6)', backdropFilter: 'blur(4px)' }}></div>
-            )}
+            </PortalModal>
 
             {/* 1. View Details Modal */}
-            <div className={`modal fade ${viewModalItem ? 'show d-block' : ''}`} tabIndex={-1} style={{ zIndex: 1070 }}>
+            <PortalModal show={!!viewModalItem} onHide={() => setViewModalItem(null)} zIndex={1070}>
                 <div className="modal-dialog modal-dialog-centered">
                     <div className="modal-content border-0 shadow-lg" style={{ borderRadius: '12px', overflow: 'hidden' }}>
                         <div className="modal-header border-bottom-0 pb-0 px-4 pt-4">
@@ -2939,7 +2985,7 @@ export default function DepartmentTasks({ initialActivity, initialAssignee }: De
                         )}
                     </div>
                 </div>
-            </div>
+            </PortalModal>
 
             <EvaluateSubmissionModal
                 item={evaluateModalItem}
@@ -2959,19 +3005,25 @@ export default function DepartmentTasks({ initialActivity, initialAssignee }: De
             />
 
             {/* Loading Spinner for Evaluation Fetch */}
-            {isEvaluationLoading && (
-                <div className="position-fixed top-50 start-50 translate-middle" style={{ zIndex: 1080 }}>
-                    <div className="spinner-border text-primary" role="status">
-                        <span className="visually-hidden">Loading...</span>
-                    </div>
-                </div>
-            )}
+            {isEvaluationLoading &&
+                typeof document !== 'undefined' &&
+                createPortal(
+                    <div className="position-fixed top-50 start-50 translate-middle" style={{ zIndex: 1080 }}>
+                        <div className="spinner-border text-primary" role="status">
+                            <span className="visually-hidden">Loading...</span>
+                        </div>
+                    </div>,
+                    document.body
+                )}
 
             {/* 4. Message/Alert Modal */}
-            {messageModal.show && (
-                <div className="modal-backdrop fade show" style={{ zIndex: 1100, background: 'rgba(15, 23, 42, 0.4)' }}></div>
-            )}
-            <div className={`modal fade ${messageModal.show ? 'show d-block' : ''}`} tabIndex={-1} style={{ zIndex: 1110 }}>
+            <PortalModal
+                show={messageModal.show}
+                onHide={() => setMessageModal({ ...messageModal, show: false })}
+                zIndex={1110}
+                backdropDismiss={false}
+                backdropStyle={{ background: 'rgba(15, 23, 42, 0.4)' }}
+            >
                 <div className="modal-dialog modal-dialog-centered modal-sm">
                     <div className="modal-content border-0 shadow-lg text-center" style={{ borderRadius: '16px' }}>
                         <div className="modal-body p-4">
@@ -2993,7 +3045,7 @@ export default function DepartmentTasks({ initialActivity, initialAssignee }: De
                         </div>
                     </div>
                 </div>
-            </div>
+            </PortalModal>
 
         </div>
     );

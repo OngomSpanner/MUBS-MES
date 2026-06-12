@@ -1,6 +1,14 @@
 'use client';
 
 import React from 'react';
+import PortalModal from '@/components/PortalModal';
+import {
+    PERFORMANCE_STATUS_LABELS,
+    PRACTICE_TYPE_LABELS,
+    performanceStatusBadgeStyle,
+    type PerformanceStatus,
+    type PracticeType,
+} from '@/lib/results-framework';
 
 export interface EvaluateSubmissionItem {
     id: number;
@@ -12,6 +20,10 @@ export interface EvaluateSubmissionItem {
     attachments?: string | null;
     task_type?: 'process' | 'kpi_driver';
     kpi_actual_value?: number | null;
+    kpi_target_value?: number | null;
+    performance_status?: PerformanceStatus | null;
+    outcome_reason?: string | null;
+    practice_type?: PracticeType | null;
 }
 
 export function parseEvidenceItems(attachments?: string | null): { label: string; url: string }[] {
@@ -90,7 +102,7 @@ const EvaluateSubmissionModal: React.FC<EvaluateSubmissionModalProps> = ({
     };
 
     return (
-        <div className={`modal fade ${open ? 'show d-block' : ''}`} tabIndex={-1} style={{ zIndex }}>
+        <PortalModal show={open} onHide={onClose} zIndex={zIndex} backdropDismiss={!isSubmitting}>
             <div className="modal-dialog modal-dialog-centered">
                 <div className="modal-content border-0 shadow-lg" style={{ borderRadius: '12px' }}>
                     <div className="modal-header border-bottom-0 pb-0 px-4 pt-4">
@@ -153,6 +165,48 @@ const EvaluateSubmissionModal: React.FC<EvaluateSubmissionModalProps> = ({
                                     >
                                         {item.report_summary}
                                     </p>
+                                </div>
+                            )}
+                            {item.task_type === 'kpi_driver' && (
+                                <div className="mt-3 pt-3 border-top border-light">
+                                    <div className="fw-semibold text-dark mb-2" style={{ fontSize: '0.8rem' }}>
+                                        Results Framework
+                                    </div>
+                                    <div className="d-flex flex-wrap gap-3 small mb-2">
+                                        <div>
+                                            <span className="text-muted">Target:</span>{' '}
+                                            <strong>{item.kpi_target_value != null ? item.kpi_target_value : '—'}</strong>
+                                        </div>
+                                        <div>
+                                            <span className="text-muted">Actual:</span>{' '}
+                                            <strong>{item.kpi_actual_value != null ? item.kpi_actual_value : '—'}</strong>
+                                        </div>
+                                        {item.performance_status ? (
+                                            <div>
+                                                <span className="text-muted">Status:</span>{' '}
+                                                <span
+                                                    className="badge"
+                                                    style={{
+                                                        background: performanceStatusBadgeStyle(item.performance_status).bg,
+                                                        color: performanceStatusBadgeStyle(item.performance_status).color,
+                                                        fontSize: '0.65rem',
+                                                    }}
+                                                >
+                                                    {PERFORMANCE_STATUS_LABELS[item.performance_status]}
+                                                </span>
+                                            </div>
+                                        ) : null}
+                                    </div>
+                                    {item.practice_type ? (
+                                        <div className="small text-muted mb-1">
+                                            Source: <strong>{PRACTICE_TYPE_LABELS[item.practice_type]}</strong>
+                                        </div>
+                                    ) : null}
+                                    {item.outcome_reason ? (
+                                        <p className="mb-0 small text-secondary" style={{ whiteSpace: 'pre-wrap' }}>
+                                            {item.outcome_reason}
+                                        </p>
+                                    ) : null}
                                 </div>
                             )}
                         </div>
@@ -323,7 +377,7 @@ const EvaluateSubmissionModal: React.FC<EvaluateSubmissionModalProps> = ({
                     </div>
                 </div>
             </div>
-        </div>
+        </PortalModal>
     );
 };
 

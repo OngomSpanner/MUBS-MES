@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { Modal, Button, Form } from 'react-bootstrap';
 import type { CourseUnitEnrollmentRecord } from '@/lib/ambassador/enrollment-records';
+import FacultySelectField from '@/components/Enrollment/FacultySelectField';
 
 export type { CourseUnitEnrollmentRecord };
 
@@ -14,6 +15,7 @@ type CourseUnitEnrollmentEntryModalProps = {
   error: string | null;
   onHide: () => void;
   onSave: (payload: {
+    facultyName: string;
     courseUnitName: string;
     totalStudents: number;
     maleCount: number;
@@ -25,6 +27,7 @@ type CourseUnitEnrollmentEntryModalProps = {
 function formDefaults(mode: 'create' | 'edit', record: CourseUnitEnrollmentRecord | null) {
   if (record && mode === 'edit') {
     return {
+      facultyName: record.facultyName,
       courseUnitName: record.courseUnitName,
       totalStudents: String(record.totalStudents),
       maleCount: String(record.maleCount),
@@ -33,6 +36,7 @@ function formDefaults(mode: 'create' | 'edit', record: CourseUnitEnrollmentRecor
     };
   }
   return {
+    facultyName: '',
     courseUnitName: '',
     totalStudents: '0',
     maleCount: '0',
@@ -50,6 +54,7 @@ function CourseUnitEnrollmentForm({
   onSave,
 }: Omit<CourseUnitEnrollmentEntryModalProps, 'show'>) {
   const defaults = formDefaults(mode, record);
+  const [facultyName, setFacultyName] = useState(defaults.facultyName);
   const [courseUnitName, setCourseUnitName] = useState(defaults.courseUnitName);
   const [totalStudents, setTotalStudents] = useState(defaults.totalStudents);
   const [maleCount, setMaleCount] = useState(defaults.maleCount);
@@ -58,8 +63,9 @@ function CourseUnitEnrollmentForm({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!courseUnitName.trim()) return;
+    if (!courseUnitName.trim() || !facultyName.trim()) return;
     onSave({
+      facultyName: facultyName.trim(),
       courseUnitName: courseUnitName.trim(),
       totalStudents: Math.max(0, Number(totalStudents) || 0),
       maleCount: Math.max(0, Number(maleCount) || 0),
@@ -72,6 +78,7 @@ function CourseUnitEnrollmentForm({
     <Form onSubmit={handleSubmit}>
       <Modal.Body>
         {error && <div className="alert alert-danger py-2 small">{error}</div>}
+        <FacultySelectField value={facultyName} onChange={setFacultyName} disabled={saving} />
         <Form.Group className="mb-3">
           <Form.Label className="fw-bold small">Course unit</Form.Label>
           <Form.Control value={courseUnitName} onChange={(e) => setCourseUnitName(e.target.value)} required />

@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import PortalModal from '@/components/PortalModal';
 
 
 interface FeedbackItem {
@@ -74,10 +75,7 @@ export default function StaffFeedback() {
     return (
         <div className="content-area w-100 position-relative">
             {/* Detailed Feedback Modal */}
-            {selectedItem && (
-                <div className="modal-backdrop fade show" style={{ zIndex: 1040, background: 'rgba(15, 23, 42, 0.6)', backdropFilter: 'blur(4px)' }}></div>
-            )}
-            <div className={`modal fade ${selectedItem ? 'show d-block' : ''}`} tabIndex={-1} style={{ zIndex: 1050 }}>
+            <PortalModal show={!!selectedItem} onHide={() => setSelectedItem(null)} zIndex={1050}>
                 <div className="modal-dialog modal-dialog-centered">
                     <div className="modal-content border-0 shadow-lg" style={{ borderRadius: '16px', overflow: 'hidden' }}>
                         <div className="modal-header bg-light border-bottom border-light-subtle px-4 py-3">
@@ -138,7 +136,7 @@ export default function StaffFeedback() {
                         {/* Modal footer removed per request */}
                     </div>
                 </div>
-            </div>
+            </PortalModal>
 
             {/* Performance summary banner */}
             <div className="p-4 mb-4 rounded-3" style={{ background: 'linear-gradient(135deg,#0f172a,var(--mubs-navy))', border: '1px solid rgba(255,255,255,.1)' }}>

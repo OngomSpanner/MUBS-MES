@@ -5,6 +5,7 @@ import axios from 'axios';
 import { useRouter } from 'next/navigation';
 
 import StatCard from '@/components/StatCard';
+import PortalModal from '@/components/PortalModal';
 import { expandProcessAssignmentsForDisplay } from '@/lib/process-assignment-display';
 
 type Activity = {
@@ -663,18 +664,11 @@ export default function DepartmentalActivities() {
         </div>
       </div>
 
-      {showCreateTaskModal && (
-        <div
-          className="modal-backdrop fade show"
-          style={{ zIndex: 1047, background: 'rgba(15, 23, 42, 0.55)', backdropFilter: 'blur(3px)' }}
-          onClick={() => !createSaving && setShowCreateTaskModal(false)}
-        />
-      )}
-      <div
-        className={`modal fade ${showCreateTaskModal ? 'show d-block' : ''}`}
-        tabIndex={-1}
-        style={{ zIndex: 1048 }}
-        aria-hidden={!showCreateTaskModal}
+      <PortalModal
+        show={showCreateTaskModal}
+        onHide={() => setShowCreateTaskModal(false)}
+        zIndex={1048}
+        backdropDismiss={!createSaving}
       >
         <div
           className="modal-dialog modal-dialog-centered modal-dialog-scrollable"
@@ -998,18 +992,10 @@ export default function DepartmentalActivities() {
             </div>
           </div>
         </div>
-      </div>
+      </PortalModal>
 
       {selected && (
-        <div
-          className={`modal fade ${showModal ? 'show d-block' : ''}`}
-          tabIndex={-1}
-          style={{
-            backgroundColor: showModal ? 'rgba(15, 23, 42, 0.6)' : 'transparent',
-            zIndex: 1050,
-            backdropFilter: 'blur(4px)',
-          }}
-        >
+        <PortalModal show={showModal} onHide={closeActivityDetailModal} zIndex={1050}>
           <div className="modal-dialog modal-dialog-centered modal-dialog-scrollable">
             <div className="modal-content border-0 shadow-lg" style={{ borderRadius: '12px', overflow: 'hidden' }}>
               <div className="modal-header border-bottom-0 pb-0 px-4 pt-4">
@@ -1441,27 +1427,17 @@ export default function DepartmentalActivities() {
               </div>
             </div>
           </div>
-        </div>
+        </PortalModal>
       )}
 
-      {showAssignmentsRequiredDialog && (
-        <div
-          className="modal fade show d-block"
-          tabIndex={-1}
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="dept-assignments-required-title"
-          style={{
-            backgroundColor: 'rgba(15, 23, 42, 0.55)',
-            zIndex: 1080,
-            backdropFilter: 'blur(2px)',
-          }}
-          onClick={() => setShowAssignmentsRequiredDialog(false)}
-        >
+      <PortalModal
+        show={showAssignmentsRequiredDialog}
+        onHide={() => setShowAssignmentsRequiredDialog(false)}
+        zIndex={1080}
+      >
           <div
             className="modal-dialog modal-dialog-centered modal-sm"
             role="document"
-            onClick={(e) => e.stopPropagation()}
           >
             <div className="modal-content border-0 shadow-lg" style={{ borderRadius: '14px', overflow: 'hidden' }}>
               <div className="modal-body p-4 text-center">
@@ -1497,11 +1473,22 @@ export default function DepartmentalActivities() {
               </div>
             </div>
           </div>
-        </div>
-      )}
+      </PortalModal>
 
       {showAssignModal && assigningTask && selected && (
-        <div className="modal fade show d-block" tabIndex={-1} style={{ backgroundColor: 'rgba(15,23,42,0.7)', zIndex: 1060 }}>
+        <PortalModal
+          show
+          onHide={() => {
+            setShowAssignModal(false);
+            setAssignStaffIds([]);
+            setAssignStaffSearchTerm('');
+            setAssignmentSectionId('');
+            setAssignBreakdownEnabled(false);
+            setAssignSubtasks([]);
+          }}
+          zIndex={1060}
+          backdropDismiss={!assignSaving}
+        >
           <div className="modal-dialog modal-dialog-centered modal-lg" style={{ maxWidth: '640px' }}>
             <div className="modal-content border-0 shadow-lg" style={{ borderRadius: '12px' }}>
               <div className="modal-header pb-0 px-4 pt-4 border-0 align-items-start">
@@ -1810,7 +1797,7 @@ export default function DepartmentalActivities() {
               </div>
             </div>
           </div>
-        </div>
+        </PortalModal>
       )}
     </div>
   );

@@ -19,19 +19,32 @@ function LayoutContent({ children, sidebarOpen, setSidebarOpen }: any) {
 
   const getPageTitle = () => {
     const key = getPageKey();
-    if (pathname.startsWith('/ambassador') && key === 'reports') {
-      const ambassadorReportTitles: Record<string, string> = {
-        compliance: 'Dept. / Unit Activity Progress',
-        'staff-profiles': 'Staff Profiles',
-        recruitment: 'Staff Recruitment',
-        benefits: 'Staff Benefits',
-        'workforce-assessments': 'Workforce Assessments',
-        'employment-skill-status': 'Skills Assessments',
-        'programme-enrollment': 'Programme Enrollment',
-        'course-unit-enrollment': 'Course Unit Enrollment',
-      };
-      const tab = searchParams.get('tab') || 'compliance';
-      return ambassadorReportTitles[tab] ?? 'Faculty Reports & Monitoring';
+    if (pathname.startsWith('/ambassador')) {
+      if (key === 'propose-changes') return 'Propose Changes';
+      if (key === 'tracking' || key === 'dashboard') {
+        const tab = searchParams.get('tab') || 'dashboard';
+        if (tab === 'dashboard') return 'Dept. / Unit Dashboard';
+        if (tab === 'alerts') return 'Risk Alerts';
+        if (tab === 'results') return 'Results Framework';
+        if (tab === 'milestones') return 'Milestone progress';
+        if (tab === 'compliance') return 'Dept. / Unit Activity Progress';
+        return 'Tracking';
+      }
+      if (key === 'reporting' || key === 'reports') {
+        const ambassadorReportTitles: Record<string, string> = {
+          compliance: 'Dept. / Unit Activity Progress',
+          'staff-profiles': 'Staff Profiles',
+          recruitment: 'Staff Recruitment',
+          benefits: 'Staff Benefits',
+          'workforce-assessments': 'Workforce Assessments',
+          'employment-skill-status': 'Skills Assessments',
+          'programme-enrollment': 'Programme Enrollment',
+          'course-unit-enrollment': 'Course Unit Enrollment',
+        };
+        const tab = searchParams.get('tab') || (key === 'reports' ? 'compliance' : 'recruitment');
+        if (tab === 'compliance') return 'Dept. / Unit Activity Progress';
+        return ambassadorReportTitles[tab] ?? 'Unit Reporting';
+      }
     }
     if (key === 'strategic' && pathname.startsWith('/admin')) {
       return 'Standard and Activities';
@@ -41,10 +54,11 @@ function LayoutContent({ children, sidebarOpen, setSidebarOpen }: any) {
       'strategic': 'Strategic Activities',
       'standards': 'Standards & Objectives',
       'tracking': 'Activity Tracking',
+      'change-requests': 'Ambassador Proposals',
       'users': 'User Management',
-      'reports': pathname.startsWith('/ambassador')
-        ? 'Faculty Reports & Monitoring'
-        : 'Reports & Analytics',
+      'reports': 'Reports & Analytics',
+      'reporting': 'Unit Reporting',
+      'propose-changes': 'Propose Changes',
 
       // HOD specific
       'activities': 'Assigned Activities',

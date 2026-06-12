@@ -5,6 +5,7 @@ import { verifyToken } from '@/lib/auth';
 import { getVisibleDepartmentIds, inPlaceholders } from '@/lib/department-head';
 import { ensureDepartmentSectionTables, staffBelongsToDepartmentSection } from '@/lib/department-sections';
 import { ensureStaffProcessAssignmentSectionColumn } from '@/lib/staff-process-assignments-schema';
+import { ensureMilestoneProgressColumn } from '@/lib/milestone-progress';
 
 async function getHodContext(token: string) {
   const decoded = verifyToken(token) as { userId?: number; role?: string } | null;
@@ -28,6 +29,7 @@ export async function GET() {
 
     await ensureStaffProcessAssignmentSectionColumn();
     await ensureDepartmentSectionTables();
+    await ensureMilestoneProgressColumn();
 
     const hodSelect = `
         SELECT 
@@ -44,6 +46,8 @@ export async function GET() {
           spa.created_at,
           sp.step_name AS task_name,
           sp.step_order AS task_order,
+          sp.milestone_progress,
+          COALESCE(sa.parent_id, sa.id) AS parent_strategic_activity_id,
           __PI_COL__
           sp.standard_id,
           st.title AS standard_title,
@@ -73,11 +77,14 @@ export async function GET() {
     } catch (e: unknown) {
       const err = e as { code?: string; errno?: number };
       if (err?.code === 'ER_BAD_FIELD_ERROR' || err?.errno === 1054) {
+        const fallbackSelect = hodSelect
+          .replace('          sp.milestone_progress,\n', '')
+          .replace('__PI_COL__', '');
         rows = (await query({
-          query: hodSelect.replace('__PI_COL__', ''),
+          query: fallbackSelect,
           values: [ctx.department_id, ctx.department_id],
         })) as any[];
-        rows = rows.map((r) => ({ ...r, performance_indicator: null }));
+        rows = rows.map((r) => ({ ...r, performance_indicator: null, milestone_progress: null }));
       } else {
         throw e;
       }

@@ -1,5 +1,23 @@
+export const ENROLLMENT_FACULTY_UNSPECIFIED = 'Unspecified';
+
+export type EnrollmentFacultyBreakdownRow = {
+  facultyName: string;
+  programmeCount: number;
+  courseUnitCount: number;
+  totalStudents: number;
+  maleCount: number;
+  femaleCount: number;
+  pwdCount: number;
+};
+
+export function normalizeEnrollmentFacultyName(raw: unknown): string {
+  const s = String(raw ?? '').trim();
+  return s || ENROLLMENT_FACULTY_UNSPECIFIED;
+}
+
 export type ProgrammeEnrollmentRecord = {
   id: number;
+  facultyName: string;
   programmeName: string;
   totalStudents: number;
   maleCount: number;
@@ -11,6 +29,7 @@ export type ProgrammeEnrollmentRecord = {
 
 export type CourseUnitEnrollmentRecord = {
   id: number;
+  facultyName: string;
   courseUnitName: string;
   totalStudents: number;
   maleCount: number;

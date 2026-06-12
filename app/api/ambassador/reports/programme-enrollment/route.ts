@@ -1,10 +1,16 @@
 import { NextResponse } from 'next/server';
 import { query } from '@/lib/db';
 import { requireSchoolRegistrarAmbassador } from '@/lib/ambassador/school-registrar';
-import { parseEnrollmentCounts, type ProgrammeEnrollmentRecord } from '@/lib/ambassador/enrollment-records';
+import {
+  normalizeEnrollmentFacultyName,
+  parseEnrollmentCounts,
+  type ProgrammeEnrollmentRecord,
+} from '@/lib/ambassador/enrollment-records';
+import { ensureEnrollmentFacultyColumns } from '@/lib/enrollment-indicators';
 
 function mapRow(r: {
   id: number;
+  faculty_name: string;
   programme_name: string;
   total_students: number;
   male_count: number;
@@ -15,6 +21,7 @@ function mapRow(r: {
 }): ProgrammeEnrollmentRecord {
   return {
     id: r.id,
+    facultyName: normalizeEnrollmentFacultyName(r.faculty_name),
     programmeName: (r.programme_name || '').trim(),
     totalStudents: Number(r.total_students ?? 0),
     maleCount: Number(r.male_count ?? 0),
@@ -25,18 +32,29 @@ function mapRow(r: {
   };
 }
 
-export async function GET() {
+export async function GET(req: Request) {
   const auth = await requireSchoolRegistrarAmbassador();
   if ('error' in auth) return auth.error;
 
+  await ensureEnrollmentFacultyColumns();
+  const facultyFilter = new URL(req.url).searchParams.get('faculty');
+
   try {
+    const values: string[] = [];
+    let facultySql = '';
+    if (facultyFilter && facultyFilter !== 'all') {
+      facultySql = ' WHERE faculty_name = ?';
+      values.push(facultyFilter);
+    }
+
     const rows = (await query({
       query: `
-        SELECT id, programme_name, total_students, male_count, female_count, pwd_count, pwd_details, updated_at
+        SELECT id, faculty_name, programme_name, total_students, male_count, female_count, pwd_count, pwd_details, updated_at
         FROM staff_programme_enrollment
-        ORDER BY programme_name ASC
+        ${facultySql}
+        ORDER BY faculty_name ASC, programme_name ASC
       `,
-      values: [],
+      values,
     })) as Parameters<typeof mapRow>[0][];
 
     return NextResponse.json({ records: rows.map(mapRow) });
@@ -49,10 +67,15 @@ export async function POST(request: Request) {
   const auth = await requireSchoolRegistrarAmbassador();
   if ('error' in auth) return auth.error;
 
+  await ensureEnrollmentFacultyColumns();
   const body = await request.json();
   const programmeName = String(body.programmeName || '').trim();
+  const facultyName = normalizeEnrollmentFacultyName(body.facultyName);
   if (!programmeName) {
     return NextResponse.json({ message: 'Programme name is required' }, { status: 400 });
+  }
+  if (facultyName === 'Unspecified' && !String(body.facultyName || '').trim()) {
+    return NextResponse.json({ message: 'Faculty / school is required' }, { status: 400 });
   }
 
   const counts = parseEnrollmentCounts(body);
@@ -66,10 +89,11 @@ export async function POST(request: Request) {
     const result = (await query({
       query: `
         INSERT INTO staff_programme_enrollment
-          (programme_name, total_students, male_count, female_count, pwd_count, pwd_details)
-        VALUES (?, ?, ?, ?, ?, ?)
+          (faculty_name, programme_name, total_students, male_count, female_count, pwd_count, pwd_details)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
       `,
       values: [
+        facultyName,
         programmeName,
         counts.totalStudents,
         counts.maleCount,
@@ -79,11 +103,14 @@ export async function POST(request: Request) {
       ],
     })) as { insertId: number };
 
-    return NextResponse.json({ message: 'Programme enrollment saved', id: result.insertId }, { status: 201 });
+    return NextResponse.json({ id: result.insertId, message: 'Programme enrollment saved' });
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : '';
-    if (msg.includes('Duplicate') || msg.includes('uq_programme_enrollment')) {
-      return NextResponse.json({ message: 'This programme already exists' }, { status: 409 });
+    if (msg.includes('Duplicate') || msg.includes('uq_programme')) {
+      return NextResponse.json(
+        { message: 'This programme already exists for the selected faculty / school' },
+        { status: 409 }
+      );
     }
     throw e;
   }

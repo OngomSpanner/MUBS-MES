@@ -1,11 +1,9 @@
-"use client";
+'use client';
 
 import Image from 'next/image';
 import Link from 'next/link';
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import { usePathname, useSearchParams } from 'next/navigation';
-import axios from 'axios';
-
 
 interface SidebarProps {
   sidebarOpen: boolean;
@@ -13,27 +11,45 @@ interface SidebarProps {
   onLogoutClick: () => void;
 }
 
+type MenuItem = {
+  key: string;
+  href: string;
+  icon: string;
+  label: string;
+};
+
 export default function Sidebar({ sidebarOpen, setSidebarOpen, onLogoutClick }: SidebarProps) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
 
-  const ambassadorPg = pathname.startsWith('/ambassador') ? (searchParams.get('pg') || 'dashboard') : null;
-  const ambassadorTab = ambassadorPg === 'reports' ? (searchParams.get('tab') || 'compliance') : null;
+  const ambassadorPg = pathname.startsWith('/ambassador') ? searchParams.get('pg') : null;
+  const ambassadorTab = searchParams.get('tab');
 
-  const currentKey = (pathname.startsWith('/admin') || pathname.startsWith('/department-head') || pathname.startsWith('/ambassador'))
-    ? (pathname.startsWith('/ambassador') && ambassadorPg === 'reports'
-        ? `reports-${ambassadorTab}`
-        : (searchParams.get('pg') || (pathname.startsWith('/ambassador') ? 'dashboard' : 'dashboard')))
-    : (pathname.substring(1) || 'dashboard');
+  const ambassadorCurrentKey = useMemo(() => {
+    if (!pathname.startsWith('/ambassador')) return null;
+    const pg = ambassadorPg || 'dashboard';
+    if (pg === 'propose-changes') return 'propose-changes';
+    if (pg === 'reporting' || (pg === 'reports' && ambassadorTab && ambassadorTab !== 'compliance')) {
+      return 'reporting';
+    }
+    return 'tracking';
+  }, [pathname, ambassadorPg, ambassadorTab]);
+
+  const currentKey =
+    pathname.startsWith('/admin') || pathname.startsWith('/department-head') || pathname.startsWith('/staff')
+      ? searchParams.get('pg') || 'dashboard'
+      : pathname.startsWith('/ambassador')
+        ? ambassadorCurrentKey || 'dashboard'
+        : pathname.substring(1) || 'dashboard';
 
   const adminMenuItems = [
     { key: 'dashboard', href: '/admin?pg=dashboard', icon: 'dashboard', label: 'Dashboard' },
     { key: 'strategic', href: '/admin?pg=strategic', icon: 'track_changes', label: 'Standard and Activities' },
     { key: 'tracking', href: '/admin?pg=tracking', icon: 'monitoring', label: 'Activity Tracking' },
+    { key: 'change-requests', href: '/admin?pg=change-requests', icon: 'rate_review', label: 'Ambassador Proposals' },
     { key: 'users', href: '/admin?pg=users', icon: 'manage_accounts', label: 'User & Role Mgmt' },
     { key: 'reports', href: '/admin?pg=reports', icon: 'bar_chart', label: 'Reports & Monitoring' },
   ];
-
 
   const departmentHeadMenuItems = [
     { key: 'dashboard', href: '/department-head?pg=dashboard', icon: 'dashboard', label: 'Dashboard' },
@@ -44,51 +60,27 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen, onLogoutClick }: 
     { key: 'evaluations', href: '/department-head?pg=evaluations', icon: 'fact_check', label: 'Submissions & reviews' },
     { key: 'reports', href: '/department-head?pg=reports', icon: 'analytics', label: 'Performance & Reports' },
   ];
-  
-  const [canManageEnrollment, setCanManageEnrollment] = useState(false);
-  const [canViewStaffProfiles, setCanViewStaffProfiles] = useState(false);
 
-  useEffect(() => {
-    if (!pathname.startsWith('/ambassador')) return;
-    axios
-      .get('/api/ambassador/reports/staff-options')
-      .then((res) => {
-        setCanManageEnrollment(Boolean(res.data.canManageEnrollment));
-        setCanViewStaffProfiles(Boolean(res.data.canViewStaffProfiles));
-      })
-      .catch(() => {
-        setCanManageEnrollment(false);
-        setCanViewStaffProfiles(false);
-      });
-  }, [pathname]);
-
-  const ambassadorMenuItems = useMemo(() => {
-    const items = [
-      { key: 'dashboard', href: '/ambassador', icon: 'dashboard', label: 'Dept. / Unit Dashboard' },
-      { key: 'reports-compliance', href: '/ambassador?pg=reports&tab=compliance', icon: 'fact_check', label: 'Dept. / Unit Activity Progress' },
-    ];
-    if (canViewStaffProfiles) {
-      items.push({
-        key: 'reports-staff-profiles',
-        href: '/ambassador?pg=reports&tab=staff-profiles',
-        icon: 'badge',
-        label: 'Staff Profiles',
-      });
-    }
-    items.push(
-      { key: 'reports-recruitment', href: '/ambassador?pg=reports&tab=recruitment', icon: 'person_add', label: 'Staff Recruitment' },
-      { key: 'reports-benefits', href: '/ambassador?pg=reports&tab=benefits', icon: 'card_giftcard', label: 'Staff Benefits' },
-      { key: 'reports-workforce-assessments', href: '/ambassador?pg=reports&tab=workforce-assessments', icon: 'groups', label: 'Workforce Assessments' },
-      { key: 'reports-employment-skill-status', href: '/ambassador?pg=reports&tab=employment-skill-status', icon: 'school', label: 'Skills Assessments' },
-    );
-    if (canManageEnrollment) {
-      items.push(
-        { key: 'reports-programme-enrollment', href: '/ambassador?pg=reports&tab=programme-enrollment', icon: 'school', label: 'Programme Enrollment' },
-        { key: 'reports-course-unit-enrollment', href: '/ambassador?pg=reports&tab=course-unit-enrollment', icon: 'menu_book', label: 'Course Unit Enrollment' }
-      );
-    }
-    return items;
-  }, [canManageEnrollment, canViewStaffProfiles]);
+  const ambassadorMenuItems: MenuItem[] = [
+    {
+      key: 'tracking',
+      href: '/ambassador?pg=tracking&tab=dashboard',
+      icon: 'monitoring',
+      label: 'Tracking',
+    },
+    {
+      key: 'reporting',
+      href: '/ambassador?pg=reporting&tab=recruitment',
+      icon: 'bar_chart',
+      label: 'Reporting',
+    },
+    {
+      key: 'propose-changes',
+      href: '/ambassador?pg=propose-changes',
+      icon: 'edit_note',
+      label: 'Propose Changes',
+    },
+  ];
 
   const staffMenuItems = [
     { key: 'dashboard', href: '/staff?pg=dashboard', icon: 'dashboard', label: 'Dashboard' },
@@ -97,18 +89,24 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen, onLogoutClick }: 
     { key: 'submissions', href: '/staff?pg=submissions', icon: 'history', label: 'Submissions & Feedback' },
   ];
 
-
-  let menuItems = adminMenuItems; // Default to admin
-
-  if (pathname.startsWith('/department-head')) {
-    menuItems = departmentHeadMenuItems;
-  } else if (pathname.startsWith('/staff')) {
-    menuItems = staffMenuItems;
-  } else if (pathname.startsWith('/ambassador')) {
-    menuItems = ambassadorMenuItems;
-  }
+  const isAmbassador = pathname.startsWith('/ambassador');
+  const isDepartmentHead = pathname.startsWith('/department-head');
+  const isStaff = pathname.startsWith('/staff');
 
   const isActive = (key: string) => currentKey === key;
+
+  const renderFlatMenu = (items: MenuItem[]) =>
+    items.map((item) => (
+      <Link
+        href={item.href}
+        key={item.key}
+        className={`sidebar-link ${isActive(item.key) ? 'active' : ''}`}
+        onClick={() => setSidebarOpen(false)}
+      >
+        <span className="material-symbols-outlined ms-icon">{item.icon}</span>
+        {item.label}
+      </Link>
+    ));
 
   return (
     <>
@@ -131,35 +129,22 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen, onLogoutClick }: 
         </div>
 
         <nav className="sidebar-nav">
-          {menuItems.map((item: any) => (
-            <Link
-              href={item.href}
-              key={item.key}
-              className={`sidebar-link ${isActive(item.key) ? 'active' : ''}`}
-              onClick={() => setSidebarOpen(false)}
-            >
-              <span className="material-symbols-outlined ms-icon">{item.icon}</span>
-              {item.label}
-              {item.badge && (
-                <span className="ms-auto" style={{
-                  background: item.badgeColor,
-                  fontSize: '.62rem',
-                  fontWeight: 800,
-                  padding: '.1rem .45rem',
-                  borderRadius: '99px',
-                  color: item.badgeTextColor
-                }}>
-                  {item.badge}
-                </span>
-              )}
-            </Link>
-          ))}
+          {isAmbassador
+            ? renderFlatMenu(ambassadorMenuItems)
+            : isDepartmentHead
+              ? renderFlatMenu(departmentHeadMenuItems)
+              : isStaff
+                ? renderFlatMenu(staffMenuItems)
+                : renderFlatMenu(adminMenuItems)}
 
           <a
             className="sidebar-link"
             href="#"
             style={{ color: '#fca5a5' }}
-            onClick={(e) => { e.preventDefault(); onLogoutClick(); }}
+            onClick={(e) => {
+              e.preventDefault();
+              onLogoutClick();
+            }}
           >
             <span className="material-symbols-outlined ms-icon">logout</span> Logout
           </a>
@@ -186,12 +171,8 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen, onLogoutClick }: 
         </div>
       </aside>
 
-      {/* Mobile overlay */}
       {sidebarOpen && (
-        <div
-          className="sidebar-overlay d-lg-none"
-          onClick={() => setSidebarOpen(false)}
-        />
+        <div className="sidebar-overlay d-lg-none" onClick={() => setSidebarOpen(false)} />
       )}
     </>
   );

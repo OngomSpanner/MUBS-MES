@@ -3,6 +3,7 @@ import { query } from '@/lib/db';
 import { cookies } from 'next/headers';
 import { verifyToken } from '@/lib/auth';
 import { getVisibleDepartmentIds, inPlaceholders } from '@/lib/department-head';
+import { recalcParentMilestoneFromProcessAssignmentId } from '@/lib/milestone-progress';
 
 // PUT — update assignment status/commentary from HOD
 export async function PUT(request: Request, context: { params: Promise<{ id: string }> }) {
@@ -22,6 +23,15 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
       query: `UPDATE staff_process_assignments SET status = ?, commentary = ?, start_date = ?, end_date = ? WHERE id = ?`,
       values: [status || 'pending', commentary || null, start_date || null, end_date || null, id]
     });
+
+    const normalized = String(status || '').toLowerCase();
+    if (normalized === 'evaluated' || normalized === 'completed') {
+      try {
+        await recalcParentMilestoneFromProcessAssignmentId(Number(id));
+      } catch (e) {
+        console.error('Milestone progress recalc after assignment update:', e);
+      }
+    }
 
     return NextResponse.json({ message: 'Assignment updated' });
   } catch (error) {

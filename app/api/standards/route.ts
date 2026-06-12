@@ -143,7 +143,9 @@ export async function POST(request: Request) {
         row.stepName,
         i,
         row.durationValue,
-        row.durationUnit
+        row.durationUnit,
+        row.milestoneProgress ??
+          (parsed.items.length > 1 ? Math.round(((i + 1) / parsed.items.length) * 100) : 100)
       );
     }
 

@@ -4,6 +4,7 @@ import { cookies } from 'next/headers';
 import { verifyToken } from '@/lib/auth';
 import { getVisibleDepartmentIds, inPlaceholders } from '@/lib/department-head';
 import { sqlTopStrategicMain } from '@/lib/strategic-activity-sql';
+import { HOD_DUE_DATE_SUBQUERY } from '@/lib/hod-due-date';
 
 export const dynamic = 'force-dynamic';
 
@@ -33,6 +34,7 @@ export async function GET() {
             query: `
                 SELECT 
                     sa.*,
+                    ${HOD_DUE_DATE_SUBQUERY},
                     u.name as unit_name,
                     st.performance_indicator as standard_indicator,
                     (SELECT COUNT(*) FROM strategic_activities c WHERE c.parent_id = sa.id AND c.department_id IN (${placeholders})) as total_tasks,
@@ -64,6 +66,7 @@ export async function GET() {
                 query: `
                     SELECT 
                         sa.*,
+                        ${HOD_DUE_DATE_SUBQUERY},
                         u.name as unit_name,
                         st.performance_indicator as standard_indicator,
                         (SELECT COUNT(*) FROM strategic_activities c WHERE c.department_id = sa.department_id AND (c.parent_id = sa.id OR c.parent_id = sa.parent_id)) as total_tasks,

@@ -1,9 +1,12 @@
 import { query } from '@/lib/db';
+import { ensureEnrollmentFacultyColumns } from '@/lib/enrollment-indicators';
+import { normalizeEnrollmentFacultyName } from '@/lib/ambassador/enrollment-records';
 
 export type ProgrammeEnrollmentGenderFilter = 'all' | 'male' | 'female';
 export type ProgrammeEnrollmentPwdFilter = 'all' | 'yes' | 'no' | 'not_recorded';
 
 export type ProgrammeEnrollmentRow = {
+  facultyName: string;
   programmeName: string;
   studentCount: number;
 };
@@ -16,6 +19,7 @@ export type StaffProgrammeEnrollmentReport = {
 };
 
 type RawEnrollmentRow = {
+  facultyName: string;
   programmeName: string;
   totalStudents: number;
   male: number;
@@ -58,16 +62,27 @@ function studentCountForRow(
 export async function generateStaffProgrammeEnrollmentReport(options?: {
   gender?: string | null;
   pwd?: string | null;
+  faculty?: string | null;
 }): Promise<StaffProgrammeEnrollmentReport> {
   const genderFilter = normalizeGenderFilter(options?.gender);
   const pwdFilter = normalizePwdFilter(options?.pwd);
+  const facultyFilter = options?.faculty && options.faculty !== 'all' ? options.faculty : null;
 
   let rawRows: RawEnrollmentRow[] = [];
 
   try {
+    await ensureEnrollmentFacultyColumns();
+    const values: string[] = [];
+    let facultySql = '';
+    if (facultyFilter) {
+      facultySql = ' WHERE faculty_name = ?';
+      values.push(facultyFilter);
+    }
+
     const dbRows = (await query({
       query: `
         SELECT
+          faculty_name,
           programme_name,
           total_students,
           male_count,
@@ -75,10 +90,12 @@ export async function generateStaffProgrammeEnrollmentReport(options?: {
           pwd_count,
           pwd_details
         FROM staff_programme_enrollment
-        ORDER BY programme_name ASC
+        ${facultySql}
+        ORDER BY faculty_name ASC, programme_name ASC
       `,
-      values: [],
+      values,
     })) as {
+      faculty_name: string;
       programme_name: string;
       total_students: number;
       male_count: number;
@@ -88,6 +105,7 @@ export async function generateStaffProgrammeEnrollmentReport(options?: {
     }[];
 
     rawRows = dbRows.map((r) => ({
+      facultyName: normalizeEnrollmentFacultyName(r.faculty_name),
       programmeName: (r.programme_name || '').trim(),
       totalStudents: Number(r.total_students ?? 0),
       male: Number(r.male_count ?? 0),
@@ -100,6 +118,7 @@ export async function generateStaffProgrammeEnrollmentReport(options?: {
   }
 
   const rows: ProgrammeEnrollmentRow[] = rawRows.map((r) => ({
+    facultyName: r.facultyName,
     programmeName: r.programmeName,
     studentCount: studentCountForRow(r, genderFilter, pwdFilter),
   }));
