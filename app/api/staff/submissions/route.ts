@@ -310,11 +310,18 @@ export async function POST(req: Request) {
                   : 'activity_assignment_id';
         
         const existingReport = await query({
-            query: `SELECT id FROM staff_reports WHERE ${filterColumn} = ? AND submitted_by = ?`,
+            query: `SELECT id, status FROM staff_reports WHERE ${filterColumn} = ? AND submitted_by = ?`,
             values: [assignmentId, decoded.userId]
         }) as any[];
 
         if (existingReport.length > 0) {
+            const LOCKED_STATUSES = ['evaluated', 'acknowledged'];
+            if (LOCKED_STATUSES.includes(existingReport[0].status)) {
+                return NextResponse.json(
+                    { message: 'This report has already been evaluated and cannot be resubmitted.' },
+                    { status: 409 }
+                );
+            }
             await query({
                 query: `
                     UPDATE staff_reports 
