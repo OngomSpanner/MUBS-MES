@@ -151,7 +151,7 @@ export async function getMilestoneStepsForParentActivity(
             JOIN strategic_activities sa ON spa.activity_id = sa.id
             WHERE spa.standard_process_id = sp.id
               AND (sa.id = ? OR sa.parent_id = ?)
-            ORDER BY spa.updated_at DESC
+            ORDER BY spa.id DESC
             LIMIT 1
           ) AS assignment_status
         FROM standard_processes sp
