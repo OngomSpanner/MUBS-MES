@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import axios from 'axios';
 import StaffProfileModal from '@/components/Staff/StaffProfileModal';
 import { StaffProfileData } from '@/lib/staff-biodata';
+import StatCard from '@/components/StatCard';
 import { workloadStatusStyle, type WorkloadStatus } from '@/lib/hod-workload';
 
 interface Staff {
@@ -21,19 +22,18 @@ interface Staff {
     workloadLabel: string;
 }
 
-interface WorkloadAlert {
-    id: number;
-    name: string;
-    position: string | null;
-    type: WorkloadStatus;
-    message: string;
-    activeTasks: number;
-    workloadLabel: string;
-}
-
 interface StaffData {
     staff: Staff[];
-    workloadAlerts: WorkloadAlert[];
+}
+
+function formatStaffDesignation(position: string | null, designationGrade: string | null): string {
+    const pos = (position || '').trim();
+    const grade = (designationGrade || '').trim();
+    if (!pos && !grade) return '—';
+    if (!pos) return grade;
+    if (!grade) return pos;
+    if (pos.toLowerCase() === grade.toLowerCase()) return pos;
+    return `${pos} · ${grade}`;
 }
 
 interface Section {
@@ -160,9 +160,17 @@ export default function DepartmentStaff() {
     const filteredStaff = data.staff.filter(s =>
         s.full_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
         (s.position || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (s.position || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
         (s.designation_grade || '').toLowerCase().includes(searchTerm.toLowerCase())
     );
+
+    const staffSummary = {
+        total: data.staff.length,
+        onTrack: data.staff.filter((s) => s.workloadStatus === 'on_track').length,
+        fallingBehind: data.staff.filter((s) => s.workloadStatus === 'falling_behind').length,
+        underutilized: data.staff.filter((s) => s.workloadStatus === 'underutilized').length,
+        overAllocated: data.staff.filter((s) => s.workloadStatus === 'over_allocated').length,
+        openAssignments: data.staff.reduce((sum, s) => sum + (s.active_tasks ?? 0), 0),
+    };
 
     const getInitials = (name: string) => {
         const parts = (name || '').trim().split(/\s+/).filter(Boolean);
@@ -388,6 +396,31 @@ export default function DepartmentStaff() {
                     </div>
                 )}
 
+                {activeTab === 'staff' && <div className="col-12">
+                    <div className="row g-3 mb-1">
+                        <div className="col-6 col-md-4 col-xl">
+                            <StatCard label="Total staff" value={staffSummary.total} color="blue" />
+                        </div>
+                        <div className="col-6 col-md-4 col-xl">
+                            <StatCard label="Open assignments" value={staffSummary.openAssignments} color="blue" />
+                        </div>
+                        <div className="col-6 col-md-4 col-xl">
+                            <StatCard label="On track" value={staffSummary.onTrack} color="green" />
+                        </div>
+                        <div className="col-6 col-md-4 col-xl">
+                            <StatCard label="Falling behind" value={staffSummary.fallingBehind} color="yellow" />
+                        </div>
+                        <div className="col-6 col-md-4 col-xl">
+                            <StatCard label="Underutilized" value={staffSummary.underutilized} color="yellow" />
+                        </div>
+                        {staffSummary.overAllocated > 0 ? (
+                            <div className="col-6 col-md-4 col-xl">
+                                <StatCard label="Over-allocated" value={staffSummary.overAllocated} color="red" />
+                            </div>
+                        ) : null}
+                    </div>
+                </div>}
+
                 {/* Department Staff Roster */}
                 {activeTab === 'staff' && <div className="col-12">
                     <div className="table-card shadow-sm border-0">
@@ -459,7 +492,7 @@ export default function DepartmentStaff() {
                                                 </td>
                                                 <td>
                                                     <span className="small text-dark fw-medium">
-                                                        {[s.position, s.designation_grade].filter(Boolean).join(' · ') || '—'}
+                                                        {formatStaffDesignation(s.position, s.designation_grade)}
                                                     </span>
                                                 </td>
                                                 <td>
@@ -518,75 +551,6 @@ export default function DepartmentStaff() {
                     </div>
                 </div>}
 
-                {/* Workload alerts — strategic-plan assignments only */}
-                {activeTab === 'staff' && <div className="col-12">
-                    <div className="table-card shadow-sm" style={{ borderTop: '4px solid var(--mubs-blue)' }}>
-                        <div className="table-card-header" style={{ background: '#eff6ff', borderBottom: '1px solid #dbeafe' }}>
-                            <h5 className="mb-0 fw-black text-primary d-flex align-items-center gap-2">
-                                <span className="material-symbols-outlined">balance</span>
-                                Workload alerts
-                            </h5>
-                        </div>
-                        <div className="p-3">
-                            {!data.workloadAlerts?.length ? (
-                                <div className="text-center py-4 text-muted small">
-                                    All staff are within normal workload for strategic-plan assignments.
-                                </div>
-                            ) : (
-                                <div className="row g-3">
-                                    {data.workloadAlerts.map((alert) => {
-                                        const wl = workloadStatusStyle(alert.type);
-                                        return (
-                                        <div key={alert.id} className="col-12 col-md-6 col-lg-4">
-                                            <div className="warn-card p-3 rounded-3 border-start border-4 h-100 bg-light" style={{ borderColor: wl.color }}>
-                                                <div className="d-flex justify-content-between align-items-start mb-2">
-                                                    <div className="fw-bold text-dark d-flex align-items-center gap-2">
-                                                        <div className="staff-avatar" style={{
-                                                            background: wl.color,
-                                                            width: '28px',
-                                                            height: '28px',
-                                                            fontSize: '.7rem',
-                                                            borderRadius: '8px',
-                                                            display: 'flex',
-                                                            alignItems: 'center',
-                                                            justifyContent: 'center',
-                                                            color: '#fff',
-                                                            fontWeight: 'bold'
-                                                        }}>
-                                                            {getInitials(alert.name)}
-                                                        </div>
-                                                        <span style={{ fontSize: '.9rem' }}>{alert.name}</span>
-                                                    </div>
-                                                    <span className="badge" style={{ fontSize: '.6rem', background: wl.bg, color: wl.color }}>
-                                                        {alert.workloadLabel.toUpperCase()}
-                                                    </span>
-                                                </div>
-                                                <div className="text-dark fw-bold mb-1" style={{ fontSize: '.8rem' }}>{alert.message}</div>
-                                                <div className="text-muted mb-3" style={{ fontSize: '.75rem', lineHeight: '1.4' }}>
-                                                    {alert.position ? <>Role: {alert.position}<br /></> : null}
-                                                    Open assignments: {alert.activeTasks}
-                                                </div>
-                                                <button
-                                                    type="button"
-                                                    className="btn btn-sm w-100 fw-bold btn-outline-primary py-1"
-                                                    style={{ fontSize: '.75rem' }}
-                                                    onClick={() =>
-                                                        router.push(
-                                                            `/department-head?pg=tasks&assignee=${encodeURIComponent(alert.name)}`
-                                                        )
-                                                    }
-                                                >
-                                                    View assignments
-                                                </button>
-                                            </div>
-                                        </div>
-                                        );
-                                    })}
-                                </div>
-                            )}
-                        </div>
-                    </div>
-                </div>}
             </div>
 
             <StaffProfileModal

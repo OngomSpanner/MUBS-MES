@@ -27,6 +27,8 @@ export type PublicStandard = {
   duration_unit: string | null;
   target: string | null;
   created_at: string | null;
+  department_ids: number[];
+  department_names: string[];
   processes: PublicStandardProcess[];
 };
 
@@ -53,7 +55,8 @@ export function toPublicProcessRow(row: Record<string, unknown>): PublicStandard
 
 export function buildPublicStandardsList(
   standardRows: Record<string, unknown>[],
-  allProcesses: Record<string, unknown>[]
+  allProcesses: Record<string, unknown>[],
+  departmentMap?: Map<number, { department_ids: number[]; department_names: string[] }>
 ): PublicStandard[] {
   const byStandard = new Map<number, PublicStandardProcess[]>();
   for (const p of allProcesses) {
@@ -61,32 +64,40 @@ export function buildPublicStandardsList(
     if (!byStandard.has(sid)) byStandard.set(sid, []);
     byStandard.get(sid)!.push(toPublicProcessRow(p));
   }
-  return standardRows.map((s) => ({
-    id: Number(s.id),
-    title: String(s.title ?? ''),
-    quality_standard: (s.quality_standard as string | null) ?? null,
-    output_standard: (s.output_standard as string | null) ?? null,
-    performance_indicator:
-      s.performance_indicator != null && String(s.performance_indicator).trim() !== ''
-        ? String(s.performance_indicator)
-        : null,
-    duration_value:
-      s.duration_value != null && s.duration_value !== '' && Number.isFinite(Number(s.duration_value))
-        ? Number(s.duration_value)
-        : null,
-    duration_unit:
-      s.duration_unit != null && String(s.duration_unit).trim() !== ''
-        ? String(s.duration_unit).trim().toLowerCase()
-        : null,
-    target: (s.target as string | null) ?? null,
-    created_at: (s.created_at as string | null) ?? null,
-    processes: byStandard.get(Number(s.id)) ?? [],
-  }));
+  return standardRows.map((s) => {
+    const id = Number(s.id);
+    const dept = departmentMap?.get(id);
+    return {
+      id,
+      title: String(s.title ?? ''),
+      quality_standard: (s.quality_standard as string | null) ?? null,
+      output_standard: (s.output_standard as string | null) ?? null,
+      performance_indicator:
+        s.performance_indicator != null && String(s.performance_indicator).trim() !== ''
+          ? String(s.performance_indicator)
+          : null,
+      duration_value:
+        s.duration_value != null && s.duration_value !== '' && Number.isFinite(Number(s.duration_value))
+          ? Number(s.duration_value)
+          : null,
+      duration_unit:
+        s.duration_unit != null && String(s.duration_unit).trim() !== ''
+          ? String(s.duration_unit).trim().toLowerCase()
+          : null,
+      target: (s.target as string | null) ?? null,
+      created_at: (s.created_at as string | null) ?? null,
+      department_ids: dept?.department_ids ?? [],
+      department_names: dept?.department_names ?? [],
+      processes: byStandard.get(id) ?? [],
+    };
+  });
 }
 
 export function buildPublicStandardDetail(
   row: Record<string, unknown>,
-  processes: Record<string, unknown>[]
+  processes: Record<string, unknown>[],
+  departmentIds: number[] = [],
+  departmentNames: string[] = []
 ): PublicStandard {
   return {
     id: Number(row.id),
@@ -107,6 +118,8 @@ export function buildPublicStandardDetail(
         : null,
     target: (row.target as string | null) ?? null,
     created_at: (row.created_at as string | null) ?? null,
+    department_ids: departmentIds,
+    department_names: departmentNames,
     processes: processes.map(toPublicProcessRow),
   };
 }

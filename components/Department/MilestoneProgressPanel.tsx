@@ -3,9 +3,9 @@
 import { useEffect, useState } from 'react';
 import axios from 'axios';
 
-type MilestoneStep = {
-  stepOrder: number;
-  stepName: string;
+type MilestoneTask = {
+  taskOrder: number;
+  taskName: string;
   milestoneProgress: number | null;
   assignmentStatus: string | null;
   completed: boolean;
@@ -18,7 +18,7 @@ type Props = {
 
 export default function MilestoneProgressPanel({ activityId, className }: Props) {
   const [parentProgress, setParentProgress] = useState<number | null>(null);
-  const [steps, setSteps] = useState<MilestoneStep[]>([]);
+  const [tasks, setTasks] = useState<MilestoneTask[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -29,12 +29,12 @@ export default function MilestoneProgressPanel({ activityId, className }: Props)
       .then((res) => {
         if (cancelled) return;
         setParentProgress(res.data?.parentProgress != null ? Number(res.data.parentProgress) : null);
-        setSteps(Array.isArray(res.data?.steps) ? res.data.steps : []);
+        setTasks(Array.isArray(res.data?.tasks) ? res.data.tasks : []);
       })
       .catch(() => {
         if (!cancelled) {
           setParentProgress(null);
-          setSteps([]);
+          setTasks([]);
         }
       })
       .finally(() => {
@@ -45,9 +45,9 @@ export default function MilestoneProgressPanel({ activityId, className }: Props)
     };
   }, [activityId]);
 
-  if (loading || steps.length === 0) return null;
+  if (loading || tasks.length === 0) return null;
 
-  const completedCount = steps.filter((s) => s.completed).length;
+  const completedCount = tasks.filter((t) => t.completed).length;
 
   return (
     <div
@@ -64,7 +64,7 @@ export default function MilestoneProgressPanel({ activityId, className }: Props)
           </h6>
           <div className="d-flex align-items-center gap-2">
             <span className="text-muted small">
-              {completedCount}/{steps.length} steps
+              {completedCount}/{tasks.length} tasks
             </span>
             <span className="badge bg-primary" style={{ fontSize: '0.75rem' }}>
               {parentProgress ?? 0}%
@@ -79,21 +79,21 @@ export default function MilestoneProgressPanel({ activityId, className }: Props)
         </div>
       </div>
       <div className="p-3 d-flex flex-column gap-2">
-        {steps.map((step) => (
-          <div key={`${step.stepOrder}-${step.stepName}`} className="d-flex align-items-center gap-2">
+        {tasks.map((task) => (
+          <div key={`${task.taskOrder}-${task.taskName}`} className="d-flex align-items-center gap-2">
             <span
-              className={`material-symbols-outlined flex-shrink-0 ${step.completed ? 'text-success' : 'text-secondary'}`}
+              className={`material-symbols-outlined flex-shrink-0 ${task.completed ? 'text-success' : 'text-secondary'}`}
               style={{ fontSize: '18px' }}
             >
-              {step.completed ? 'check_circle' : 'trip_origin'}
+              {task.completed ? 'check_circle' : 'trip_origin'}
             </span>
             <span
-              className={`flex-grow-1 small text-truncate ${step.completed ? 'text-dark fw-semibold' : 'text-secondary'}`}
+              className={`flex-grow-1 small text-truncate ${task.completed ? 'text-dark fw-semibold' : 'text-secondary'}`}
             >
-              {step.stepName}
+              {task.taskName}
             </span>
             <span className="text-muted small flex-shrink-0" style={{ fontSize: '0.72rem' }}>
-              {step.milestoneProgress != null ? `${step.milestoneProgress}%` : '—'}
+              {task.milestoneProgress != null ? `${task.milestoneProgress}%` : '—'}
             </span>
           </div>
         ))}

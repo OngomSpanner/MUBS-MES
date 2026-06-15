@@ -548,6 +548,16 @@ EXECUTE stmt;
 DEALLOCATE PREPARE stmt;
 
 -- =============================================================================
+-- M. Standard ↔ department/unit links (many-to-many)
+-- =============================================================================
+CREATE TABLE IF NOT EXISTS standard_departments (
+  standard_id INT NOT NULL,
+  department_id INT NOT NULL,
+  PRIMARY KEY (standard_id, department_id),
+  KEY idx_standard_departments_dept (department_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- =============================================================================
 -- Done. Verify:
 --   SHOW TABLES LIKE 'staff_%';
 --   SELECT status, COUNT(*) FROM users GROUP BY status;

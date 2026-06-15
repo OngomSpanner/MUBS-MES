@@ -3,7 +3,7 @@ import { cookies } from 'next/headers';
 import { verifyToken } from '@/lib/auth';
 import { getVisibleDepartmentIds, inPlaceholders } from '@/lib/department-head';
 import { query } from '@/lib/db';
-import { getMilestoneStepsForParentActivity, resolveParentStrategicActivityId } from '@/lib/milestone-progress';
+import { getMilestoneTasksForParentActivity, resolveParentStrategicActivityId } from '@/lib/milestone-progress';
 
 export const dynamic = 'force-dynamic';
 
@@ -45,7 +45,7 @@ export async function GET(req: Request) {
     }
 
     const parentId = (await resolveParentStrategicActivityId(activityId)) ?? activityId;
-    const summary = await getMilestoneStepsForParentActivity(parentId);
+    const summary = await getMilestoneTasksForParentActivity(parentId);
     return NextResponse.json({ activityId, parentActivityId: parentId, ...summary });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Unknown error';

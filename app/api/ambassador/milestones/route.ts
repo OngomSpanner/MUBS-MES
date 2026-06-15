@@ -13,7 +13,7 @@ export async function GET() {
       managedUnitName: ctx.managedUnitName,
       activities,
       totalActivities: activities.length,
-      totalPendingSteps: activities.reduce((sum, a) => sum + a.pendingSteps, 0),
+      totalPendingTasks: activities.reduce((sum, a) => sum + a.pendingTasks, 0),
     });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Unknown error';

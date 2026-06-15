@@ -375,7 +375,7 @@ export async function POST(request: Request) {
         {
           message:
             skippedDuplicate > 0 && skippedInvalid === 0
-              ? 'All selected staff already have this step assigned'
+              ? 'All selected staff already have this process task assigned'
               : 'No assignments created',
           created: 0,
           skippedDuplicate,

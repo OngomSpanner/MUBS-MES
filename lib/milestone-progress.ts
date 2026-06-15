@@ -20,9 +20,9 @@ export async function ensureMilestoneProgressColumn(): Promise<void> {
 
 /**
  * Progress from standard process milestones: highest cumulative milestone_progress
- * among evaluated/completed process steps on this activity tree.
+ * among evaluated/completed process tasks on this activity tree.
  */
-/** True when the activity's standard defines cumulative milestone weights on process steps. */
+/** True when the activity's standard defines cumulative milestone weights on process tasks. */
 export async function parentActivityHasMilestoneTemplate(
   parentActivityId: number
 ): Promise<boolean> {
@@ -113,18 +113,18 @@ export async function recalcParentMilestoneFromProcessAssignmentId(
   return recalcParentMilestoneFromActivityId(Number(activityId));
 }
 
-export type MilestoneStepStatus = {
-  stepOrder: number;
-  stepName: string;
+export type MilestoneTaskStatus = {
+  taskOrder: number;
+  taskName: string;
   milestoneProgress: number | null;
   assignmentStatus: string | null;
   completed: boolean;
 };
 
-/** Ordered process steps + assignment status for a parent strategic activity. */
-export async function getMilestoneStepsForParentActivity(
+/** Ordered process tasks + assignment status for a parent strategic activity. */
+export async function getMilestoneTasksForParentActivity(
   parentActivityId: number
-): Promise<{ parentProgress: number | null; steps: MilestoneStepStatus[] }> {
+): Promise<{ parentProgress: number | null; tasks: MilestoneTaskStatus[] }> {
   await ensureMilestoneProgressColumn();
 
   const parent = (await query({
@@ -134,10 +134,10 @@ export async function getMilestoneStepsForParentActivity(
 
   const standardId = parent[0]?.standard_id;
   if (!standardId) {
-    return { parentProgress: parent[0]?.progress != null ? Number(parent[0].progress) : null, steps: [] };
+    return { parentProgress: parent[0]?.progress != null ? Number(parent[0].progress) : null, tasks: [] };
   }
 
-  let steps: MilestoneStepStatus[] = [];
+  let tasks: MilestoneTaskStatus[] = [];
   try {
     const rows = (await query({
       query: `
@@ -166,24 +166,24 @@ export async function getMilestoneStepsForParentActivity(
       assignment_status: string | null;
     }[];
 
-    steps = rows.map((r) => {
+    tasks = rows.map((r) => {
       const st = String(r.assignment_status || '').toLowerCase();
       const completed = st === 'evaluated' || st === 'completed';
       return {
-        stepOrder: Number(r.step_order) || 0,
-        stepName: String(r.step_name || ''),
+        taskOrder: Number(r.step_order) || 0,
+        taskName: String(r.step_name || ''),
         milestoneProgress: r.milestone_progress != null ? Number(r.milestone_progress) : null,
         assignmentStatus: r.assignment_status,
         completed,
       };
     });
   } catch {
-    steps = [];
+    tasks = [];
   }
 
   const milestoneProgress = await computeMilestoneProgressForStrategicActivity(parentActivityId);
   return {
     parentProgress: milestoneProgress ?? (parent[0]?.progress != null ? Number(parent[0].progress) : null),
-    steps,
+    tasks,
   };
 }

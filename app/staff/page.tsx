@@ -24,6 +24,7 @@ function StaffContent() {
         case 'submissions':
             return <StaffSubmissions />;
         case 'process-steps':
+        case 'process-tasks':
             return <StaffProcessTasks />;
         default:
             return <StaffDashboard />;

@@ -6,6 +6,12 @@ import { buildPublicStandardsList } from '@/lib/standards-api';
 import { canManageStrategicStandards } from '@/lib/role-routing';
 import { insertStandardProcessRow, selectStandardProcessesAll } from '@/lib/standard-processes-db';
 import { parseStandardProcessesPayload } from '@/lib/standard-processes-payload';
+import {
+  groupStandardDepartments,
+  loadStandardDepartmentRows,
+  parseDepartmentIdsPayload,
+  setStandardDepartments,
+} from '@/lib/standard-departments';
 
 export const dynamic = 'force-dynamic';
 
@@ -49,8 +55,10 @@ export async function GET() {
     }
     
     const processes = await selectStandardProcessesAll();
+    const deptRows = await loadStandardDepartmentRows();
+    const departmentMap = groupStandardDepartments(deptRows);
 
-    return NextResponse.json(buildPublicStandardsList(standards, processes));
+    return NextResponse.json(buildPublicStandardsList(standards, processes, departmentMap));
   } catch (error) {
     console.error('Error fetching standards:', error);
     return NextResponse.json({ message: 'Error fetching standards' }, { status: 500 });
@@ -68,9 +76,9 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json();
-    const { title: rawTitle, quality_standard, output_standard, performance_indicator, duration_value, duration_unit, processes } = body;
+    const { title: rawTitle, quality_standard, output_standard, performance_indicator, duration_value, duration_unit, processes, department_ids } = body;
     const title = typeof rawTitle === 'string' ? rawTitle.trim() : '';
-    if (!title) return NextResponse.json({ message: 'Title is required' }, { status: 400 });
+    if (!title) return NextResponse.json({ message: 'Standard title is required' }, { status: 400 });
     const quality = typeof quality_standard === 'string' ? quality_standard.trim() : '';
     const output = typeof output_standard === 'string' ? output_standard.trim() : '';
     const pi = typeof performance_indicator === 'string' ? performance_indicator.trim() : '';
@@ -132,6 +140,11 @@ export async function POST(request: Request) {
       return NextResponse.json({ message: 'Error creating standard' }, { status: 500 });
     }
 
+    const departmentIds = parseDepartmentIdsPayload(department_ids);
+    if (departmentIds.length === 0) {
+      return NextResponse.json({ message: 'Select at least one department or unit' }, { status: 400 });
+    }
+
     const parsed = parseStandardProcessesPayload(processes);
     if (!parsed.ok) {
       return NextResponse.json({ message: parsed.message }, { status: 400 });
@@ -148,6 +161,8 @@ export async function POST(request: Request) {
           (parsed.items.length > 1 ? Math.round(((i + 1) / parsed.items.length) * 100) : 100)
       );
     }
+
+    await setStandardDepartments(standardId, departmentIds);
 
     return NextResponse.json({ message: 'Standard created', id: standardId }, { status: 201 });
   } catch (error) {

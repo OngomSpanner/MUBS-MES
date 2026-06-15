@@ -1,3 +1,5 @@
+import { milestonePercentsForStepCount } from '@/lib/milestone-progress-utils';
+
 export type ParsedStandardProcess = {
   stepName: string;
   durationValue: number | null;
@@ -30,19 +32,16 @@ export function parseStandardProcessesPayload(
       };
     }
 
-    const rawMilestone =
-      o.milestone_progress != null && o.milestone_progress !== ''
-        ? Number(o.milestone_progress)
-        : null;
-    const milestoneProgress =
-      rawMilestone != null && Number.isFinite(rawMilestone)
-        ? Math.min(100, Math.max(0, Math.round(rawMilestone)))
-        : null;
-
-    items.push({ stepName, durationValue, durationUnit, milestoneProgress });
+    items.push({ stepName, durationValue, durationUnit, milestoneProgress: null });
   }
   if (items.length === 0) {
     return { ok: false, message: 'At least one process is required.' };
   }
+
+  const percents = milestonePercentsForStepCount(items.length);
+  items.forEach((item, idx) => {
+    item.milestoneProgress = percents[idx] ?? 100;
+  });
+
   return { ok: true, items };
 }

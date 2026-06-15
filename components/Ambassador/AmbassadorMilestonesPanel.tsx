@@ -3,9 +3,9 @@
 import { Fragment, useCallback, useEffect, useState } from 'react';
 import axios from 'axios';
 
-type MilestoneStep = {
-  stepOrder: number;
-  stepName: string;
+type MilestoneTask = {
+  taskOrder: number;
+  taskName: string;
   milestoneProgress: number | null;
   assignmentStatus: string | null;
   completed: boolean;
@@ -16,10 +16,10 @@ type MilestoneActivity = {
   title: string;
   department: string;
   progress: number;
-  pendingSteps: number;
-  totalSteps: number;
-  completedSteps: number;
-  steps: MilestoneStep[];
+  pendingTasks: number;
+  totalTasks: number;
+  completedTasks: number;
+  tasks: MilestoneTask[];
 };
 
 export default function AmbassadorMilestonesPanel() {
@@ -57,7 +57,7 @@ export default function AmbassadorMilestonesPanel() {
             Milestone progress
           </h5>
           <p className="text-muted small mb-0 mt-1">
-            Auto-calculated from standard process steps for <strong>{managedUnitName || 'your unit'}</strong>.
+            Auto-calculated from standard process tasks for <strong>{managedUnitName || 'your unit'}</strong>.
           </p>
         </div>
       </div>
@@ -83,7 +83,7 @@ export default function AmbassadorMilestonesPanel() {
                   <th className="small text-muted px-3">Activity</th>
                   <th className="small text-muted">Department</th>
                   <th className="small text-muted">Progress</th>
-                  <th className="small text-muted">Steps</th>
+                  <th className="small text-muted">Tasks</th>
                   <th className="small text-muted px-3">Pending</th>
                 </tr>
               </thead>
@@ -108,12 +108,12 @@ export default function AmbassadorMilestonesPanel() {
                         </div>
                       </td>
                       <td className="small">
-                        {act.completedSteps}/{act.totalSteps}
+                        {act.completedTasks}/{act.totalTasks}
                       </td>
                       <td className="px-3">
-                        {act.pendingSteps > 0 ? (
+                        {act.pendingTasks > 0 ? (
                           <span className="badge bg-warning text-dark" style={{ fontSize: '0.65rem' }}>
-                            {act.pendingSteps} pending
+                            {act.pendingTasks} pending
                           </span>
                         ) : (
                           <span className="badge bg-success" style={{ fontSize: '0.65rem' }}>
@@ -126,28 +126,28 @@ export default function AmbassadorMilestonesPanel() {
                       <tr>
                         <td colSpan={5} className="px-3 pb-3 bg-light bg-opacity-50">
                           <div className="small fw-bold text-muted mb-2 text-uppercase" style={{ fontSize: '0.65rem' }}>
-                            Process milestones
+                            Process tasks
                           </div>
                           <ul className="list-unstyled mb-0">
-                            {act.steps.map((step) => (
+                            {act.tasks.map((task) => (
                               <li
-                                key={`${act.id}-${step.stepOrder}`}
+                                key={`${act.id}-${task.taskOrder}`}
                                 className="d-flex align-items-center gap-2 py-1 small"
                               >
                                 <span
                                   className="material-symbols-outlined"
                                   style={{
                                     fontSize: 16,
-                                    color: step.completed ? '#15803d' : '#94a3b8',
+                                    color: task.completed ? '#15803d' : '#94a3b8',
                                   }}
                                 >
-                                  {step.completed ? 'check_circle' : 'radio_button_unchecked'}
+                                  {task.completed ? 'check_circle' : 'radio_button_unchecked'}
                                 </span>
-                                <span className={step.completed ? 'text-dark' : 'text-muted'}>
-                                  {step.stepName}
+                                <span className={task.completed ? 'text-dark' : 'text-muted'}>
+                                  {task.taskName}
                                 </span>
-                                {step.milestoneProgress != null ? (
-                                  <span className="text-muted ms-auto">{step.milestoneProgress}%</span>
+                                {task.milestoneProgress != null ? (
+                                  <span className="text-muted ms-auto">{task.milestoneProgress}%</span>
                                 ) : null}
                               </li>
                             ))}

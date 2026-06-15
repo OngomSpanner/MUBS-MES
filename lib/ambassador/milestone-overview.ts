@@ -3,8 +3,8 @@ import { inPlaceholders } from '@/lib/department-head';
 import { getManagedUnitDepartmentIds } from '@/lib/ambassador/managed-unit-departments';
 import {
   computeMilestoneProgressForStrategicActivity,
-  getMilestoneStepsForParentActivity,
-  type MilestoneStepStatus,
+  getMilestoneTasksForParentActivity,
+  type MilestoneTaskStatus,
 } from '@/lib/milestone-progress';
 
 const MAIN_ACTIVITY_FILTER = `
@@ -17,10 +17,10 @@ export type AmbassadorMilestoneRow = {
   title: string;
   department: string;
   progress: number;
-  pendingSteps: number;
-  totalSteps: number;
-  completedSteps: number;
-  steps: MilestoneStepStatus[];
+  pendingTasks: number;
+  totalTasks: number;
+  completedTasks: number;
+  tasks: MilestoneTaskStatus[];
 };
 
 export async function listManagedUnitMilestoneActivities(
@@ -51,23 +51,23 @@ export async function listManagedUnitMilestoneActivities(
   const rows: AmbassadorMilestoneRow[] = [];
 
   for (const act of activities) {
-    const { steps, parentProgress } = await getMilestoneStepsForParentActivity(act.id);
-    if (steps.length === 0) continue;
+    const { tasks, parentProgress } = await getMilestoneTasksForParentActivity(act.id);
+    if (tasks.length === 0) continue;
 
     const milestoneProgress =
       parentProgress ?? (await computeMilestoneProgressForStrategicActivity(act.id)) ?? 0;
-    const completedSteps = steps.filter((s) => s.completed).length;
-    const pendingSteps = steps.filter((s) => !s.completed).length;
+    const completedTasks = tasks.filter((t) => t.completed).length;
+    const pendingTasks = tasks.filter((t) => !t.completed).length;
 
     rows.push({
       id: act.id,
       title: act.title,
-      department: act.department || '—',
+      department: act.department,
       progress: milestoneProgress,
-      pendingSteps,
-      totalSteps: steps.length,
-      completedSteps,
-      steps,
+      pendingTasks,
+      totalTasks: tasks.length,
+      completedTasks,
+      tasks,
     });
   }
 

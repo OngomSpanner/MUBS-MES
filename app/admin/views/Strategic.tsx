@@ -19,10 +19,7 @@ import {
   Cell 
 } from 'recharts';
 import { formatStandardProcessDuration, PROCESS_DURATION_UNIT_OPTIONS } from '@/lib/process-duration';
-import {
-    applyDefaultMilestonesToProcessRows,
-    redistributeMilestonePercents,
-} from '@/lib/milestone-progress-utils';
+import { applyDefaultMilestonesToProcessRows } from '@/lib/milestone-progress-utils';
 import { ACTIVITY_FY_TARGET_COLUMNS } from '@/lib/activity-fy-targets';
 import {
   labelForActivityUnitOfMeasure,
@@ -30,6 +27,7 @@ import {
 } from '@/lib/activity-unit-of-measure';
 import { fyLabelForDateJulyJune, fyRangeJulyJune, formatFyRangeShort } from '@/lib/financial-year';
 import { resolveRfPerformanceIndicator, resolveRfTargetValue } from '@/lib/rf-activity-targets';
+import DepartmentUnitMultiSelect, { type DepartmentUnitOption } from '@/components/DepartmentUnitMultiSelect';
 
 function isUnassigned(a: { department_id?: number | null; department?: string }): boolean {
     return a.department_id == null || !a.department?.trim() || a.department === '-';
@@ -38,11 +36,10 @@ function isUnassigned(a: { department_id?: number | null; department?: string })
 /** Table headers use global uppercase; show department names in normal casing (title-case if DB stored ALL CAPS). */
 type StandardProcessFormRow = {
     step_name: string;
-    milestone_progress: string;
 };
 
 function emptyProcessRow(): StandardProcessFormRow {
-    return { step_name: '', milestone_progress: '' };
+    return { step_name: '' };
 }
 
 function formatResponsibleOfficeLabel(name: string | undefined | null): string {
@@ -135,6 +132,7 @@ export default function StrategicView() {
         performance_indicator: '',
         duration_value: '1',
         duration_unit: 'weeks',
+        department_ids: [] as number[],
         processes: [] as StandardProcessFormRow[]
     });
     const [standardError, setStandardError] = useState<string | null>(null);
@@ -146,6 +144,7 @@ export default function StrategicView() {
     const [departmentFilter, setDepartmentFilter] = useState('All Departments/Units');
     const [searchQuery, setSearchQuery] = useState('');
     const [departmentUnitOptions, setDepartmentUnitOptions] = useState<{ id: number; name: string }[]>([]);
+    const [allDepartments, setAllDepartments] = useState<DepartmentUnitOption[]>([]);
     const [currentPage, setCurrentPage] = useState(1);
     const PAGE_SIZE = 10;
     
@@ -166,6 +165,7 @@ export default function StrategicView() {
         try {
             const response = await axios.get('/api/departments');
             const list = Array.isArray(response.data) ? response.data : [];
+            setAllDepartments(list);
             setDepartmentUnitOptions(list.filter((d: { parent_id: number | null }) => d.parent_id != null));
         } catch (e) { console.error('Error loading departments', e); }
     };
@@ -236,7 +236,10 @@ export default function StrategicView() {
     });
 
     const filteredStandards = standards.filter(s => 
-        !searchLower || s.title.toLowerCase().includes(searchLower) || (s.quality_standard && s.quality_standard.toLowerCase().includes(searchLower))
+        !searchLower ||
+        s.title.toLowerCase().includes(searchLower) ||
+        (s.quality_standard && s.quality_standard.toLowerCase().includes(searchLower)) ||
+        (s.department_names || []).some((name: string) => name.toLowerCase().includes(searchLower))
     );
 
     const totalPages = Math.max(1, Math.ceil((activeSubTab === 'activities' ? filteredActivities.length : filteredStandards.length) / PAGE_SIZE));
@@ -269,16 +272,13 @@ export default function StrategicView() {
                 typeof std?.duration_unit === 'string' && std.duration_unit.trim()
                     ? String(std.duration_unit).trim().toLowerCase()
                     : 'weeks',
+            department_ids: Array.isArray(std?.department_ids)
+                ? std.department_ids.map((id: number) => Number(id)).filter((id: number) => Number.isFinite(id))
+                : [],
             processes: std?.processes?.length
-                ? applyDefaultMilestonesToProcessRows(
-                      std.processes.map((p: any) => ({
-                          step_name: p.step_name || '',
-                          milestone_progress:
-                            p.milestone_progress != null && p.milestone_progress !== ''
-                              ? String(p.milestone_progress)
-                              : '',
-                      }))
-                  )
+                ? std.processes.map((p: any) => ({
+                      step_name: p.step_name || '',
+                  }))
                 : [],
         });
     };
@@ -303,7 +303,7 @@ export default function StrategicView() {
         setStandardError(null);
         setStandardSuccess(null);
         const name = standardForm.title.trim();
-        if (!name) return setStandardError('Standard Name is required.');
+        if (!name) return setStandardError('Standard title is required.');
         const quality = standardForm.quality_standard.trim();
         const output = standardForm.output_standard.trim();
         if (!quality) return setStandardError('Quality standard is required.');
@@ -316,19 +316,18 @@ export default function StrategicView() {
         }
         const namedProcesses = standardForm.processes.filter((p) => p.step_name.trim());
         if (namedProcesses.length === 0) return setStandardError('At least one process is required.');
-        const processesPayload = namedProcesses.map((p, idx) => {
-            const raw = p.milestone_progress.trim();
-            const milestone =
-              raw !== '' && Number.isFinite(Number(raw))
-                ? Math.min(100, Math.max(0, Math.round(Number(raw))))
-                : namedProcesses.length > 1
-                  ? Math.round(((idx + 1) / namedProcesses.length) * 100)
-                  : 100;
-            return {
+        if (standardForm.department_ids.length === 0) {
+            return setStandardError('Select at least one department or unit.');
+        }
+        const processesPayload = applyDefaultMilestonesToProcessRows(
+            namedProcesses.map((p) => ({
                 step_name: p.step_name.trim(),
-                milestone_progress: milestone,
-            };
-        });
+                milestone_progress: '',
+            }))
+        ).map((p) => ({
+            step_name: p.step_name,
+            milestone_progress: Number(p.milestone_progress),
+        }));
         setSavingStandard(true);
         try {
             const payload = {
@@ -338,6 +337,7 @@ export default function StrategicView() {
                 performance_indicator: perf,
                 duration_value: durCount,
                 duration_unit: standardForm.duration_unit,
+                department_ids: standardForm.department_ids,
                 processes: processesPayload,
             };
             if (selectedStandard) {
@@ -436,7 +436,7 @@ export default function StrategicView() {
                 }
                 setStandardForm({
                     ...standardForm,
-                    processes: redistributeMilestonePercents(arr),
+                    processes: arr,
                 });
             }
         }
@@ -445,14 +445,14 @@ export default function StrategicView() {
     const addProcessRow = () => {
         setStandardForm({
             ...standardForm,
-            processes: redistributeMilestonePercents([...standardForm.processes, emptyProcessRow()]),
+            processes: [...standardForm.processes, emptyProcessRow()],
         });
     };
 
     const removeProcessRow = (idx: number) => {
         setStandardForm({
             ...standardForm,
-            processes: redistributeMilestonePercents(standardForm.processes.filter((_, i) => i !== idx)),
+            processes: standardForm.processes.filter((_, i) => i !== idx),
         });
     };
 
@@ -633,26 +633,41 @@ export default function StrategicView() {
                         <table className="table mb-0 align-middle">
                             <thead>
                                 <tr>
-                                    <th className="ps-4">Standard Name</th>
-                                    <th>Quality Standard</th>
-                                    <th>Output Standard</th>
+                                    <th className="ps-4">Standard Title</th>
+                                    <th>Department(s) / Unit(s)</th>
                                     <th>Processes</th>
                                     <th className="text-end pe-4">Actions</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {loadingStandards ? (
-                                    <tr><td colSpan={6} className="text-center py-4"><span className="spinner-border spinner-border-sm text-primary"></span> Loading...</td></tr>
+                                    <tr><td colSpan={4} className="text-center py-4"><span className="spinner-border spinner-border-sm text-primary"></span> Loading...</td></tr>
                                 ) : paginatedStandards.length === 0 ? (
-                                    <tr><td colSpan={6} className="text-center py-4 text-muted">No standards defined. Create one to use as a template.</td></tr>
+                                    <tr><td colSpan={4} className="text-center py-4 text-muted">No standards defined. Create one to use as a template.</td></tr>
                                 ) : (
                                     paginatedStandards.map((s) => (
                                         <tr key={s.id}>
                                             <td className="ps-4">
                                                 <div className="text-dark" style={{ fontSize: '.86rem', fontWeight: 600 }}>{s.title}</div>
                                             </td>
-                                            <td style={{ maxWidth: '200px' }} className="text-truncate small text-muted" title={s.quality_standard}>{s.quality_standard || '—'}</td>
-                                            <td style={{ maxWidth: '200px' }} className="text-truncate small text-muted" title={s.output_standard}>{s.output_standard || '—'}</td>
+                                            <td style={{ maxWidth: '280px' }}>
+                                                {(s.department_names || []).length > 0 ? (
+                                                    <div className="d-flex flex-wrap gap-1">
+                                                        {s.department_names.map((name: string) => (
+                                                            <Badge
+                                                                key={`${s.id}-${name}`}
+                                                                bg="light"
+                                                                className="text-dark border fw-normal"
+                                                                style={{ fontSize: '0.65rem' }}
+                                                            >
+                                                                {name}
+                                                            </Badge>
+                                                        ))}
+                                                    </div>
+                                                ) : (
+                                                    <span className="text-muted small">—</span>
+                                                )}
+                                            </td>
                                             <td><Badge bg="info-subtle" className="text-info border">{s.processes?.length || 0} process{(s.processes?.length || 0) === 1 ? '' : 'es'}</Badge></td>
                                             <td className="text-end pe-4">
                                                 <button
@@ -718,6 +733,15 @@ export default function StrategicView() {
                                         ? formatStandardProcessDuration(viewStandardDetails.duration_value, viewStandardDetails.duration_unit)
                                         : '—'}
                                 </div>
+                                {(viewStandardDetails.department_names || []).length > 0 ? (
+                                    <div className="d-flex flex-wrap gap-1 mt-2">
+                                        {viewStandardDetails.department_names.map((name: string) => (
+                                            <Badge key={name} bg="light" className="text-dark border fw-normal" style={{ fontSize: '0.65rem' }}>
+                                                {name}
+                                            </Badge>
+                                        ))}
+                                    </div>
+                                ) : null}
                             </div>
                         </div>
 
@@ -850,7 +874,7 @@ export default function StrategicView() {
                     )}
                     <div className="row g-2">
                         <div className="col-12">
-                            <Form.Label className="fw-bold small mb-1">Standard Name</Form.Label>
+                            <Form.Label className="fw-bold small mb-1">Standard Title</Form.Label>
                             <Form.Control
                                 size="sm"
                                 type="text"
@@ -860,6 +884,11 @@ export default function StrategicView() {
                                 onChange={(e) => setStandardForm({ ...standardForm, title: e.target.value })}
                             />
                         </div>
+                        <DepartmentUnitMultiSelect
+                            departments={allDepartments}
+                            selectedIds={standardForm.department_ids}
+                            onChange={(department_ids) => setStandardForm({ ...standardForm, department_ids })}
+                        />
                         <div className="col-md-6">
                             <Form.Label className="fw-bold small mb-1">Quality Standard</Form.Label>
                             <Form.Control
@@ -938,7 +967,7 @@ export default function StrategicView() {
                                 <Button type="button" size="sm" variant="outline-primary" onClick={addProcessRow}>+ Add process</Button>
                             </div>
                             <p className="text-muted small mb-2" style={{ fontSize: '0.78rem' }}>
-                                Set cumulative progress % when each step is completed (e.g. 10, 20, … 100). Empty fields auto-fill evenly on save.
+                                List process tasks in order. Milestone progress is calculated automatically when you save.
                             </p>
                             <div className="d-flex flex-column gap-1">
                                 {standardForm.processes.map((proc, idx) => (
@@ -964,22 +993,6 @@ export default function StrategicView() {
                                                     setStandardForm({ ...standardForm, processes: arr });
                                                 }}
                                                 onPaste={(e) => handleProcessPaste(e, idx)}
-                                            />
-                                            <Form.Control
-                                                size="sm"
-                                                type="number"
-                                                min={0}
-                                                max={100}
-                                                className="flex-shrink-0"
-                                                style={{ width: '72px' }}
-                                                title="Cumulative progress % when this step completes"
-                                                placeholder="%"
-                                                value={proc.milestone_progress}
-                                                onChange={(e) => {
-                                                    const arr = [...standardForm.processes];
-                                                    arr[idx].milestone_progress = e.target.value;
-                                                    setStandardForm({ ...standardForm, processes: arr });
-                                                }}
                                             />
                                             <Button
                                                 size="sm"
@@ -1219,7 +1232,7 @@ export default function StrategicView() {
                                     <div className="row g-3">
                                         <div className="col-12">
                                             <div className="p-3 border rounded bg-light-subtle">
-                                                <label className="fw-bold small text-muted text-uppercase d-block mb-1" style={{ fontSize: '0.65rem' }}>Standard Name</label>
+                                                <label className="fw-bold small text-muted text-uppercase d-block mb-1" style={{ fontSize: '0.65rem' }}>Standard Title</label>
                                                 <div className="small fw-semibold text-primary">{viewingStandardDetails.title || '—'}</div>
                                             </div>
                                         </div>
@@ -1249,11 +1262,11 @@ export default function StrategicView() {
                                             <label className="fw-bold small text-muted text-uppercase d-block mb-2">Process</label>
                                             {viewingStandardDetails.processes?.length > 0 ? (
                                                 <div className="d-flex flex-column gap-2">
-                                                    {viewingStandardDetails.processes.map((step: any, idx: number) => (
+                                                    {viewingStandardDetails.processes.map((proc: any, idx: number) => (
                                                         <div key={idx} className="small">
                                                             <div className="d-flex gap-2 flex-wrap align-items-baseline">
                                                                 <span className="text-primary fw-bold">{idx + 1}.</span>
-                                                                <span className="fw-medium">{step.step_name}</span>
+                                                                <span className="fw-medium">{proc.step_name}</span>
                                                             </div>
                                                         </div>
                                                     ))}

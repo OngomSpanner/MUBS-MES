@@ -29,9 +29,9 @@ export async function notifyStaffProcessStepOpened(
         const base = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
         const staffLink = `${base}/staff`;
         const lead = options?.nextStep
-            ? 'The next standard process step is now open for you:'
-            : 'A standard process step is now open for you:';
-        const subject = options?.nextStep ? 'M&E: Next process step opened' : 'M&E: Process step opened';
+            ? 'The next standard process task is now open for you:'
+            : 'A standard process task is now open for you:';
+        const subject = options?.nextStep ? 'M&E: Next process task opened' : 'M&E: Process task opened';
         const inner = `
 <p style="color:#333333;font-size:16px;line-height:1.6;">Hello ${escapeHtml(sn.full_name || '')},</p>
 <p style="color:#333333;font-size:16px;line-height:1.6;">${lead} <strong>${escapeHtml(sn.step_name || '')}</strong>.</p>
@@ -170,7 +170,7 @@ export async function assertPriorProcessStepsComplete(
     if (n > 0) {
         return {
             ok: false,
-            message: 'Complete earlier process steps first (they run in order).',
+            message: 'Complete earlier process tasks first (they run in order).',
         };
     }
     return { ok: true };

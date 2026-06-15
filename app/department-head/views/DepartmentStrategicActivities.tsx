@@ -831,7 +831,7 @@ export default function DepartmentStrategicActivities() {
                                                                                                     title={
                                                                                                         hasStaff
                                                                                                             ? 'Remove assignment'
-                                                                                                            : 'Remove assignment and all duties under this step'
+                                                                                                            : 'Remove assignment and all duties under this process task'
                                                                                                     }
                                                                                                     aria-label="Remove assignment"
                                                                                                     onClick={() => handleRemoveAssignment(sa.id)}
@@ -920,7 +920,7 @@ export default function DepartmentStrategicActivities() {
                                                                                                 <span
                                                                                                     className="ms-1 text-muted"
                                                                                                     style={{ fontSize: '0.62rem' }}
-                                                                                                    title="Cannot remove: one or more steps are already open"
+                                                                                                    title="Cannot remove: one or more process tasks are already open"
                                                                                                 >
                                                                                                     locked
                                                                                                 </span>
