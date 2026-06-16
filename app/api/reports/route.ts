@@ -57,7 +57,7 @@ export async function GET(request: Request) {
 
     if (type) {
       const ambassadorScope = await resolveAmbassadorReportScope(userId, null);
-      if (ambassadorScope.restricted && !AMBASSADOR_ALLOWED_REPORT_TYPES.has(type)) {
+      if (ambassadorScope.restricted && ambassadorScope.managedUnitId && !AMBASSADOR_ALLOWED_REPORT_TYPES.has(type)) {
         return NextResponse.json(
           { message: 'This report is not available for your ambassador unit scope' },
           { status: 403 }

@@ -114,7 +114,10 @@ export async function POST(request: Request) {
       return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
     }
     const decoded = verifyToken(token) as any;
-    const assignedBy = decoded?.userId ?? null;
+    if (!decoded || !decoded.userId) {
+      return NextResponse.json({ message: 'Invalid token' }, { status: 401 });
+    }
+    const assignedBy = decoded.userId;
 
     const body = await request.json();
     const { 

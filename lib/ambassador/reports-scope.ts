@@ -81,5 +81,5 @@ export async function resolveAmbassadorReportScope(
     return { restricted: true, managedUnitId: null, isElevated: false };
   }
 
-  return { restricted: false, managedUnitId: null, isElevated: false };
+  return { restricted: true, managedUnitId: null, isElevated: false };
 }
