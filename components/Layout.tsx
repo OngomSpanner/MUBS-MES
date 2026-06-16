@@ -33,6 +33,7 @@ function LayoutContent({ children, sidebarOpen, setSidebarOpen }: any) {
       if (key === 'reporting' || key === 'reports') {
         const ambassadorReportTitles: Record<string, string> = {
           compliance: 'Dept. / Unit Activity Progress',
+          'data-collection': 'Performance Indicators',
           'staff-profiles': 'Staff Profiles',
           recruitment: 'Staff Recruitment',
           benefits: 'Staff Benefits',
@@ -57,6 +58,7 @@ function LayoutContent({ children, sidebarOpen, setSidebarOpen }: any) {
       'change-requests': 'Ambassador Proposals',
       'users': 'User Management',
       'reports': 'Reports & Analytics',
+      'questionnaire': 'Questionnaire Templates',
       'reporting': 'Unit Reporting',
       'propose-changes': 'Propose Changes',
 

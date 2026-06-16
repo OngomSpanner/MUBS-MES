@@ -28,6 +28,7 @@ import {
 import { fyLabelForDateJulyJune, fyRangeJulyJune, formatFyRangeShort } from '@/lib/financial-year';
 import { resolveRfPerformanceIndicator, resolveRfTargetValue } from '@/lib/rf-activity-targets';
 import DepartmentUnitMultiSelect, { type DepartmentUnitOption } from '@/components/DepartmentUnitMultiSelect';
+import { formatUserFeeDisplay } from '@/lib/standard-sds-fields';
 
 function isUnassigned(a: { department_id?: number | null; department?: string }): boolean {
     return a.department_id == null || !a.department?.trim() || a.department === '-';
@@ -40,6 +41,104 @@ type StandardProcessFormRow = {
 
 function emptyProcessRow(): StandardProcessFormRow {
     return { step_name: '' };
+}
+
+type StandardFormState = {
+    standard_no: string;
+    user_fee: string;
+    title: string;
+    standard_owner: string;
+    supporting_units: string;
+    pathway: string;
+    quality_standard: string;
+    output_standard: string;
+    performance_indicators: string[];
+    process_standard: string;
+    time_standard: string;
+    accessibility: string;
+    coverage: string;
+    frequency: string;
+    target_beneficiary: string;
+    access_criteria: string;
+    methodology: string;
+    inputs: string;
+    duration_value: string;
+    duration_unit: string;
+    department_ids: number[];
+    processes: StandardProcessFormRow[];
+};
+
+function emptyStandardForm(): StandardFormState {
+    return {
+        standard_no: '',
+        user_fee: '',
+        title: '',
+        standard_owner: '',
+        supporting_units: '',
+        pathway: '',
+        quality_standard: '',
+        output_standard: '',
+        performance_indicators: [''],
+        process_standard: '',
+        time_standard: '',
+        accessibility: '',
+        coverage: '',
+        frequency: '',
+        target_beneficiary: '',
+        access_criteria: '',
+        methodology: '',
+        inputs: '',
+        duration_value: '1',
+        duration_unit: 'weeks',
+        department_ids: [],
+        processes: [emptyProcessRow()],
+    };
+}
+
+function indicatorsFromStandard(std?: {
+    performance_indicators?: string[];
+    performance_indicator?: string | null;
+}): string[] {
+    if (Array.isArray(std?.performance_indicators) && std.performance_indicators.length > 0) {
+        return [...std.performance_indicators];
+    }
+    const legacy = std?.performance_indicator;
+    if (legacy != null && String(legacy).trim() !== '') {
+        return String(legacy)
+            .split(/\n+/)
+            .map((s) => s.trim())
+            .filter(Boolean);
+    }
+    return [''];
+}
+
+function buildStandardDimensionsSummary(std: {
+    quality_standard?: string | null;
+    time_standard?: string | null;
+    accessibility?: string | null;
+    coverage?: string | null;
+    frequency?: string | null;
+}): string[] {
+    const parts: string[] = [];
+    if (std.quality_standard?.trim()) parts.push(`Quality: ${std.quality_standard.trim()}`);
+    if (std.time_standard?.trim()) parts.push(`Time: ${std.time_standard.trim()}`);
+    if (std.accessibility?.trim()) parts.push(`Accessibility: ${std.accessibility.trim()}`);
+    if (std.coverage?.trim()) parts.push(`Coverage: ${std.coverage.trim()}`);
+    if (std.frequency?.trim()) parts.push(`Frequency: ${std.frequency.trim()}`);
+    return parts;
+}
+
+function standardIndicatorsList(std: {
+    performance_indicators?: string[];
+    performance_indicator?: string | null;
+}): string[] {
+    if (Array.isArray(std.performance_indicators) && std.performance_indicators.length > 0) {
+        return std.performance_indicators;
+    }
+    if (std.performance_indicator != null && String(std.performance_indicator).trim() !== '') {
+        return String(std.performance_indicator).split(/\n+/).map((s) => s.trim()).filter(Boolean);
+    }
+    return [];
 }
 
 function formatResponsibleOfficeLabel(name: string | undefined | null): string {
@@ -125,16 +224,7 @@ export default function StrategicView() {
     const [selectedStandard, setSelectedStandard] = useState<any>(null);
     const [savingStandard, setSavingStandard] = useState(false);
     const [loadingStandardModal, setLoadingStandardModal] = useState(false);
-    const [standardForm, setStandardForm] = useState({
-        title: '',
-        quality_standard: '',
-        output_standard: '',
-        performance_indicator: '',
-        duration_value: '1',
-        duration_unit: 'weeks',
-        department_ids: [] as number[],
-        processes: [] as StandardProcessFormRow[]
-    });
+    const [standardForm, setStandardForm] = useState<StandardFormState>(emptyStandardForm);
     const [standardError, setStandardError] = useState<string | null>(null);
     const [standardSuccess, setStandardSuccess] = useState<string | null>(null);
 
@@ -238,7 +328,9 @@ export default function StrategicView() {
     const filteredStandards = standards.filter(s => 
         !searchLower ||
         s.title.toLowerCase().includes(searchLower) ||
+        (s.standard_no && s.standard_no.toLowerCase().includes(searchLower)) ||
         (s.quality_standard && s.quality_standard.toLowerCase().includes(searchLower)) ||
+        (s.standard_owner && s.standard_owner.toLowerCase().includes(searchLower)) ||
         (s.department_names || []).some((name: string) => name.toLowerCase().includes(searchLower))
     );
 
@@ -259,27 +351,45 @@ export default function StrategicView() {
 
     const applyStandardToForm = (std?: any) => {
         setSelectedStandard(std || null);
+        if (!std) {
+            setStandardForm(emptyStandardForm());
+            return;
+        }
         setStandardForm({
-            title: std?.title || '',
-            quality_standard: std?.quality_standard || '',
-            output_standard: std?.output_standard || '',
-            performance_indicator: std?.performance_indicator || '',
+            standard_no: std.standard_no || '',
+            user_fee: std.user_fee || '',
+            title: std.title || '',
+            standard_owner: std.standard_owner || '',
+            supporting_units: std.supporting_units || '',
+            pathway: std.pathway || '',
+            quality_standard: std.quality_standard || '',
+            output_standard: std.output_standard || '',
+            performance_indicators: indicatorsFromStandard(std),
+            process_standard: std.process_standard || '',
+            time_standard: std.time_standard || '',
+            accessibility: std.accessibility || '',
+            coverage: std.coverage || '',
+            frequency: std.frequency || '',
+            target_beneficiary: std.target_beneficiary || '',
+            access_criteria: std.access_criteria || '',
+            methodology: std.methodology || '',
+            inputs: std.inputs || '',
             duration_value:
-                std?.duration_value != null && std.duration_value !== ''
+                std.duration_value != null && std.duration_value !== ''
                     ? String(std.duration_value)
                     : '1',
             duration_unit:
-                typeof std?.duration_unit === 'string' && std.duration_unit.trim()
+                typeof std.duration_unit === 'string' && std.duration_unit.trim()
                     ? String(std.duration_unit).trim().toLowerCase()
                     : 'weeks',
-            department_ids: Array.isArray(std?.department_ids)
+            department_ids: Array.isArray(std.department_ids)
                 ? std.department_ids.map((id: number) => Number(id)).filter((id: number) => Number.isFinite(id))
                 : [],
-            processes: std?.processes?.length
+            processes: std.processes?.length
                 ? std.processes.map((p: any) => ({
                       step_name: p.step_name || '',
                   }))
-                : [],
+                : [emptyProcessRow()],
         });
     };
 
@@ -302,20 +412,22 @@ export default function StrategicView() {
     const handleSaveStandard = async () => {
         setStandardError(null);
         setStandardSuccess(null);
+        const standardNo = standardForm.standard_no.trim();
         const name = standardForm.title.trim();
-        if (!name) return setStandardError('Standard title is required.');
-        const quality = standardForm.quality_standard.trim();
+        const owner = standardForm.standard_owner.trim();
         const output = standardForm.output_standard.trim();
-        if (!quality) return setStandardError('Quality standard is required.');
-        if (!output) return setStandardError('Output standard is required.');
-        const perf = standardForm.performance_indicator.trim();
-        if (!perf) return setStandardError('Performance indicator is required.');
+        if (!standardNo) return setStandardError('Standard No. is required.');
+        if (!name) return setStandardError('Standard title is required.');
+        if (!owner) return setStandardError('Standard owner is required.');
+        if (!output) return setStandardError('Output / service description is required.');
+        const indicators = standardForm.performance_indicators.map((s) => s.trim()).filter(Boolean);
+        if (indicators.length === 0) return setStandardError('Add at least one performance indicator.');
         const durCount = parseInt(String(standardForm.duration_value || ''), 10);
         if ((standardForm.duration_unit && (!Number.isFinite(durCount) || durCount < 1)) || (!standardForm.duration_unit && standardForm.duration_value)) {
-            return setStandardError('If fallback duration is set, include valid value (>= 1) and unit.');
+            return setStandardError('If duration is set, include valid value (>= 1) and unit.');
         }
         const namedProcesses = standardForm.processes.filter((p) => p.step_name.trim());
-        if (namedProcesses.length === 0) return setStandardError('At least one process is required.');
+        if (namedProcesses.length === 0) return setStandardError('At least one process task is required.');
         if (standardForm.department_ids.length === 0) {
             return setStandardError('Select at least one department or unit.');
         }
@@ -331,10 +443,24 @@ export default function StrategicView() {
         setSavingStandard(true);
         try {
             const payload = {
+                standard_no: standardNo,
+                user_fee: standardForm.user_fee.trim() || null,
                 title: name,
-                quality_standard: quality,
+                standard_owner: owner,
+                supporting_units: standardForm.supporting_units.trim() || null,
+                pathway: standardForm.pathway.trim() || null,
+                quality_standard: standardForm.quality_standard.trim() || null,
                 output_standard: output,
-                performance_indicator: perf,
+                performance_indicators: indicators,
+                process_standard: standardForm.process_standard.trim() || null,
+                time_standard: standardForm.time_standard.trim() || null,
+                accessibility: standardForm.accessibility.trim() || null,
+                coverage: standardForm.coverage.trim() || null,
+                frequency: standardForm.frequency.trim() || null,
+                target_beneficiary: standardForm.target_beneficiary.trim() || null,
+                access_criteria: standardForm.access_criteria.trim() || null,
+                methodology: standardForm.methodology.trim() || null,
+                inputs: standardForm.inputs.trim() || null,
                 duration_value: durCount,
                 duration_unit: standardForm.duration_unit,
                 department_ids: standardForm.department_ids,
@@ -454,6 +580,27 @@ export default function StrategicView() {
             ...standardForm,
             processes: standardForm.processes.filter((_, i) => i !== idx),
         });
+    };
+
+    const addIndicatorRow = () => {
+        setStandardForm({
+            ...standardForm,
+            performance_indicators: [...standardForm.performance_indicators, ''],
+        });
+    };
+
+    const removeIndicatorRow = (idx: number) => {
+        const next = standardForm.performance_indicators.filter((_, i) => i !== idx);
+        setStandardForm({
+            ...standardForm,
+            performance_indicators: next.length > 0 ? next : [''],
+        });
+    };
+
+    const updateIndicatorRow = (idx: number, value: string) => {
+        const arr = [...standardForm.performance_indicators];
+        arr[idx] = value;
+        setStandardForm({ ...standardForm, performance_indicators: arr });
     };
 
     return (
@@ -633,21 +780,25 @@ export default function StrategicView() {
                         <table className="table mb-0 align-middle">
                             <thead>
                                 <tr>
-                                    <th className="ps-4">Standard Title</th>
-                                    <th>Department(s) / Unit(s)</th>
+                                    <th className="ps-4">Standard No.</th>
+                                    <th>Standard Title</th>
+                                    <th>Department/Unit</th>
                                     <th>Processes</th>
                                     <th className="text-end pe-4">Actions</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {loadingStandards ? (
-                                    <tr><td colSpan={4} className="text-center py-4"><span className="spinner-border spinner-border-sm text-primary"></span> Loading...</td></tr>
+                                    <tr><td colSpan={5} className="text-center py-4"><span className="spinner-border spinner-border-sm text-primary"></span> Loading...</td></tr>
                                 ) : paginatedStandards.length === 0 ? (
-                                    <tr><td colSpan={4} className="text-center py-4 text-muted">No standards defined. Create one to use as a template.</td></tr>
+                                    <tr><td colSpan={5} className="text-center py-4 text-muted">No standards defined. Create one to use as a template.</td></tr>
                                 ) : (
                                     paginatedStandards.map((s) => (
                                         <tr key={s.id}>
                                             <td className="ps-4">
+                                                <code className="text-dark" style={{ fontSize: '0.72rem' }}>{s.standard_no || '—'}</code>
+                                            </td>
+                                            <td>
                                                 <div className="text-dark" style={{ fontSize: '.86rem', fontWeight: 600 }}>{s.title}</div>
                                             </td>
                                             <td style={{ maxWidth: '280px' }}>
@@ -703,119 +854,157 @@ export default function StrategicView() {
 
             {/* --- MODALS --- */}
 
-            {/* View Standard Modal (read-only, with safe actions) */}
+            {/* View Standard Modal (read-only, mockup-style preview) */}
             <Modal
                 show={showViewStandardModal && !!viewStandardDetails}
                 onHide={() => setShowViewStandardModal(false)}
                 centered
-                dialogClassName="modal-standard-view"
+                scrollable
+                size="xl"
+                dialogClassName="modal-standard-preview"
             >
-                <Modal.Header closeButton className="modal-header-mubs py-2">
-                    <Modal.Title className="fw-bold d-flex align-items-center gap-2 fs-6 mb-0 text-white">
-                        <span className="material-symbols-outlined" style={{ fontSize: '1.25rem' }}>visibility</span>
-                        Standard details
-                    </Modal.Title>
+                <Modal.Header closeButton className="modal-standard-preview-header py-3">
+                    <div>
+                        <Modal.Title className="fw-bold d-flex align-items-center gap-2 fs-6 mb-0 text-white">
+                            <span className="material-symbols-outlined" style={{ fontSize: '1.25rem' }}>visibility</span>
+                            Standard details
+                        </Modal.Title>
+                        <p className="modal-standard-preview-subtitle mb-0">Read-only summary</p>
+                    </div>
                 </Modal.Header>
                 {viewStandardDetails && (
-                    <Modal.Body className="p-3">
-                        <div className="d-flex align-items-start justify-content-between gap-2">
-                            <div style={{ minWidth: 0 }}>
-                                <div className="text-muted fw-bold text-uppercase" style={{ fontSize: '0.65rem', letterSpacing: '0.04em' }}>
-                                    Standard
-                                </div>
-                                <div className="fw-bold text-dark" style={{ fontSize: '1.05rem', lineHeight: 1.2, wordBreak: 'break-word' }}>
-                                    {viewStandardDetails.title}
-                                </div>
-                                <div className="text-muted" style={{ fontSize: '0.78rem' }}>
-                                    Number of Process: {viewStandardDetails.processes?.length || 0} task{(viewStandardDetails.processes?.length || 0) === 1 ? '' : 's'}
-                                    {', '}Duration:{' '}
+                    <Modal.Body className="modal-standard-preview-body">
+                        <div className="standard-preview-hero">
+                            <div className="standard-preview-meta-line">
+                                <span className="standard-preview-meta-label">Standard id:</span>
+                                <span className="standard-preview-code">{viewStandardDetails.standard_no || '—'}</span>
+                            </div>
+                            <div className="standard-preview-meta-line">
+                                <span className="standard-preview-meta-label">Standard title:</span>
+                                <span className="standard-preview-meta-value"><strong>{viewStandardDetails.title}</strong></span>
+                            </div>
+                        </div>
+
+                        <div className="standard-preview-overview">
+                            <div className="standard-preview-meta-line">
+                                <span className="standard-preview-meta-label">Standard owner:</span>
+                                <span className="standard-preview-meta-value">{viewStandardDetails.standard_owner || '—'}</span>
+                            </div>
+                            <div className="standard-preview-meta-line">
+                                <span className="standard-preview-meta-label">Supporting units:</span>
+                                <span className="standard-preview-meta-value">{viewStandardDetails.supporting_units || '—'}</span>
+                            </div>
+                            <div className="standard-preview-meta-line">
+                                <span className="standard-preview-meta-label">User fee:</span>
+                                <span className="standard-preview-meta-value">{formatUserFeeDisplay(viewStandardDetails.user_fee)}</span>
+                            </div>
+                            <div className="standard-preview-meta-line">
+                                <span className="standard-preview-meta-label">Duration:</span>
+                                <span className="standard-preview-meta-value">
                                     {viewStandardDetails.duration_unit
                                         ? formatStandardProcessDuration(viewStandardDetails.duration_value, viewStandardDetails.duration_unit)
                                         : '—'}
-                                </div>
-                                {(viewStandardDetails.department_names || []).length > 0 ? (
-                                    <div className="d-flex flex-wrap gap-1 mt-2">
-                                        {viewStandardDetails.department_names.map((name: string) => (
-                                            <Badge key={name} bg="light" className="text-dark border fw-normal" style={{ fontSize: '0.65rem' }}>
-                                                {name}
-                                            </Badge>
-                                        ))}
-                                    </div>
-                                ) : null}
+                                </span>
+                            </div>
+                            <div className="standard-preview-meta-line">
+                                <span className="standard-preview-meta-label">Department / Unit:</span>
+                                <span className="standard-preview-meta-value">
+                                    {(viewStandardDetails.department_names || []).length > 0 ? (
+                                        <span className="standard-preview-dept-chips">
+                                            {viewStandardDetails.department_names.map((name: string) => (
+                                                <span key={name} className="standard-preview-dept-chip">{name}</span>
+                                            ))}
+                                        </span>
+                                    ) : '—'}
+                                </span>
                             </div>
                         </div>
 
-                        <div className="row g-2 mt-2">
-                            <div className="col-12 col-md-6">
-                                <div className="p-3 border rounded-3 h-100" style={{ background: '#f8fafc' }}>
-                                    <div className="d-flex align-items-center gap-2 mb-2">
-                                        <span className="material-symbols-outlined text-primary" style={{ fontSize: '18px' }}>verified</span>
-                                        <div className="text-muted fw-bold text-uppercase" style={{ fontSize: '0.65rem', letterSpacing: '0.04em' }}>
-                                            Quality standard
-                                        </div>
-                                    </div>
-                                    <div className="text-dark" style={{ fontSize: '0.85rem', lineHeight: 1.35, whiteSpace: 'pre-wrap' }}>
-                                        {viewStandardDetails.quality_standard || '—'}
-                                    </div>
-                                </div>
-                            </div>
-                            <div className="col-12 col-md-6">
-                                <div className="p-3 border rounded-3 h-100" style={{ background: '#f8fafc' }}>
-                                    <div className="d-flex align-items-center gap-2 mb-2">
-                                        <span className="material-symbols-outlined text-primary" style={{ fontSize: '18px' }}>inventory_2</span>
-                                        <div className="text-muted fw-bold text-uppercase" style={{ fontSize: '0.65rem', letterSpacing: '0.04em' }}>
-                                            Output standard
-                                        </div>
-                                    </div>
-                                    <div className="text-dark" style={{ fontSize: '0.85rem', lineHeight: 1.35, whiteSpace: 'pre-wrap' }}>
-                                        {viewStandardDetails.output_standard || '—'}
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        {viewStandardDetails.performance_indicator ? (
-                            <div className="mt-2 p-3 rounded-3 border" style={{ background: '#f0f9ff' }}>
-                                <div className="d-flex align-items-center gap-2 mb-1">
-                                    <span className="material-symbols-outlined text-primary" style={{ fontSize: '18px' }}>flag</span>
-                                    <div className="text-muted fw-bold text-uppercase" style={{ fontSize: '0.65rem', letterSpacing: '0.04em' }}>
-                                        Performance indicator
-                                    </div>
-                                </div>
-                                <div className="text-dark" style={{ fontSize: '0.85rem', lineHeight: 1.35, whiteSpace: 'pre-wrap' }}>
-                                    {viewStandardDetails.performance_indicator}
-                                </div>
-                            </div>
-                        ) : null}
-
-                        <div className="mt-3">
-                            <div className="d-flex align-items-center justify-content-between mb-1">
-                                <div className="text-muted fw-bold text-uppercase" style={{ fontSize: '0.65rem', letterSpacing: '0.04em' }}>
-                                    Process tasks
-                                </div>
-                            </div>
+                        <div className="standard-preview-section">
+                            <h4>Delivery process</h4>
                             {viewStandardDetails.processes?.length ? (
-                                <div className="d-flex flex-column gap-2">
+                                <div className="standard-process-stepper">
                                     {viewStandardDetails.processes.map((p: any, idx: number) => (
-                                        <div key={`${p?.id ?? 't'}-${idx}`} className="d-flex align-items-start gap-2">
-                                            <div className="text-muted fw-bold" style={{ minWidth: '22px', fontSize: '0.85rem', lineHeight: 1.25 }}>
-                                                {idx + 1}.
-                                            </div>
-                                            <div className="text-dark" style={{ fontSize: '0.85rem', lineHeight: 1.25, wordBreak: 'break-word' }}>
-                                                {String(p.step_name ?? '').trim() || '—'}
-                                            </div>
+                                        <div key={`${p?.id ?? 't'}-${idx}`} className="standard-process-step">
+                                            {idx > 0 && <span className="standard-process-step-arrow">→</span>}
+                                            <span className="standard-process-step-num">{idx + 1}</span>
+                                            <span className="standard-process-step-label">{String(p.step_name ?? '').trim() || '—'}</span>
                                         </div>
                                     ))}
                                 </div>
                             ) : (
-                                <div className="small text-muted">No tasks defined for this standard.</div>
+                                <p className="standard-preview-empty">No tasks defined.</p>
                             )}
+                            {viewStandardDetails.process_standard?.trim() ? (
+                                <div className="standard-process-timing-note">
+                                    <strong>Process timing:</strong> {viewStandardDetails.process_standard}
+                                </div>
+                            ) : null}
+                        </div>
+
+                        <div className="standard-preview-section">
+                            <h4>Service delivery (SDS matrix)</h4>
+                            <div className="standard-preview-table-wrap">
+                                <table className="standard-preview-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Output</th>
+                                            <th>Performance indicators</th>
+                                            <th>Standard</th>
+                                            <th>Target beneficiary</th>
+                                            <th>Access criteria</th>
+                                            <th>Methodology</th>
+                                            <th>Inputs</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr>
+                                            <td>{viewStandardDetails.output_standard || '—'}</td>
+                                            <td>
+                                                {standardIndicatorsList(viewStandardDetails).length > 0 ? (
+                                                    <ul>
+                                                        {standardIndicatorsList(viewStandardDetails).map((ind: string, i: number) => (
+                                                            <li key={i}>{ind}</li>
+                                                        ))}
+                                                    </ul>
+                                                ) : '—'}
+                                            </td>
+                                            <td>
+                                                {buildStandardDimensionsSummary(viewStandardDetails).length > 0 ? (
+                                                    <div className="standard-dimensions-cell">
+                                                        {viewStandardDetails.quality_standard?.trim() ? (
+                                                            <div><strong>Quality:</strong> {viewStandardDetails.quality_standard}</div>
+                                                        ) : null}
+                                                        {viewStandardDetails.time_standard?.trim() ? (
+                                                            <div><strong>Time:</strong> {viewStandardDetails.time_standard}</div>
+                                                        ) : null}
+                                                        {viewStandardDetails.accessibility?.trim() ? (
+                                                            <div><strong>Accessibility:</strong> {viewStandardDetails.accessibility}</div>
+                                                        ) : null}
+                                                        {viewStandardDetails.coverage?.trim() ? (
+                                                            <div><strong>Coverage:</strong> {viewStandardDetails.coverage}</div>
+                                                        ) : null}
+                                                        {viewStandardDetails.frequency?.trim() ? (
+                                                            <div><strong>Frequency:</strong> {viewStandardDetails.frequency}</div>
+                                                        ) : null}
+                                                    </div>
+                                                ) : '—'}
+                                            </td>
+                                            <td>{viewStandardDetails.target_beneficiary || '—'}</td>
+                                            <td>{viewStandardDetails.access_criteria || '—'}</td>
+                                            <td className="standard-preview-pre">{viewStandardDetails.methodology || '—'}</td>
+                                            <td className="standard-preview-pre">{viewStandardDetails.inputs || '—'}</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
                         </div>
                     </Modal.Body>
                 )}
-                <Modal.Footer className="justify-content-end gap-2">
+                <Modal.Footer className="modal-standard-preview-footer justify-content-between flex-wrap gap-2">
+                    <span className="text-muted small">Read-only summary</span>
                     {viewStandardDetails && (
-                        <>
+                        <div className="d-flex gap-2">
                             <Button
                                 variant="primary"
                                 onClick={() => {
@@ -834,7 +1023,7 @@ export default function StrategicView() {
                             >
                                 Delete
                             </Button>
-                        </>
+                        </div>
                     )}
                 </Modal.Footer>
             </Modal>
@@ -872,99 +1061,128 @@ export default function StrategicView() {
                             {standardSuccess}
                         </div>
                     )}
-                    <div className="row g-2">
-                        <div className="col-12">
-                            <Form.Label className="fw-bold small mb-1">Standard Title</Form.Label>
-                            <Form.Control
-                                size="sm"
-                                type="text"
-                                required
-                                name="standard_title"
-                                value={standardForm.title}
-                                onChange={(e) => setStandardForm({ ...standardForm, title: e.target.value })}
-                            />
-                        </div>
-                        <DepartmentUnitMultiSelect
-                            departments={allDepartments}
-                            selectedIds={standardForm.department_ids}
-                            onChange={(department_ids) => setStandardForm({ ...standardForm, department_ids })}
-                        />
-                        <div className="col-md-6">
-                            <Form.Label className="fw-bold small mb-1">Quality Standard</Form.Label>
-                            <Form.Control
-                                size="sm"
-                                as="textarea"
-                                rows={2}
-                                required
-                                name="quality_standard"
-                                value={standardForm.quality_standard}
-                                onChange={(e) => setStandardForm({ ...standardForm, quality_standard: e.target.value })}
-                            />
-                        </div>
-                        <div className="col-md-6">
-                            <Form.Label className="fw-bold small mb-1">Output Standard</Form.Label>
-                            <Form.Control
-                                size="sm"
-                                as="textarea"
-                                rows={2}
-                                required
-                                name="output_standard"
-                                value={standardForm.output_standard}
-                                onChange={(e) => setStandardForm({ ...standardForm, output_standard: e.target.value })}
-                            />
-                        </div>
-                        <div className="col-12">
-                            <Form.Label className="fw-bold small mb-1">Performance Indicator</Form.Label>
-                            <Form.Control
-                                size="sm"
-                                as="textarea"
-                                rows={2}
-                                required
-                                name="standard_performance_indicator"
-                                value={standardForm.performance_indicator}
-                                onChange={(e) => setStandardForm({ ...standardForm, performance_indicator: e.target.value })}
-                            />
-                        </div>
-                        <div className="col-12">
-                            <Form.Label className="fw-bold small mb-1">Process Duration</Form.Label>
-                            <div className="d-flex flex-wrap gap-2 align-items-center">
-                                <Form.Control
-                                    type="number"
-                                    min={1}
-                                    size="sm"
-                                    style={{ width: '120px' }}
-                                    name="standard_duration_value"
-                                    value={standardForm.duration_value}
-                                    onChange={(e) => setStandardForm({ ...standardForm, duration_value: e.target.value })}
-                                    required
+                    <div className="d-flex flex-column gap-3">
+                        <div className="border rounded-3 p-3">
+                            <h6 className="fw-bold text-primary small mb-3">1. Standard identity</h6>
+                            <div className="row g-2">
+                                <div className="col-md-6">
+                                    <Form.Label className="fw-bold small mb-1">Standard No. <span className="text-danger">*</span></Form.Label>
+                                    <Form.Control size="sm" type="text" required name="standard_no" placeholder="e.g. MUBS/P1/OBJ12/REG/S007" value={standardForm.standard_no} onChange={(e) => setStandardForm({ ...standardForm, standard_no: e.target.value })} />
+                                </div>
+                                <div className="col-md-6">
+                                    <Form.Label className="fw-bold small mb-1">User fee</Form.Label>
+                                    <Form.Control size="sm" type="text" name="user_fee" placeholder="Leave blank if not applicable" value={standardForm.user_fee} onChange={(e) => setStandardForm({ ...standardForm, user_fee: e.target.value })} />
+                                    <div className="text-muted" style={{ fontSize: '0.72rem' }}>Blank = Not Applicable</div>
+                                </div>
+                                <div className="col-md-6">
+                                    <Form.Label className="fw-bold small mb-1">Duration</Form.Label>
+                                    <div className="d-flex flex-wrap gap-2 align-items-center">
+                                        <Form.Control type="number" min={1} size="sm" style={{ width: '90px' }} name="standard_duration_value" value={standardForm.duration_value} onChange={(e) => setStandardForm({ ...standardForm, duration_value: e.target.value })} required />
+                                        <Form.Select size="sm" style={{ width: '140px' }} name="standard_duration_unit" value={standardForm.duration_unit} onChange={(e) => setStandardForm({ ...standardForm, duration_unit: e.target.value })} required>
+                                            {PROCESS_DURATION_UNIT_OPTIONS.map((opt) => (
+                                                <option key={opt.value} value={opt.value}>{opt.label}</option>
+                                            ))}
+                                        </Form.Select>
+                                        <span className="text-muted small">{formatStandardProcessDuration(parseInt(String(standardForm.duration_value || '1'), 10), standardForm.duration_unit)}</span>
+                                    </div>
+                                </div>
+                                <div className="col-12">
+                                    <Form.Label className="fw-bold small mb-1">Standard title <span className="text-danger">*</span></Form.Label>
+                                    <Form.Control size="sm" type="text" required name="standard_title" value={standardForm.title} onChange={(e) => setStandardForm({ ...standardForm, title: e.target.value })} />
+                                </div>
+                                <div className="col-12">
+                                    <Form.Label className="fw-bold small mb-1">Standard owner <span className="text-danger">*</span></Form.Label>
+                                    <Form.Control size="sm" type="text" required name="standard_owner" placeholder="e.g. Office of the School Registrar" value={standardForm.standard_owner} onChange={(e) => setStandardForm({ ...standardForm, standard_owner: e.target.value })} />
+                                </div>
+                                <div className="col-12">
+                                    <Form.Label className="fw-bold small mb-1">Supporting units</Form.Label>
+                                    <Form.Control size="sm" type="text" name="supporting_units" placeholder="Faculties, Departments, QAD, …" value={standardForm.supporting_units} onChange={(e) => setStandardForm({ ...standardForm, supporting_units: e.target.value })} />
+                                </div>
+                                <DepartmentUnitMultiSelect
+                                    departments={allDepartments}
+                                    selectedIds={standardForm.department_ids}
+                                    onChange={(department_ids) => setStandardForm({ ...standardForm, department_ids })}
                                 />
-                                <Form.Select
-                                    size="sm"
-                                    style={{ width: '180px' }}
-                                    name="standard_duration_unit"
-                                    value={standardForm.duration_unit}
-                                    onChange={(e) => setStandardForm({ ...standardForm, duration_unit: e.target.value })}
-                                    required
-                                >
-                                    {PROCESS_DURATION_UNIT_OPTIONS.map((opt) => (
-                                        <option key={opt.value} value={opt.value}>
-                                            {opt.label}
-                                        </option>
-                                    ))}
-                                </Form.Select>
-                                <div className="text-muted small" style={{ fontSize: '0.78rem' }}>
-                                    {formatStandardProcessDuration(
-                                        parseInt(String(standardForm.duration_value || '1'), 10),
-                                        standardForm.duration_unit
-                                    )}
+                                <div className="col-12">
+                                    <Form.Label className="fw-bold small mb-1">Pathway (high-level flow)</Form.Label>
+                                    <Form.Control size="sm" as="textarea" rows={2} name="pathway" value={standardForm.pathway} onChange={(e) => setStandardForm({ ...standardForm, pathway: e.target.value })} />
                                 </div>
                             </div>
                         </div>
 
-                        <div className="col-12 pt-1"><hr className="opacity-25 my-2" />
-                            <div className="d-flex justify-content-between align-items-center mb-1 flex-wrap gap-2">
-                                <h6 className="fw-bold text-primary small mb-0">Processes</h6>
-                                <Button type="button" size="sm" variant="outline-primary" onClick={addProcessRow}>+ Add process</Button>
+                        <div className="border rounded-3 p-3">
+                            <h6 className="fw-bold text-primary small mb-3">2. Service delivery row (SDS matrix)</h6>
+                            <div className="row g-2">
+                                <div className="col-12">
+                                    <Form.Label className="fw-bold small mb-1">Output / service description <span className="text-danger">*</span></Form.Label>
+                                    <Form.Control size="sm" as="textarea" rows={2} required name="output_standard" value={standardForm.output_standard} onChange={(e) => setStandardForm({ ...standardForm, output_standard: e.target.value })} />
+                                </div>
+                                <div className="col-12">
+                                    <Form.Label className="fw-bold small mb-1">Performance indicators <span className="text-danger">*</span></Form.Label>
+                                    <div className="d-flex flex-column gap-1">
+                                        {standardForm.performance_indicators.map((ind, idx) => (
+                                            <div key={idx} className="d-flex gap-2 align-items-center">
+                                                <Form.Control size="sm" value={ind} onChange={(e) => updateIndicatorRow(idx, e.target.value)} placeholder={`Indicator ${idx + 1}`} />
+                                                {standardForm.performance_indicators.length > 1 && (
+                                                    <Button type="button" size="sm" variant="outline-danger" onClick={() => removeIndicatorRow(idx)}>×</Button>
+                                                )}
+                                            </div>
+                                        ))}
+                                    </div>
+                                    <Button type="button" size="sm" variant="outline-primary" className="mt-2" onClick={addIndicatorRow}>+ Add indicator</Button>
+                                </div>
+                                <div className="col-12">
+                                    <Form.Label className="fw-bold small mb-2">Standard dimensions</Form.Label>
+                                    <div className="row g-2">
+                                        <div className="col-md-6">
+                                            <Form.Label className="small text-muted mb-1">Quality</Form.Label>
+                                            <Form.Control size="sm" as="textarea" rows={2} name="quality_standard" value={standardForm.quality_standard} onChange={(e) => setStandardForm({ ...standardForm, quality_standard: e.target.value })} />
+                                        </div>
+                                        <div className="col-md-6">
+                                            <Form.Label className="small text-muted mb-1">Process (with time)</Form.Label>
+                                            <Form.Control size="sm" as="textarea" rows={2} name="process_standard" value={standardForm.process_standard} onChange={(e) => setStandardForm({ ...standardForm, process_standard: e.target.value })} />
+                                        </div>
+                                        <div className="col-md-4">
+                                            <Form.Label className="small text-muted mb-1">Time / turnaround</Form.Label>
+                                            <Form.Control size="sm" type="text" name="time_standard" value={standardForm.time_standard} onChange={(e) => setStandardForm({ ...standardForm, time_standard: e.target.value })} />
+                                        </div>
+                                        <div className="col-md-4">
+                                            <Form.Label className="small text-muted mb-1">Accessibility</Form.Label>
+                                            <Form.Control size="sm" type="text" name="accessibility" value={standardForm.accessibility} onChange={(e) => setStandardForm({ ...standardForm, accessibility: e.target.value })} />
+                                        </div>
+                                        <div className="col-md-4">
+                                            <Form.Label className="small text-muted mb-1">Coverage</Form.Label>
+                                            <Form.Control size="sm" type="text" name="coverage" value={standardForm.coverage} onChange={(e) => setStandardForm({ ...standardForm, coverage: e.target.value })} />
+                                        </div>
+                                        <div className="col-md-4">
+                                            <Form.Label className="small text-muted mb-1">Frequency</Form.Label>
+                                            <Form.Control size="sm" type="text" name="frequency" value={standardForm.frequency} onChange={(e) => setStandardForm({ ...standardForm, frequency: e.target.value })} />
+                                        </div>
+                                    </div>
+                                </div>
+                                <div className="col-md-6">
+                                    <Form.Label className="fw-bold small mb-1">Target beneficiary</Form.Label>
+                                    <Form.Control size="sm" type="text" name="target_beneficiary" value={standardForm.target_beneficiary} onChange={(e) => setStandardForm({ ...standardForm, target_beneficiary: e.target.value })} />
+                                </div>
+                                <div className="col-md-6">
+                                    <Form.Label className="fw-bold small mb-1">Access criteria</Form.Label>
+                                    <Form.Control size="sm" type="text" name="access_criteria" value={standardForm.access_criteria} onChange={(e) => setStandardForm({ ...standardForm, access_criteria: e.target.value })} />
+                                </div>
+                                <div className="col-12">
+                                    <Form.Label className="fw-bold small mb-1">Methodology for providing the service</Form.Label>
+                                    <Form.Control size="sm" as="textarea" rows={3} name="methodology" value={standardForm.methodology} onChange={(e) => setStandardForm({ ...standardForm, methodology: e.target.value })} />
+                                </div>
+                                <div className="col-12">
+                                    <Form.Label className="fw-bold small mb-1">Inputs</Form.Label>
+                                    <Form.Control size="sm" as="textarea" rows={2} name="inputs" value={standardForm.inputs} onChange={(e) => setStandardForm({ ...standardForm, inputs: e.target.value })} />
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="border rounded-3 p-3">
+                            <div className="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-2">
+                                <h6 className="fw-bold text-primary small mb-0">3. Process tasks</h6>
+                                <Button type="button" size="sm" variant="outline-primary" onClick={addProcessRow}>+ Add task</Button>
                             </div>
                             <p className="text-muted small mb-2" style={{ fontSize: '0.78rem' }}>
                                 List process tasks in order. Milestone progress is calculated automatically when you save.
@@ -973,36 +1191,9 @@ export default function StrategicView() {
                                 {standardForm.processes.map((proc, idx) => (
                                     <div key={idx} className="border rounded p-2 py-1 bg-light bg-opacity-50">
                                         <div className="d-flex flex-nowrap align-items-center gap-2">
-                                            <div
-                                                className="bg-white border rounded-circle text-center small fw-bold flex-shrink-0"
-                                                style={{ width: '26px', height: '26px', lineHeight: '24px', fontSize: '0.75rem' }}
-                                                title={`Task ${idx + 1}`}
-                                            >
-                                                {idx + 1}
-                                            </div>
-                                            <Form.Control
-                                                size="sm"
-                                                className="flex-grow-1"
-                                                style={{ minWidth: 0 }}
-                                                required
-                                                name={`process_${idx}_step_name`}
-                                                value={proc.step_name}
-                                                onChange={(e) => {
-                                                    const arr = [...standardForm.processes];
-                                                    arr[idx].step_name = e.target.value;
-                                                    setStandardForm({ ...standardForm, processes: arr });
-                                                }}
-                                                onPaste={(e) => handleProcessPaste(e, idx)}
-                                            />
-                                            <Button
-                                                size="sm"
-                                                variant="outline-danger"
-                                                className="flex-shrink-0"
-                                                onClick={() => removeProcessRow(idx)}
-                                                title="Delete task"
-                                            >
-                                                ×
-                                            </Button>
+                                            <div className="bg-white border rounded-circle text-center small fw-bold flex-shrink-0" style={{ width: '26px', height: '26px', lineHeight: '24px', fontSize: '0.75rem' }} title={`Task ${idx + 1}`}>{idx + 1}</div>
+                                            <Form.Control size="sm" className="flex-grow-1" style={{ minWidth: 0 }} required name={`process_${idx}_step_name`} value={proc.step_name} onChange={(e) => { const arr = [...standardForm.processes]; arr[idx].step_name = e.target.value; setStandardForm({ ...standardForm, processes: arr }); }} onPaste={(e) => handleProcessPaste(e, idx)} />
+                                            <Button size="sm" variant="outline-danger" className="flex-shrink-0" onClick={() => removeProcessRow(idx)} title="Delete task">×</Button>
                                         </div>
                                     </div>
                                 ))}

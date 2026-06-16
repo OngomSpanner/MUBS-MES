@@ -2,9 +2,10 @@ import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { verifyToken } from '@/lib/auth';
 import { query } from '@/lib/db';
+import { getVisibleDepartmentIds } from '@/lib/department-head';
 import { normalizeRoleForCookie, parseRoles } from '@/lib/role-routing';
 
-const REVIEWER_ROLES = new Set(['System Administrator', 'Strategy Manager']);
+const REVIEWER_ROLES = new Set(['HOD']);
 
 async function userCanReviewChangeRequests(userId: number): Promise<boolean> {
   const roles = new Set<string>();
@@ -33,7 +34,9 @@ async function userCanReviewChangeRequests(userId: number): Promise<boolean> {
   return [...roles].some((role) => REVIEWER_ROLES.has(role));
 }
 
-export async function requireChangeRequestReviewer(): Promise<{ userId: number } | { error: NextResponse }> {
+export async function requireChangeRequestReviewer(): Promise<
+  { userId: number; departmentIds: number[] } | { error: NextResponse }
+> {
   const cookieStore = await cookies();
   const token = cookieStore.get('token')?.value;
   if (!token) {
@@ -49,11 +52,12 @@ export async function requireChangeRequestReviewer(): Promise<{ userId: number }
   if (!allowed) {
     return {
       error: NextResponse.json(
-        { message: 'Strategy Manager or System Administrator role required' },
+        { message: 'Head of Department / Unit Head role required' },
         { status: 403 }
       ),
     };
   }
 
-  return { userId: decoded.userId };
+  const departmentIds = await getVisibleDepartmentIds(decoded.userId);
+  return { userId: decoded.userId, departmentIds };
 }

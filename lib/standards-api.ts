@@ -4,6 +4,12 @@
  * `target` on standards is legacy; new work uses per-FY targets on strategic_activities.
  */
 
+import {
+  formatUserFeeDisplay,
+  parsePerformanceIndicatorsFromRow,
+  sdsFieldsFromRow,
+} from '@/lib/standard-sds-fields';
+
 export type PublicStandardProcess = {
   id: number;
   standard_id: number;
@@ -17,11 +23,27 @@ export type PublicStandardProcess = {
 
 export type PublicStandard = {
   id: number;
+  standard_no: string | null;
   title: string;
+  user_fee: string | null;
+  user_fee_display: string;
+  standard_owner: string | null;
+  supporting_units: string | null;
+  pathway: string | null;
   quality_standard: string | null;
   output_standard: string | null;
   /** What evidences completion of this standard process (e.g. signed form, published report). */
   performance_indicator: string | null;
+  performance_indicators: string[];
+  process_standard: string | null;
+  time_standard: string | null;
+  accessibility: string | null;
+  coverage: string | null;
+  frequency: string | null;
+  target_beneficiary: string | null;
+  access_criteria: string | null;
+  methodology: string | null;
+  inputs: string | null;
   /** Planned duration for the whole process (applies to all tasks). */
   duration_value: number | null;
   duration_unit: string | null;
@@ -53,6 +75,57 @@ export function toPublicProcessRow(row: Record<string, unknown>): PublicStandard
   };
 }
 
+function toPublicStandardCore(
+  s: Record<string, unknown>,
+  dept?: { department_ids: number[]; department_names: string[] },
+  processes: PublicStandardProcess[] = []
+): PublicStandard {
+  const id = Number(s.id);
+  const sds = sdsFieldsFromRow(s);
+  const indicators = parsePerformanceIndicatorsFromRow(s);
+  return {
+    id,
+    standard_no: sds.standard_no || null,
+    title: String(s.title ?? ''),
+    user_fee: sds.user_fee,
+    user_fee_display: formatUserFeeDisplay(sds.user_fee),
+    standard_owner: sds.standard_owner || null,
+    supporting_units: sds.supporting_units,
+    pathway: sds.pathway,
+    quality_standard: (s.quality_standard as string | null) ?? null,
+    output_standard: (s.output_standard as string | null) ?? null,
+    performance_indicator:
+      s.performance_indicator != null && String(s.performance_indicator).trim() !== ''
+        ? String(s.performance_indicator)
+        : indicators.length > 0
+          ? indicators.join('\n')
+          : null,
+    performance_indicators: indicators,
+    process_standard: sds.process_standard,
+    time_standard: sds.time_standard,
+    accessibility: sds.accessibility,
+    coverage: sds.coverage,
+    frequency: sds.frequency,
+    target_beneficiary: sds.target_beneficiary,
+    access_criteria: sds.access_criteria,
+    methodology: sds.methodology,
+    inputs: sds.inputs,
+    duration_value:
+      s.duration_value != null && s.duration_value !== '' && Number.isFinite(Number(s.duration_value))
+        ? Number(s.duration_value)
+        : null,
+    duration_unit:
+      s.duration_unit != null && String(s.duration_unit).trim() !== ''
+        ? String(s.duration_unit).trim().toLowerCase()
+        : null,
+    target: (s.target as string | null) ?? null,
+    created_at: (s.created_at as string | null) ?? null,
+    department_ids: dept?.department_ids ?? [],
+    department_names: dept?.department_names ?? [],
+    processes,
+  };
+}
+
 export function buildPublicStandardsList(
   standardRows: Record<string, unknown>[],
   allProcesses: Record<string, unknown>[],
@@ -67,29 +140,7 @@ export function buildPublicStandardsList(
   return standardRows.map((s) => {
     const id = Number(s.id);
     const dept = departmentMap?.get(id);
-    return {
-      id,
-      title: String(s.title ?? ''),
-      quality_standard: (s.quality_standard as string | null) ?? null,
-      output_standard: (s.output_standard as string | null) ?? null,
-      performance_indicator:
-        s.performance_indicator != null && String(s.performance_indicator).trim() !== ''
-          ? String(s.performance_indicator)
-          : null,
-      duration_value:
-        s.duration_value != null && s.duration_value !== '' && Number.isFinite(Number(s.duration_value))
-          ? Number(s.duration_value)
-          : null,
-      duration_unit:
-        s.duration_unit != null && String(s.duration_unit).trim() !== ''
-          ? String(s.duration_unit).trim().toLowerCase()
-          : null,
-      target: (s.target as string | null) ?? null,
-      created_at: (s.created_at as string | null) ?? null,
-      department_ids: dept?.department_ids ?? [],
-      department_names: dept?.department_names ?? [],
-      processes: byStandard.get(id) ?? [],
-    };
+    return toPublicStandardCore(s, dept, byStandard.get(id) ?? []);
   });
 }
 
@@ -99,27 +150,9 @@ export function buildPublicStandardDetail(
   departmentIds: number[] = [],
   departmentNames: string[] = []
 ): PublicStandard {
-  return {
-    id: Number(row.id),
-    title: String(row.title ?? ''),
-    quality_standard: (row.quality_standard as string | null) ?? null,
-    output_standard: (row.output_standard as string | null) ?? null,
-    performance_indicator:
-      row.performance_indicator != null && String(row.performance_indicator).trim() !== ''
-        ? String(row.performance_indicator)
-        : null,
-    duration_value:
-      row.duration_value != null && row.duration_value !== '' && Number.isFinite(Number(row.duration_value))
-        ? Number(row.duration_value)
-        : null,
-    duration_unit:
-      row.duration_unit != null && String(row.duration_unit).trim() !== ''
-        ? String(row.duration_unit).trim().toLowerCase()
-        : null,
-    target: (row.target as string | null) ?? null,
-    created_at: (row.created_at as string | null) ?? null,
-    department_ids: departmentIds,
-    department_names: departmentNames,
-    processes: processes.map(toPublicProcessRow),
-  };
+  return toPublicStandardCore(
+    row,
+    { department_ids: departmentIds, department_names: departmentNames },
+    processes.map(toPublicProcessRow)
+  );
 }

@@ -1,4 +1,5 @@
 import { query } from '@/lib/db';
+import { getVisibleDepartmentIds } from '@/lib/department-head';
 import {
   CHANGE_REQUEST_CATEGORIES,
   type ChangeRequestCategory,
@@ -6,7 +7,7 @@ import {
 import { brandEmailWrapper, escapeHtml, isSmtpConfigured, sendTransactionalMail } from '@/lib/mail';
 import { normalizeRoleForCookie, parseRoles } from '@/lib/role-routing';
 
-const REVIEWER_ROLES = new Set(['System Administrator', 'Strategy Manager']);
+const REVIEWER_ROLES = new Set(['HOD']);
 
 function baseUrl(): string {
   return String(process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000').replace(/\/+$/, '');
@@ -26,7 +27,7 @@ function buildReviewerNotificationHtml(args: {
   description: string;
 }): string {
   const appBase = baseUrl();
-  const adminUrl = `${appBase}/admin?pg=change-requests&id=${args.requestId}`;
+  const reviewUrl = `${appBase}/department-head?pg=change-requests&id=${args.requestId}`;
   const reviewerName = escapeHtml(args.reviewerName || 'Colleague');
   const ambassadorName = escapeHtml(args.ambassadorName || 'An ambassador');
   const unitName = escapeHtml(args.managedUnitName || 'Unknown unit');
@@ -50,7 +51,7 @@ function buildReviewerNotificationHtml(args: {
     </div>
     <p style="color:#333;font-size:15px;line-height:1.6;margin:0 0 12px;">
       Open the proposal in <strong>Ambassador Proposals</strong> to review:
-      <a href="${adminUrl}" style="color:#005696;text-decoration:none;">Review in M&amp;E System</a>
+      <a href="${reviewUrl}" style="color:#005696;text-decoration:none;">Review in M&amp;E System</a>
     </p>
     <p style="color:#666;font-size:13px;line-height:1.6;margin:0;">
       This is an automated notification. The request is stored as <strong>submitted</strong> until reviewed.
@@ -58,7 +59,11 @@ function buildReviewerNotificationHtml(args: {
   `);
 }
 
-export async function getChangeRequestReviewerRecipients(): Promise<{ email: string; fullName: string }[]> {
+export async function getChangeRequestReviewerRecipients(
+  managedUnitId: number | null
+): Promise<{ email: string; fullName: string }[]> {
+  if (managedUnitId == null) return [];
+
   const candidates = (await query({
     query: `
       SELECT id, full_name, email, role
@@ -75,7 +80,7 @@ export async function getChangeRequestReviewerRecipients(): Promise<{ email: str
       query: `
         SELECT user_id, role
         FROM user_roles
-        WHERE role IN ('strategy_manager', 'system_admin')
+        WHERE role IN ('department_head', 'unit_head', 'hod')
       `,
     })) as { user_id: number; role: string }[];
 
@@ -102,6 +107,9 @@ export async function getChangeRequestReviewerRecipients(): Promise<{ email: str
     const isReviewer = [...roles].some((role) => REVIEWER_ROLES.has(role));
     if (!isReviewer) continue;
 
+    const visibleDepartmentIds = await getVisibleDepartmentIds(user.id);
+    if (!visibleDepartmentIds.includes(managedUnitId)) continue;
+
     const email = String(user.email).trim();
     const key = email.toLowerCase();
     if (!byEmail.has(key)) {
@@ -127,6 +135,7 @@ async function getAmbassadorDisplayName(userId: number): Promise<string> {
 export async function notifyReviewersOfNewChangeRequest(args: {
   requestId: number;
   ambassadorUserId: number;
+  managedUnitId: number | null;
   managedUnitName: string;
   category: ChangeRequestCategory;
   title: string;
@@ -137,9 +146,9 @@ export async function notifyReviewersOfNewChangeRequest(args: {
     return { sent: 0, skipped: true };
   }
 
-  const recipients = await getChangeRequestReviewerRecipients();
+  const recipients = await getChangeRequestReviewerRecipients(args.managedUnitId);
   if (!recipients.length) {
-    console.warn('[change-request-emails] No Strategy Manager / System Administrator recipients found');
+    console.warn('[change-request-emails] No Head of Department recipients found for this unit');
     return { sent: 0, skipped: true };
   }
 

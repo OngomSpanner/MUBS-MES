@@ -55,6 +55,7 @@ export async function POST(request: Request) {
     notifyReviewersOfNewChangeRequest({
       requestId: id,
       ambassadorUserId: ctx.userId,
+      managedUnitId: ctx.managedUnitId,
       managedUnitName: ctx.managedUnitName,
       category,
       title,

@@ -11,6 +11,7 @@ import AmbassadorSkillsDataPanel from '@/components/Ambassador/reports/Ambassado
 import AmbassadorStaffProfilePanel from '@/components/Ambassador/reports/AmbassadorStaffProfilePanel';
 import AmbassadorProgrammeEnrollmentPanel from '@/components/Ambassador/reports/AmbassadorProgrammeEnrollmentPanel';
 import AmbassadorCourseUnitEnrollmentPanel from '@/components/Ambassador/reports/AmbassadorCourseUnitEnrollmentPanel';
+import AmbassadorDataCollection from './AmbassadorDataCollection';
 
 export type AmbassadorReportingTab =
   | 'staff-profiles'
@@ -19,7 +20,8 @@ export type AmbassadorReportingTab =
   | 'workforce-assessments'
   | 'employment-skill-status'
   | 'programme-enrollment'
-  | 'course-unit-enrollment';
+  | 'course-unit-enrollment'
+  | 'data-collection';
 
 const VALID_TABS = new Set<string>([
   'staff-profiles',
@@ -29,11 +31,13 @@ const VALID_TABS = new Set<string>([
   'employment-skill-status',
   'programme-enrollment',
   'course-unit-enrollment',
+  'data-collection',
 ]);
 
 const REGISTRAR_ONLY_TABS = new Set<string>(['programme-enrollment', 'course-unit-enrollment']);
 
 const TAB_LABELS: Record<AmbassadorReportingTab, string> = {
+  'data-collection': 'Performance Indicators',
   recruitment: 'Recruitment',
   benefits: 'Benefits',
   'workforce-assessments': 'Workforce',
@@ -47,7 +51,7 @@ function parseTab(value: string | null): AmbassadorReportingTab {
   if (value && VALID_TABS.has(value)) {
     return value as AmbassadorReportingTab;
   }
-  return 'recruitment';
+  return 'data-collection';
 }
 
 export default function AmbassadorReporting() {
@@ -85,6 +89,7 @@ export default function AmbassadorReporting() {
 
   const visibleTabs = useMemo(() => {
     const tabs: AmbassadorReportingTab[] = [
+      'data-collection',
       'recruitment',
       'benefits',
       'workforce-assessments',
@@ -128,6 +133,8 @@ export default function AmbassadorReporting() {
           <strong>Human Resources</strong> unit.
         </div>
       )}
+
+      {activeTab === 'data-collection' && <AmbassadorDataCollection />}
 
       {activeTab === 'staff-profiles' && canViewStaffProfiles && <AmbassadorStaffProfilePanel />}
 

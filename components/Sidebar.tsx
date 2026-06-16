@@ -45,8 +45,8 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen, onLogoutClick }: 
   const adminMenuItems = [
     { key: 'dashboard', href: '/admin?pg=dashboard', icon: 'dashboard', label: 'Dashboard' },
     { key: 'strategic', href: '/admin?pg=strategic', icon: 'track_changes', label: 'Standard and Activities' },
+    { key: 'questionnaire', href: '/admin?pg=questionnaire', icon: 'help_outline', label: 'Questionnaire' },
     { key: 'tracking', href: '/admin?pg=tracking', icon: 'monitoring', label: 'Activity Tracking' },
-    { key: 'change-requests', href: '/admin?pg=change-requests', icon: 'rate_review', label: 'Ambassador Proposals' },
     { key: 'users', href: '/admin?pg=users', icon: 'manage_accounts', label: 'User & Role Mgmt' },
     { key: 'reports', href: '/admin?pg=reports', icon: 'bar_chart', label: 'Reports & Monitoring' },
   ];
@@ -58,6 +58,7 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen, onLogoutClick }: 
     { key: 'tasks', href: '/department-head?pg=tasks', icon: 'checklist', label: 'Processes' },
     { key: 'staff', href: '/department-head?pg=staff', icon: 'group', label: 'Staff & Warnings' },
     { key: 'evaluations', href: '/department-head?pg=evaluations', icon: 'fact_check', label: 'Submissions & reviews' },
+    { key: 'change-requests', href: '/department-head?pg=change-requests', icon: 'rate_review', label: 'Ambassador Proposals' },
     { key: 'reports', href: '/department-head?pg=reports', icon: 'analytics', label: 'Performance & Reports' },
   ];
 

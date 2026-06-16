@@ -13,6 +13,12 @@ import {
   parseDepartmentIdsPayload,
   setStandardDepartments,
 } from '@/lib/standard-departments';
+import {
+  parseStandardSdsFromBody,
+  selectStandardRowById,
+  updateStandardRow,
+  validateStandardWritePayload,
+} from '@/lib/standards-db';
 
 export const dynamic = 'force-dynamic';
 
@@ -23,43 +29,8 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
     const token = cookieStore.get('token')?.value;
     if (!token) return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
 
-    let standard: Record<string, unknown>[];
-    try {
-      standard = (await query({
-        query: `SELECT id, title, quality_standard, output_standard, performance_indicator, duration_value, duration_unit, target, created_at FROM standards WHERE id = ?`,
-        values: [id],
-      })) as Record<string, unknown>[];
-    } catch (e: unknown) {
-      const err = e as { code?: string; errno?: number };
-      if (err?.code === 'ER_BAD_FIELD_ERROR' || err?.errno === 1054) {
-        try {
-          standard = (await query({
-            query: `SELECT id, title, quality_standard, output_standard, performance_indicator, target, created_at FROM standards WHERE id = ?`,
-            values: [id],
-          })) as Record<string, unknown>[];
-          standard = standard.map((s) => ({ ...s, duration_value: null, duration_unit: null }));
-        } catch (e2: unknown) {
-          const err2 = e2 as { code?: string; errno?: number };
-          if (err2?.code === 'ER_BAD_FIELD_ERROR' || err2?.errno === 1054) {
-            standard = (await query({
-              query: `SELECT id, title, quality_standard, output_standard, duration_value, duration_unit, target, created_at FROM standards WHERE id = ?`,
-              values: [id],
-            })) as Record<string, unknown>[];
-            standard = standard.map((s) => ({ ...s, performance_indicator: null }));
-          } else {
-            standard = (await query({
-              query: `SELECT id, title, quality_standard, output_standard, target, created_at FROM standards WHERE id = ?`,
-              values: [id],
-            })) as Record<string, unknown>[];
-            standard = standard.map((s) => ({ ...s, performance_indicator: null, duration_value: null, duration_unit: null }));
-          }
-        }
-      } else {
-        throw e;
-      }
-    }
-
-    if (standard.length === 0) {
+    const standard = await selectStandardRowById(id);
+    if (!standard) {
       return NextResponse.json({ message: 'Standard not found' }, { status: 404 });
     }
 
@@ -70,7 +41,7 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
 
     return NextResponse.json(
       buildPublicStandardDetail(
-        standard[0],
+        standard,
         processes,
         departmentIds,
         dept?.department_names ?? []
@@ -94,81 +65,32 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
     }
 
     const body = await request.json();
-    const { title: rawTitle, quality_standard, output_standard, performance_indicator, duration_value, duration_unit, processes, department_ids } = body;
-    const title = typeof rawTitle === 'string' ? rawTitle.trim() : '';
-    if (!title) return NextResponse.json({ message: 'Standard title is required' }, { status: 400 });
-    const quality = typeof quality_standard === 'string' ? quality_standard.trim() : '';
-    const output = typeof output_standard === 'string' ? output_standard.trim() : '';
-    const pi = typeof performance_indicator === 'string' ? performance_indicator.trim() : '';
-    if (!quality) return NextResponse.json({ message: 'Quality standard is required' }, { status: 400 });
-    if (!output) return NextResponse.json({ message: 'Output standard is required' }, { status: 400 });
-    const departmentIds = parseDepartmentIdsPayload(department_ids);
+    const parsed = parseStandardSdsFromBody(body);
+    const validationError = validateStandardWritePayload(parsed);
+    if (validationError) {
+      return NextResponse.json({ message: validationError }, { status: 400 });
+    }
+
+    const departmentIds = parseDepartmentIdsPayload(body.department_ids);
     if (departmentIds.length === 0) {
       return NextResponse.json({ message: 'Select at least one department or unit' }, { status: 400 });
     }
-    const unit = typeof duration_unit === 'string' ? duration_unit.trim().toLowerCase() : '';
-    const dvNum = duration_value != null && duration_value !== '' ? parseInt(String(duration_value), 10) : null;
 
-    const coreValues = [
-      title, 
-      quality, 
-      output, 
-      pi || null, 
-      dvNum, 
-      unit, 
-      null, 
-      id
-    ];
-    try {
-      if ((unit && (dvNum == null || !Number.isFinite(dvNum) || dvNum < 1)) || (!unit && dvNum != null)) {
-        return NextResponse.json({ message: 'If provided, standard duration must include both unit and value (>= 1)' }, { status: 400 });
-      }
-      await query({
-        query: `UPDATE standards SET 
-        title = ?, quality_standard = ?, output_standard = ?, performance_indicator = ?, duration_value = ?, duration_unit = ?, target = ?
-        WHERE id = ?`,
-        values: coreValues,
-      });
-    } catch (e: unknown) {
-      const err = e as { code?: string; errno?: number };
-      if (err?.code === 'ER_BAD_FIELD_ERROR' || err?.errno === 1054) {
-        // Try schema with performance_indicator only
-        try {
-          await query({
-            query: `UPDATE standards SET title = ?, quality_standard = ?, output_standard = ?, performance_indicator = ?, target = ? WHERE id = ?`,
-            values: [title, quality, output, pi || null, null, id],
-          });
-        } catch (e2: unknown) {
-          const err2 = e2 as { code?: string; errno?: number };
-          if (err2?.code === 'ER_BAD_FIELD_ERROR' || err2?.errno === 1054) {
-            // Oldest schema
-            await query({
-              query: `UPDATE standards SET title = ?, quality_standard = ?, output_standard = ?, target = ? WHERE id = ?`,
-              values: [title, quality, output, null, id],
-            });
-          } else {
-            throw e2;
-          }
-        }
-      } else {
-        throw e;
-      }
-    }
+    await updateStandardRow(id, parsed);
 
-    // Replace processes
-    if (processes !== undefined) {
+    if (body.processes !== undefined) {
       await query({
         query: `DELETE FROM standard_processes WHERE standard_id = ?`,
-        values: [id]
+        values: [id],
       });
 
-      const parsed = parseStandardProcessesPayload(processes);
-      if (!parsed.ok) {
-        return NextResponse.json({ message: parsed.message }, { status: 400 });
+      const processParsed = parseStandardProcessesPayload(body.processes);
+      if (!processParsed.ok) {
+        return NextResponse.json({ message: processParsed.message }, { status: 400 });
       }
       const sid = Number(id);
-      for (let i = 0; i < parsed.items.length; i++) {
-        const row = parsed.items[i];
+      for (let i = 0; i < processParsed.items.length; i++) {
+        const row = processParsed.items[i];
         await insertStandardProcessRow(
           sid,
           row.stepName,
@@ -176,7 +98,7 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
           row.durationValue,
           row.durationUnit,
           row.milestoneProgress ??
-            (parsed.items.length > 1 ? Math.round(((i + 1) / parsed.items.length) * 100) : 100)
+            (processParsed.items.length > 1 ? Math.round(((i + 1) / processParsed.items.length) * 100) : 100)
         );
       }
     }
@@ -203,7 +125,7 @@ export async function DELETE(request: Request, context: { params: Promise<{ id: 
 
     await query({
       query: `DELETE FROM standards WHERE id = ?`,
-      values: [id]
+      values: [id],
     });
 
     return NextResponse.json({ message: 'Standard deleted' });

@@ -151,17 +151,32 @@ function mapChangeRequestRow(r: ChangeRequestRow): AmbassadorChangeRequest {
   };
 }
 
-export async function listAllChangeRequestsForReview(
+function departmentScopeClause(departmentIds: number[]): { clause: string; values: number[] } {
+  if (!departmentIds.length) {
+    return { clause: 'AND 1=0', values: [] };
+  }
+  const placeholders = departmentIds.map(() => '?').join(', ');
+  return {
+    clause: `AND r.managed_unit_id IN (${placeholders})`,
+    values: departmentIds,
+  };
+}
+
+export async function listChangeRequestsForDepartmentReview(
+  departmentIds: number[],
   statusFilter?: ChangeRequestStatus
 ): Promise<AdminChangeRequest[]> {
   await ensureChangeRequestTable();
 
-  const values: string[] = [];
+  const values: (number | string)[] = [];
   let statusClause = '';
   if (statusFilter) {
     statusClause = 'AND r.status = ?';
     values.push(statusFilter);
   }
+
+  const scope = departmentScopeClause(departmentIds);
+  values.push(...scope.values);
 
   const rows = (await query({
     query: `
@@ -173,7 +188,7 @@ export async function listAllChangeRequestsForReview(
       FROM ambassador_change_requests r
       INNER JOIN users u ON u.id = r.user_id
       LEFT JOIN departments d ON d.id = r.managed_unit_id
-      WHERE 1=1 ${statusClause}
+      WHERE 1=1 ${statusClause} ${scope.clause}
       ORDER BY r.created_at DESC, r.id DESC
     `,
     values,
@@ -182,8 +197,14 @@ export async function listAllChangeRequestsForReview(
   return rows.map(mapAdminChangeRequestRow);
 }
 
-export async function getChangeRequestForReview(id: number): Promise<AdminChangeRequest | null> {
+export async function getChangeRequestForDepartmentReview(
+  id: number,
+  departmentIds: number[]
+): Promise<AdminChangeRequest | null> {
   await ensureChangeRequestTable();
+
+  const scope = departmentScopeClause(departmentIds);
+  const values = [id, ...scope.values];
 
   const rows = (await query({
     query: `
@@ -195,10 +216,10 @@ export async function getChangeRequestForReview(id: number): Promise<AdminChange
       FROM ambassador_change_requests r
       INNER JOIN users u ON u.id = r.user_id
       LEFT JOIN departments d ON d.id = r.managed_unit_id
-      WHERE r.id = ?
+      WHERE r.id = ? ${scope.clause}
       LIMIT 1
     `,
-    values: [id],
+    values,
   })) as AdminChangeRequestRow[];
 
   const r = rows[0];

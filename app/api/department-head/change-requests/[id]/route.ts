@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
-import { requireChangeRequestReviewer } from '@/lib/admin/change-request-access';
+import { requireChangeRequestReviewer } from '@/lib/department-head/change-request-access';
 import {
-  getChangeRequestForReview,
+  getChangeRequestForDepartmentReview,
   isChangeRequestStatus,
   updateChangeRequestReview,
 } from '@/lib/ambassador/change-requests';
@@ -19,7 +19,7 @@ export async function GET(_request: Request, context: RouteContext) {
       return NextResponse.json({ message: 'Invalid request id' }, { status: 400 });
     }
 
-    const request = await getChangeRequestForReview(id);
+    const request = await getChangeRequestForDepartmentReview(id, ctx.departmentIds);
     if (!request) {
       return NextResponse.json({ message: 'Change request not found' }, { status: 404 });
     }
@@ -27,7 +27,7 @@ export async function GET(_request: Request, context: RouteContext) {
     return NextResponse.json({ request });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Unknown error';
-    console.error('Admin change-requests GET [id] error:', error);
+    console.error('Department-head change-requests GET [id] error:', error);
     return NextResponse.json({ message: 'Error loading change request', detail: message }, { status: 500 });
   }
 }
@@ -43,7 +43,7 @@ export async function PATCH(request: Request, context: RouteContext) {
       return NextResponse.json({ message: 'Invalid request id' }, { status: 400 });
     }
 
-    const existing = await getChangeRequestForReview(id);
+    const existing = await getChangeRequestForDepartmentReview(id, ctx.departmentIds);
     if (!existing) {
       return NextResponse.json({ message: 'Change request not found' }, { status: 404 });
     }
@@ -65,11 +65,11 @@ export async function PATCH(request: Request, context: RouteContext) {
       return NextResponse.json({ message: 'Change request not found' }, { status: 404 });
     }
 
-    const requestRow = await getChangeRequestForReview(id);
+    const requestRow = await getChangeRequestForDepartmentReview(id, ctx.departmentIds);
     return NextResponse.json({ message: 'Change request updated', request: requestRow });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Unknown error';
-    console.error('Admin change-requests PATCH error:', error);
+    console.error('Department-head change-requests PATCH error:', error);
     return NextResponse.json({ message: 'Error updating change request', detail: message }, { status: 500 });
   }
 }

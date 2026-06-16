@@ -1,5 +1,4 @@
 import { NextResponse } from 'next/server';
-import { query } from '@/lib/db';
 import { cookies } from 'next/headers';
 import { verifyToken } from '@/lib/auth';
 import { buildPublicStandardsList } from '@/lib/standards-api';
@@ -12,6 +11,12 @@ import {
   parseDepartmentIdsPayload,
   setStandardDepartments,
 } from '@/lib/standard-departments';
+import {
+  insertStandardRow,
+  parseStandardSdsFromBody,
+  selectAllStandardsRows,
+  validateStandardWritePayload,
+} from '@/lib/standards-db';
 
 export const dynamic = 'force-dynamic';
 
@@ -20,40 +25,8 @@ export async function GET() {
     const cookieStore = await cookies();
     const token = cookieStore.get('token')?.value;
     if (!token) return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
-    
-    let standards: Record<string, unknown>[];
-    try {
-      standards = (await query({
-        query: `SELECT id, title, quality_standard, output_standard, performance_indicator, duration_value, duration_unit, target, created_at FROM standards ORDER BY created_at DESC`,
-      })) as Record<string, unknown>[];
-    } catch (e: unknown) {
-      const err = e as { code?: string; errno?: number };
-      if (err?.code === 'ER_BAD_FIELD_ERROR' || err?.errno === 1054) {
-        try {
-          standards = (await query({
-            query: `SELECT id, title, quality_standard, output_standard, performance_indicator, target, created_at FROM standards ORDER BY created_at DESC`,
-          })) as Record<string, unknown>[];
-          standards = standards.map((s) => ({ ...s, duration_value: null, duration_unit: null }));
-        } catch (e2: unknown) {
-          const err2 = e2 as { code?: string; errno?: number };
-          if (err2?.code === 'ER_BAD_FIELD_ERROR' || err2?.errno === 1054) {
-            standards = (await query({
-              query: `SELECT id, title, quality_standard, output_standard, duration_value, duration_unit, target, created_at FROM standards ORDER BY created_at DESC`,
-            })) as Record<string, unknown>[];
-            standards = standards.map((s) => ({ ...s, performance_indicator: null }));
-          } else {
-            // Oldest schema: neither column exists
-            standards = (await query({
-              query: `SELECT id, title, quality_standard, output_standard, target, created_at FROM standards ORDER BY created_at DESC`,
-            })) as Record<string, unknown>[];
-            standards = standards.map((s) => ({ ...s, performance_indicator: null, duration_value: null, duration_unit: null }));
-          }
-        }
-      } else {
-        throw e;
-      }
-    }
-    
+
+    const standards = await selectAllStandardsRows();
     const processes = await selectStandardProcessesAll();
     const deptRows = await loadStandardDepartmentRows();
     const departmentMap = groupStandardDepartments(deptRows);
@@ -76,81 +49,26 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json();
-    const { title: rawTitle, quality_standard, output_standard, performance_indicator, duration_value, duration_unit, processes, department_ids } = body;
-    const title = typeof rawTitle === 'string' ? rawTitle.trim() : '';
-    if (!title) return NextResponse.json({ message: 'Standard title is required' }, { status: 400 });
-    const quality = typeof quality_standard === 'string' ? quality_standard.trim() : '';
-    const output = typeof output_standard === 'string' ? output_standard.trim() : '';
-    const pi = typeof performance_indicator === 'string' ? performance_indicator.trim() : '';
-    const unit = typeof duration_unit === 'string' ? duration_unit.trim().toLowerCase() : '';
-    const dvNum = duration_value != null && duration_value !== '' ? parseInt(String(duration_value), 10) : null;
-    if (!quality) return NextResponse.json({ message: 'Quality standard is required' }, { status: 400 });
-    if (!output) return NextResponse.json({ message: 'Output standard is required' }, { status: 400 });
-    // Duration is required when duration columns exist; otherwise, API will ignore it.
-    const insertValues = [
-      title, 
-      quality, 
-      output, 
-      pi || null, 
-      dvNum, 
-      unit, 
-      null,
-    ];
-
-    let result: unknown;
-    try {
-      if ((unit && (dvNum == null || !Number.isFinite(dvNum) || dvNum < 1)) || (!unit && dvNum != null)) {
-        return NextResponse.json({ message: 'If provided, standard duration must include both unit and value (>= 1)' }, { status: 400 });
-      }
-      result = await query({
-        query: `INSERT INTO standards (
-        title, quality_standard, output_standard, performance_indicator, duration_value, duration_unit, target
-      ) VALUES (?, ?, ?, ?, ?, ?, ?)`,
-        values: insertValues,
-      });
-    } catch (e: unknown) {
-      const err = e as { code?: string; errno?: number };
-      if (err?.code === 'ER_BAD_FIELD_ERROR' || err?.errno === 1054) {
-        // Try schema with performance_indicator only
-        try {
-          result = await query({
-            query: `INSERT INTO standards (title, quality_standard, output_standard, performance_indicator, target) VALUES (?, ?, ?, ?, ?)`,
-            values: [title, quality, output, pi || null, null],
-          });
-        } catch (e2: unknown) {
-          const err2 = e2 as { code?: string; errno?: number };
-          if (err2?.code === 'ER_BAD_FIELD_ERROR' || err2?.errno === 1054) {
-            // Oldest schema
-            result = await query({
-              query: `INSERT INTO standards (title, quality_standard, output_standard, target) VALUES (?, ?, ?, ?)`,
-              values: [title, quality, output, null],
-            });
-          } else {
-            throw e2;
-          }
-        }
-      } else {
-        throw e;
-      }
+    const parsed = parseStandardSdsFromBody(body);
+    const validationError = validateStandardWritePayload(parsed);
+    if (validationError) {
+      return NextResponse.json({ message: validationError }, { status: 400 });
     }
 
-    const standardId = Number((result as { insertId?: number | bigint }).insertId);
-    if (!Number.isFinite(standardId) || standardId <= 0) {
-      console.error('standards POST: missing insertId', result);
-      return NextResponse.json({ message: 'Error creating standard' }, { status: 500 });
-    }
-
-    const departmentIds = parseDepartmentIdsPayload(department_ids);
+    const departmentIds = parseDepartmentIdsPayload(body.department_ids);
     if (departmentIds.length === 0) {
       return NextResponse.json({ message: 'Select at least one department or unit' }, { status: 400 });
     }
 
-    const parsed = parseStandardProcessesPayload(processes);
-    if (!parsed.ok) {
-      return NextResponse.json({ message: parsed.message }, { status: 400 });
+    const processParsed = parseStandardProcessesPayload(body.processes);
+    if (!processParsed.ok) {
+      return NextResponse.json({ message: processParsed.message }, { status: 400 });
     }
-    for (let i = 0; i < parsed.items.length; i++) {
-      const row = parsed.items[i];
+
+    const { insertId: standardId } = await insertStandardRow(parsed);
+
+    for (let i = 0; i < processParsed.items.length; i++) {
+      const row = processParsed.items[i];
       await insertStandardProcessRow(
         standardId,
         row.stepName,
@@ -158,7 +76,7 @@ export async function POST(request: Request) {
         row.durationValue,
         row.durationUnit,
         row.milestoneProgress ??
-          (parsed.items.length > 1 ? Math.round(((i + 1) / parsed.items.length) * 100) : 100)
+          (processParsed.items.length > 1 ? Math.round(((i + 1) / processParsed.items.length) * 100) : 100)
       );
     }
 
