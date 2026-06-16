@@ -904,7 +904,7 @@ function ImportPanel({ onImported }: { onImported: () => void }) {
 type SubTab = 'outcomes' | 'indicators' | 'import';
 
 export default function QuestionnaireView() {
-  const [activeTab, setActiveTab] = useState<SubTab>('indicators');
+  const [activeTab, setActiveTab] = useState<SubTab>('outcomes');
   const [outcomes, setOutcomes] = useState<Outcome[]>([]);
   const [indicators, setIndicators] = useState<Indicator[]>([]);
   const [allDepartments, setAllDepartments] = useState<DepartmentUnitOption[]>([]);
@@ -954,8 +954,8 @@ export default function QuestionnaireView() {
   const totalMetrics = indicators.reduce((sum, i) => sum + i.metrics.length, 0);
 
   const TABS: { key: SubTab; label: string; icon: string; count?: number }[] = [
-    { key: 'indicators', label: 'Indicators', icon: 'assignment', count: indicators.length },
     { key: 'outcomes', label: 'Manage Outcomes', icon: 'account_tree', count: outcomes.length },
+    { key: 'indicators', label: 'Indicators', icon: 'assignment', count: indicators.length },
     { key: 'import', label: 'Import', icon: 'cloud_upload' },
   ];
 
