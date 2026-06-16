@@ -1002,7 +1002,6 @@ export default function StrategicView() {
                     </Modal.Body>
                 )}
                 <Modal.Footer className="modal-standard-preview-footer justify-content-between flex-wrap gap-2">
-                    <span className="text-muted small">Read-only summary</span>
                     {viewStandardDetails && (
                         <div className="d-flex gap-2">
                             <Button
