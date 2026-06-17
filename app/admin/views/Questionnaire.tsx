@@ -1,11 +1,10 @@
 'use client';
 
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import Layout from '@/components/Layout';
 import StatCard from '@/components/StatCard';
 import { Modal, Button, Form, Badge } from 'react-bootstrap';
 import axios from 'axios';
-import * as XLSX from 'xlsx';
 import DeleteConfirmModal from '@/components/Questionnaire/DeleteConfirmModal';
 import DepartmentUnitMultiSelect, { type DepartmentUnitOption } from '@/components/DepartmentUnitMultiSelect';
 import { getAvailableFinancialYears } from '@/lib/questionnaire/fy-utils';
@@ -709,199 +708,9 @@ function IndicatorsPanel({
 }
 
 // ────────────────────────────────────────────────────────────
-// Sub-panel: Import
-// ────────────────────────────────────────────────────────────
-function ImportPanel({ onImported }: { onImported: () => void }) {
-  const fileRef = useRef<HTMLInputElement>(null);
-  const [parsing, setParsing] = useState(false);
-  const [confirming, setConfirming] = useState(false);
-  const [preview, setPreview] = useState<any[] | null>(null);
-  const [parseErr, setParseErr] = useState<string | null>(null);
-  const [result, setResult] = useState<any | null>(null);
-  const [dupActions, setDupActions] = useState<Record<number, 'skip' | 'overwrite'>>({});
-
-  const handleFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    setParsing(true); setParseErr(null); setPreview(null); setResult(null);
-    try {
-      const fd = new FormData();
-      fd.append('file', file);
-      const res = await axios.post('/api/questionnaire/import', fd, { headers: { 'Content-Type': 'multipart/form-data' } });
-      setPreview(res.data.rows);
-    } catch (e: unknown) {
-      setParseErr(axios.isAxiosError(e) ? e.response?.data?.message ?? 'Parse error' : 'Parse error');
-    } finally { setParsing(false); }
-  };
-
-  const downloadTemplate = () => {
-    const headers = [
-      'outcome_type', 'outcome_label', 'indicator_text', 'dept_names', 'fin_years',
-      'metric_1_text', 'metric_1_uom', 'metric_2_text', 'metric_2_uom',
-      'metric_3_text', 'metric_3_uom', 'metric_4_text', 'metric_4_uom',
-      'metric_5_text', 'metric_5_uom',
-    ];
-    const example = [
-      'Outcome',
-      'Outcome 6.1: Example',
-      'Number of events hosted',
-      "Dean of Students Office;Finance Office",
-      '2024/2025;2025/2026',
-      'Number of events in the year', 'numeric',
-      'List of event names', 'list',
-      '', '',
-      '', '',
-      '', '',
-    ];
-    const instructions = [
-      ['Column', 'Description'],
-      ['outcome_type', 'Outcome or Output'],
-      ['outcome_label', 'Outcome/output label'],
-      ['indicator_text', 'Performance indicator text'],
-      ['dept_names', 'Department names separated by semicolons (;)'],
-      ['fin_years', 'Financial years separated by semicolons, e.g. 2024/2025;2025/2026'],
-      ['metric_N_text', 'Metric description (N = 1, 2, 3, …)'],
-      ['metric_N_uom', 'numeric | ratio | percentage | currency | text | list'],
-    ];
-
-    const dataSheet = XLSX.utils.aoa_to_sheet([headers, example]);
-    const guideSheet = XLSX.utils.aoa_to_sheet(instructions);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, dataSheet, 'Indicators');
-    XLSX.utils.book_append_sheet(wb, guideSheet, 'Instructions');
-    XLSX.writeFile(wb, 'questionnaire_import_template.xlsx');
-  };
-
-  const handleConfirm = async () => {
-    if (!preview) return;
-    setConfirming(true);
-    try {
-      const rows = preview.map((row, i) => ({
-        ...row,
-        duplicate_action: row.is_duplicate ? (dupActions[i] ?? 'skip') : undefined,
-      }));
-      const res = await axios.post('/api/questionnaire/import/confirm', { rows });
-      setResult(res.data);
-      setPreview(null);
-      onImported();
-    } catch (e: unknown) {
-      alert(axios.isAxiosError(e) ? e.response?.data?.message ?? 'Import failed' : 'Import failed');
-    } finally { setConfirming(false); }
-  };
-
-  const errorRows = preview?.filter((r) => r.has_errors) ?? [];
-  const validRows = preview?.filter((r) => !r.has_errors) ?? [];
-  const dupRows = validRows.filter((r) => r.is_duplicate);
-
-  return (
-    <div>
-      <div className="d-flex gap-2 mb-3 flex-wrap align-items-center">
-        <Button size="sm" variant="outline-secondary" onClick={downloadTemplate}>
-          <span className="material-symbols-outlined me-1" style={{ fontSize: '14px', verticalAlign: 'middle' }}>download</span>
-          Download template (.xlsx)
-        </Button>
-        <span className="text-muted small">Fill in the Excel template, then upload:</span>
-        <Button size="sm" variant="primary" style={{ background: 'var(--mubs-blue)', borderColor: 'var(--mubs-blue)' }} onClick={() => fileRef.current?.click()} disabled={parsing}>
-          <span className="material-symbols-outlined me-1" style={{ fontSize: '14px', verticalAlign: 'middle' }}>upload</span>
-          {parsing ? 'Parsing…' : 'Upload Excel'}
-        </Button>
-        <input ref={fileRef} type="file" accept=".xlsx,.xls,.csv" className="d-none" onChange={handleFile} />
-      </div>
-
-      {parseErr && <div className="alert alert-danger small py-2">{parseErr}</div>}
-
-      {result && (
-        <div className="alert alert-success small py-2">
-          Import complete: <strong>{result.created}</strong> created, <strong>{result.overwritten}</strong> overwritten, <strong>{result.skipped}</strong> skipped.
-          {result.errors?.length > 0 && <div className="mt-1">{result.errors.join('; ')}</div>}
-        </div>
-      )}
-
-      {preview && (
-        <div>
-          <div className="mb-3 d-flex gap-2 flex-wrap">
-            <Badge bg="secondary">{preview.length} rows</Badge>
-            {errorRows.length > 0 && <Badge bg="danger">{errorRows.length} with errors</Badge>}
-            {dupRows.length > 0 && <Badge bg="warning" className="text-dark">{dupRows.length} duplicates</Badge>}
-            <Badge bg="success">{validRows.length - dupRows.length} new</Badge>
-          </div>
-
-          {dupRows.length > 0 && (
-            <div className="alert alert-warning small py-2 mb-3">
-              <strong>{dupRows.length} duplicate indicator(s)</strong> found. Choose action for each:
-            </div>
-          )}
-
-          <div className="table-responsive mb-3">
-            <table className="table table-sm table-bordered" style={{ fontSize: '0.78rem' }}>
-              <thead className="table-dark">
-                <tr>
-                  <th>#</th><th>Outcome</th><th>Indicator</th><th>Depts</th><th>FYs</th><th>Metrics</th><th>Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {preview.map((row, i) => (
-                  <tr key={i} style={{ background: row.has_errors ? '#fff5f5' : row.is_duplicate ? '#fffbeb' : 'inherit' }}>
-                    <td className="text-muted">{row.rowNum}</td>
-                    <td>{row.outcome_type} — {row.outcome_label}</td>
-                    <td>{row.indicator_text}</td>
-                    <td>
-                      {row.dept_resolved?.map((d: any, di: number) => (
-                        <span key={di} className={`badge me-1 ${d.department_id ? 'bg-success' : 'bg-danger'}`} style={{ fontSize: '0.62rem' }}>{d.name}</span>
-                      ))}
-                    </td>
-                    <td>{row.fin_years?.join(', ')}</td>
-                    <td>{row.metrics?.length}</td>
-                    <td>
-                      {row.has_errors ? (
-                        <span className="text-danger small d-block">{row.errors.join('; ')}</span>
-                      ) : row.is_duplicate ? (
-                        <div className="d-flex gap-1">
-                          <Form.Select size="sm" value={dupActions[i] ?? 'skip'} onChange={(e) => setDupActions((prev) => ({ ...prev, [i]: e.target.value as 'skip' | 'overwrite' }))} style={{ width: '100px', fontSize: '0.72rem' }}>
-                            <option value="skip">Skip</option>
-                            <option value="overwrite">Overwrite</option>
-                          </Form.Select>
-                        </div>
-                      ) : (
-                        <Badge bg="success" style={{ fontSize: '0.62rem' }}>New</Badge>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-
-          <div className="d-flex justify-content-end gap-2">
-            <Button size="sm" variant="outline-secondary" onClick={() => setPreview(null)}>Cancel</Button>
-            <Button
-              size="sm"
-              variant="primary"
-              style={{ background: 'var(--mubs-blue)', borderColor: 'var(--mubs-blue)' }}
-              onClick={handleConfirm}
-              disabled={confirming || validRows.length === 0}
-            >
-              {confirming ? 'Importing…' : `Confirm import (${validRows.length} valid rows)`}
-            </Button>
-          </div>
-        </div>
-      )}
-
-      {!preview && !result && !parsing && (
-        <div className="text-center text-muted py-5 small">
-          <span className="material-symbols-outlined d-block mb-2" style={{ fontSize: '2rem' }}>table_view</span>
-          Upload a filled Excel file to preview and import indicators.
-          <br /><span className="text-muted">CSV is also accepted if needed.</span>
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ────────────────────────────────────────────────────────────
 // Main Questionnaire page
 // ────────────────────────────────────────────────────────────
-type SubTab = 'outcomes' | 'indicators' | 'import';
+type SubTab = 'outcomes' | 'indicators';
 
 export default function QuestionnaireView() {
   const [activeTab, setActiveTab] = useState<SubTab>('outcomes');
@@ -956,7 +765,6 @@ export default function QuestionnaireView() {
   const TABS: { key: SubTab; label: string; icon: string; count?: number }[] = [
     { key: 'outcomes', label: 'Manage Outcomes', icon: 'account_tree', count: outcomes.length },
     { key: 'indicators', label: 'Indicators', icon: 'assignment', count: indicators.length },
-    { key: 'import', label: 'Import', icon: 'cloud_upload' },
   ];
 
   return (
@@ -1011,9 +819,6 @@ export default function QuestionnaireView() {
               onCreate={handleCreate}
               onRefresh={() => { void fetchIndicators(); void fetchOutcomes(); }}
             />
-          )}
-          {activeTab === 'import' && (
-            <ImportPanel onImported={() => { void fetchIndicators(); void fetchOutcomes(); }} />
           )}
         </div>
 
