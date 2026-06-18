@@ -268,7 +268,7 @@ export default function AdminDashboard() {
                                     <span className="badge bg-warning text-dark ms-auto">{stats.pendingProposals}</span>
                                 )}
                             </a>
-                            <a href="/tracking" className="btn btn-outline-danger fw-bold text-start d-flex align-items-center gap-2">
+                            <a href="/admin?pg=reports" className="btn btn-outline-danger fw-bold text-start d-flex align-items-center gap-2">
                                 <span className="material-symbols-outlined" style={{ fontSize: '18px', color: 'var(--mubs-red)' }}>
                                     warning
                                 </span>

@@ -37,3 +37,16 @@ export function parseFyStartYear(fy: string): number | null {
   const m = String(fy).match(/^(\d{4})\/\d{4}$/);
   return m ? parseInt(m[1], 10) : null;
 }
+
+/** Canonical FY label for matching stored values (handles 2024/25 and 2024/2025). */
+export function normalizeFinancialYear(fy: string): string {
+  const s = String(fy).trim();
+  const long = s.match(/^(\d{4})\/(\d{4})$/);
+  if (long) return `${long[1]}/${long[2]}`;
+  const short = s.match(/^(\d{4})\/(\d{2})$/);
+  if (short) {
+    const start = parseInt(short[1], 10);
+    return `${start}/${start + 1}`;
+  }
+  return s;
+}

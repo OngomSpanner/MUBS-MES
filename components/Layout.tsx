@@ -54,7 +54,6 @@ function LayoutContent({ children, sidebarOpen, setSidebarOpen }: any) {
       'dashboard': 'Dashboard Overview',
       'strategic': 'Strategic Activities',
       'standards': 'Standards & Objectives',
-      'tracking': 'Activity Tracking',
       'change-requests': 'Ambassador Proposals',
       'users': 'User Management',
       'reports': 'Reports & Analytics',

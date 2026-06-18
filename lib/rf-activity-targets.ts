@@ -52,6 +52,19 @@ export function resolveRfTargetValue(
   return null;
 }
 
+export function activityQualifiesForResultsFrameworkMatrix(
+  row: RfActivityTargetInput & { standard_id?: number | null; task_type?: string | null },
+): boolean {
+  if (row.task_type === 'kpi_driver') return true;
+  if (row.kpi_target_value != null && row.kpi_target_value !== '') return true;
+  if (resolveRfPerformanceIndicator(row) && row.standard_id) return true;
+  if (resolveRfPerformanceIndicator(row) && resolveRfTargetValue(row, new Date()) != null) return true;
+  return ACTIVITY_FY_TARGET_COLUMNS.some((col) => {
+    const raw = row[col.key];
+    return raw != null && raw !== '';
+  });
+}
+
 export function activityQualifiesForResultsFramework(
   row: RfActivityTargetInput & { standard_id?: number | null; task_type?: string | null },
   financialYear?: string

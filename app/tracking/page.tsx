@@ -1,19 +1,15 @@
-"use client";
+'use client';
 
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 
-export default function RedirectPage() {
+/** Legacy route — Activity Tracking was removed; send users to Reports. */
+export default function TrackingRedirectPage() {
   const router = useRouter();
+
   useEffect(() => {
-    router.replace('/admin?pg=tracking');
+    router.replace('/admin?pg=reports');
   }, [router]);
 
-  return (
-    <div className="d-flex justify-content-center align-items-center vh-100">
-      <div className="spinner-border text-primary" role="status">
-        <span className="visually-hidden">Redirecting...</span>
-      </div>
-    </div>
-  );
+  return null;
 }

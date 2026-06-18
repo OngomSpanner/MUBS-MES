@@ -4,7 +4,6 @@ import { useState, useEffect } from 'react';
 import Layout from '@/components/Layout';
 import axios from 'axios';
 import * as XLSX from 'xlsx';
-import StaffProfileModal from '@/components/Staff/StaffProfileModal';
 import StaffEstablishmentPanel from '@/components/Reports/StaffEstablishmentPanel';
 import StaffPromotionPanel from '@/components/Reports/StaffPromotionPanel';
 import StaffRetentionPanel from '@/components/Reports/StaffRetentionPanel';
@@ -22,8 +21,8 @@ import StaffStudentRatioPanel from '@/components/Reports/StaffStudentRatioPanel'
 import StaffProgrammeEnrollmentPanel from '@/components/Reports/StaffProgrammeEnrollmentPanel';
 import StaffCourseUnitEnrollmentPanel from '@/components/Reports/StaffCourseUnitEnrollmentPanel';
 import AdminResultsFrameworkPanel from '@/components/Admin/AdminResultsFrameworkPanel';
-import { GENDER_OPTIONS, StaffProfileData } from '@/lib/staff-biodata';
-import { STAFF_CATEGORIES } from '@/lib/staff-categories';
+import ReportsSubTabs, { ReportsTabShell } from '@/components/Reports/ReportsSubTabs';
+import AmbassadorCollectedDataPanel from '@/components/Reports/data-collection/AmbassadorCollectedDataPanel';
 
 interface DepartmentSummary {
     department: string;
@@ -35,95 +34,44 @@ interface DepartmentSummary {
     score: string;
 }
 
-interface StaffEvaluation {
-    user_id: number;
-    name: string;
-    email: string;
-    department: string;
-    faculty_office?: string | null;
-    gender?: string | null;
-    staff_category?: string | null;
-    designation_grade?: string | null;
-    position?: string | null;
-    disability_status?: string | null;
-    disability_type?: string | null;
-    workplace_accommodation?: string | null;
-    special_support_needs?: string | null;
-    leave_status?: string | null;
-    employment_status?: string | null;
-    contract_type?: string | null;
-    nationality?: string | null;
-    date_of_birth?: string | null;
-    date_first_appointment?: string | null;
-    date_current_appointment?: string | null;
-    date_office_assignment?: string | null;
-    retirement_date?: string | null;
-    contract_start_date?: string | null;
-    contract_end_date?: string | null;
-    account_status?: string | null;
-    active_tasks?: number;
-    assigned: number;
-    completed: number;
-    rate: number;
-    evaluation: string;
-}
-
-interface StaffReportSummary {
-    total_synced: number;
-    active_accounts: number;
-    pwd_count: number;
-    pwd_pct: number;
-    filtered_count: number;
-}
-
 const getScore = (progress: number) =>
     progress >= 80 ? 'Exceptional Performance' : progress >= 65 ? 'Exceeds Expectations' : progress >= 50 ? 'Meets Expectations' : 'Below Expectations';
 
-const getEvaluation = (rate: number) =>
-    rate >= 80 ? 'Exceptional Performance' : rate >= 60 ? 'Exceeds Expectations' : rate >= 40 ? 'Meets Expectations' : 'Below Expectations';
+type PrimaryTab = 'activity' | 'data-collection' | 'results-framework';
+type ActivitySubTab = 'monitoring' | 'trends' | 'strategic-priority';
+type DataSubTab = 'hr' | 'ambassador' | 'other';
+type HrSubTab =
+    | 'establishment'
+    | 'promotion'
+    | 'retention'
+    | 'recruitment'
+    | 'turnover'
+    | 'development'
+    | 'payments'
+    | 'benefits'
+    | 'workforce-assessments'
+    | 'employment-skill-status'
+    | 'job-description-workplans'
+    | 'miscellaneous';
+type OtherSubTab = 'staff-student-ratio' | 'programme-enrollment' | 'course-unit-enrollment';
 
 export default function ReportsView() {
     const [departmentSummaries, setUnitSummaries] = useState<DepartmentSummary[]>([]);
-    const [staffEvaluations, setStaffEvaluations] = useState<StaffEvaluation[]>([]);
     const [strategicOverview, setStrategicOverview] = useState<{
         byPillar: { pillar: string; label: string; avg_progress: number; count: number }[];
         status: { completed: number; in_progress: number; delayed: number; pending: number };
     } | null>(null);
     const [loadingUnits, setLoadingUnits] = useState(true);
-    const [loadingStaff, setLoadingStaff] = useState(true);
     const [loadingTrend, setLoadingTrend] = useState(true);
 
     const [summaryUnitFilter, setSummaryUnitFilter] = useState('All Departments');
-    const [selectedUnit, setSelectedUnit] = useState('All Departments');
-    const [pwdFilter, setPwdFilter] = useState('all');
-    const [genderFilter, setGenderFilter] = useState('All');
-    const [categoryFilter, setCategoryFilter] = useState('All');
-    const [staffSummary, setStaffSummary] = useState<StaffReportSummary | null>(null);
-    const [profileStaff, setProfileStaff] = useState<StaffProfileData | null>(null);
     const [dateFrom, setDateFrom] = useState('');
     const [dateTo, setDateTo] = useState('');
-    const [activeTab, setActiveTab] = useState<
-        | 'summary'
-        | 'staff'
-        | 'establishment'
-        | 'promotion'
-        | 'retention'
-        | 'recruitment'
-        | 'turnover'
-        | 'development'
-        | 'payments'
-        | 'benefits'
-        | 'trends'
-        | 'workforce-assessments'
-        | 'employment-skill-status'
-        | 'strategic-priority'
-        | 'job-description-workplans'
-        | 'staff-student-ratio'
-        | 'programme-enrollment'
-        | 'course-unit-enrollment'
-        | 'miscellaneous'
-        | 'results-framework'
-    >('summary');
+    const [primaryTab, setPrimaryTab] = useState<PrimaryTab>('activity');
+    const [activitySub, setActivitySub] = useState<ActivitySubTab>('monitoring');
+    const [dataSub, setDataSub] = useState<DataSubTab>('hr');
+    const [hrSub, setHrSub] = useState<HrSubTab>('establishment');
+    const [otherSub, setOtherSub] = useState<OtherSubTab>('staff-student-ratio');
 
     const [departmentsList, setDepartmentsList] = useState<string[]>([]);
 
@@ -131,12 +79,7 @@ export default function ReportsView() {
     const [departmentPage, setUnitPage] = useState(1);
     const UNIT_PAGE_SIZE = 5;
 
-    // Pagination — Staff Evaluations
-    const [staffPage, setStaffPage] = useState(1);
-    const STAFF_PAGE_SIZE = 10;
-
     useEffect(() => { setUnitPage(1); }, [summaryUnitFilter]);
-    useEffect(() => { setStaffPage(1); }, [selectedUnit, pwdFilter, genderFilter, categoryFilter]);
 
     useEffect(() => {
         axios.get('/api/departments')
@@ -180,58 +123,6 @@ export default function ReportsView() {
         fetchActivitySummary();
     }, [summaryUnitFilter, dateFrom, dateTo]);
 
-    useEffect(() => {
-        setLoadingStaff(true);
-        const params = new URLSearchParams();
-        params.append('type', 'staff-evaluation');
-        if (selectedUnit !== 'All Departments') params.append('department', selectedUnit);
-        if (pwdFilter !== 'all') params.append('pwd', pwdFilter);
-        if (genderFilter !== 'All') params.append('gender', genderFilter);
-        if (categoryFilter !== 'All') params.append('staff_category', categoryFilter);
-
-        axios.get(`/api/reports?${params.toString()}`)
-            .then(({ data }) => {
-                const payload = data.data as { rows?: any[]; summary?: StaffReportSummary };
-                const rows = Array.isArray(payload?.rows) ? payload.rows : (Array.isArray(data.data) ? data.data : []);
-                const mapped: StaffEvaluation[] = rows.map((r: any) => ({
-                    user_id: Number(r.user_id),
-                    name: r.name,
-                    email: r.email || '',
-                    department: r.department ?? '—',
-                    faculty_office: r.faculty_office ?? null,
-                    gender: r.gender ?? null,
-                    staff_category: r.staff_category ?? null,
-                    designation_grade: r.designation_grade ?? null,
-                    position: r.position ?? null,
-                    disability_status: r.disability_status ?? null,
-                    disability_type: r.disability_type ?? null,
-                    workplace_accommodation: r.workplace_accommodation ?? null,
-                    special_support_needs: r.special_support_needs ?? null,
-                    leave_status: r.leave_status ?? null,
-                    employment_status: r.employment_status ?? null,
-                    contract_type: r.contract_type ?? null,
-                    nationality: r.nationality ?? null,
-                    date_of_birth: r.date_of_birth ?? null,
-                    date_first_appointment: r.date_first_appointment ?? null,
-                    date_current_appointment: r.date_current_appointment ?? null,
-                    date_office_assignment: r.date_office_assignment ?? null,
-                    retirement_date: r.retirement_date ?? null,
-                    contract_start_date: r.contract_start_date ?? null,
-                    contract_end_date: r.contract_end_date ?? null,
-                    account_status: r.account_status ?? null,
-                    active_tasks: Number(r.active_tasks ?? 0),
-                    assigned: Number(r.assigned),
-                    completed: Number(r.completed),
-                    rate: Number(r.rate ?? 0),
-                    evaluation: getEvaluation(Number(r.rate ?? 0)),
-                }));
-                setStaffEvaluations(mapped);
-                setStaffSummary(payload?.summary ?? null);
-            })
-            .catch(err => console.error('staff-evaluation error', err))
-            .finally(() => setLoadingStaff(false));
-    }, [selectedUnit, pwdFilter, genderFilter, categoryFilter]);
-
     const fetchStrategicOverview = async () => {
         setLoadingTrend(true);
         try {
@@ -260,107 +151,10 @@ export default function ReportsView() {
     };
 
     useEffect(() => {
-        if (activeTab === 'trends') {
+        if (primaryTab === 'activity' && activitySub === 'trends') {
             fetchStrategicOverview();
         }
-    }, [activeTab]);
-
-    const staffToProfile = (s: StaffEvaluation): StaffProfileData => ({
-        id: s.user_id,
-        full_name: s.name,
-        email: s.email,
-        department: s.department,
-        faculty_office: s.faculty_office,
-        gender: s.gender,
-        nationality: s.nationality,
-        position: s.position,
-        designation_grade: s.designation_grade,
-        staff_category: s.staff_category,
-        contract_type: s.contract_type,
-        leave_status: s.leave_status,
-        employment_status: s.employment_status,
-        account_status: s.account_status,
-        date_of_birth: s.date_of_birth,
-        date_first_appointment: s.date_first_appointment,
-        date_current_appointment: s.date_current_appointment,
-        date_office_assignment: s.date_office_assignment,
-        retirement_date: s.retirement_date,
-        contract_start_date: s.contract_start_date,
-        contract_end_date: s.contract_end_date,
-        active_tasks: s.active_tasks,
-        disability_status: s.disability_status,
-        disability_type: s.disability_type,
-        workplace_accommodation: s.workplace_accommodation,
-        special_support_needs: s.special_support_needs,
-    });
-
-    const exportExcel = (dataset: 'departments' | 'staff', filename: string) => {
-        const rows = dataset === 'departments'
-            ? filteredUnitSummaries.map(u => ({
-                Department: u.department, Total: u.total, Completed: u.completed,
-                'In Progress': u.inProgress, Delayed: u.delayed,
-                'Avg Progress (%)': u.progress, Score: u.score
-            }))
-            : filteredStaff.map(s => ({
-                'Staff Name': s.name,
-                Department: s.department,
-                Gender: s.gender || '',
-                Category: s.staff_category || '',
-                'Designation / Grade': s.designation_grade || '',
-                'Disability Status': s.disability_status || '',
-                'Disability Type': s.disability_type || '',
-                Assigned: s.assigned,
-                Completed: s.completed,
-                'Completion Rate (%)': s.rate,
-                Evaluation: s.evaluation
-            }));
-
-        const ws = XLSX.utils.json_to_sheet(rows);
-        const wb = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(wb, ws, 'Report');
-        XLSX.writeFile(wb, `${filename}.xlsx`);
-    };
-
-    const exportPDF = async (dataset: 'departments' | 'staff', filename: string) => {
-        const { default: jsPDF } = await import('jspdf');
-        const { default: autoTable } = await import('jspdf-autotable');
-        const doc = new jsPDF({ orientation: 'landscape' });
-        doc.setFontSize(14);
-        doc.text(filename, 14, 15);
-        doc.setFontSize(9);
-        doc.text(`Generated: ${new Date().toLocaleString()}`, 14, 22);
-
-        if (dataset === 'departments') {
-            autoTable(doc, {
-                startY: 28,
-                head: [['Department', 'Total', 'Completed', 'In Progress', 'Delayed', 'Avg Progress', 'Score']],
-                body: filteredUnitSummaries.map(u => [u.department, u.total, u.completed, u.inProgress, u.delayed, `${u.progress}%`, u.score]),
-                foot: [['TOTAL / AVG', totals.total, totals.completed, totals.inProgress, totals.delayed, `${avgProgress}%`, '']],
-                styles: { fontSize: 8 },
-                headStyles: { fillColor: [30, 92, 164] },
-                footStyles: { fillColor: [240, 245, 255], textColor: [30, 92, 164], fontStyle: 'bold' }
-            });
-        } else {
-            autoTable(doc, {
-                startY: 28,
-                head: [['Staff Name', 'Department', 'Gender', 'PwD', 'Category', 'Assigned', 'Completed', 'Rate', 'Evaluation']],
-                body: filteredStaff.map(s => [
-                    s.name,
-                    s.department,
-                    s.gender || '—',
-                    s.disability_status || '—',
-                    s.staff_category || '—',
-                    s.assigned,
-                    s.completed,
-                    `${s.rate}%`,
-                    s.evaluation,
-                ]),
-                styles: { fontSize: 8 },
-                headStyles: { fillColor: [30, 92, 164] }
-            });
-        }
-        doc.save(`${filename}.pdf`);
-    };
+    }, [primaryTab, activitySub]);
 
     // Filtered Department Summaries
     const filteredUnitSummaries = summaryUnitFilter === 'All Departments'
@@ -385,24 +179,17 @@ export default function ReportsView() {
     const totalUnitPages = Math.max(1, Math.ceil(filteredUnitSummaries.length / UNIT_PAGE_SIZE));
     const paginatedUnits = filteredUnitSummaries.slice((departmentPage - 1) * UNIT_PAGE_SIZE, departmentPage * UNIT_PAGE_SIZE);
 
-    const showPwdColumns = pwdFilter === 'yes' || pwdFilter === 'all';
-
-    // Filtered + paginated staff evaluations
-    const filteredStaff = selectedUnit === 'All Departments'
-        ? staffEvaluations
-        : staffEvaluations.filter(s => s.department === selectedUnit);
-    const totalStaffPages = Math.max(1, Math.ceil(filteredStaff.length / STAFF_PAGE_SIZE));
-    const paginatedStaff = filteredStaff.slice((staffPage - 1) * STAFF_PAGE_SIZE, staffPage * STAFF_PAGE_SIZE);
-
-    // Unique departments for staff filter
-    const uniqueStaffUnits = Array.from(new Set(staffEvaluations.map(s => s.department))).filter(Boolean);
-
-    const reportCards: { title: string; description: string; icon: string; color: string; dataset: 'departments' | 'staff' }[] = [
-        { title: 'Activity Progress Summary', description: 'Overview of all activities by status & department', icon: 'bar_chart', color: 'var(--mubs-blue)', dataset: 'departments' },
-        { title: 'Department Performance Snapshots', description: 'Per-department activity completion rates', icon: 'corporate_fare', color: '#10b981', dataset: 'departments' },
-        { title: 'Staff Evaluation Summaries', description: 'Individual & departmental evaluation scores', icon: 'person_search', color: '#b45309', dataset: 'staff' },
-        { title: 'Delayed Activities Report', description: 'All overdue items with escalation log', icon: 'report', color: 'var(--mubs-red)', dataset: 'departments' }
-    ];
+    const exportExcel = (filename: string) => {
+        const rows = filteredUnitSummaries.map(u => ({
+            Department: u.department, Total: u.total, Completed: u.completed,
+            'In Progress': u.inProgress, Delayed: u.delayed,
+            'Avg Progress (%)': u.progress, Score: u.score
+        }));
+        const ws = XLSX.utils.json_to_sheet(rows);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, 'Report');
+        XLSX.writeFile(wb, `${filename}.xlsx`);
+    };
 
     const getPageNumbers = (current: number, totalPages: number): (number | 'ellipsis')[] => {
         if (totalPages <= 7) {
@@ -562,154 +349,132 @@ export default function ReportsView() {
         );
     };
 
+    const PRIMARY_TABS = [
+        { key: 'activity' as const, label: 'Activity', icon: 'monitoring', hint: 'Progress & trends' },
+        { key: 'data-collection' as const, label: 'Data Collection', icon: 'database', hint: 'HR, ambassador & other' },
+        { key: 'results-framework' as const, label: 'Results Framework', icon: 'analytics', hint: 'Targets & actuals matrix' },
+    ];
+
+    const ACTIVITY_TABS = [
+        { key: 'monitoring' as const, label: 'Activity Monitoring', icon: 'summarize' },
+        { key: 'trends' as const, label: 'Performance Trends', icon: 'trending_up' },
+        { key: 'strategic-priority' as const, label: 'Strategic Priority', icon: 'flag' },
+    ];
+
+    const DATA_TABS = [
+        { key: 'hr' as const, label: 'HR Data', icon: 'groups' },
+        { key: 'ambassador' as const, label: 'Ambassador', icon: 'assignment' },
+        { key: 'other' as const, label: 'Other', icon: 'category' },
+    ];
+
+    const HR_TABS: { key: HrSubTab; label: string }[] = [
+        { key: 'establishment', label: 'Staff Establishment' },
+        { key: 'promotion', label: 'Staff Promotions' },
+        { key: 'retention', label: 'Staff Retention' },
+        { key: 'recruitment', label: 'Staff Recruitment' },
+        { key: 'turnover', label: 'Staff Turnover' },
+        { key: 'development', label: 'Staff Development' },
+        { key: 'payments', label: 'Staff Payments' },
+        { key: 'benefits', label: 'Staff Benefits' },
+        { key: 'workforce-assessments', label: 'Workforce Assessments' },
+        { key: 'employment-skill-status', label: 'Employment & Skills' },
+        { key: 'job-description-workplans', label: 'Job Descriptions' },
+        { key: 'miscellaneous', label: 'Miscellaneous' },
+    ];
+
+    const OTHER_TABS = [
+        { key: 'staff-student-ratio' as const, label: 'Staff–Student Ratio', icon: 'school' },
+        { key: 'programme-enrollment' as const, label: 'Programme Enrollment', icon: 'menu_book' },
+        { key: 'course-unit-enrollment' as const, label: 'Course Unit Enrollment', icon: 'library_books' },
+    ];
+
+    const renderHrPanel = () => {
+        switch (hrSub) {
+            case 'establishment': return <StaffEstablishmentPanel />;
+            case 'promotion': return <StaffPromotionPanel />;
+            case 'retention': return <StaffRetentionPanel />;
+            case 'recruitment': return <StaffRecruitmentPanel />;
+            case 'turnover': return <StaffTurnoverPanel />;
+            case 'development': return <StaffDevelopmentPanel />;
+            case 'payments': return <StaffPaymentsPanel />;
+            case 'benefits': return <StaffBenefitsPanel />;
+            case 'workforce-assessments': return <StaffWorkforceAssessmentsPanel />;
+            case 'employment-skill-status': return <StaffEmploymentSkillStatusPanel />;
+            case 'job-description-workplans': return <StaffJobDescriptionWorkplansPanel />;
+            case 'miscellaneous': return <StaffMiscellaneousPanel />;
+            default: return null;
+        }
+    };
+
+    const renderOtherPanel = () => {
+        switch (otherSub) {
+            case 'staff-student-ratio': return <StaffStudentRatioPanel />;
+            case 'programme-enrollment': return <StaffProgrammeEnrollmentPanel />;
+            case 'course-unit-enrollment': return <StaffCourseUnitEnrollmentPanel />;
+            default: return null;
+        }
+    };
+
     return (
         <Layout>
-            {/* Nav Tabs */}
-            <ul className="nav nav-tabs border-0 mb-4 gap-2">
-                <li className="nav-item">
-                    <button className={`nav-link border rounded-pill px-4 fw-bold ${activeTab === 'summary' ? 'active bg-primary text-white border-primary' : 'text-muted'}`} onClick={() => setActiveTab('summary')}>
-                        Activity Monitoring
-                    </button>
-                </li>
-                <li className="nav-item">
-                    <button className={`nav-link border rounded-pill px-4 fw-bold ${activeTab === 'staff' ? 'active bg-primary text-white border-primary' : 'text-muted'}`} onClick={() => setActiveTab('staff')}>
-                        Staff Appraisal &amp; Profiles
-                    </button>
-                </li>
-                <li className="nav-item">
-                    <button className={`nav-link border rounded-pill px-4 fw-bold ${activeTab === 'establishment' ? 'active bg-primary text-white border-primary' : 'text-muted'}`} onClick={() => setActiveTab('establishment')}>
-                        Staff Establishment
-                    </button>
-                </li>
-                <li className="nav-item">
-                    <button className={`nav-link border rounded-pill px-4 fw-bold ${activeTab === 'promotion' ? 'active bg-primary text-white border-primary' : 'text-muted'}`} onClick={() => setActiveTab('promotion')}>
-                        Staff Promotions
-                    </button>
-                </li>
-                <li className="nav-item">
-                    <button className={`nav-link border rounded-pill px-4 fw-bold ${activeTab === 'retention' ? 'active bg-primary text-white border-primary' : 'text-muted'}`} onClick={() => setActiveTab('retention')}>
-                        Staff Retention
-                    </button>
-                </li>
-                <li className="nav-item">
-                    <button className={`nav-link border rounded-pill px-4 fw-bold ${activeTab === 'recruitment' ? 'active bg-primary text-white border-primary' : 'text-muted'}`} onClick={() => setActiveTab('recruitment')}>
-                        Staff Recruitment
-                    </button>
-                </li>
-                <li className="nav-item">
-                    <button className={`nav-link border rounded-pill px-4 fw-bold ${activeTab === 'turnover' ? 'active bg-primary text-white border-primary' : 'text-muted'}`} onClick={() => setActiveTab('turnover')}>
-                        Staff Turnover
-                    </button>
-                </li>
-                <li className="nav-item">
-                    <button className={`nav-link border rounded-pill px-4 fw-bold ${activeTab === 'development' ? 'active bg-primary text-white border-primary' : 'text-muted'}`} onClick={() => setActiveTab('development')}>
-                        Staff Development
-                    </button>
-                </li>
-                <li className="nav-item">
-                    <button className={`nav-link border rounded-pill px-4 fw-bold ${activeTab === 'payments' ? 'active bg-primary text-white border-primary' : 'text-muted'}`} onClick={() => setActiveTab('payments')}>
-                        Staff Payments
-                    </button>
-                </li>
-                <li className="nav-item">
-                    <button className={`nav-link border rounded-pill px-4 fw-bold ${activeTab === 'benefits' ? 'active bg-primary text-white border-primary' : 'text-muted'}`} onClick={() => setActiveTab('benefits')}>
-                        Staff Benefits
-                    </button>
-                </li>
-                <li className="nav-item">
-                    <button className={`nav-link border rounded-pill px-4 fw-bold ${activeTab === 'results-framework' ? 'active bg-primary text-white border-primary' : 'text-muted'}`} onClick={() => setActiveTab('results-framework')}>
-                        Results Framework
-                    </button>
-                </li>
-                <li className="nav-item">
-                    <button className={`nav-link border rounded-pill px-4 fw-bold ${activeTab === 'trends' ? 'active bg-primary text-white border-primary' : 'text-muted'}`} onClick={() => setActiveTab('trends')}>
-                        Performance Trends
-                    </button>
-                </li>
-                <li className="nav-item">
-                    <button className={`nav-link border rounded-pill px-4 fw-bold ${activeTab === 'workforce-assessments' ? 'active bg-primary text-white border-primary' : 'text-muted'}`} onClick={() => setActiveTab('workforce-assessments')}>
-                        Workforce Assessments
-                    </button>
-                </li>
-                <li className="nav-item">
-                    <button className={`nav-link border rounded-pill px-4 fw-bold ${activeTab === 'employment-skill-status' ? 'active bg-primary text-white border-primary' : 'text-muted'}`} onClick={() => setActiveTab('employment-skill-status')} title="No of annual employment & skill status report produced">
-                        Employment &amp; Skills
-                    </button>
-                </li>
-                <li className="nav-item">
-                    <button className={`nav-link border rounded-pill px-4 fw-bold ${activeTab === 'strategic-priority' ? 'active bg-primary text-white border-primary' : 'text-muted'}`} onClick={() => setActiveTab('strategic-priority')} title="% of staff in strategic priority areas">
-                        Strategic Priority
-                    </button>
-                </li>
-                <li className="nav-item">
-                    <button className={`nav-link border rounded-pill px-4 fw-bold ${activeTab === 'job-description-workplans' ? 'active bg-primary text-white border-primary' : 'text-muted'}`} onClick={() => setActiveTab('job-description-workplans')} title="% of staff with updated job description and workplans">
-                        Job Descriptions
-                    </button>
-                </li>
-                <li className="nav-item">
-                    <button className={`nav-link border rounded-pill px-4 fw-bold ${activeTab === 'staff-student-ratio' ? 'active bg-primary text-white border-primary' : 'text-muted'}`} onClick={() => setActiveTab('staff-student-ratio')} title="Teaching staff and student counts per programme with ratio">
-                        Staff-Student Ratio
-                    </button>
-                </li>
-                <li className="nav-item">
-                    <button className={`nav-link border rounded-pill px-4 fw-bold ${activeTab === 'programme-enrollment' ? 'active bg-primary text-white border-primary' : 'text-muted'}`} onClick={() => setActiveTab('programme-enrollment')} title="Number of students in each programme">
-                        Programme Enrollment
-                    </button>
-                </li>
-                <li className="nav-item">
-                    <button className={`nav-link border rounded-pill px-4 fw-bold ${activeTab === 'course-unit-enrollment' ? 'active bg-primary text-white border-primary' : 'text-muted'}`} onClick={() => setActiveTab('course-unit-enrollment')} title="Number of students enrolled per course unit">
-                        Course Unit Enrollment
-                    </button>
-                </li>
-                <li className="nav-item">
-                    <button className={`nav-link border rounded-pill px-4 fw-bold ${activeTab === 'miscellaneous' ? 'active bg-primary text-white border-primary' : 'text-muted'}`} onClick={() => setActiveTab('miscellaneous')}>
-                        Miscellaneous
-                    </button>
-                </li>
-            </ul>
-
-            {activeTab === 'results-framework' && <AdminResultsFrameworkPanel />}
-
-            {activeTab === 'trends' && (
+            <div className="page-section active-page">
                 <div className="mb-4">
-                    <StrategicTrendSection />
+                    <h5 className="fw-bold mb-1 d-flex align-items-center gap-2">
+                        <span className="material-symbols-outlined text-primary">assessment</span>
+                        Reports &amp; Analytics
+                    </h5>
+                    <p className="text-muted small mb-0">
+                        Monitor activity progress, review collected HR and ambassador data, and track results framework performance.
+                    </p>
                 </div>
-            )}
 
-            {/* Report Cards - Only show if not on trends tab */}
-            {activeTab === 'summary' && (
-                <div className="row g-4 mb-4">
-                    {reportCards.map((card, index) => (
-                        <div className="col-12 col-md-6 col-xl-3" key={index}>
-                            <div className="stat-card" style={{ borderLeftColor: card.color, cursor: 'pointer' }}>
-                                <div className="stat-label">Report Type</div>
-                                <div className="fw-bold text-dark" style={{ fontSize: '1rem', marginTop: '4px' }}>{card.title}</div>
-                                <div className="text-muted mt-1" style={{ fontSize: '.75rem' }}>{card.description}</div>
-                                <div className="d-flex gap-2 mt-3">
-                                    <button
-                                        className="btn btn-xs py-1 px-2 btn-outline-primary fw-bold"
-                                        style={{ fontSize: '.75rem' }}
-                                        onClick={() => exportPDF(card.dataset, card.title)}
-                                    >
-                                        <span className="material-symbols-outlined" style={{ fontSize: '14px' }}>picture_as_pdf</span> PDF
-                                    </button>
-                                    <button
-                                        className="btn btn-xs py-1 px-2 btn-outline-success fw-bold"
-                                        style={{ fontSize: '.75rem' }}
-                                        onClick={() => exportExcel(card.dataset, card.title)}
-                                    >
-                                        <span className="material-symbols-outlined" style={{ fontSize: '14px' }}>table_chart</span> Excel
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-                    ))}
-                </div>
-            )}
+                <ReportsTabShell
+                    primary={
+                        <ReportsSubTabs
+                            variant="primary"
+                            tabs={PRIMARY_TABS}
+                            active={primaryTab}
+                            onChange={setPrimaryTab}
+                        />
+                    }
+                    sub={
+                        primaryTab === 'activity' ? (
+                            <ReportsSubTabs
+                                variant="secondary"
+                                tabs={ACTIVITY_TABS}
+                                active={activitySub}
+                                onChange={setActivitySub}
+                            />
+                        ) : primaryTab === 'data-collection' ? (
+                            <ReportsSubTabs
+                                variant="secondary"
+                                tabs={DATA_TABS}
+                                active={dataSub}
+                                onChange={setDataSub}
+                            />
+                        ) : null
+                    }
+                    tertiary={
+                        primaryTab === 'data-collection' && dataSub === 'hr' ? (
+                            <ReportsSubTabs
+                                variant="tertiary"
+                                tabs={HR_TABS}
+                                active={hrSub}
+                                onChange={setHrSub}
+                            />
+                        ) : primaryTab === 'data-collection' && dataSub === 'other' ? (
+                            <ReportsSubTabs
+                                variant="tertiary"
+                                tabs={OTHER_TABS}
+                                active={otherSub}
+                                onChange={setOtherSub}
+                            />
+                        ) : null
+                    }
+                />
 
-            {activeTab === 'summary' && (
-                /* Activity Progress Summary */
-                <>
+                {/* Activity → Monitoring */}
+                {primaryTab === 'activity' && activitySub === 'monitoring' && (
                     <div className="table-card mb-4">
                         <div className="table-card-header">
                         <h5>
@@ -759,15 +524,15 @@ export default function ReportsView() {
                             >
                                 Reset
                             </button>
-                            <button className="btn btn-sm btn-success fw-bold" onClick={() => exportExcel('departments', 'Activity Progress Summary')}>
+                            <button className="btn btn-sm btn-success fw-bold" onClick={() => exportExcel('Activity Progress Summary')}>
                                 <span className="material-symbols-outlined me-1" style={{ fontSize: '16px' }}>download</span>
                                 Export Current View
                             </button>
                         </div>
                     </div>
                     <div className="table-responsive">
-                        <table className="table mb-0">
-                            <thead>
+                        <table className="table table-sm table-bordered mb-0" style={{ fontSize: '0.78rem' }}>
+                            <thead className="table-dark">
                                 <tr>
                                     <th>Department</th>
                                     <th>Total Activities</th>
@@ -830,234 +595,43 @@ export default function ReportsView() {
                         </span>
                         <Paginator page={departmentPage} total={totalUnitPages} onPrev={() => setUnitPage(p => p - 1)} onNext={() => setUnitPage(p => p + 1)} onPage={setUnitPage} />
                     </div>
-                </div>
-                </>
-            )}
-
-            {activeTab === 'establishment' && (
-                <StaffEstablishmentPanel />
-            )}
-
-            {activeTab === 'promotion' && (
-                <StaffPromotionPanel />
-            )}
-
-            {activeTab === 'retention' && (
-                <StaffRetentionPanel />
-            )}
-
-            {activeTab === 'recruitment' && (
-                <StaffRecruitmentPanel />
-            )}
-
-            {activeTab === 'turnover' && (
-                <StaffTurnoverPanel />
-            )}
-
-            {activeTab === 'development' && (
-                <StaffDevelopmentPanel />
-            )}
-
-            {activeTab === 'payments' && (
-                <StaffPaymentsPanel />
-            )}
-
-            {activeTab === 'benefits' && (
-                <StaffBenefitsPanel />
-            )}
-
-            {activeTab === 'workforce-assessments' && (
-                <StaffWorkforceAssessmentsPanel />
-            )}
-
-            {activeTab === 'employment-skill-status' && (
-                <StaffEmploymentSkillStatusPanel />
-            )}
-
-            {activeTab === 'strategic-priority' && (
-                <StaffStrategicPriorityPanel />
-            )}
-
-            {activeTab === 'job-description-workplans' && (
-                <StaffJobDescriptionWorkplansPanel />
-            )}
-
-            {activeTab === 'staff-student-ratio' && (
-                <StaffStudentRatioPanel />
-            )}
-
-            {activeTab === 'programme-enrollment' && (
-                <StaffProgrammeEnrollmentPanel />
-            )}
-
-            {activeTab === 'course-unit-enrollment' && (
-                <StaffCourseUnitEnrollmentPanel />
-            )}
-
-            {activeTab === 'miscellaneous' && (
-                <StaffMiscellaneousPanel />
-            )}
-
-            {activeTab === 'staff' && (
-                <div className="table-card">
-                    <div className="table-card-header">
-                        <h5>
-                            <span className="material-symbols-outlined me-2" style={{ color: 'var(--mubs-blue)' }}>person_search</span>
-                            Staff Appraisal &amp; Profiles
-                        </h5>
-                        <div className="d-flex gap-2 flex-wrap align-items-center">
-                            <select
-                                className="form-select form-select-sm"
-                                style={{ width: '160px' }}
-                                value={selectedUnit}
-                                onChange={e => setSelectedUnit(e.target.value)}
-                            >
-                                <option>All Departments</option>
-                                {departmentsList.map((name, i) => <option key={`${i}-${name}`} value={name}>{name}</option>)}
-                            </select>
-                            <select
-                                className="form-select form-select-sm"
-                                style={{ width: '130px' }}
-                                value={pwdFilter}
-                                onChange={e => setPwdFilter(e.target.value)}
-                            >
-                                <option value="all">All staff</option>
-                                <option value="yes">PwD only</option>
-                                <option value="no">Non-PwD</option>
-                                <option value="not_recorded">Not recorded</option>
-                            </select>
-                            <select
-                                className="form-select form-select-sm"
-                                style={{ width: '120px' }}
-                                value={genderFilter}
-                                onChange={e => setGenderFilter(e.target.value)}
-                            >
-                                <option value="All">All genders</option>
-                                {GENDER_OPTIONS.map(g => <option key={g} value={g}>{g}</option>)}
-                            </select>
-                            <select
-                                className="form-select form-select-sm"
-                                style={{ width: '140px' }}
-                                value={categoryFilter}
-                                onChange={e => setCategoryFilter(e.target.value)}
-                            >
-                                <option value="All">All categories</option>
-                                {STAFF_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
-                            </select>
-                            <button
-                                className="btn btn-sm btn-outline-danger fw-bold"
-                                onClick={() => exportPDF('staff', 'Staff Evaluations')}
-                            >
-                                PDF
-                            </button>
-                            <button
-                                className="btn btn-sm btn-primary fw-bold"
-                                style={{ background: 'var(--mubs-blue)', borderColor: 'var(--mubs-blue)' }}
-                                onClick={() => exportExcel('staff', 'Staff Evaluations')}
-                            >
-                                <span className="material-symbols-outlined me-1" style={{ fontSize: '16px' }}>download</span>
-                                Export
-                            </button>
-                        </div>
                     </div>
-                    {staffSummary && (
-                        <div className="px-4 py-2 border-bottom bg-light small d-flex flex-wrap gap-3">
-                            <span>
-                                <strong>{staffSummary.pwd_count}</strong> PwD of{' '}
-                                <strong>{staffSummary.total_synced.toLocaleString()}</strong> HR-synced staff (
-                                {staffSummary.pwd_pct}%) ·{' '}
-                                <strong>{staffSummary.active_accounts.toLocaleString()}</strong> active M&E accounts
-                            </span>
-                            <span className="text-muted">Showing {filteredStaff.length.toLocaleString()} in current filter</span>
-                        </div>
-                    )}
-                    <div className="table-responsive">
-                        <table className="table mb-0">
-                            <thead>
-                                <tr>
-                                    <th>Staff Name</th>
-                                    <th>Department</th>
-                                    {showPwdColumns && <th>Gender</th>}
-                                    {showPwdColumns && <th>PwD</th>}
-                                    {pwdFilter === 'yes' && <th>Disability Type</th>}
-                                    {showPwdColumns && <th>Category</th>}
-                                    <th>Activities Assigned</th>
-                                    <th>Completed</th>
-                                    <th>Completion Rate</th>
-                                    <th>Evaluation</th>
-                                    <th className="text-end">Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {loadingStaff ? (
-                                    <tr><td colSpan={12} className="text-center py-4"><div className="spinner-border text-primary" role="status"><span className="visually-hidden">Loading...</span></div></td></tr>
-                                ) : paginatedStaff.length === 0 ? (
-                                    <tr><td colSpan={12} className="text-center py-4 text-muted">No staff found for the selected filters</td></tr>
-                                ) : paginatedStaff.map((staff) => {
-                                    const scoreStyle = getScoreBadge(staff.evaluation);
-                                    return (
-                                        <tr key={staff.user_id}>
-                                            <td className="fw-bold text-dark" style={{ fontSize: '.85rem' }}>{staff.name}</td>
-                                            <td style={{ fontSize: '.83rem' }}>{staff.department}</td>
-                                            {showPwdColumns && <td style={{ fontSize: '.83rem' }}>{staff.gender || '—'}</td>}
-                                            {showPwdColumns && (
-                                                <td style={{ fontSize: '.83rem' }}>
-                                                    {staff.disability_status === 'Yes' ? (
-                                                        <span className="badge bg-info text-dark">Yes</span>
-                                                    ) : (
-                                                        staff.disability_status || '—'
-                                                    )}
-                                                </td>
-                                            )}
-                                            {pwdFilter === 'yes' && <td style={{ fontSize: '.83rem' }}>{staff.disability_type || '—'}</td>}
-                                            {showPwdColumns && <td style={{ fontSize: '.83rem' }}>{staff.staff_category || '—'}</td>}
-                                            <td style={{ fontSize: '.83rem' }}>{staff.assigned}</td>
-                                            <td style={{ fontSize: '.83rem' }}>{staff.completed}</td>
-                                            <td>
-                                                <div className="progress-bar-custom" style={{ width: '80px', display: 'inline-block', verticalAlign: 'middle' }}>
-                                                    <div className="progress-bar-fill" style={{ width: `${staff.rate}%`, background: staff.rate >= 70 ? '#10b981' : staff.rate >= 50 ? '#ffcd00' : '#e31837' }} />
-                                                </div>
-                                                <span style={{ fontSize: '.75rem', marginLeft: '6px' }}>{staff.rate}%</span>
-                                            </td>
-                                            <td>
-                                                <span className="status-badge" style={{ background: scoreStyle.bg, color: scoreStyle.color }}>{staff.evaluation}</span>
-                                            </td>
-                                            <td className="text-end">
-                                                <button
-                                                    type="button"
-                                                    className="btn btn-sm btn-outline-primary fw-bold d-inline-flex align-items-center gap-1 px-2 py-1"
-                                                    style={{ fontSize: '.75rem', borderRadius: '8px' }}
-                                                    onClick={() => setProfileStaff(staffToProfile(staff))}
-                                                >
-                                                    <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>person_search</span>
-                                                    Profile
-                                                </button>
-                                            </td>
-                                        </tr>
-                                    );
-                                })}
-                            </tbody>
-                        </table>
-                    </div>
-                    <div className="table-card-footer">
-                        <span className="footer-label">
-                            Showing {filteredStaff.length === 0 ? 0 : (staffPage - 1) * STAFF_PAGE_SIZE + 1}–{Math.min(staffPage * STAFF_PAGE_SIZE, filteredStaff.length)} of {filteredStaff.length} staff
-                        </span>
-                        <Paginator page={staffPage} total={totalStaffPages} onPrev={() => setStaffPage(p => p - 1)} onNext={() => setStaffPage(p => p + 1)} onPage={setStaffPage} />
-                    </div>
-                </div>
-            )}
+                )}
 
-            <StaffProfileModal
-                staff={profileStaff}
-                onClose={() => setProfileStaff(null)}
-                mode="admin"
-                onEditUser={() => {
-                    const id = profileStaff?.id;
-                    setProfileStaff(null);
-                    if (id) window.location.href = `/admin?pg=users&edit=${id}`;
-                }}
-            />
+                {primaryTab === 'activity' && activitySub === 'trends' && (
+                    <div className="mb-4">
+                        <StrategicTrendSection />
+                    </div>
+                )}
+
+                {primaryTab === 'activity' && activitySub === 'strategic-priority' && (
+                    <div className="mb-4">
+                        <StaffStrategicPriorityPanel />
+                    </div>
+                )}
+
+                {primaryTab === 'data-collection' && dataSub === 'hr' && (
+                    <div className="mb-4">
+                        {renderHrPanel()}
+                    </div>
+                )}
+
+                {primaryTab === 'data-collection' && dataSub === 'ambassador' && (
+                    <div className="table-card p-3 p-md-4 mb-4">
+                        <AmbassadorCollectedDataPanel />
+                    </div>
+                )}
+
+                {primaryTab === 'data-collection' && dataSub === 'other' && (
+                    <div className="mb-4">
+                        {renderOtherPanel()}
+                    </div>
+                )}
+
+                {primaryTab === 'results-framework' && (
+                    <AdminResultsFrameworkPanel />
+                )}
+            </div>
         </Layout>
     );
 }

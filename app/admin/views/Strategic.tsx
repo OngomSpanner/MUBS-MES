@@ -1103,7 +1103,7 @@ export default function StrategicView() {
                                     onChange={(department_ids) => setStandardForm({ ...standardForm, department_ids })}
                                 />
                                 <div className="col-12">
-                                    <Form.Label className="fw-bold small mb-1">Pathway (high-level flow)</Form.Label>
+                                    <Form.Label className="fw-bold small mb-1">Pathway</Form.Label>
                                     <Form.Control size="sm" as="textarea" rows={2} name="pathway" value={standardForm.pathway} onChange={(e) => setStandardForm({ ...standardForm, pathway: e.target.value })} />
                                 </div>
                             </div>

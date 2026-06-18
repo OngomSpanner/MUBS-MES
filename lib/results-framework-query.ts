@@ -6,14 +6,22 @@ import {
   type PracticeType,
 } from '@/lib/results-framework';
 import {
-  RF_ACTIVITY_FY_SELECT,
   activityQualifiesForResultsFramework,
-  buildResultsFrameworkKpiFilterSql,
+  activityQualifiesForResultsFrameworkMatrix,
   resolveRfPerformanceIndicator,
+  RF_ACTIVITY_FY_SELECT,
+  buildResultsFrameworkKpiFilterSql,
   resolveRfTargetValue,
   type RfActivityTargetInput,
 } from '@/lib/rf-activity-targets';
 import type { ActivityFyTargetKey } from '@/lib/activity-fy-targets';
+import {
+  RF_MATRIX_BASELINE,
+  RF_MATRIX_FY_COLUMNS,
+  buildResultsFrameworkMatrixActualSelect,
+  type ResultsFrameworkMatrixFyCell,
+  type ResultsFrameworkMatrixRow,
+} from '@/lib/results-framework-matrix';
 export type ResultsFrameworkDbRow = {
   id: number;
   title: string;
@@ -22,6 +30,8 @@ export type ResultsFrameworkDbRow = {
   actual_value: number | null;
   unit_of_measure: string | null;
   standard_title: string | null;
+  quality_standard: string | null;
+  output_standard: string | null;
   performance_indicator: string | null;
   standard_id: number | null;
   task_type: string | null;
@@ -30,7 +40,14 @@ export type ResultsFrameworkDbRow = {
   ambassador_practice_type?: PracticeType | null;
   staff_outcome_reason?: string | null;
   staff_practice_type?: PracticeType | null;
-} & Partial<Record<ActivityFyTargetKey, number | null>>;
+} & Partial<Record<ActivityFyTargetKey, number | null>> & {
+  actual_baseline_fy24_25?: number | null;
+  actual_fy25_26?: number | null;
+  actual_fy26_27?: number | null;
+  actual_fy27_28?: number | null;
+  actual_fy28_29?: number | null;
+  actual_fy29_30?: number | null;
+};
 
 export type ResultsFrameworkSummary = {
   total: number;
@@ -115,12 +132,91 @@ export function buildResultsFrameworkActivitySelect(financialYearKey: string): s
   sa.task_type,
   ${RF_ACTIVITY_FY_SELECT},
   st.title AS standard_title,
+  st.quality_standard,
+  st.output_standard,
   st.performance_indicator,
   COALESCE(NULLIF(TRIM(d.external_name), ''), d.name) AS department_name,
   arn.outcome_reason AS ambassador_outcome_reason,
   arn.practice_type AS ambassador_practice_type,
   ${STAFF_NARRATIVE_SUBQUERY}
   `;
+}
+
+export function buildResultsFrameworkMatrixActivitySelect(): string {
+  return `
+  sa.id,
+  sa.title,
+  sa.target_kpi,
+  sa.kpi_target_value,
+  sa.unit_of_measure,
+  sa.standard_id,
+  sa.task_type,
+  ${RF_ACTIVITY_FY_SELECT},
+  st.title AS standard_title,
+  st.quality_standard,
+  st.output_standard,
+  st.performance_indicator,
+  COALESCE(NULLIF(TRIM(d.external_name), ''), d.name) AS department_name,
+  ${buildResultsFrameworkMatrixActualSelect()}
+  `;
+}
+
+function toNumberOrNull(value: unknown): number | null {
+  if (value == null || value === '') return null;
+  const n = Number(value);
+  return Number.isFinite(n) ? n : null;
+}
+
+function formatOutcomeOutputLabel(row: {
+  quality_standard?: string | null;
+  output_standard?: string | null;
+  standard_title?: string | null;
+}): string {
+  const quality = String(row.quality_standard || '').trim();
+  const output = String(row.output_standard || '').trim();
+  if (quality && output) return `${quality} / ${output}`;
+  if (quality) return quality;
+  if (output) return output;
+  return String(row.standard_title || '').trim() || '—';
+}
+
+export function mapResultsFrameworkMatrixRows(rows: ResultsFrameworkDbRow[]): ResultsFrameworkMatrixRow[] {
+  return rows
+    .filter((row) =>
+      activityQualifiesForResultsFrameworkMatrix({
+        ...row,
+        performance_indicator: row.performance_indicator,
+      }),
+    )
+    .map((row) => {
+      const indicator = resolveRfPerformanceIndicator({
+        target_kpi: row.target_kpi,
+        kpi_target_value: row.kpi_target_value,
+        performance_indicator: row.performance_indicator,
+        target_fy25_26: row.target_fy25_26,
+        target_fy26_27: row.target_fy26_27,
+        target_fy27_28: row.target_fy27_28,
+        target_fy28_29: row.target_fy28_29,
+        target_fy29_30: row.target_fy29_30,
+      });
+
+      const fiscalYears: ResultsFrameworkMatrixFyCell[] = RF_MATRIX_FY_COLUMNS.map((col) => ({
+        label: col.label,
+        target: toNumberOrNull(row[col.targetKey]),
+        actual: toNumberOrNull(row[col.actualAlias as keyof ResultsFrameworkDbRow]),
+      }));
+
+      return {
+        id: row.id,
+        outcomeOutput: formatOutcomeOutputLabel(row),
+        indicator: indicator || row.title,
+        baseline2024_25: toNumberOrNull(row.kpi_target_value),
+        fiscalYears,
+        budget: null,
+        responsibleOffice: row.department_name || '—',
+        unitOfMeasure: row.unit_of_measure,
+      };
+    });
 }
 
 export const RESULTS_FRAMEWORK_ACTIVITY_SELECT = buildResultsFrameworkActivitySelect('2025/26');
@@ -147,9 +243,35 @@ export type MappedResultsFrameworkRow = {
   practiceTypeLabel: string | null;
   narrativeSource: 'ambassador' | 'staff' | null;
   expectedOutcome: string | null;
+  qualityStandard: string | null;
+  outputStandard: string | null;
+  resultCategory: 'outcome' | 'output' | 'both' | null;
   ambassadorNarrativeRecorded: boolean;
   needsAmbassadorNarrative: boolean;
 };
+
+export function classifyRfResultCategory(row: {
+  quality_standard?: string | null;
+  output_standard?: string | null;
+}): 'outcome' | 'output' | 'both' | null {
+  const hasQuality = Boolean(String(row.quality_standard || '').trim());
+  const hasOutput = Boolean(String(row.output_standard || '').trim());
+  if (hasQuality && hasOutput) return 'both';
+  if (hasQuality) return 'outcome';
+  if (hasOutput) return 'output';
+  return null;
+}
+
+export function filterResultsFrameworkByCategory(
+  indicators: MappedResultsFrameworkRow[],
+  category: 'outcome' | 'output'
+): MappedResultsFrameworkRow[] {
+  return indicators.filter((row) => {
+    if (row.resultCategory === 'both') return true;
+    if (category === 'outcome') return row.resultCategory === 'outcome';
+    return row.resultCategory === 'output';
+  });
+}
 
 export function mapResultsFrameworkRows(
   rows: ResultsFrameworkDbRow[],
@@ -195,6 +317,9 @@ export function mapResultsFrameworkRows(
       const ambassadorNarrativeRecorded = Boolean(ambassadorReason);
       const needsAmbassadorNarrative =
         performanceStatus != null && !ambassadorNarrativeRecorded;
+      const qualityStandard = String(row.quality_standard || '').trim() || null;
+      const outputStandard = String(row.output_standard || '').trim() || null;
+      const resultCategory = classifyRfResultCategory(row);
 
       return {
         id: row.id,
@@ -212,7 +337,10 @@ export function mapResultsFrameworkRows(
         practiceType,
         practiceTypeLabel: practiceType ? PRACTICE_TYPE_LABELS[practiceType] : null,
         narrativeSource,
-        expectedOutcome: indicator,
+        expectedOutcome: qualityStandard || outputStandard || indicator,
+        qualityStandard,
+        outputStandard,
+        resultCategory,
         ambassadorNarrativeRecorded,
         needsAmbassadorNarrative,
       };

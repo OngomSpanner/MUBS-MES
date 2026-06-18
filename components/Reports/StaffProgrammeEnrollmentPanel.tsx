@@ -1,9 +1,10 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { Fragment, useCallback, useEffect, useMemo, useState } from 'react';
 import axios from 'axios';
 import * as XLSX from 'xlsx';
 import type { StaffProgrammeEnrollmentReport } from '@/lib/hrms/staff-programme-enrollment';
+import { REPORTS_TABLE_CLASS, ReportsTableWrap } from '@/components/Reports/ReportsDataTable';
 
 function formatCount(n: number): string {
   return n > 0 ? String(n) : '—';
@@ -68,6 +69,23 @@ export default function StaffProgrammeEnrollmentPanel({ facultyFilter: externalF
   const filtersAtDefault =
     genderFilter === 'all' && pwdFilter === 'all' && (hideFacultyFilter || facultyFilter === 'all');
   const colSpan = 3;
+
+  const facultyGroups = useMemo(() => {
+    if (!report?.rows.length) return [];
+    const groups: { facultyName: string; rows: StaffProgrammeEnrollmentReport['rows'] }[] = [];
+    const indexByFaculty = new Map<string, number>();
+    for (const row of report.rows) {
+      const key = row.facultyName || '—';
+      const existing = indexByFaculty.get(key);
+      if (existing !== undefined) {
+        groups[existing].rows.push(row);
+      } else {
+        indexByFaculty.set(key, groups.length);
+        groups.push({ facultyName: key, rows: [row] });
+      }
+    }
+    return groups;
+  }, [report?.rows]);
 
   const buildExportRows = (r: StaffProgrammeEnrollmentReport) => {
     const body = r.rows.map((row) => [row.facultyName, row.programmeName, formatCount(row.studentCount)]);
@@ -206,17 +224,15 @@ export default function StaffProgrammeEnrollmentPanel({ facultyFilter: externalF
         </div>
       </div>
 
-      <div className="table-responsive">
-        <table className="table mb-0 staff-programme-enrollment-table">
+      <ReportsTableWrap>
+        <table className={REPORTS_TABLE_CLASS}>
           <thead>
             <tr>
-              <th className="text-start ps-4" style={{ minWidth: '160px' }}>
-                Faculty / school
-              </th>
+              <th style={{ width: '30px' }}>#</th>
               <th className="text-start" style={{ minWidth: '220px' }}>
                 Programme Name
               </th>
-              <th className="text-center" style={{ minWidth: '110px' }}>
+              <th className="reports-th-num" style={{ minWidth: '110px' }}>
                 No of students
               </th>
             </tr>
@@ -244,33 +260,35 @@ export default function StaffProgrammeEnrollmentPanel({ facultyFilter: externalF
               </tr>
             ) : (
               <>
-                {report.rows.map((row) => (
-                  <tr key={`${row.facultyName}-${row.programmeName}`}>
-                    <td className="text-start ps-4 text-muted" style={{ fontSize: '.8rem' }}>
-                      {row.facultyName}
-                    </td>
-                    <td className="text-start fw-semibold" style={{ fontSize: '.85rem' }}>
-                      {row.programmeName}
-                    </td>
-                    <td className="text-center" style={{ fontSize: '.85rem' }}>
-                      {formatCount(row.studentCount)}
-                    </td>
-                  </tr>
+                {facultyGroups.map((group, groupIndex) => (
+                  <Fragment key={group.facultyName}>
+                    {groupIndex > 0 && (
+                      <tr className="reports-section-gap" aria-hidden="true">
+                        <td colSpan={colSpan} />
+                      </tr>
+                    )}
+                    <tr className="reports-section-row">
+                      <td colSpan={colSpan}>{group.facultyName}</td>
+                    </tr>
+                    {group.rows.map((row, i) => (
+                      <tr key={`${group.facultyName}-${row.programmeName}`}>
+                        <td className="reports-td-index">{i + 1}</td>
+                        <td className="fw-semibold">{row.programmeName}</td>
+                        <td className="reports-td-num">{formatCount(row.studentCount)}</td>
+                      </tr>
+                    ))}
+                  </Fragment>
                 ))}
-                <tr style={{ background: '#f8fafc' }}>
-                  <td className="text-start ps-4" />
-                  <td className="text-start fw-bold" style={{ color: 'var(--mubs-blue)', fontSize: '.85rem' }}>
-                    TOTAL
-                  </td>
-                  <td className="text-center fw-bold" style={{ fontSize: '.85rem' }}>
-                    {formatCount(report.totals.studentCount)}
-                  </td>
+                <tr className="reports-total-row">
+                  <td />
+                  <td style={{ color: 'var(--mubs-blue)' }}>TOTAL</td>
+                  <td className="reports-td-num">{formatCount(report.totals.studentCount)}</td>
                 </tr>
               </>
             )}
           </tbody>
         </table>
-      </div>
+      </ReportsTableWrap>
     </div>
   );
 }

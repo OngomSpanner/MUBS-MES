@@ -287,7 +287,7 @@ export default function AmbassadorCompliancePanel() {
         [REPORT_TITLE],
         ['Faculty / office', summary.managedUnitName],
         ['Reporting cycle', reportingCycle],
-        ['Faculty strategic progress', `${summary.overallProgress}%`],
+        ['Dept/Unit strategic progress', `${summary.overallProgress}%`],
         ['Total activities', summary.totalActivities],
         ['On track', summary.onTrack],
         ['In progress', summary.inProgress],

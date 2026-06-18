@@ -180,25 +180,6 @@ export default function Dashboard() {
         </div>
 
         <div className="col-12 col-sm-6 col-xl-3">
-          <Link href="/admin?pg=tracking" className="text-decoration-none h-100">
-            <div
-              className="quick-action-card p-3 d-flex align-items-center gap-2 gap-sm-3 bg-white border rounded-4 shadow-sm h-100"
-              style={{ transition: 'all 0.2s', cursor: 'pointer', minHeight: '92px' }}
-              onMouseOver={(e) => { (e.currentTarget as HTMLDivElement).style.transform = 'translateY(-4px)'; (e.currentTarget as HTMLDivElement).style.boxShadow = '0 12px 24px rgba(0,0,0,0.1)'; }}
-              onMouseOut={(e) => { (e.currentTarget as HTMLDivElement).style.transform = 'translateY(0)'; (e.currentTarget as HTMLDivElement).style.boxShadow = '0 4px 12px rgba(0,0,0,0.05)'; }}
-            >
-              <div className="icon-box d-flex align-items-center justify-content-center flex-shrink-0" style={{ width: '48px', height: '48px', borderRadius: '14px', background: 'rgba(245, 158, 11, 0.12)' }}>
-                <span className="material-symbols-outlined" style={{ color: '#b45309', fontSize: '22px' }}>monitoring</span>
-              </div>
-              <div className="min-w-0">
-                <div className="fw-black text-dark text-truncate" style={{ fontSize: '.95rem', lineHeight: 1.25, whiteSpace: 'nowrap' }}>Tracking</div>
-                <div className="text-muted small text-truncate" style={{ fontSize: '.78rem', whiteSpace: 'nowrap' }}>Monitor progress by unit</div>
-              </div>
-            </div>
-          </Link>
-        </div>
-
-        <div className="col-12 col-sm-6 col-xl-3">
           <Link href="/admin?pg=reports" className="text-decoration-none h-100">
             <div
               className="quick-action-card p-3 d-flex align-items-center gap-2 gap-sm-3 bg-white border rounded-4 shadow-sm h-100"
@@ -230,7 +211,7 @@ export default function Dashboard() {
                 Unit Performance
               </h5>
               <div className="d-flex align-items-center gap-2">
-              <Link href="/admin?pg=tracking" className="btn btn-sm btn-outline-secondary">View all</Link>
+              <Link href="/admin?pg=reports" className="btn btn-sm btn-outline-secondary">View all</Link>
               </div>
             </div>
             <div className="p-4" style={{ height: '320px', overflowY: 'auto' }}>
@@ -263,7 +244,7 @@ export default function Dashboard() {
                 </span>
                 Activity Status
               </h5>
-              <Link href="/admin?pg=tracking" className="btn btn-sm btn-outline-secondary">View</Link>
+              <Link href="/admin?pg=reports" className="btn btn-sm btn-outline-secondary">View</Link>
             </div>
             <div className="p-4 d-flex flex-column align-items-center justify-content-center" style={{ height: '320px' }}>
               <ResponsiveContainer width="100%" height="80%">

@@ -8,7 +8,7 @@ import axios from 'axios';
 import DeleteConfirmModal from '@/components/Questionnaire/DeleteConfirmModal';
 import DepartmentUnitMultiSelect, { type DepartmentUnitOption } from '@/components/DepartmentUnitMultiSelect';
 import { getAvailableFinancialYears } from '@/lib/questionnaire/fy-utils';
-import { UOM_OPTIONS, uomLabel } from '@/lib/questionnaire/uom';
+import { UOM_OPTIONS } from '@/lib/questionnaire/uom';
 
 // ────────────────────────────────────────────────────────────
 // Types
@@ -649,7 +649,6 @@ function IndicatorsPanel({
                                     <tr>
                                       <th style={{ width: '30px' }}>#</th>
                                       <th>Metric</th>
-                                      <th style={{ width: '130px' }}>Unit of Measure</th>
                                       {visibleFys.map((fy) => (
                                         <th key={fy} className="text-center" style={{ width: '90px' }}>{fy}</th>
                                       ))}
@@ -660,7 +659,6 @@ function IndicatorsPanel({
                                       <tr key={m.id}>
                                         <td className="text-center fw-bold" style={{ color: 'var(--mubs-gold, #C8922A)' }}>{mi + 1}</td>
                                         <td>{m.metric_text}</td>
-                                        <td><Badge bg="light" className="text-dark border" style={{ fontSize: '0.62rem' }}>{uomLabel(m.unit_of_measure)}</Badge></td>
                                         {visibleFys.map((fy) => {
                                           const val = responseValue(responses, dept.id, m.id, fy);
                                           return (

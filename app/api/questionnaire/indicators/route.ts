@@ -3,6 +3,7 @@ import { query } from '@/lib/db';
 import { cookies } from 'next/headers';
 import { verifyToken } from '@/lib/auth';
 import { canManageStrategicStandards } from '@/lib/role-routing';
+import { normalizeFinancialYear } from '@/lib/questionnaire/fy-utils';
 
 export const dynamic = 'force-dynamic';
 
@@ -46,29 +47,36 @@ export async function GET() {
 
     const metricsMap = new Map<number, any[]>();
     for (const m of metrics) {
-      if (!metricsMap.has(m.indicator_id)) metricsMap.set(m.indicator_id, []);
-      metricsMap.get(m.indicator_id)!.push(m);
+      const indicatorId = Number(m.indicator_id);
+      if (!metricsMap.has(indicatorId)) metricsMap.set(indicatorId, []);
+      metricsMap.get(indicatorId)!.push(m);
     }
 
     const deptsMap = new Map<number, any[]>();
     for (const d of depts) {
-      if (!deptsMap.has(d.indicator_id)) deptsMap.set(d.indicator_id, []);
-      deptsMap.get(d.indicator_id)!.push({ id: d.department_id, name: d.department_name });
+      const indicatorId = Number(d.indicator_id);
+      if (!deptsMap.has(indicatorId)) deptsMap.set(indicatorId, []);
+      deptsMap.get(indicatorId)!.push({ id: Number(d.department_id), name: d.department_name });
     }
 
     const fysMap = new Map<number, string[]>();
     for (const f of fys) {
-      if (!fysMap.has(f.indicator_id)) fysMap.set(f.indicator_id, []);
-      fysMap.get(f.indicator_id)!.push(f.financial_year);
+      const indicatorId = Number(f.indicator_id);
+      if (!fysMap.has(indicatorId)) fysMap.set(indicatorId, []);
+      fysMap.get(indicatorId)!.push(normalizeFinancialYear(f.financial_year));
     }
 
-    const result = indicators.map((ind) => ({
-      ...ind,
-      is_locked: Boolean(ind.is_locked),
-      metrics: metricsMap.get(ind.id) ?? [],
-      departments: deptsMap.get(ind.id) ?? [],
-      financial_years: fysMap.get(ind.id) ?? [],
-    }));
+    const result = indicators.map((ind) => {
+      const id = Number(ind.id);
+      return {
+        ...ind,
+        id,
+        is_locked: Boolean(ind.is_locked),
+        metrics: (metricsMap.get(id) ?? []).map((m: { id: number }) => ({ ...m, id: Number(m.id) })),
+        departments: deptsMap.get(id) ?? [],
+        financial_years: fysMap.get(id) ?? [],
+      };
+    });
 
     return NextResponse.json(result);
   } catch (e) {
