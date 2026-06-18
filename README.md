@@ -95,9 +95,3 @@ node scripts/migrate-staff-reports-process-subtasks.js
 node scripts/migrate-hrms-sync-columns.js
 node scripts/migrate-hr-sync-runs.js
 ```
-
-<<<<<<< HEAD
-If a script fails, confirm `.env.local` is present and points to the correct MySQL database.
-=======
-If you run a script and it fails, confirm `.env.local` is present and points to the correct MySQL database.
->>>>>>> 557490cc0f3fd3dcb7ad3b48a187c1e383bb1c9c
