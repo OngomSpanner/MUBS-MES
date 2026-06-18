@@ -1,5 +1,6 @@
 import { query } from '@/lib/db';
 import { normalizeRoleForCookie, parseRoles } from '@/lib/role-routing';
+import { isHrManagedUnit } from '@/lib/ambassador/hr-unit';
 
 export type AmbassadorReportScope = {
   /** Caller is limited to their managed unit (ambassador). */
@@ -7,6 +8,31 @@ export type AmbassadorReportScope = {
   managedUnitId: number | null;
   isElevated: boolean;
 };
+
+async function getManagedUnitName(managedUnitId: number): Promise<string> {
+  const rows = (await query({
+    query: `SELECT COALESCE(NULLIF(TRIM(external_name), ''), name, '') AS unit_name FROM departments WHERE id = ?`,
+    values: [managedUnitId],
+  })) as { unit_name: string }[];
+  return rows[0]?.unit_name ?? '';
+}
+
+/**
+ * Staff HR reports: HR directorate ambassadors see institution-wide data (undefined).
+ * Other ambassadors remain scoped to their managed unit.
+ */
+export async function resolveStaffReportManagedUnitId(
+  ambassadorScope: AmbassadorReportScope
+): Promise<number | undefined> {
+  if (!ambassadorScope.restricted) return undefined;
+  if (!ambassadorScope.managedUnitId) return undefined;
+
+  const unitName = await getManagedUnitName(ambassadorScope.managedUnitId);
+  if (await isHrManagedUnit(ambassadorScope.managedUnitId, unitName)) {
+    return undefined;
+  }
+  return ambassadorScope.managedUnitId;
+}
 
 async function loadUserRoleSet(userId: number): Promise<Set<string>> {
   const roles = new Set<string>();

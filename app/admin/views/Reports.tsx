@@ -887,23 +887,11 @@ export default function ReportsView() {
             )}
 
             {activeTab === 'programme-enrollment' && (
-                <>
-                    <div className="alert alert-secondary py-2 small mb-3">
-                        Data entry is performed by the Strategic Plan Ambassador assigned to the{' '}
-                        <strong>School Registrar&apos;s Office</strong>. This view is read-only for administrators.
-                    </div>
-                    <StaffProgrammeEnrollmentPanel />
-                </>
+                <StaffProgrammeEnrollmentPanel />
             )}
 
             {activeTab === 'course-unit-enrollment' && (
-                <>
-                    <div className="alert alert-secondary py-2 small mb-3">
-                        Data entry is performed by the Strategic Plan Ambassador assigned to the{' '}
-                        <strong>School Registrar&apos;s Office</strong>. This view is read-only for administrators.
-                    </div>
-                    <StaffCourseUnitEnrollmentPanel />
-                </>
+                <StaffCourseUnitEnrollmentPanel />
             )}
 
             {activeTab === 'miscellaneous' && (

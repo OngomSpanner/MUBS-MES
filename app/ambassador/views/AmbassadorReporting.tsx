@@ -14,16 +14,17 @@ import AmbassadorCourseUnitEnrollmentPanel from '@/components/Ambassador/reports
 import AmbassadorDataCollection from './AmbassadorDataCollection';
 
 export type AmbassadorReportingTab =
+  | 'data-collection'
   | 'staff-profiles'
   | 'recruitment'
   | 'benefits'
   | 'workforce-assessments'
   | 'employment-skill-status'
   | 'programme-enrollment'
-  | 'course-unit-enrollment'
-  | 'data-collection';
+  | 'course-unit-enrollment';
 
 const VALID_TABS = new Set<string>([
+  'data-collection',
   'staff-profiles',
   'recruitment',
   'benefits',
@@ -31,7 +32,14 @@ const VALID_TABS = new Set<string>([
   'employment-skill-status',
   'programme-enrollment',
   'course-unit-enrollment',
-  'data-collection',
+]);
+
+const HR_ONLY_TABS = new Set<string>([
+  'staff-profiles',
+  'recruitment',
+  'benefits',
+  'workforce-assessments',
+  'employment-skill-status',
 ]);
 
 const REGISTRAR_ONLY_TABS = new Set<string>(['programme-enrollment', 'course-unit-enrollment']);
@@ -61,15 +69,15 @@ export default function AmbassadorReporting() {
   const [managedUnitName, setManagedUnitName] = useState<string | null>(null);
   const [managedUnitId, setManagedUnitId] = useState<number | null>(null);
   const [canManageEnrollment, setCanManageEnrollment] = useState(false);
-  const [canViewStaffProfiles, setCanViewStaffProfiles] = useState(false);
+  const [canManageHrWorkforce, setCanManageHrWorkforce] = useState(false);
 
   const scopeProps = useMemo(
     () => ({
-      scopeFaculty: managedUnitName,
-      lockFaculty: Boolean(managedUnitName),
-      managedUnitId: managedUnitId ?? undefined,
+      scopeFaculty: canManageHrWorkforce ? undefined : managedUnitName,
+      lockFaculty: false,
+      managedUnitId: canManageHrWorkforce ? undefined : managedUnitId ?? undefined,
     }),
-    [managedUnitName, managedUnitId]
+    [managedUnitName, managedUnitId, canManageHrWorkforce]
   );
 
   useEffect(() => {
@@ -79,7 +87,7 @@ export default function AmbassadorReporting() {
         setManagedUnitName(metaRes.data.managedUnitName ?? null);
         setManagedUnitId(metaRes.data.managedUnitId ?? null);
         setCanManageEnrollment(Boolean(metaRes.data.canManageEnrollment));
-        setCanViewStaffProfiles(Boolean(metaRes.data.canViewStaffProfiles));
+        setCanManageHrWorkforce(Boolean(metaRes.data.canManageHrWorkforce));
       } catch (err: unknown) {
         console.error('Ambassador reporting meta error:', err);
       }
@@ -88,22 +96,24 @@ export default function AmbassadorReporting() {
   }, []);
 
   const visibleTabs = useMemo(() => {
-    const tabs: AmbassadorReportingTab[] = [
-      'data-collection',
-      'recruitment',
-      'benefits',
-      'workforce-assessments',
-      'employment-skill-status',
-    ];
-    if (canViewStaffProfiles) tabs.push('staff-profiles');
+    const tabs: AmbassadorReportingTab[] = ['data-collection'];
+    if (canManageHrWorkforce) {
+      tabs.push(
+        'recruitment',
+        'benefits',
+        'workforce-assessments',
+        'employment-skill-status',
+        'staff-profiles'
+      );
+    }
     if (canManageEnrollment) {
       tabs.push('programme-enrollment', 'course-unit-enrollment');
     }
     return tabs;
-  }, [canManageEnrollment, canViewStaffProfiles]);
+  }, [canManageEnrollment, canManageHrWorkforce]);
 
+  const hrTabDenied = HR_ONLY_TABS.has(activeTab) && !canManageHrWorkforce;
   const enrollmentTabDenied = REGISTRAR_ONLY_TABS.has(activeTab) && !canManageEnrollment;
-  const staffProfilesTabDenied = activeTab === 'staff-profiles' && !canViewStaffProfiles;
 
   return (
     <div className="page-section active-page">
@@ -120,6 +130,13 @@ export default function AmbassadorReporting() {
         ))}
       </div>
 
+      {hrTabDenied && (
+        <div className="alert alert-warning">
+          HR workforce data may only be viewed and entered by the Strategic Plan Ambassador assigned to the{' '}
+          <strong>Human Resources directorate</strong>.
+        </div>
+      )}
+
       {enrollmentTabDenied && (
         <div className="alert alert-warning">
           Programme and course unit enrollment data may only be entered by the Strategic Plan Ambassador
@@ -127,27 +144,24 @@ export default function AmbassadorReporting() {
         </div>
       )}
 
-      {staffProfilesTabDenied && (
-        <div className="alert alert-warning">
-          Full staff profiles are only available to the Strategic Plan Ambassador assigned to the{' '}
-          <strong>Human Resources</strong> unit.
-        </div>
-      )}
-
       {activeTab === 'data-collection' && <AmbassadorDataCollection />}
 
-      {activeTab === 'staff-profiles' && canViewStaffProfiles && <AmbassadorStaffProfilePanel />}
+      {activeTab === 'staff-profiles' && canManageHrWorkforce && <AmbassadorStaffProfilePanel />}
 
-      {activeTab === 'recruitment' && <StaffRecruitmentPanel {...scopeProps} />}
+      {activeTab === 'recruitment' && canManageHrWorkforce && <StaffRecruitmentPanel {...scopeProps} />}
 
-      {activeTab === 'benefits' && <AmbassadorBenefitsDataPanel {...scopeProps} />}
+      {activeTab === 'benefits' && canManageHrWorkforce && <AmbassadorBenefitsDataPanel {...scopeProps} />}
 
-      {activeTab === 'workforce-assessments' && (
-        <AmbassadorWorkforceDataPanel managedUnitId={managedUnitId ?? undefined} />
+      {activeTab === 'workforce-assessments' && canManageHrWorkforce && (
+        <AmbassadorWorkforceDataPanel
+          managedUnitId={canManageHrWorkforce ? undefined : managedUnitId ?? undefined}
+        />
       )}
 
-      {activeTab === 'employment-skill-status' && (
-        <AmbassadorSkillsDataPanel managedUnitId={managedUnitId ?? undefined} />
+      {activeTab === 'employment-skill-status' && canManageHrWorkforce && (
+        <AmbassadorSkillsDataPanel
+          managedUnitId={canManageHrWorkforce ? undefined : managedUnitId ?? undefined}
+        />
       )}
 
       {activeTab === 'programme-enrollment' && canManageEnrollment && <AmbassadorProgrammeEnrollmentPanel />}

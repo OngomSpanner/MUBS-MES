@@ -2,7 +2,7 @@
 
 import Image from 'next/image';
 import Link from 'next/link';
-import { useMemo } from 'react';
+import { useMemo, useEffect, useState } from 'react';
 import { usePathname, useSearchParams } from 'next/navigation';
 
 interface SidebarProps {
@@ -58,6 +58,7 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen, onLogoutClick }: 
     { key: 'tasks', href: '/department-head?pg=tasks', icon: 'checklist', label: 'Processes' },
     { key: 'staff', href: '/department-head?pg=staff', icon: 'group', label: 'Staff & Warnings' },
     { key: 'evaluations', href: '/department-head?pg=evaluations', icon: 'fact_check', label: 'Submissions & reviews' },
+    { key: 'teaching-data', href: '/department-head?pg=teaching-data', icon: 'school', label: 'Academic Teaching Data' },
     { key: 'change-requests', href: '/department-head?pg=change-requests', icon: 'rate_review', label: 'Ambassador Proposals' },
     { key: 'reports', href: '/department-head?pg=reports', icon: 'analytics', label: 'Performance & Reports' },
   ];
@@ -71,7 +72,7 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen, onLogoutClick }: 
     },
     {
       key: 'reporting',
-      href: '/ambassador?pg=reporting&tab=recruitment',
+      href: '/ambassador?pg=reporting&tab=data-collection',
       icon: 'bar_chart',
       label: 'Reporting',
     },
@@ -88,11 +89,68 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen, onLogoutClick }: 
     { key: 'tasks', href: '/staff?pg=tasks', icon: 'checklist', label: 'Tasks' },
     { key: 'notifications', href: '/staff?pg=notifications', icon: 'notifications_active', label: 'Notifications & Deadlines' },
     { key: 'submissions', href: '/staff?pg=submissions', icon: 'history', label: 'Submissions & Feedback' },
+    { key: 'academic-teaching', href: '/staff?pg=academic-teaching', icon: 'school', label: 'Academic Teaching' },
   ];
 
   const isAmbassador = pathname.startsWith('/ambassador');
   const isDepartmentHead = pathname.startsWith('/department-head');
   const isStaff = pathname.startsWith('/staff');
+  const [isAcademicStaff, setIsAcademicStaff] = useState<boolean | null>(null);
+  const [hasAcademicTeachingScope, setHasAcademicTeachingScope] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    if (!isStaff) {
+      setIsAcademicStaff(null);
+      return;
+    }
+    let cancelled = false;
+    void fetch('/api/staff/profile')
+      .then((r) => (r.ok ? r.json() : { isAcademicStaff: false }))
+      .then((data: { isAcademicStaff?: boolean }) => {
+        if (!cancelled) setIsAcademicStaff(Boolean(data.isAcademicStaff));
+      })
+      .catch(() => {
+        if (!cancelled) setIsAcademicStaff(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [isStaff]);
+
+  useEffect(() => {
+    if (!isDepartmentHead) {
+      setHasAcademicTeachingScope(null);
+      return;
+    }
+    let cancelled = false;
+    void fetch('/api/department-head/profile')
+      .then((r) => (r.ok ? r.json() : { hasAcademicTeachingScope: false }))
+      .then((data: { hasAcademicTeachingScope?: boolean }) => {
+        if (!cancelled) setHasAcademicTeachingScope(Boolean(data.hasAcademicTeachingScope));
+      })
+      .catch(() => {
+        if (!cancelled) setHasAcademicTeachingScope(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [isDepartmentHead]);
+
+  const visibleStaffMenuItems = useMemo(
+    () =>
+      staffMenuItems.filter(
+        (item) => item.key !== 'academic-teaching' || isAcademicStaff === true
+      ),
+    [isAcademicStaff]
+  );
+
+  const visibleDepartmentHeadMenuItems = useMemo(
+    () =>
+      departmentHeadMenuItems.filter(
+        (item) => item.key !== 'teaching-data' || hasAcademicTeachingScope === true
+      ),
+    [hasAcademicTeachingScope]
+  );
 
   const isActive = (key: string) => currentKey === key;
 
@@ -133,9 +191,9 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen, onLogoutClick }: 
           {isAmbassador
             ? renderFlatMenu(ambassadorMenuItems)
             : isDepartmentHead
-              ? renderFlatMenu(departmentHeadMenuItems)
+              ? renderFlatMenu(visibleDepartmentHeadMenuItems)
               : isStaff
-                ? renderFlatMenu(staffMenuItems)
+                ? renderFlatMenu(visibleStaffMenuItems)
                 : renderFlatMenu(adminMenuItems)}
 
           <a

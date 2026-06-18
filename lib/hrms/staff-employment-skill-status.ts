@@ -26,9 +26,11 @@ async function loadYearCounts(
 
   const placeholders = yearKeys.map(() => '?').join(',');
   const unitClause =
-    managedUnitId != null
-      ? ' AND managed_unit_id = ?'
-      : ' AND managed_unit_id IS NULL';
+    managedUnitId === undefined
+      ? ''
+      : managedUnitId != null
+        ? ' AND managed_unit_id = ?'
+        : ' AND managed_unit_id IS NULL';
   const values: (string | number)[] = [...yearKeys];
   if (managedUnitId != null) values.push(managedUnitId);
 

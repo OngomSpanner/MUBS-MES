@@ -1,24 +1,24 @@
 import { NextResponse } from 'next/server';
 import { query } from '@/lib/db';
-import { requireAmbassador } from '@/lib/ambassador/context';
+import { requireHrAmbassador } from '@/lib/ambassador/hr-unit';
 
-async function getOwned(id: number, managedUnitId: number) {
+async function getEntry(id: number) {
   const rows = (await query({
-    query: `SELECT id FROM staff_workforce_assessment_counts WHERE id = ? AND managed_unit_id = ? LIMIT 1`,
-    values: [id, managedUnitId],
+    query: `SELECT id FROM staff_workforce_assessment_counts WHERE id = ? LIMIT 1`,
+    values: [id],
   })) as { id: number }[];
   return rows[0] ?? null;
 }
 
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const auth = await requireAmbassador();
+  const auth = await requireHrAmbassador();
   if ('error' in auth) return auth.error;
 
   const { id: idParam } = await params;
   const id = Number(idParam);
   if (!id) return NextResponse.json({ message: 'Invalid id' }, { status: 400 });
 
-  if (!(await getOwned(id, auth.managedUnitId))) {
+  if (!(await getEntry(id))) {
     return NextResponse.json({ message: 'Record not found' }, { status: 404 });
   }
 
@@ -36,9 +36,9 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       query: `
         UPDATE staff_workforce_assessment_counts
         SET assessment_detail = ?, financial_year_key = ?, count_value = ?
-        WHERE id = ? AND managed_unit_id = ?
+        WHERE id = ?
       `,
-      values: [assessmentDetail, financialYearKey, countValue, id, auth.managedUnitId],
+      values: [assessmentDetail, financialYearKey, countValue, id],
     });
     return NextResponse.json({ message: 'Workforce assessment updated' });
   } catch (e: unknown) {
@@ -54,20 +54,20 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
 }
 
 export async function DELETE(_request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const auth = await requireAmbassador();
+  const auth = await requireHrAmbassador();
   if ('error' in auth) return auth.error;
 
   const { id: idParam } = await params;
   const id = Number(idParam);
   if (!id) return NextResponse.json({ message: 'Invalid id' }, { status: 400 });
 
-  if (!(await getOwned(id, auth.managedUnitId))) {
+  if (!(await getEntry(id))) {
     return NextResponse.json({ message: 'Record not found' }, { status: 404 });
   }
 
   await query({
-    query: 'DELETE FROM staff_workforce_assessment_counts WHERE id = ? AND managed_unit_id = ?',
-    values: [id, auth.managedUnitId],
+    query: 'DELETE FROM staff_workforce_assessment_counts WHERE id = ?',
+    values: [id],
   });
   return NextResponse.json({ message: 'Workforce assessment deleted' });
 }

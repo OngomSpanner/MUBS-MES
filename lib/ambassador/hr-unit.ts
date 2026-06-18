@@ -47,7 +47,7 @@ export async function requireHrAmbassador(): Promise<
       error: NextResponse.json(
         {
           message:
-            'Full staff profiles are only available to the Strategic Plan Ambassador assigned to the Human Resources unit.',
+            'HR workforce data is only available to the Strategic Plan Ambassador assigned to the Human Resources directorate.',
         },
         { status: 403 }
       ),

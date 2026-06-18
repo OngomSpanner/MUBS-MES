@@ -1,40 +1,31 @@
 import { NextResponse } from 'next/server';
 import { query } from '@/lib/db';
-import { requireAmbassador } from '@/lib/ambassador/context';
-import { isStaffInFaculty } from '@/lib/ambassador/faculty-staff';
-import { getManagedUnitDepartmentIds } from '@/lib/ambassador/managed-unit-departments';
-import { inPlaceholders } from '@/lib/department-head';
+import { requireHrAmbassador } from '@/lib/ambassador/hr-unit';
+import { isSyncedStaff } from '@/lib/ambassador/faculty-staff';
 import { BENEFIT_TYPES, type BenefitType } from '@/lib/hrms/staff-benefits';
 
 const VALID_TYPES = new Set(BENEFIT_TYPES.map((b) => b.value));
 
-async function getOwnedEntry(id: number, departmentIds: number[]) {
-  if (departmentIds.length === 0) return null;
-  const deptPlaceholders = inPlaceholders(departmentIds.length);
+async function getEntry(id: number) {
   const rows = (await query({
     query: `
-      SELECT e.id, e.user_id, e.financial_year_key, e.benefit_type, e.received
-      FROM staff_benefit_entries e
-      INNER JOIN users u ON u.id = e.user_id
-      WHERE e.id = ?
-        AND u.department_id IN (${deptPlaceholders})
-      LIMIT 1
+      SELECT id, user_id, financial_year_key, benefit_type, received
+      FROM staff_benefit_entries WHERE id = ? LIMIT 1
     `,
-    values: [id, ...departmentIds],
+    values: [id],
   })) as { id: number; user_id: number; financial_year_key: string; benefit_type: BenefitType; received: number }[];
   return rows[0] ?? null;
 }
 
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const auth = await requireAmbassador();
+  const auth = await requireHrAmbassador();
   if ('error' in auth) return auth.error;
 
   const { id: idParam } = await params;
   const id = Number(idParam);
   if (!id) return NextResponse.json({ message: 'Invalid id' }, { status: 400 });
 
-  const departmentIds = await getManagedUnitDepartmentIds(auth.managedUnitId);
-  const existing = await getOwnedEntry(id, departmentIds);
+  const existing = await getEntry(id);
   if (!existing) return NextResponse.json({ message: 'Record not found' }, { status: 404 });
 
   const body = await request.json();
@@ -47,9 +38,8 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     return NextResponse.json({ message: 'Invalid benefit type' }, { status: 400 });
   }
 
-  const inFaculty = await isStaffInFaculty(userId, auth.managedUnitId, auth.managedUnitName);
-  if (!inFaculty) {
-    return NextResponse.json({ message: 'Staff member is not in your department or unit' }, { status: 403 });
+  if (!(await isSyncedStaff(userId))) {
+    return NextResponse.json({ message: 'Staff member is not HR-synced in M&E' }, { status: 403 });
   }
 
   try {
@@ -75,15 +65,14 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
 }
 
 export async function DELETE(_request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const auth = await requireAmbassador();
+  const auth = await requireHrAmbassador();
   if ('error' in auth) return auth.error;
 
   const { id: idParam } = await params;
   const id = Number(idParam);
   if (!id) return NextResponse.json({ message: 'Invalid id' }, { status: 400 });
 
-  const departmentIds = await getManagedUnitDepartmentIds(auth.managedUnitId);
-  const existing = await getOwnedEntry(id, departmentIds);
+  const existing = await getEntry(id);
   if (!existing) return NextResponse.json({ message: 'Record not found' }, { status: 404 });
 
   await query({ query: 'DELETE FROM staff_benefit_entries WHERE id = ?', values: [id] });

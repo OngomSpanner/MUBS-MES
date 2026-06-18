@@ -378,7 +378,7 @@ export default function AmbassadorCompliancePanel() {
 
       <div className="row g-4 mb-4">
         <div className="col-12 col-sm-6 col-xl-3">
-          <StatCard label="Faculty Strategic Progress" value={`${summary.overallProgress}%`} color="blue" />
+          <StatCard label="Dept/Unit Strategic Progress" value={`${summary.overallProgress}%`} color="blue" />
         </div>
         <div className="col-12 col-sm-6 col-xl-3">
           <StatCard label="Strategic Activities" value={summary.totalActivities} color="blue" />

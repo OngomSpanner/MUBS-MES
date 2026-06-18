@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { requireAmbassador } from '@/lib/ambassador/context';
-import { listFacultyStaff } from '@/lib/ambassador/faculty-staff';
+import { listFacultyStaff, listInstitutionSyncedStaff } from '@/lib/ambassador/faculty-staff';
 import { getAmbassadorReportYearOptions } from '@/lib/ambassador/report-years';
 import { BENEFIT_TYPES } from '@/lib/hrms/staff-benefits';
 import { isSchoolRegistrarManagedUnit } from '@/lib/ambassador/school-registrar';
@@ -10,17 +10,22 @@ export async function GET() {
   const auth = await requireAmbassador();
   if ('error' in auth) return auth.error;
 
-  const staff = await listFacultyStaff(auth.managedUnitId, auth.managedUnitName);
-  const [canManageEnrollment, canViewStaffProfiles] = await Promise.all([
+  const [canManageEnrollment, canManageHrWorkforce] = await Promise.all([
     isSchoolRegistrarManagedUnit(auth.managedUnitId, auth.managedUnitName),
     isHrManagedUnit(auth.managedUnitId, auth.managedUnitName),
   ]);
+
+  const staff = canManageHrWorkforce
+    ? await listInstitutionSyncedStaff()
+    : await listFacultyStaff(auth.managedUnitId, auth.managedUnitName);
 
   return NextResponse.json({
     managedUnitId: auth.managedUnitId,
     managedUnitName: auth.managedUnitName,
     canManageEnrollment,
-    canViewStaffProfiles,
+    canManageHrWorkforce,
+    /** @deprecated use canManageHrWorkforce */
+    canViewStaffProfiles: canManageHrWorkforce,
     years: getAmbassadorReportYearOptions(),
     benefitTypes: BENEFIT_TYPES,
     staff,

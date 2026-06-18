@@ -7,6 +7,7 @@ import DepartmentTasks from './views/DepartmentTasks';
 import DepartmentStaff from './views/DepartmentStaff';
 import DepartmentEvaluations from './views/DepartmentEvaluations';
 import DepartmentReports from './views/DepartmentReports';
+import DepartmentTeachingDataGate from './views/DepartmentTeachingDataGate';
 import ChangeRequestsView from './views/ChangeRequests';
 
 interface DepartmentHeadPageProps {
@@ -33,6 +34,8 @@ export default async function DepartmentHeadPage({ searchParams }: DepartmentHea
                 return <DepartmentEvaluations />;
             case 'reports':
                 return <DepartmentReports />;
+            case 'teaching-data':
+                return <DepartmentTeachingDataGate />;
             case 'change-requests':
                 return <ChangeRequestsView />;
             case 'dashboard':

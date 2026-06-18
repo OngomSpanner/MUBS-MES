@@ -1,9 +1,7 @@
 import { NextResponse } from 'next/server';
 import { query } from '@/lib/db';
-import { requireAmbassador } from '@/lib/ambassador/context';
-import { isStaffInFaculty } from '@/lib/ambassador/faculty-staff';
-import { getManagedUnitDepartmentIds } from '@/lib/ambassador/managed-unit-departments';
-import { inPlaceholders } from '@/lib/department-head';
+import { requireHrAmbassador } from '@/lib/ambassador/hr-unit';
+import { isSyncedStaff } from '@/lib/ambassador/faculty-staff';
 import { BENEFIT_TYPES, type BenefitType } from '@/lib/hrms/staff-benefits';
 import { labelsFromFyWindow, getPastFinancialYearWindow } from '@/lib/financial-year';
 
@@ -15,14 +13,8 @@ function yearLabel(key: string) {
 }
 
 export async function GET() {
-  const auth = await requireAmbassador();
+  const auth = await requireHrAmbassador();
   if ('error' in auth) return auth.error;
-
-  const departmentIds = await getManagedUnitDepartmentIds(auth.managedUnitId);
-  if (departmentIds.length === 0) {
-    return NextResponse.json({ records: [] });
-  }
-  const deptPlaceholders = inPlaceholders(departmentIds.length);
 
   const rows = (await query({
     query: `
@@ -33,10 +25,9 @@ export async function GET() {
       FROM staff_benefit_entries e
       INNER JOIN users u ON u.id = e.user_id
       LEFT JOIN departments d ON d.id = u.department_id
-      WHERE u.department_id IN (${deptPlaceholders})
       ORDER BY e.updated_at DESC, e.id DESC
     `,
-    values: departmentIds,
+    values: [],
   })) as {
     id: number;
     user_id: number;
@@ -67,7 +58,7 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
-  const auth = await requireAmbassador();
+  const auth = await requireHrAmbassador();
   if ('error' in auth) return auth.error;
 
   const body = await request.json();
@@ -84,9 +75,9 @@ export async function POST(request: Request) {
     return NextResponse.json({ message: 'Invalid benefit type' }, { status: 400 });
   }
 
-  const inFaculty = await isStaffInFaculty(userId, auth.managedUnitId, auth.managedUnitName);
-  if (!inFaculty) {
-    return NextResponse.json({ message: 'Staff member is not in your department or unit' }, { status: 403 });
+  const synced = await isSyncedStaff(userId);
+  if (!synced) {
+    return NextResponse.json({ message: 'Staff member is not HR-synced in M&E' }, { status: 403 });
   }
 
   try {

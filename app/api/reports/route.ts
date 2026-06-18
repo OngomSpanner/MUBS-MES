@@ -19,15 +19,19 @@ import { generateStaffJobDescriptionWorkplansReport } from '@/lib/hrms/staff-job
 import { generateStaffStudentRatioReport } from '@/lib/hrms/staff-student-ratio';
 import { generateStaffProgrammeEnrollmentReport } from '@/lib/hrms/staff-programme-enrollment';
 import { generateStaffCourseUnitEnrollmentReport } from '@/lib/hrms/staff-course-unit-enrollment';
-import { resolveAmbassadorReportScope } from '@/lib/ambassador/reports-scope';
+import { resolveAmbassadorReportScope, resolveStaffReportManagedUnitId } from '@/lib/ambassador/reports-scope';
+import { isHrManagedUnit } from '@/lib/ambassador/hr-unit';
 import { getManagedUnitDepartmentIds } from '@/lib/ambassador/managed-unit-departments';
 
-const AMBASSADOR_ALLOWED_REPORT_TYPES = new Set([
-  'staff-recruitment',
-  'staff-benefits',
-  'staff-workforce-assessments',
-  'staff-employment-skill-status',
-]);
+const AMBASSADOR_ALLOWED_REPORT_TYPES = new Set<string>([]);
+
+async function getManagedUnitName(managedUnitId: number): Promise<string> {
+  const rows = (await query({
+    query: `SELECT COALESCE(NULLIF(TRIM(external_name), ''), name, '') AS unit_name FROM departments WHERE id = ?`,
+    values: [managedUnitId],
+  })) as { unit_name: string }[];
+  return rows[0]?.unit_name ?? '';
+}
 
 function parseManagedUnitParam(value: string | null): number | null {
   if (!value) return null;
@@ -57,11 +61,22 @@ export async function GET(request: Request) {
 
     if (type) {
       const ambassadorScope = await resolveAmbassadorReportScope(userId, null);
-      if (ambassadorScope.restricted && !AMBASSADOR_ALLOWED_REPORT_TYPES.has(type)) {
-        return NextResponse.json(
-          { message: 'This report is not available for your ambassador unit scope' },
-          { status: 403 }
-        );
+      if (ambassadorScope.restricted) {
+        if (type.startsWith('staff-') && ambassadorScope.managedUnitId) {
+          const unitName = await getManagedUnitName(ambassadorScope.managedUnitId);
+          const isHr = await isHrManagedUnit(ambassadorScope.managedUnitId, unitName);
+          if (!isHr) {
+            return NextResponse.json(
+              { message: 'HR workforce reports are only available to the Human Resources directorate ambassador' },
+              { status: 403 }
+            );
+          }
+        } else if (!AMBASSADOR_ALLOWED_REPORT_TYPES.has(type)) {
+          return NextResponse.json(
+            { message: 'This report is not available for your ambassador unit scope' },
+            { status: 403 }
+          );
+        }
       }
     }
     const from = searchParams.get('from');
@@ -510,13 +525,14 @@ export async function GET(request: Request) {
         if (recruitmentScope.restricted && !recruitmentScope.managedUnitId) {
           return NextResponse.json({ message: 'Forbidden' }, { status: 403 });
         }
+        const staffUnitId = await resolveStaffReportManagedUnitId(recruitmentScope);
         data = await generateStaffRecruitmentReport({
           faculty:
             faculty && faculty !== 'All Faculties' ? faculty : null,
           department:
             dept && dept !== 'All Departments' ? dept : null,
           pwd: recruitmentPwd,
-          managedUnitId: recruitmentScope.managedUnitId,
+          managedUnitId: staffUnitId ?? null,
         });
         break;
       }
@@ -578,10 +594,9 @@ export async function GET(request: Request) {
         if (benefitsScope.restricted && !benefitsScope.managedUnitId) {
           return NextResponse.json({ message: 'Forbidden' }, { status: 403 });
         }
+        const staffUnitId = await resolveStaffReportManagedUnitId(benefitsScope);
         const departmentIds =
-          benefitsScope.restricted && benefitsScope.managedUnitId
-            ? await getManagedUnitDepartmentIds(benefitsScope.managedUnitId)
-            : undefined;
+          staffUnitId != null ? await getManagedUnitDepartmentIds(staffUnitId) : undefined;
         data = await generateStaffBenefitsReport({
           faculty: faculty && faculty !== 'All Faculties' ? faculty : null,
           department: dept && dept !== 'All Departments' ? dept : null,
@@ -602,8 +617,9 @@ export async function GET(request: Request) {
         if (workforceScope.restricted && !workforceScope.managedUnitId) {
           return NextResponse.json({ message: 'Forbidden' }, { status: 403 });
         }
+        const staffUnitId = await resolveStaffReportManagedUnitId(workforceScope);
         data = await generateStaffWorkforceAssessmentsReport({
-          managedUnitId: workforceScope.managedUnitId,
+          managedUnitId: staffUnitId,
         });
         break;
       }
@@ -614,8 +630,9 @@ export async function GET(request: Request) {
         if (skillsScope.restricted && !skillsScope.managedUnitId) {
           return NextResponse.json({ message: 'Forbidden' }, { status: 403 });
         }
+        const staffUnitId = await resolveStaffReportManagedUnitId(skillsScope);
         data = await generateStaffEmploymentSkillStatusReport({
-          managedUnitId: skillsScope.managedUnitId,
+          managedUnitId: staffUnitId,
         });
         break;
       }

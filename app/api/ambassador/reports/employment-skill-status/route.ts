@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { query } from '@/lib/db';
-import { requireAmbassador } from '@/lib/ambassador/context';
+import { requireHrAmbassador } from '@/lib/ambassador/hr-unit';
 import { labelsFromFyWindow, getPastFinancialYearWindow } from '@/lib/financial-year';
 
 function yearLabel(key: string) {
@@ -9,17 +9,16 @@ function yearLabel(key: string) {
 }
 
 export async function GET() {
-  const auth = await requireAmbassador();
+  const auth = await requireHrAmbassador();
   if ('error' in auth) return auth.error;
 
   const rows = (await query({
     query: `
       SELECT id, financial_year_key, reports_produced, skills_missing, updated_at
       FROM staff_employment_skill_status
-      WHERE managed_unit_id = ?
       ORDER BY financial_year_key ASC
     `,
-    values: [auth.managedUnitId],
+    values: [],
   })) as {
     id: number;
     financial_year_key: string;
@@ -41,7 +40,7 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
-  const auth = await requireAmbassador();
+  const auth = await requireHrAmbassador();
   if ('error' in auth) return auth.error;
 
   const body = await request.json();

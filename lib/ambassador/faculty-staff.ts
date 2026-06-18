@@ -39,6 +39,28 @@ export async function listFacultyStaff(
   }));
 }
 
+/** All HR-synced staff (institution-wide) for HR directorate ambassador. */
+export async function listInstitutionSyncedStaff(): Promise<FacultyStaffOption[]> {
+  const rows = (await query({
+    query: `
+      SELECT u.id,
+             TRIM(CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(u.surname, ''))) AS full_name,
+             COALESCE(NULLIF(TRIM(d.external_name), ''), d.name, '') AS department
+      FROM users u
+      LEFT JOIN departments d ON d.id = u.department_id
+      WHERE u.hrms_staff_id IS NOT NULL
+      ORDER BY u.surname ASC, u.first_name ASC
+    `,
+    values: [],
+  })) as { id: number; full_name: string; department: string }[];
+
+  return rows.map((r) => ({
+    id: r.id,
+    fullName: (r.full_name || '').trim() || `Staff #${r.id}`,
+    department: r.department || '—',
+  }));
+}
+
 export async function isStaffInFaculty(
   userId: number,
   managedUnitId: number,
@@ -59,6 +81,14 @@ export async function isStaffInFaculty(
       LIMIT 1
     `,
     values: [userId, ...departmentIds],
+  })) as { id: number }[];
+  return rows.length > 0;
+}
+
+export async function isSyncedStaff(userId: number): Promise<boolean> {
+  const rows = (await query({
+    query: `SELECT id FROM users WHERE id = ? AND hrms_staff_id IS NOT NULL LIMIT 1`,
+    values: [userId],
   })) as { id: number }[];
   return rows.length > 0;
 }

@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { Modal, Button, Form } from 'react-bootstrap';
 import type { ProgrammeEnrollmentRecord } from '@/lib/ambassador/enrollment-records';
 import FacultySelectField from '@/components/Enrollment/FacultySelectField';
+import ProgrammeSelectField from '@/components/Enrollment/ProgrammeSelectField';
 
 export type { ProgrammeEnrollmentRecord };
 
@@ -85,8 +86,8 @@ function ProgrammeEnrollmentForm({
         {error && <div className="alert alert-danger py-2 small">{error}</div>}
         <FacultySelectField value={facultyName} onChange={setFacultyName} disabled={saving} />
         <Form.Group className="mb-3">
-          <Form.Label className="fw-bold small">Programme name</Form.Label>
-          <Form.Control value={programmeName} onChange={(e) => setProgrammeName(e.target.value)} required />
+          <Form.Label className="fw-bold small">Programme</Form.Label>
+          <ProgrammeSelectField value={programmeName} onChange={setProgrammeName} disabled={saving} required />
         </Form.Group>
         <div className="row g-3">
           <div className="col-6 col-md-3">
