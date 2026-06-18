@@ -658,7 +658,7 @@ export default function DepartmentStrategicActivities() {
             {/* View Activity Modal */}
             {selectedActivity && (
                 <div className={`modal fade ${showViewModal ? 'show d-block' : ''}`} tabIndex={-1} style={{ backgroundColor: showViewModal ? 'rgba(15, 23, 42, 0.6)' : 'transparent', zIndex: 1050, backdropFilter: 'blur(4px)' }}>
-                    <div className="modal-dialog modal-dialog-centered">
+                    <div className="modal-dialog modal-dialog-centered modal-lg modal-dialog-scrollable" style={{ maxWidth: '920px' }}>
                         <div className="modal-content border-0 shadow-lg" style={{ borderRadius: '12px', overflow: 'hidden' }}>
                             <div className="modal-header border-bottom-0 pb-0 px-4 pt-4">
                                 <h5 className="modal-title fw-bold text-dark d-flex align-items-center gap-2" style={{ fontSize: '1.1rem' }}>
@@ -692,7 +692,7 @@ export default function DepartmentStrategicActivities() {
                                         <label className="text-muted fw-bold mb-1 d-block" style={{ fontSize: '0.7rem', letterSpacing: '0.5px', textTransform: 'uppercase' }}>Strategic Pillar</label>
                                         <div className="text-dark fw-medium" style={{ fontSize: '0.9rem' }}>{selectedActivity.pillar || 'N/A'}</div>
                                     </div>
-                                    <div className="col-md-6 mt-3">
+                                    <div className="col-12 mt-3">
                                         <label className="text-muted fw-bold mb-1 d-block" style={{ fontSize: '0.7rem', letterSpacing: '0.5px', textTransform: 'uppercase' }}>Performance Indicator</label>
                                         <div className="text-dark fw-medium mb-0" style={{ fontSize: '0.9rem' }}>
                                             {selectedActivity.target_kpi || 'N/A'}

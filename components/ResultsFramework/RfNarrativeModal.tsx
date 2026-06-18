@@ -3,12 +3,21 @@
 import { FormEvent, useEffect, useState } from 'react';
 import { Modal, Button, Form } from 'react-bootstrap';
 import axios from 'axios';
-import { PRACTICE_TYPE_LABELS, type PracticeType } from '@/lib/results-framework';
-import type { ResultsFrameworkIndicatorRow } from './ResultsFrameworkTable';
+import { PRACTICE_TYPE_LABELS, type PerformanceStatus, type PracticeType } from '@/lib/results-framework';
+
+export type RfNarrativeRow = {
+  id: number;
+  title: string;
+  performanceStatus?: PerformanceStatus | null;
+  performanceStatusLabel?: string;
+  outcomeReason?: string | null;
+  narrativeSource?: 'ambassador' | 'staff' | null;
+  practiceType?: PracticeType | null;
+};
 
 type Props = {
   show: boolean;
-  row: ResultsFrameworkIndicatorRow | null;
+  row: RfNarrativeRow | null;
   financialYear: string;
   onHide: () => void;
   onSaved: () => void;

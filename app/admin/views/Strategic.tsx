@@ -1,23 +1,11 @@
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import Layout from '@/components/Layout';
 import CreateActivityModal from '@/components/Modals/CreateActivityModal';
+import StatCard from '@/components/StatCard';
 import { Modal, Button, Form, Badge } from 'react-bootstrap';
 import axios from 'axios';
-import { 
-  BarChart, 
-  Bar, 
-  XAxis, 
-  YAxis, 
-  CartesianGrid, 
-  Tooltip, 
-  Legend, 
-  ResponsiveContainer,
-  PieChart, 
-  Pie, 
-  Cell 
-} from 'recharts';
 import { formatStandardProcessDuration, PROCESS_DURATION_UNIT_OPTIONS } from '@/lib/process-duration';
 import { applyDefaultMilestonesToProcessRows } from '@/lib/milestone-progress-utils';
 import { ACTIVITY_FY_TARGET_COLUMNS } from '@/lib/activity-fy-targets';
@@ -237,16 +225,32 @@ export default function StrategicView() {
     const [allDepartments, setAllDepartments] = useState<DepartmentUnitOption[]>([]);
     const [currentPage, setCurrentPage] = useState(1);
     const PAGE_SIZE = 10;
-    
-    const [stats, setStats] = useState({ total: 0, onTrack: 0, inProgress: 0, delayed: 0 });
-    const [achievementStats, setAchievementStats] = useState<any[]>([]);
-    const [themeStats, setThemeStats] = useState<any[]>([]);
+
     const [viewingStandardDetails, setViewingStandardDetails] = useState<any>(null);
     const [loadingStandardDetails, setLoadingStandardDetails] = useState(false);
 
+    const activitySummary = useMemo(() => {
+        let met = 0;
+        let partial = 0;
+        let notMet = 0;
+        const themes = new Set<string>();
+        for (const a of activities) {
+            themes.add(a.pillar || 'Unassigned');
+            if (a.status === 'completed') met += 1;
+            else if (a.status === 'in_progress') partial += 1;
+            else notMet += 1;
+        }
+        return {
+            total: activities.length,
+            met,
+            partial,
+            notMet,
+            themeCount: themes.size,
+        };
+    }, [activities]);
+
     useEffect(() => {
         fetchActivities();
-        fetchStats();
         loadDepartments();
         fetchStandards();
     }, []);
@@ -266,27 +270,6 @@ export default function StrategicView() {
             const response = await axios.get('/api/activities');
             const data = Array.isArray(response.data) ? response.data : [];
             setActivities(data);
-
-            const themes: Record<string, { goals: number, achieved: number }> = {};
-            data.forEach(a => {
-                const pillar = a.pillar || 'Unassigned';
-                if (!themes[pillar]) themes[pillar] = { goals: 0, achieved: 0 };
-                themes[pillar].goals++;
-                if (a.status === 'completed') themes[pillar].achieved++;
-            });
-            setThemeStats(Object.entries(themes).map(([name, val]) => ({ name, ...val })));
-
-            let met = 0, partial = 0, notMet = 0;
-            data.forEach(a => {
-                if (a.status === 'completed') met++;
-                else if (a.status === 'in_progress') partial++;
-                else notMet++;
-            });
-            setAchievementStats([
-                { name: 'Met', value: met, color: '#10b981' },
-                { name: 'Partial', value: partial, color: '#f59e0b' },
-                { name: 'Not Met', value: notMet, color: '#ef4444' },
-            ]);
         } catch (error) {
             console.error('Error fetching activities:', error);
             setActivities([]);
@@ -302,18 +285,6 @@ export default function StrategicView() {
             setStandards(Array.isArray(response.data) ? response.data : []);
         } catch (e) { console.error('Error fetching standards', e); }
         finally { setLoadingStandards(false); }
-    };
-
-    const fetchStats = async () => {
-        try {
-            const response = await axios.get('/api/dashboard/stats');
-            setStats({
-                total: response.data.stats.totalActivities || 0,
-                onTrack: response.data.stats.onTrackActivities || 0,
-                inProgress: response.data.stats.inProgressActivities || 0,
-                delayed: response.data.stats.delayedActivities || 0
-            });
-        } catch (e) { console.error(e); }
     };
 
     const searchLower = searchQuery.trim().toLowerCase();
@@ -503,7 +474,6 @@ export default function StrategicView() {
             setSelectedActivity(null);
             setViewingStandardDetails(null);
             fetchActivities();
-            fetchStats();
         } catch (e) {
             console.error(e);
             alert('Failed to delete activity');
@@ -605,58 +575,25 @@ export default function StrategicView() {
 
     return (
         <Layout>
-            {/* Summary Charts Row */}
+            {/* Summary stat cards */}
             <div className="row g-4 mb-4">
-                <div className="col-12 col-md-9">
-                    <div className="table-card p-0 h-100">
-                        <div className="table-card-header">
-                            <h5>
-                                <span className="material-symbols-outlined me-2" style={{ color: '#3b82f6' }}>query_stats</span>
-                                Goals by Strategic Theme
-                            </h5>
-                        </div>
-                        <div className="p-4" style={{ height: '260px' }}>
-                            <ResponsiveContainer width="100%" height="100%">
-                                <BarChart data={themeStats} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(255,255,255,0.05)" />
-                                    <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 10 }} />
-                                    <YAxis axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 10 }} />
-                                    <Tooltip contentStyle={{ backgroundColor: '#1e293b', border: 'none', borderRadius: '8px', color: '#fff' }} itemStyle={{ color: '#fff' }} />
-                                    <Legend verticalAlign="top" height={36} align="center" iconType="circle" />
-                                    <Bar dataKey="goals" name="Goals" fill="#3b82f6" radius={[4, 4, 0, 0]} barSize={24} />
-                                    <Bar dataKey="achieved" name="Achieved" fill="#10b981" radius={[4, 4, 0, 0]} barSize={24} />
-                                </BarChart>
-                            </ResponsiveContainer>
-                        </div>
-                    </div>
+                <div className="col-12 col-sm-6 col-xl">
+                    <StatCard label="Strategic Activities" value={activitySummary.total} color="blue" />
                 </div>
-                <div className="col-12 col-md-3">
-                    <div className="table-card p-0 h-100">
-                        <div className="table-card-header">
-                            <h5>
-                                <span className="material-symbols-outlined me-2" style={{ color: '#f59e0b' }}>donut_large</span>
-                                Target Achievement
-                            </h5>
-                        </div>
-                        <div className="p-4 d-flex flex-column align-items-center justify-content-center" style={{ height: '260px' }}>
-                            <ResponsiveContainer width="100%" height="80%">
-                                <PieChart>
-                                    <Pie data={achievementStats} cx="50%" cy="50%" innerRadius={50} outerRadius={70} paddingAngle={5} dataKey="value">
-                                        {achievementStats.map((entry, index) => <Cell key={`cell-${index}`} fill={entry.color} />)}
-                                    </Pie>
-                                    <Tooltip contentStyle={{ backgroundColor: '#1e293b', border: 'none', borderRadius: '8px', color: '#fff' }} itemStyle={{ color: '#fff' }} />
-                                </PieChart>
-                            </ResponsiveContainer>
-                            <div className="d-flex flex-wrap justify-content-center gap-2 mt-2">
-                                {achievementStats.map((item, i) => (
-                                    <div key={i} className="d-flex align-items-center gap-1" style={{ fontSize: '10px', color: '#94a3b8' }}>
-                                        <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: item.color }}></div>
-                                        {item.name}
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-                    </div>
+                <div className="col-12 col-sm-6 col-xl">
+                    <StatCard label="Strategic Themes" value={activitySummary.themeCount} color="blue" />
+                </div>
+                <div className="col-12 col-sm-6 col-xl">
+                    <StatCard label="Target Met" value={activitySummary.met} color="green" />
+                </div>
+                <div className="col-12 col-sm-6 col-xl">
+                    <StatCard label="In Progress" value={activitySummary.partial} color="yellow" />
+                </div>
+                <div className="col-12 col-sm-6 col-xl">
+                    <StatCard label="Not Met" value={activitySummary.notMet} color="red" />
+                </div>
+                <div className="col-12 col-sm-6 col-xl">
+                    <StatCard label="Standards" value={standards.length} color="green" />
                 </div>
             </div>
 
@@ -1217,7 +1154,7 @@ export default function StrategicView() {
             <CreateActivityModal 
                 show={showCreateModal} 
                 onHide={() => setShowCreateModal(false)} 
-                onActivityCreated={() => { fetchActivities(); fetchStats(); }} 
+                onActivityCreated={() => { fetchActivities(); }} 
                 activity={selectedActivity} 
                 mode={modalMode} 
             />

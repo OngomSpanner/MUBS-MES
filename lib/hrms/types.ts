@@ -1,6 +1,8 @@
 /** Raw staff row from HRMS `staff` / `basic_info` arrays */
 export type HrmsStaffRecord = {
   id?: number | string;
+  staffId?: number | string;
+  name?: string;
   userid?: number | string;
   firstname?: string;
   surname?: string;
@@ -24,6 +26,7 @@ export type HrmsStaffRecord = {
   ipps_no?: string | null;
   ifms_no?: string | null;
   id_no?: string | null;
+  staff_no?: string | null;
   [key: string]: unknown;
 };
 

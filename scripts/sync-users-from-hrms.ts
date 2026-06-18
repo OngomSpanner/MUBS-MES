@@ -2,9 +2,6 @@
  * Sync M&E users from MUBS HRMS API (no Excel).
  * Run: npm run sync:hrms -- --dry-run --from-db
  */
-import dotenv from 'dotenv';
-dotenv.config({ path: '.env.local' });
-
 import mysql from 'mysql2/promise';
 import { buildChangedUsersWhere } from '../lib/hrms/sync-queries';
 import { importNewStaffFromHrmsBatch } from '../lib/hrms/sync-import';

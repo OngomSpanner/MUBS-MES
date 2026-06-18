@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "sync:hrms": "tsx scripts/sync-users-from-hrms.ts"
+    "sync:hrms": "tsx --env-file=.env.local scripts/sync-users-from-hrms.ts"
   },
   "dependencies": {
     "@fontsource/dm-sans": "^5.2.8",

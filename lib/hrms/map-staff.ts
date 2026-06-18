@@ -35,8 +35,11 @@ export async function mapHrmsStaffToMeUser(staff: HrmsStaffRecord): Promise<MeUs
   const first_name = staff.firstname ? String(staff.firstname).trim() : null;
   const surname = staff.surname ? String(staff.surname).trim() : null;
   const other_names = staff.othernames ? String(staff.othernames).trim() : null;
+  const preformattedName = staff.name ? String(staff.name).trim() : '';
   const full_name =
-    `${first_name || ''} ${surname || ''}${other_names ? ` ${other_names}` : ''}`.trim() || email;
+    `${first_name || ''} ${surname || ''}${other_names ? ` ${other_names}` : ''}`.trim() ||
+    preformattedName ||
+    email;
 
   const contract_start =
     parseHrmsDate(staff.contract_starts) ||
@@ -51,6 +54,7 @@ export async function mapHrmsStaffToMeUser(staff: HrmsStaffRecord): Promise<MeUs
   const department_id = await resolveDepartmentId(deptName);
 
   const employee_id =
+    (staff.staff_no && String(staff.staff_no).trim()) ||
     (staff.ipps_no && String(staff.ipps_no).trim()) ||
     (staff.ifms_no && String(staff.ifms_no).trim()) ||
     (staff.id_no && String(staff.id_no).trim()) ||

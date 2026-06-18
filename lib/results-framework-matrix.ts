@@ -94,3 +94,15 @@ export type ResultsFrameworkMatrixRow = {
   responsibleOffice: string;
   unitOfMeasure: string | null;
 };
+
+/** Map short FY key (e.g. 2025/26) to matrix column label (2025/2026). */
+export function rfMatrixFyLabelFromFyKey(fyKey: string): string | null {
+  const t = String(fyKey || '')
+    .trim()
+    .replace(/^FY\s+/i, '');
+  const m = t.match(/^(\d{4})\s*\/\s*(\d{2}|\d{4})$/);
+  if (!m) return null;
+  const y1 = parseInt(m[1], 10);
+  if (!Number.isFinite(y1)) return null;
+  return `${y1}/${y1 + 1}`;
+}

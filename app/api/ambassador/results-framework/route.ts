@@ -9,9 +9,8 @@ import {
   MAIN_STRATEGIC_ACTIVITY_FILTER,
   RESULTS_FRAMEWORK_KPI_FILTER,
   RESULTS_FRAMEWORK_NARRATIVE_JOIN,
-  buildResultsFrameworkActivitySelect,
-  mapResultsFrameworkRows,
-  summarizeResultsFramework,
+  buildResultsFrameworkAmbassadorMatrixSelect,
+  mapResultsFrameworkAmbassadorMatrixRows,
   type ResultsFrameworkDbRow,
 } from '@/lib/results-framework-query';
 
@@ -27,8 +26,7 @@ export async function GET(req: Request) {
       return NextResponse.json({
         managedUnitName: ctx.managedUnitName,
         financialYear: fyKey,
-        summary: summarizeResultsFramework([]),
-        indicators: [],
+        rows: [],
       });
     }
 
@@ -36,7 +34,7 @@ export async function GET(req: Request) {
 
     const rows = (await query({
       query: `
-        SELECT ${buildResultsFrameworkActivitySelect(fyKey)}
+        SELECT ${buildResultsFrameworkAmbassadorMatrixSelect()}
         FROM strategic_activities sa
         LEFT JOIN standards st ON st.id = sa.standard_id
         LEFT JOIN departments d ON d.id = sa.department_id
@@ -44,18 +42,17 @@ export async function GET(req: Request) {
         WHERE sa.department_id IN (${deptPlaceholders})
           AND ${MAIN_STRATEGIC_ACTIVITY_FILTER}
           AND ${RESULTS_FRAMEWORK_KPI_FILTER}
-        ORDER BY sa.title ASC
+        ORDER BY st.quality_standard ASC, st.output_standard ASC, sa.title ASC
       `,
       values: [fyKey, ...scopedDepartmentIds],
     })) as ResultsFrameworkDbRow[];
 
-    const indicators = mapResultsFrameworkRows(rows, fyKey);
+    const matrixRows = mapResultsFrameworkAmbassadorMatrixRows(rows, fyKey);
 
     return NextResponse.json({
       managedUnitName: ctx.managedUnitName,
       financialYear: fyKey,
-      summary: summarizeResultsFramework(indicators),
-      indicators,
+      rows: matrixRows,
     });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Unknown error';

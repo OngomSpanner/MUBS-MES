@@ -103,7 +103,7 @@ const EvaluateSubmissionModal: React.FC<EvaluateSubmissionModalProps> = ({
 
     return (
         <PortalModal show={open} onHide={onClose} zIndex={zIndex} backdropDismiss={!isSubmitting}>
-            <div className="modal-dialog modal-dialog-centered">
+            <div className="modal-dialog modal-dialog-centered modal-lg" style={{ maxWidth: '720px' }}>
                 <div className="modal-content border-0 shadow-lg" style={{ borderRadius: '12px' }}>
                     <div className="modal-header border-bottom-0 pb-0 px-4 pt-4">
                         <h5 className="modal-title fw-bold text-dark d-flex align-items-center gap-2" style={{ fontSize: '1.1rem' }}>
@@ -253,7 +253,7 @@ const EvaluateSubmissionModal: React.FC<EvaluateSubmissionModalProps> = ({
                                     <p className="text-muted small mb-2" style={{ fontSize: '0.78rem' }}>
                                     </p>
                                 ) : null}
-                                <div className="d-flex gap-3">
+                                <div className="d-flex flex-wrap gap-2">
                                     {(['Complete', 'Incomplete', 'Not Done'] as const).map((opt) => (
                                         <div
                                             key={opt}
@@ -266,16 +266,20 @@ const EvaluateSubmissionModal: React.FC<EvaluateSubmissionModalProps> = ({
                                                 }
                                             }}
                                             onClick={() => onSelectRating(item.id, opt)}
-                                            className="flex-fill text-center p-3 rounded-3 cursor-pointer border shadow-sm"
+                                            className="flex-fill text-center cursor-pointer border shadow-sm d-flex align-items-center justify-content-center"
                                             style={{
                                                 cursor: 'pointer',
-                                                fontSize: '0.9rem',
-                                                fontWeight: 'bold',
+                                                fontSize: '0.82rem',
+                                                fontWeight: 600,
+                                                lineHeight: 1.3,
+                                                minHeight: '40px',
+                                                padding: '8px 12px',
                                                 transition: 'all 0.2s',
                                                 borderColor: selectedRating[item.id] === opt ? 'var(--mubs-blue)' : '#e2e8f0',
                                                 background: selectedRating[item.id] === opt ? 'var(--mubs-blue)' : '#fff',
                                                 color: selectedRating[item.id] === opt ? '#fff' : '#475569',
-                                                borderRadius: '12px',
+                                                borderRadius: '8px',
+                                                flex: '1 1 140px',
                                             }}
                                         >
                                             {choiceLabel(opt)}
@@ -361,10 +365,12 @@ const EvaluateSubmissionModal: React.FC<EvaluateSubmissionModalProps> = ({
                     <div className="modal-footer bg-light border-top-0 py-3 px-4 d-flex justify-content-end align-items-center gap-2">
                         <button
                             type="button"
-                            className="btn btn-primary fw-bold px-4 py-2 d-flex align-items-center gap-2 shadow-sm"
+                            className="btn btn-primary fw-bold d-flex align-items-center justify-content-center gap-2 shadow-sm"
                             style={{
                                 borderRadius: '8px',
                                 fontSize: '.9rem',
+                                minWidth: '160px',
+                                padding: '8px 28px',
                                 background: 'var(--mubs-blue)',
                                 borderColor: 'var(--mubs-blue)',
                             }}

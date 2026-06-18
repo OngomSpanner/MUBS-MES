@@ -2099,7 +2099,7 @@ export default function DepartmentTasks({ initialActivity, initialAssignee }: De
             </div>
 
             <PortalModal show={!!tableDetailsTask} onHide={() => setTableDetailsTask(null)} zIndex={1049}>
-                <div className="modal-dialog modal-dialog-centered modal-dialog-scrollable" style={{ maxWidth: '440px' }}>
+                <div className="modal-dialog modal-dialog-centered modal-dialog-scrollable" style={{ maxWidth: '680px' }}>
                     <div className="modal-content border-0 shadow-lg" style={{ borderRadius: '12px' }}>
                         {tableDetailsTask && (
                             <>

@@ -15,10 +15,12 @@ import {
   type RfActivityTargetInput,
 } from '@/lib/rf-activity-targets';
 import type { ActivityFyTargetKey } from '@/lib/activity-fy-targets';
+import { fyRangeJulyJune } from '@/lib/financial-year';
 import {
   RF_MATRIX_BASELINE,
   RF_MATRIX_FY_COLUMNS,
   buildResultsFrameworkMatrixActualSelect,
+  rfMatrixFyLabelFromFyKey,
   type ResultsFrameworkMatrixFyCell,
   type ResultsFrameworkMatrixRow,
 } from '@/lib/results-framework-matrix';
@@ -161,6 +163,28 @@ export function buildResultsFrameworkMatrixActivitySelect(): string {
   `;
 }
 
+export function buildResultsFrameworkAmbassadorMatrixSelect(): string {
+  return `
+  ${buildResultsFrameworkMatrixActivitySelect().trim()},
+  arn.outcome_reason AS ambassador_outcome_reason,
+  arn.practice_type AS ambassador_practice_type,
+  ${STAFF_NARRATIVE_SUBQUERY}
+  `;
+}
+
+export type AmbassadorResultsFrameworkMatrixRow = ResultsFrameworkMatrixRow & {
+  title: string;
+  performanceStatus: PerformanceStatus | null;
+  performanceStatusLabel: string;
+  statusFyLabel: string;
+  outcomeReason: string | null;
+  practiceType: PracticeType | null;
+  practiceTypeLabel: string | null;
+  narrativeSource: 'ambassador' | 'staff' | null;
+  ambassadorNarrativeRecorded: boolean;
+  needsAmbassadorNarrative: boolean;
+};
+
 function toNumberOrNull(value: unknown): number | null {
   if (value == null || value === '') return null;
   const n = Number(value);
@@ -188,8 +212,56 @@ export function mapResultsFrameworkMatrixRows(rows: ResultsFrameworkDbRow[]): Re
         performance_indicator: row.performance_indicator,
       }),
     )
+    .map((row) => mapSingleResultsFrameworkMatrixRow(row));
+}
+
+function mapSingleResultsFrameworkMatrixRow(row: ResultsFrameworkDbRow): ResultsFrameworkMatrixRow {
+  const indicator = resolveRfPerformanceIndicator({
+    target_kpi: row.target_kpi,
+    kpi_target_value: row.kpi_target_value,
+    performance_indicator: row.performance_indicator,
+    target_fy25_26: row.target_fy25_26,
+    target_fy26_27: row.target_fy26_27,
+    target_fy27_28: row.target_fy27_28,
+    target_fy28_29: row.target_fy28_29,
+    target_fy29_30: row.target_fy29_30,
+  });
+
+  const fiscalYears: ResultsFrameworkMatrixFyCell[] = RF_MATRIX_FY_COLUMNS.map((col) => ({
+    label: col.label,
+    target: toNumberOrNull(row[col.targetKey]),
+    actual: toNumberOrNull(row[col.actualAlias as keyof ResultsFrameworkDbRow]),
+  }));
+
+  return {
+    id: row.id,
+    outcomeOutput: formatOutcomeOutputLabel(row),
+    indicator: indicator || row.title,
+    baseline2024_25: toNumberOrNull(row.kpi_target_value),
+    fiscalYears,
+    budget: null,
+    responsibleOffice: row.department_name || '—',
+    unitOfMeasure: row.unit_of_measure,
+  };
+}
+
+export function mapResultsFrameworkAmbassadorMatrixRows(
+  rows: ResultsFrameworkDbRow[],
+  financialYearKey: string,
+): AmbassadorResultsFrameworkMatrixRow[] {
+  const matrixFyLabel = rfMatrixFyLabelFromFyKey(financialYearKey);
+  const fyRange = fyRangeJulyJune(financialYearKey);
+
+  return rows
+    .filter((row) =>
+      activityQualifiesForResultsFrameworkMatrix({
+        ...row,
+        performance_indicator: row.performance_indicator,
+      }),
+    )
     .map((row) => {
-      const indicator = resolveRfPerformanceIndicator({
+      const matrix = mapSingleResultsFrameworkMatrixRow(row);
+      const rfInput: RfActivityTargetInput = {
         target_kpi: row.target_kpi,
         kpi_target_value: row.kpi_target_value,
         performance_indicator: row.performance_indicator,
@@ -198,23 +270,42 @@ export function mapResultsFrameworkMatrixRows(rows: ResultsFrameworkDbRow[]): Re
         target_fy27_28: row.target_fy27_28,
         target_fy28_29: row.target_fy28_29,
         target_fy29_30: row.target_fy29_30,
-      });
+      };
 
-      const fiscalYears: ResultsFrameworkMatrixFyCell[] = RF_MATRIX_FY_COLUMNS.map((col) => ({
-        label: col.label,
-        target: toNumberOrNull(row[col.targetKey]),
-        actual: toNumberOrNull(row[col.actualAlias as keyof ResultsFrameworkDbRow]),
-      }));
+      const target = resolveRfTargetValue(rfInput, financialYearKey);
+      const fyCell = matrixFyLabel
+        ? matrix.fiscalYears.find((fy) => fy.label === matrixFyLabel)
+        : undefined;
+      const actual = fyCell?.actual ?? null;
+      const performanceStatus = computePerformanceStatus(target, actual);
+
+      const ambassadorReason = String(row.ambassador_outcome_reason || '').trim() || null;
+      const staffReason = String(row.staff_outcome_reason || '').trim() || null;
+      const outcomeReason = ambassadorReason || staffReason;
+      const practiceType = row.ambassador_practice_type ?? row.staff_practice_type ?? null;
+      const narrativeSource: 'ambassador' | 'staff' | null = ambassadorReason
+        ? 'ambassador'
+        : staffReason
+          ? 'staff'
+          : null;
+      const ambassadorNarrativeRecorded = Boolean(ambassadorReason);
+      const needsAmbassadorNarrative =
+        performanceStatus != null && !ambassadorNarrativeRecorded;
 
       return {
-        id: row.id,
-        outcomeOutput: formatOutcomeOutputLabel(row),
-        indicator: indicator || row.title,
-        baseline2024_25: toNumberOrNull(row.kpi_target_value),
-        fiscalYears,
-        budget: null,
-        responsibleOffice: row.department_name || '—',
-        unitOfMeasure: row.unit_of_measure,
+        ...matrix,
+        title: row.title,
+        performanceStatus,
+        performanceStatusLabel: performanceStatus
+          ? PERFORMANCE_STATUS_LABELS[performanceStatus]
+          : 'Not assessed',
+        outcomeReason,
+        practiceType,
+        practiceTypeLabel: practiceType ? PRACTICE_TYPE_LABELS[practiceType] : null,
+        narrativeSource,
+        ambassadorNarrativeRecorded,
+        needsAmbassadorNarrative,
+        statusFyLabel: fyRange?.label ?? financialYearKey,
       };
     });
 }
