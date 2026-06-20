@@ -3,16 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import axios from 'axios';
 import * as XLSX from 'xlsx';
-import ResultsFrameworkTable, {
-  type ResultsFrameworkIndicatorRow,
-} from '@/components/ResultsFramework/ResultsFrameworkTable';
-import ResultsFrameworkSummaryCards from '@/components/ResultsFramework/ResultsFrameworkSummaryCards';
-import ResultsFrameworkFyFilter, {
-  defaultResultsFrameworkFy,
-} from '@/components/ResultsFramework/ResultsFrameworkFyFilter';
-import type { ResultsFrameworkSummary } from '@/lib/results-framework-query';
-import { formatActivityMeasuredValue } from '@/lib/activity-unit-of-measure';
-import { PERFORMANCE_STATUS_LABELS } from '@/lib/results-framework';
+import HodResultsFrameworkPanel from '@/components/DepartmentHead/HodResultsFrameworkPanel';
 import {
   ResponsiveContainer,
   ComposedChart,
@@ -109,10 +100,6 @@ export default function DepartmentReports() {
   const [tasks, setTasks] = useState<TaskRow[]>([]);
   const [loadingPerf, setLoadingPerf] = useState(true);
   const [loadingTasks, setLoadingTasks] = useState(true);
-  const [rfIndicators, setRfIndicators] = useState<ResultsFrameworkIndicatorRow[]>([]);
-  const [rfSummary, setRfSummary] = useState<ResultsFrameworkSummary | null>(null);
-  const [rfFinancialYear, setRfFinancialYear] = useState(defaultResultsFrameworkFy);
-  const [loadingRf, setLoadingRf] = useState(false);
 
   const fetchPerformance = async (p: Period, scope: ActivityScope) => {
     setLoadingPerf(true);
@@ -154,49 +141,6 @@ export default function DepartmentReports() {
   useEffect(() => {
     fetchPerformance(period, activityScope);
   }, [period, activityScope]);
-
-  useEffect(() => {
-    if (activeTab !== 'results') return;
-    setLoadingRf(true);
-    axios
-      .get('/api/department-head/results-framework', {
-        params: { financialYear: rfFinancialYear },
-      })
-      .then((res) => {
-        setRfIndicators(res.data.indicators ?? []);
-        setRfSummary(res.data.summary ?? null);
-      })
-      .catch(() => {
-        setRfIndicators([]);
-        setRfSummary(null);
-      })
-      .finally(() => setLoadingRf(false));
-  }, [activeTab, rfFinancialYear]);
-
-  const exportRfExcel = () => {
-    if ((rfSummary?.narrativesMissing ?? 0) > 0) {
-      window.alert(
-        `Complete ambassador outcome narratives before export (${rfSummary?.narrativesMissing} assessed indicator(s) still missing).`
-      );
-      return;
-    }
-    const rows = rfIndicators.map((r) => ({
-      'Financial year': rfFinancialYear,
-      Activity: r.title,
-      'Expected outcome': r.expectedOutcome || '',
-      Indicator: r.performanceIndicator || '',
-      Department: r.departmentName,
-      Target: formatActivityMeasuredValue(r.targetValue, r.unitOfMeasure),
-      Actual: formatActivityMeasuredValue(r.actualValue, r.unitOfMeasure),
-      Status: r.performanceStatus ? PERFORMANCE_STATUS_LABELS[r.performanceStatus] : r.performanceStatusLabel,
-      'Outcome narrative': r.outcomeReason || '',
-      'Practice / innovation': r.practiceTypeLabel || '',
-    }));
-    const ws = XLSX.utils.json_to_sheet(rows);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'Results Framework');
-    XLSX.writeFile(wb, `hod-results-framework-${rfFinancialYear || 'export'}.xlsx`);
-  };
 
   const scopeMatchesTask = (task: TaskRow): boolean => {
     const source = String(task.source || '').trim();
@@ -586,45 +530,7 @@ export default function DepartmentReports() {
         </div>
       )}
 
-      {activeTab === 'results' && (
-        <div className="table-card mb-4">
-          <div className="table-card-header flex-wrap gap-2">
-            <h5 className="mb-0">
-              <span className="material-symbols-outlined me-2" style={{ color: 'var(--mubs-blue)' }}>analytics</span>
-              Results Framework — target vs actual
-            </h5>
-            <div className="d-flex align-items-center gap-2 ms-auto flex-wrap">
-              <ResultsFrameworkFyFilter
-                value={rfFinancialYear}
-                onChange={setRfFinancialYear}
-                disabled={loadingRf}
-              />
-              <button
-                type="button"
-                className="btn btn-outline-success btn-sm fw-bold"
-                onClick={exportRfExcel}
-                disabled={loadingRf || rfIndicators.length === 0}
-              >
-                Export Excel
-              </button>
-            </div>
-          </div>
-          <div className="p-3 pt-2">
-            {loadingRf ? (
-              <div className="text-center py-5">
-                <div className="spinner-border text-primary" role="status" />
-              </div>
-            ) : (
-              <>
-                {rfSummary ? (
-                  <ResultsFrameworkSummaryCards summary={rfSummary} financialYear={rfFinancialYear} />
-                ) : null}
-                <ResultsFrameworkTable indicators={rfIndicators} financialYear={rfFinancialYear} />
-              </>
-            )}
-          </div>
-        </div>
-      )}
+      {activeTab === 'results' && <HodResultsFrameworkPanel />}
 
       {activeTab === 'trends' && (
         <div className="table-card mb-4">

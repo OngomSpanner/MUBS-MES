@@ -147,7 +147,7 @@ export async function GET() {
     const fyKey = fyLabelForDateJulyJune();
     const rfRows = (await query({
       query: `
-        SELECT ${buildResultsFrameworkActivitySelect(fyKey)}
+        SELECT ${buildResultsFrameworkActivitySelect(fyKey, { hodApprovedOnly: false })}
         FROM strategic_activities sa
         LEFT JOIN standards st ON st.id = sa.standard_id
         LEFT JOIN departments d ON d.id = sa.department_id

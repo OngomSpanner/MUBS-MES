@@ -4,6 +4,7 @@ import { cookies } from 'next/headers';
 import { verifyToken } from '@/lib/auth';
 import { SQL_TOP_STRATEGIC_MAIN_NO_ALIAS } from '@/lib/strategic-activity-sql';
 import { summarizeEnrollmentIndicators } from '@/lib/enrollment-indicators';
+import { ensureHodReviewWorkflowSchema } from '@/lib/hod-review-workflow';
 import { ensureActivityRfNarrativesTable } from '@/lib/activity-rf-narratives';
 import { fyLabelForDateJulyJune } from '@/lib/financial-year';
 import {
@@ -130,6 +131,7 @@ export async function GET() {
     const enrollment = await summarizeEnrollmentIndicators();
 
     await ensureActivityRfNarrativesTable();
+    await ensureHodReviewWorkflowSchema();
     const fyKey = fyLabelForDateJulyJune();
     const rfRows = (await query({
       query: `

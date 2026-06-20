@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { verifyToken } from '@/lib/auth';
 import { query } from '@/lib/db';
+import { ensureHodReviewWorkflowSchema } from '@/lib/hod-review-workflow';
 import { canManageStrategicStandards } from '@/lib/role-routing';
 import {
   MAIN_STRATEGIC_ACTIVITY_FILTER,
@@ -23,6 +24,8 @@ export async function GET() {
     if (!decoded || !canManageStrategicStandards(decoded.role)) {
       return NextResponse.json({ message: 'Forbidden' }, { status: 403 });
     }
+
+    await ensureHodReviewWorkflowSchema();
 
     const rows = (await query({
       query: `

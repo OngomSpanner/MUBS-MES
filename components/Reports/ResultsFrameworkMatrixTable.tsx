@@ -56,7 +56,7 @@ export default function ResultsFrameworkMatrixTable({
       <table className="table table-sm table-bordered mb-0" style={{ fontSize: '0.72rem' }}>
         <thead className="table-dark">
           <tr>
-            <th style={{ minWidth: '180px' }}>Output / Outcome</th>
+            <th style={{ minWidth: '180px' }}>Result</th>
             <th style={{ minWidth: '160px' }}>Indicator</th>
             <th className="text-center" style={{ minWidth: '88px' }}>
               Baseline

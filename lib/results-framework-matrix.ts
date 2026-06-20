@@ -1,4 +1,8 @@
 import type { ActivityFyTargetKey } from '@/lib/activity-fy-targets';
+import {
+  buildQuestionnaireActualSubquery,
+  type QuestionnaireActualOptions,
+} from '@/lib/results-framework-questionnaire-actuals';
 
 /** Matrix columns for admin Results Framework report (Jul–Jun FY). */
 export const RF_MATRIX_BASELINE = {
@@ -46,34 +50,17 @@ export const RF_MATRIX_FY_COLUMNS = [
   },
 ] as const;
 
-function buildActualSumSubquery(start: string, end: string, alias: string): string {
-  return `(
-    SELECT SUM(sr.kpi_actual_value)
-    FROM staff_reports sr
-    LEFT JOIN activity_assignments aa ON sr.activity_assignment_id = aa.id
-    LEFT JOIN strategic_activities act_aa ON aa.activity_id = act_aa.id
-    LEFT JOIN staff_process_subtasks sps ON sr.process_subtask_id = sps.id
-    LEFT JOIN staff_process_assignments spa ON COALESCE(sr.process_assignment_id, sps.process_assignment_id) = spa.id
-    LEFT JOIN strategic_activities act_spa ON spa.activity_id = act_spa.id
-    WHERE sr.kpi_actual_value IS NOT NULL
-      AND sr.status IN ('submitted', 'evaluated')
-      AND sr.report_date >= '${start}'
-      AND sr.report_date < '${end}'
-      AND (
-        act_aa.id = sa.id OR act_aa.parent_id = sa.id
-        OR act_spa.id = sa.id OR act_spa.parent_id = sa.id
-      )
-  ) AS ${alias}`;
-}
-
-export function buildResultsFrameworkMatrixActualSelect(): string {
-  const baseline = buildActualSumSubquery(
-    RF_MATRIX_BASELINE.start,
-    RF_MATRIX_BASELINE.end,
+/** Questionnaire actuals per FY: baseline (2024/25) and each plan-year actual column. */
+export function buildResultsFrameworkMatrixActualSelect(
+  options: QuestionnaireActualOptions = {},
+): string {
+  const baseline = buildQuestionnaireActualSubquery(
+    RF_MATRIX_BASELINE.label,
     RF_MATRIX_BASELINE.actualAlias,
+    options,
   );
   const fyActuals = RF_MATRIX_FY_COLUMNS.map((c) =>
-    buildActualSumSubquery(c.start, c.end, c.actualAlias),
+    buildQuestionnaireActualSubquery(c.label, c.actualAlias, options),
   );
   return [baseline, ...fyActuals].join(',\n  ');
 }

@@ -17,13 +17,17 @@ import {
 import type { ActivityFyTargetKey } from '@/lib/activity-fy-targets';
 import { fyRangeJulyJune } from '@/lib/financial-year';
 import {
-  RF_MATRIX_BASELINE,
   RF_MATRIX_FY_COLUMNS,
   buildResultsFrameworkMatrixActualSelect,
   rfMatrixFyLabelFromFyKey,
   type ResultsFrameworkMatrixFyCell,
   type ResultsFrameworkMatrixRow,
 } from '@/lib/results-framework-matrix';
+import {
+  buildQuestionnaireActualSubquery,
+  questionnaireFyLabelFromKey,
+  type QuestionnaireActualOptions,
+} from '@/lib/results-framework-questionnaire-actuals';
 export type ResultsFrameworkDbRow = {
   id: number;
   title: string;
@@ -65,6 +69,7 @@ export type ResultsFrameworkSummary = {
   narrativesComplete: number;
 };
 
+/** @deprecated Staff-report rollup; matrix and RF actuals use questionnaire responses. */
 const RF_KPI_ACTUAL_SUBQUERY = `
   (
     SELECT SUM(sr.kpi_actual_value)
@@ -83,7 +88,7 @@ const RF_KPI_ACTUAL_SUBQUERY = `
   )
 `;
 
-/** Prefer staff KPI sum over stored actual_value (rollup may be stale). */
+/** @deprecated Use buildResultsFrameworkActivitySelect instead. */
 export const RF_ACTIVITY_ACTUAL_SELECT = `
   COALESCE(
     ${RF_KPI_ACTUAL_SUBQUERY},
@@ -122,13 +127,18 @@ const STAFF_NARRATIVE_SUBQUERY = `
   ) AS staff_practice_type
 `;
 
-export function buildResultsFrameworkActivitySelect(financialYearKey: string): string {
+export function buildResultsFrameworkActivitySelect(
+  financialYearKey: string,
+  options: QuestionnaireActualOptions = {},
+): string {
+  const fyLabel = questionnaireFyLabelFromKey(financialYearKey);
+  const actualSelect = buildQuestionnaireActualSubquery(fyLabel, 'actual_value', options);
   return `
   sa.id,
   sa.title,
   sa.target_kpi,
   sa.kpi_target_value,
-  ${RF_ACTIVITY_ACTUAL_SELECT},
+  ${actualSelect},
   sa.unit_of_measure,
   sa.standard_id,
   sa.task_type,
@@ -144,7 +154,9 @@ export function buildResultsFrameworkActivitySelect(financialYearKey: string): s
   `;
 }
 
-export function buildResultsFrameworkMatrixActivitySelect(): string {
+export function buildResultsFrameworkMatrixActivitySelect(
+  options: QuestionnaireActualOptions = {},
+): string {
   return `
   sa.id,
   sa.title,
@@ -159,13 +171,13 @@ export function buildResultsFrameworkMatrixActivitySelect(): string {
   st.output_standard,
   st.performance_indicator,
   COALESCE(NULLIF(TRIM(d.external_name), ''), d.name) AS department_name,
-  ${buildResultsFrameworkMatrixActualSelect()}
+  ${buildResultsFrameworkMatrixActualSelect(options)}
   `;
 }
 
 export function buildResultsFrameworkAmbassadorMatrixSelect(): string {
   return `
-  ${buildResultsFrameworkMatrixActivitySelect().trim()},
+  ${buildResultsFrameworkMatrixActivitySelect({ hodApprovedOnly: false }).trim()},
   arn.outcome_reason AS ambassador_outcome_reason,
   arn.practice_type AS ambassador_practice_type,
   ${STAFF_NARRATIVE_SUBQUERY}
@@ -237,7 +249,7 @@ function mapSingleResultsFrameworkMatrixRow(row: ResultsFrameworkDbRow): Results
     id: row.id,
     outcomeOutput: formatOutcomeOutputLabel(row),
     indicator: indicator || row.title,
-    baseline2024_25: toNumberOrNull(row.kpi_target_value),
+    baseline2024_25: toNumberOrNull(row.actual_baseline_fy24_25),
     fiscalYears,
     budget: null,
     responsibleOffice: row.department_name || '—',

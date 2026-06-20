@@ -3,15 +3,12 @@ import { cookies } from 'next/headers';
 import { verifyToken } from '@/lib/auth';
 import { query } from '@/lib/db';
 import { getVisibleDepartmentIds, inPlaceholders } from '@/lib/department-head';
-import { ensureActivityRfNarrativesTable } from '@/lib/activity-rf-narratives';
-import { parseResultsFrameworkFyParam } from '@/lib/results-framework-fy';
+import { ensureHodReviewWorkflowSchema } from '@/lib/hod-review-workflow';
 import {
   MAIN_STRATEGIC_ACTIVITY_FILTER,
   RESULTS_FRAMEWORK_KPI_FILTER,
-  RESULTS_FRAMEWORK_NARRATIVE_JOIN,
-  buildResultsFrameworkActivitySelect,
-  mapResultsFrameworkRows,
-  summarizeResultsFramework,
+  buildResultsFrameworkMatrixActivitySelect,
+  mapResultsFrameworkMatrixRows,
   type ResultsFrameworkDbRow,
 } from '@/lib/results-framework-query';
 
@@ -28,41 +25,31 @@ export async function GET(req: Request) {
       return NextResponse.json({ message: 'Invalid token' }, { status: 401 });
     }
 
-    await ensureActivityRfNarrativesTable();
-    const fyKey = parseResultsFrameworkFyParam(new URL(req.url).searchParams.get('financialYear'));
+    await ensureHodReviewWorkflowSchema();
     const departmentIds = await getVisibleDepartmentIds(decoded.userId);
     if (departmentIds.length === 0) {
-      return NextResponse.json({
-        financialYear: fyKey,
-        summary: summarizeResultsFramework([]),
-        indicators: [],
-      });
+      return NextResponse.json({ rows: [] });
     }
 
     const placeholders = inPlaceholders(departmentIds.length);
 
     const rows = (await query({
       query: `
-        SELECT ${buildResultsFrameworkActivitySelect(fyKey)}
+        SELECT ${buildResultsFrameworkMatrixActivitySelect({ hodApprovedOnly: true })}
         FROM strategic_activities sa
         LEFT JOIN standards st ON st.id = sa.standard_id
         LEFT JOIN departments d ON d.id = sa.department_id
-        ${RESULTS_FRAMEWORK_NARRATIVE_JOIN}
         WHERE sa.department_id IN (${placeholders})
           AND ${MAIN_STRATEGIC_ACTIVITY_FILTER}
           AND ${RESULTS_FRAMEWORK_KPI_FILTER}
-        ORDER BY sa.title ASC
+        ORDER BY st.quality_standard ASC, st.output_standard ASC, sa.title ASC
       `,
-      values: [fyKey, ...departmentIds],
+      values: departmentIds,
     })) as ResultsFrameworkDbRow[];
 
-    const indicators = mapResultsFrameworkRows(rows, fyKey);
+    const matrixRows = mapResultsFrameworkMatrixRows(rows);
 
-    return NextResponse.json({
-      financialYear: fyKey,
-      summary: summarizeResultsFramework(indicators),
-      indicators,
-    });
+    return NextResponse.json({ rows: matrixRows });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Unknown error';
     console.error('Department-head results-framework GET error:', error);

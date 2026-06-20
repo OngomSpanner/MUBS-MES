@@ -9,7 +9,7 @@ import { RF_MATRIX_BASELINE } from '@/lib/results-framework-matrix';
 import type { ResultsFrameworkMatrixRow } from '@/lib/results-framework-matrix';
 import { formatActivityMeasuredValue } from '@/lib/activity-unit-of-measure';
 
-export default function AdminResultsFrameworkPanel() {
+export default function HodResultsFrameworkPanel() {
   const [rows, setRows] = useState<ResultsFrameworkMatrixRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -18,7 +18,7 @@ export default function AdminResultsFrameworkPanel() {
     setLoading(true);
     setError(null);
     try {
-      const res = await axios.get('/api/admin/results-framework');
+      const res = await axios.get('/api/department-head/results-framework');
       setRows(res.data.rows ?? []);
     } catch {
       setError('Failed to load Results Framework data.');
@@ -53,16 +53,8 @@ export default function AdminResultsFrameworkPanel() {
     const ws = XLSX.utils.json_to_sheet(sheetRows);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Results Framework');
-    XLSX.writeFile(wb, 'results-framework-matrix.xlsx');
+    XLSX.writeFile(wb, 'hod-results-framework-matrix.xlsx');
   };
-
-  if (loading) {
-    return (
-      <div className="table-card p-3 p-md-4 mb-4 text-center py-5">
-        <div className="spinner-border text-primary" role="status" />
-      </div>
-    );
-  }
 
   return (
     <div className="table-card p-3 p-md-4 mb-4">
@@ -70,7 +62,7 @@ export default function AdminResultsFrameworkPanel() {
         icon="analytics"
         title="Results Framework"
         count={rows.length}
-        description="University-wide targets and actuals across the strategic plan period."
+        description="Department targets and actuals across the strategic plan period."
         filters={
           <>
             <button
@@ -85,7 +77,7 @@ export default function AdminResultsFrameworkPanel() {
               type="button"
               className="btn btn-sm btn-outline-success fw-bold d-inline-flex align-items-center gap-1"
               onClick={exportExcel}
-              disabled={rows.length === 0}
+              disabled={loading || rows.length === 0}
             >
               <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>
                 table_chart
@@ -97,7 +89,16 @@ export default function AdminResultsFrameworkPanel() {
       />
 
       {error && <div className="alert alert-danger py-2 small">{error}</div>}
-      <ResultsFrameworkMatrixTable rows={rows} />
+
+      {loading ? (
+        <div className="text-center py-5">
+          <div className="spinner-border text-primary" role="status">
+            <span className="visually-hidden">Loading...</span>
+          </div>
+        </div>
+      ) : (
+        <ResultsFrameworkMatrixTable rows={rows} />
+      )}
     </div>
   );
 }
