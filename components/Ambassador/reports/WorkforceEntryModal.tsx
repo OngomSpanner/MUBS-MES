@@ -19,7 +19,7 @@ type WorkforceEntryModalProps = {
   saving: boolean;
   error: string | null;
   onHide: () => void;
-  onSave: (payload: { assessmentDetail: string; financialYearKey: string; countValue: number }) => void;
+  onSave: (payload: { assessmentDetail: string; financialYearKey: string; countValue: number; submitForReview?: boolean }) => void;
 };
 
 function workforceFormDefaults(
@@ -55,14 +55,19 @@ function WorkforceEntryForm({
   const [financialYearKey, setFinancialYearKey] = useState(defaults.financialYearKey);
   const [countValue, setCountValue] = useState(defaults.countValue);
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
+  const save = (submitForReview: boolean) => {
     if (!assessmentDetail.trim() || !financialYearKey) return;
     onSave({
       assessmentDetail: assessmentDetail.trim(),
       financialYearKey,
       countValue: Math.max(0, Number(countValue) || 0),
+      submitForReview,
     });
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    save(false);
   };
 
   return (
@@ -103,8 +108,11 @@ function WorkforceEntryForm({
         <Button variant="secondary" onClick={onHide} disabled={saving}>
           Cancel
         </Button>
-        <Button type="submit" variant="primary" disabled={saving} style={{ background: 'var(--mubs-blue)', borderColor: 'var(--mubs-blue)' }}>
-          {saving ? 'Saving…' : 'Save'}
+        <Button type="submit" variant="outline-primary" disabled={saving}>
+          {saving ? 'Saving…' : 'Save draft'}
+        </Button>
+        <Button type="button" variant="primary" disabled={saving} style={{ background: 'var(--mubs-blue)', borderColor: 'var(--mubs-blue)' }} onClick={() => save(true)}>
+          Submit for HOD review
         </Button>
       </Modal.Footer>
     </Form>

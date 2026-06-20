@@ -198,6 +198,22 @@ export async function getOwnedProgrammeAllocation(
   return rows[0] ?? null;
 }
 
+/** True when any user in these departments is categorised as academic staff. */
+export async function hasAcademicStaffInDepartments(departmentIds: number[]): Promise<boolean> {
+  if (departmentIds.length === 0) return false;
+  const ph = inPlaceholders(departmentIds.length);
+  const rows = (await query({
+    query: `
+      SELECT u.id FROM users u
+      WHERE LOWER(TRIM(COALESCE(u.staff_category, ''))) = 'academic'
+        AND u.department_id IN (${ph})
+      LIMIT 1
+    `,
+    values: departmentIds,
+  })) as { id: number }[];
+  return rows.length > 0;
+}
+
 export async function isAcademicStaffInDepartments(
   userId: number,
   departmentIds: number[]

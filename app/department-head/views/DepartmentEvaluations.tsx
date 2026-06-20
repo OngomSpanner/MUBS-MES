@@ -1,7 +1,12 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import axios from 'axios';
+import DepartmentTeachingData from './DepartmentTeachingData';
+import ChangeRequestsView from './ChangeRequests';
+import HodQuestionnaireSubmissionsTab from '@/components/DepartmentHead/HodQuestionnaireSubmissionsTab';
+import HodAmbassadorReportingTab from '@/components/DepartmentHead/HodAmbassadorReportingTab';
 
 import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
@@ -79,7 +84,56 @@ interface EvaluationData {
     completed: Evaluation[];
 }
 
+type HodSubmissionTab =
+    | 'staff-reports'
+    | 'teaching'
+    | 'proposals'
+    | 'questionnaire'
+    | 'hr-reporting'
+    | 'enrollment'
+    | 'results-framework';
+
+const HOD_SUBMISSION_TABS: { key: HodSubmissionTab; label: string; scope?: 'teaching' | 'hr' | 'enrollment' }[] = [
+    { key: 'staff-reports', label: 'Staff reports' },
+    { key: 'teaching', label: 'Lecturer teaching data', scope: 'teaching' },
+    { key: 'proposals', label: 'Ambassador proposals' },
+    { key: 'questionnaire', label: 'Performance indicators' },
+    { key: 'hr-reporting', label: 'HR & workforce', scope: 'hr' },
+    { key: 'enrollment', label: 'Enrollment', scope: 'enrollment' },
+    { key: 'results-framework', label: 'Results framework' },
+];
+
+type HodTabScopes = {
+    hasAcademicTeachingScope: boolean;
+    canManageHrWorkforce: boolean;
+    canManageEnrollment: boolean;
+};
+
+function isTabVisible(tab: (typeof HOD_SUBMISSION_TABS)[number], scopes: HodTabScopes | null): boolean {
+    if (!tab.scope) return true;
+    if (!scopes) return false;
+    if (tab.scope === 'teaching') return scopes.hasAcademicTeachingScope;
+    if (tab.scope === 'hr') return scopes.canManageHrWorkforce;
+    if (tab.scope === 'enrollment') return scopes.canManageEnrollment;
+    return true;
+}
+
+function parseHodSubmissionTab(raw: string | null, scopes: HodTabScopes | null): HodSubmissionTab {
+    const valid = new Set(HOD_SUBMISSION_TABS.map((t) => t.key));
+    if (raw && valid.has(raw as HodSubmissionTab)) {
+        const tab = HOD_SUBMISSION_TABS.find((t) => t.key === raw);
+        if (tab && isTabVisible(tab, scopes)) return raw as HodSubmissionTab;
+    }
+    return 'staff-reports';
+}
+
 export default function DepartmentEvaluations() {
+    const router = useRouter();
+    const searchParams = useSearchParams();
+    const [tabScopes, setTabScopes] = useState<HodTabScopes | null>(null);
+    const rawTab = searchParams.get('tab');
+    const activeTab = parseHodSubmissionTab(rawTab, tabScopes);
+    const [pendingCounts, setPendingCounts] = useState<Record<string, number>>({});
     const [data, setData] = useState<EvaluationData | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -105,8 +159,71 @@ export default function DepartmentEvaluations() {
     const [pageError, setPageError] = useState<string | null>(null);
 
     useEffect(() => {
-        fetchData();
+        axios
+            .get('/api/department-head/profile')
+            .then((res) => {
+                setTabScopes({
+                    hasAcademicTeachingScope: Boolean(res.data?.hasAcademicTeachingScope),
+                    canManageHrWorkforce: Boolean(res.data?.canManageHrWorkforce),
+                    canManageEnrollment: Boolean(res.data?.canManageEnrollment),
+                });
+            })
+            .catch(() => {
+                setTabScopes({
+                    hasAcademicTeachingScope: false,
+                    canManageHrWorkforce: false,
+                    canManageEnrollment: false,
+                });
+            });
     }, []);
+
+    const visibleTabs = useMemo(
+        () => HOD_SUBMISSION_TABS.filter((tab) => isTabVisible(tab, tabScopes)),
+        [tabScopes]
+    );
+
+    useEffect(() => {
+        if (tabScopes === null) return;
+        const requested = rawTab as HodSubmissionTab | null;
+        if (!requested || requested === activeTab) return;
+        router.replace(`/department-head?pg=evaluations&tab=${activeTab}`);
+    }, [tabScopes, rawTab, activeTab, router]);
+
+    useEffect(() => {
+        if (activeTab === 'staff-reports') fetchData();
+    }, [activeTab]);
+
+    useEffect(() => {
+        axios
+            .get('/api/department-head/submission-inbox/summary')
+            .then((res) => setPendingCounts(res.data ?? {}))
+            .catch(() => setPendingCounts({}));
+    }, [activeTab]);
+
+    const setActiveTab = (tab: HodSubmissionTab) => {
+        router.replace(`/department-head?pg=evaluations&tab=${tab}`);
+    };
+
+    const pendingForTab = (tab: HodSubmissionTab): number => {
+        switch (tab) {
+            case 'staff-reports':
+                return pendingCounts.staffReports ?? 0;
+            case 'teaching':
+                return pendingCounts.teaching ?? 0;
+            case 'proposals':
+                return pendingCounts.proposals ?? 0;
+            case 'questionnaire':
+                return pendingCounts.questionnaire ?? 0;
+            case 'hr-reporting':
+                return pendingCounts.hrReporting ?? 0;
+            case 'enrollment':
+                return pendingCounts.enrollment ?? 0;
+            case 'results-framework':
+                return pendingCounts.resultsFramework ?? 0;
+            default:
+                return 0;
+        }
+    };
     
     useEffect(() => {
         if (evaluateModalItem) {
@@ -137,6 +254,12 @@ export default function DepartmentEvaluations() {
         };
     }, [evaluateModalItem]);
 
+    useEffect(() => {
+        if (activeTab !== 'staff-reports' && data === null && !loading) {
+            void fetchData();
+        }
+    }, [activeTab, data, loading]);
+
     const fetchData = async () => {
         try {
             setLoading(true);
@@ -150,7 +273,7 @@ export default function DepartmentEvaluations() {
         }
     };
 
-    if (error) {
+    if (activeTab === 'staff-reports' && error) {
         return (
             <div className="container mt-5">
                 <div className="alert alert-danger shadow-sm border-0 d-flex align-items-center gap-3 p-4" role="alert">
@@ -164,7 +287,7 @@ export default function DepartmentEvaluations() {
         );
     }
 
-    if (loading || !data) {
+    if (activeTab === 'staff-reports' && (loading || !data)) {
         return (
             <div className="d-flex justify-content-center align-items-center vh-100">
                 <div className="spinner-border text-primary" role="status">
@@ -173,6 +296,8 @@ export default function DepartmentEvaluations() {
             </div>
         );
     }
+
+    const staffData = data ?? { pending: [], completed: [] };
 
     const handleComment = (id: number, comment: string) => {
         setComments(prev => ({ ...prev, [id]: comment }));
@@ -273,13 +398,13 @@ export default function DepartmentEvaluations() {
     };
 
     const handleExportExcel = () => {
-        if (!data || data.completed.length === 0) {
+        if (!staffData.completed.length) {
             setPageError("No completed evaluations to export.");
             setTimeout(() => setPageError(null), 3000);
             return;
         }
 
-        const exportData = data.completed.map(e => ({
+        const exportData = staffData.completed.map(e => ({
             "Staff Name": e.staff_name,
             "Activity Title": e.activity_title,
             "Report Name": e.report_name,
@@ -296,7 +421,7 @@ export default function DepartmentEvaluations() {
     };
 
     const handleExportPDF = () => {
-        if (!data || data.completed.length === 0) {
+        if (!staffData.completed.length) {
             setPageError("No completed evaluations to export.");
             setTimeout(() => setPageError(null), 3000);
             return;
@@ -309,7 +434,7 @@ export default function DepartmentEvaluations() {
         doc.text(`Generated: ${new Date().toLocaleDateString()}`, 14, 22);
 
         const tableColumn = ["Staff Name", "Activity Title", "Report Name", "Date Evaluated", "Status", "Rating"];
-        const tableRows = data.completed.map(e => [
+        const tableRows = staffData.completed.map(e => [
             e.staff_name,
             e.activity_title,
             e.report_name,
@@ -331,6 +456,36 @@ export default function DepartmentEvaluations() {
 
     return (
         <div id="page-evaluations" className="page-section active-page position-relative">
+            <div className="d-flex flex-wrap gap-2 mb-4">
+                {visibleTabs.map((tab) => {
+                    const pending = pendingForTab(tab.key);
+                    return (
+                        <button
+                            key={tab.key}
+                            type="button"
+                            className={`btn btn-sm fw-bold d-inline-flex align-items-center gap-2 ${activeTab === tab.key ? 'btn-primary' : 'btn-outline-secondary'}`}
+                            onClick={() => setActiveTab(tab.key)}
+                        >
+                            {tab.label}
+                            {pending > 0 ? (
+                                <span className="badge bg-danger rounded-pill" style={{ fontSize: '0.62rem' }}>
+                                    {pending}
+                                </span>
+                            ) : null}
+                        </button>
+                    );
+                })}
+            </div>
+
+            {activeTab === 'teaching' ? <DepartmentTeachingData embedded /> : null}
+            {activeTab === 'proposals' ? <ChangeRequestsView embedded /> : null}
+            {activeTab === 'questionnaire' ? <HodQuestionnaireSubmissionsTab /> : null}
+            {activeTab === 'hr-reporting' ? <HodAmbassadorReportingTab group="hr" /> : null}
+            {activeTab === 'enrollment' ? <HodAmbassadorReportingTab group="enrollment" /> : null}
+            {activeTab === 'results-framework' ? <HodAmbassadorReportingTab group="rf" /> : null}
+
+            {activeTab !== 'staff-reports' ? null : (
+            <>
             {pageError && (
                 <div className="alert alert-danger shadow-sm border-0 d-flex align-items-center gap-3 p-3 mb-4 animate__animated animate__fadeInDown" role="alert" style={{ borderRadius: '12px', background: '#fef2f2', border: '1px solid #fee2e2' }}>
                     <span className="material-symbols-outlined text-danger">error</span>
@@ -343,7 +498,7 @@ export default function DepartmentEvaluations() {
                     <StatCard
                         icon="pending_actions"
                         label="Total Pending"
-                        value={data.pending.length}
+                        value={staffData.pending.length}
                         badge="Needs Review"
                         badgeIcon="schedule"
                         color="blue"
@@ -353,7 +508,7 @@ export default function DepartmentEvaluations() {
                     <StatCard
                         icon="task_alt"
                         label="Total Completed"
-                        value={data.completed.length}
+                        value={staffData.completed.length}
                         badge="Reviewed"
                         badgeIcon="done_all"
                         color="green"
@@ -363,7 +518,7 @@ export default function DepartmentEvaluations() {
                     <StatCard
                         icon="check_circle"
                         label="Accepted"
-                        value={data.completed.filter(e => e.status === 'Completed').length}
+                        value={staffData.completed.filter(e => e.status === 'Completed').length}
                         badge="Approved"
                         badgeIcon="thumb_up"
                         color="yellow"
@@ -373,7 +528,7 @@ export default function DepartmentEvaluations() {
                     <StatCard
                         icon="assignment_return"
                         label="Returned"
-                        value={data.completed.filter(e => e.status !== 'Completed').length}
+                        value={staffData.completed.filter(e => e.status !== 'Completed').length}
                         badge="Requires Edits"
                         badgeIcon="edit_note"
                         color="red"
@@ -532,8 +687,8 @@ export default function DepartmentEvaluations() {
             {/* Combined Evaluations Table */}
             {(() => {
                 const allEvaluations = [
-                    ...data.pending,
-                    ...data.completed
+                    ...staffData.pending,
+                    ...staffData.completed
                 ];
 
                 const filtered = allEvaluations.filter(e => {
@@ -544,7 +699,7 @@ export default function DepartmentEvaluations() {
 
                     const matchesStatus =
                         statusFilter === 'All' ||
-                        (statusFilter === 'Pending' && data.pending.some(p => p.id === e.id)) ||
+                        (statusFilter === 'Pending' && staffData.pending.some(p => p.id === e.id)) ||
                         (statusFilter === 'Complete' && e.status === 'Completed') ||
                         (statusFilter === 'Incomplete' && (e.status === 'Incomplete' || e.status === 'Returned')) ||
                         (statusFilter === 'Not Done' && e.status === 'Not Done');
@@ -555,7 +710,7 @@ export default function DepartmentEvaluations() {
                 const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
                 const safePage = Math.min(currentPage, totalPages);
                 const paged = filtered.slice((safePage - 1) * pageSize, safePage * pageSize);
-                const isPending = (e: Evaluation) => data.pending.some(p => p.id === e.id);
+                const isPending = (e: Evaluation) => staffData.pending.some(p => p.id === e.id);
 
                 return (
                     <div className="table-card shadow-sm">
@@ -812,6 +967,8 @@ export default function DepartmentEvaluations() {
                     </div>
                 );
             })()}
+            </>
+            )}
         </div>
     );
 }

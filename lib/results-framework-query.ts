@@ -317,6 +317,13 @@ export const RESULTS_FRAMEWORK_NARRATIVE_JOIN = `
     ON arn.activity_id = sa.id AND arn.financial_year_key = ?
 `;
 
+/** Admin reports: only HOD-approved ambassador narratives (legacy rows without status pass through). */
+export const RESULTS_FRAMEWORK_NARRATIVE_JOIN_ADMIN = `
+  LEFT JOIN activity_rf_narratives arn
+    ON arn.activity_id = sa.id AND arn.financial_year_key = ?
+    AND (arn.hod_review_status IS NULL OR arn.hod_review_status = 'approved')
+`;
+
 export type MappedResultsFrameworkRow = {
   id: number;
   title: string;

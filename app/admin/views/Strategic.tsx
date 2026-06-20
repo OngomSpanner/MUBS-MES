@@ -390,7 +390,7 @@ export default function StrategicView() {
         if (!standardNo) return setStandardError('Standard No. is required.');
         if (!name) return setStandardError('Standard title is required.');
         if (!owner) return setStandardError('Standard owner is required.');
-        if (!output) return setStandardError('Output / service description is required.');
+        if (!output) return setStandardError('Output service description is required.');
         const indicators = standardForm.performance_indicators.map((s) => s.trim()).filter(Boolean);
         if (indicators.length === 0) return setStandardError('Add at least one performance indicator.');
         const durCount = parseInt(String(standardForm.duration_value || ''), 10);
@@ -806,7 +806,6 @@ export default function StrategicView() {
                             <span className="material-symbols-outlined" style={{ fontSize: '1.25rem' }}>visibility</span>
                             Standard details
                         </Modal.Title>
-                        <p className="modal-standard-preview-subtitle mb-0">Read-only summary</p>
                     </div>
                 </Modal.Header>
                 {viewStandardDetails && (
@@ -1050,7 +1049,7 @@ export default function StrategicView() {
                             <h6 className="fw-bold text-primary small mb-3">2. Service delivery row (SDS matrix)</h6>
                             <div className="row g-2">
                                 <div className="col-12">
-                                    <Form.Label className="fw-bold small mb-1">Output / service description <span className="text-danger">*</span></Form.Label>
+                                    <Form.Label className="fw-bold small mb-1">Output service description <span className="text-danger">*</span></Form.Label>
                                     <Form.Control size="sm" as="textarea" rows={2} required name="output_standard" value={standardForm.output_standard} onChange={(e) => setStandardForm({ ...standardForm, output_standard: e.target.value })} />
                                 </div>
                                 <div className="col-12">

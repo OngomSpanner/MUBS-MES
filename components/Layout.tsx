@@ -63,7 +63,7 @@ function LayoutContent({ children, sidebarOpen, setSidebarOpen }: any) {
 
       // HOD specific
       'activities': 'Assigned Activities',
-      'teaching-data': 'Academic Teaching Data',
+      'teaching-data': 'Lecturer teaching data',
 
       // Both HOD and Staff specific shared keys
       'tasks': 'Task Management',
@@ -74,7 +74,7 @@ function LayoutContent({ children, sidebarOpen, setSidebarOpen }: any) {
       // Staff specific
       'deadlines': 'Notifications & Deadlines',
       'notifications': 'Notifications & Deadlines',
-      'academic-teaching': 'Academic Teaching Data',
+      'academic-teaching': 'Lecturer teaching data',
     };
     return pageTitles[key] || 'Dashboard';
   };

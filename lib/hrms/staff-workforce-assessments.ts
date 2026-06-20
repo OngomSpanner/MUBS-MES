@@ -1,5 +1,6 @@
 import { query } from '@/lib/db';
 import { getRollingReportFyWindow, labelsFromFyWindow } from '@/lib/financial-year';
+import { sqlAdminApprovedOnly } from '@/lib/hod-review-workflow';
 
 export type WorkforceAssessmentRow = {
   assessmentDetail: string;
@@ -35,6 +36,7 @@ async function loadAssessmentCounts(
         SELECT assessment_detail, financial_year_key, count_value
         FROM staff_workforce_assessment_counts
         WHERE financial_year_key IN (${placeholders})${unitClause}
+          AND ${sqlAdminApprovedOnly('staff_workforce_assessment_counts')}
         ORDER BY assessment_detail ASC
       `,
       values,

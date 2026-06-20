@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { verifyToken } from '@/lib/auth';
-import { departmentHeadHasAcademicTeachingScope } from '@/lib/department-head-auth';
+import { departmentHeadSubmissionTabScopes } from '@/lib/department-head-auth';
 
 export const dynamic = 'force-dynamic';
 
@@ -17,6 +17,6 @@ export async function GET() {
     return NextResponse.json({ message: 'Invalid token' }, { status: 401 });
   }
 
-  const hasAcademicTeachingScope = await departmentHeadHasAcademicTeachingScope(decoded.userId);
-  return NextResponse.json({ hasAcademicTeachingScope });
+  const scopes = await departmentHeadSubmissionTabScopes(decoded.userId);
+  return NextResponse.json(scopes);
 }

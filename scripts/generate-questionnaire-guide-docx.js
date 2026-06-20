@@ -196,7 +196,7 @@ async function run() {
           body(
             'The Revised Questions for Data Collection document uses standards such as Curriculum/Course Development and Review (Standard MUBS/P1/OBJ12/REG/S007). Each standard has:'
           ),
-          bullet('Output / Service Description — what service is being delivered'),
+          bullet('Output  Service Description — what service is being delivered'),
           bullet('Performance Indicators — what you count or measure'),
           bullet('Other columns (Quality, Process, Target beneficiary, Methodology, Inputs, etc.) — background description of the standard'),
           body(

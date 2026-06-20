@@ -1,4 +1,5 @@
 import { query } from '@/lib/db';
+import { columnExists, indexExists } from '@/lib/db-schema';
 import { listAcademicStaffFacultyOptions } from '@/lib/academic-staff-locations';
 import {
   ENROLLMENT_FACULTY_UNSPECIFIED,
@@ -19,44 +20,31 @@ export async function ensureEnrollmentFacultyColumns(): Promise<void> {
   if (ensuredFacultyColumns) return;
 
   for (const table of ['staff_programme_enrollment', 'staff_course_unit_enrollment']) {
-    try {
+    if (!(await columnExists(table, 'faculty_name'))) {
       await query({
         query: `ALTER TABLE ${table} ADD COLUMN faculty_name VARCHAR(255) NOT NULL DEFAULT '${ENROLLMENT_FACULTY_UNSPECIFIED}' AFTER id`,
       });
-    } catch (e: unknown) {
-      const err = e as { errno?: number };
-      if (err.errno !== 1060) throw e;
     }
   }
 
-  try {
+  if (await indexExists('staff_programme_enrollment', 'uq_programme_enrollment_name')) {
     await query({ query: 'ALTER TABLE staff_programme_enrollment DROP INDEX uq_programme_enrollment_name' });
-  } catch {
-    /* index may not exist */
   }
-  try {
+  if (!(await indexExists('staff_programme_enrollment', 'uq_programme_faculty_name'))) {
     await query({
       query:
         'ALTER TABLE staff_programme_enrollment ADD UNIQUE KEY uq_programme_faculty_name (faculty_name, programme_name)',
     });
-  } catch (e: unknown) {
-    const err = e as { errno?: number };
-    if (err.errno !== 1061) throw e;
   }
 
-  try {
+  if (await indexExists('staff_course_unit_enrollment', 'uq_course_unit_enrollment_name')) {
     await query({ query: 'ALTER TABLE staff_course_unit_enrollment DROP INDEX uq_course_unit_enrollment_name' });
-  } catch {
-    /* index may not exist */
   }
-  try {
+  if (!(await indexExists('staff_course_unit_enrollment', 'uq_course_unit_faculty_name'))) {
     await query({
       query:
         'ALTER TABLE staff_course_unit_enrollment ADD UNIQUE KEY uq_course_unit_faculty_name (faculty_name, course_unit_name)',
     });
-  } catch (e: unknown) {
-    const err = e as { errno?: number };
-    if (err.errno !== 1061) throw e;
   }
 
   ensuredFacultyColumns = true;

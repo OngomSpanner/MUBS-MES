@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { query } from '@/lib/db';
 import { requireAmbassador } from '@/lib/ambassador/context';
+import { ensureHodReviewWorkflowSchema } from '@/lib/hod-review-workflow';
 
 export const dynamic = 'force-dynamic';
 
@@ -9,6 +10,8 @@ export const dynamic = 'force-dynamic';
 export async function GET(request: Request) {
   const auth = await requireAmbassador();
   if ('error' in auth) return auth.error;
+
+  await ensureHodReviewWorkflowSchema();
 
   const url = new URL(request.url);
   const fyFilter = url.searchParams.get('fy') || 'all';
@@ -53,6 +56,17 @@ export async function GET(request: Request) {
             WHERE indicator_id IN (${inClause}) AND department_id = ?`,
     values: [...indicatorIds, auth.managedUnitId],
   }) as any[];
+
+  const submissionRows = await query({
+    query: `SELECT indicator_id, hod_review_status, hod_review_comment
+            FROM q_indicator_submissions
+            WHERE indicator_id IN (${inClause}) AND department_id = ?`,
+    values: [...indicatorIds, auth.managedUnitId],
+  }) as { indicator_id: number; hod_review_status: string; hod_review_comment: string | null }[];
+
+  const submissionMap = new Map(
+    submissionRows.map((s) => [s.indicator_id, s])
+  );
 
   const metricsMap = new Map<number, any[]>();
   for (const m of metrics) {
@@ -101,6 +115,8 @@ export async function GET(request: Request) {
         total,
         department_id: auth.managedUnitId,
         department_name: auth.managedUnitName,
+        hod_review_status: submissionMap.get(ind.id)?.hod_review_status ?? 'draft',
+        hod_review_comment: submissionMap.get(ind.id)?.hod_review_comment ?? null,
       };
     })
     .filter(Boolean);

@@ -9,6 +9,7 @@ import {
 } from '@/lib/activity-rf-narratives';
 import { isPracticeType } from '@/lib/results-framework';
 import { parseResultsFrameworkFyParam } from '@/lib/results-framework-fy';
+import { parseSubmitForReview } from '@/lib/hod-review-workflow';
 import {
   MAIN_STRATEGIC_ACTIVITY_FILTER,
   RESULTS_FRAMEWORK_KPI_FILTER,
@@ -78,6 +79,7 @@ export async function POST(request: Request) {
       outcomeReason,
       practiceType,
       financialYearKey: fyKey,
+      submitForReview: parseSubmitForReview(body),
     });
 
     const saved = await getActivityRfNarrative(activityId, fyKey);

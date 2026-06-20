@@ -23,6 +23,7 @@ type SkillsEntryModalProps = {
     financialYearKey: string;
     reportsProduced: number;
     skillsMissing: number;
+    submitForReview?: boolean;
   }) => void;
 };
 
@@ -59,14 +60,19 @@ function SkillsEntryForm({
   const [reportsProduced, setReportsProduced] = useState(defaults.reportsProduced);
   const [skillsMissing, setSkillsMissing] = useState(defaults.skillsMissing);
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
+  const save = (submitForReview: boolean) => {
     if (!financialYearKey) return;
     onSave({
       financialYearKey,
       reportsProduced: Math.max(0, Number(reportsProduced) || 0),
       skillsMissing: Math.max(0, Number(skillsMissing) || 0),
+      submitForReview,
     });
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    save(false);
   };
 
   return (
@@ -108,8 +114,11 @@ function SkillsEntryForm({
         <Button variant="secondary" onClick={onHide} disabled={saving}>
           Cancel
         </Button>
-        <Button type="submit" variant="primary" disabled={saving} style={{ background: 'var(--mubs-blue)', borderColor: 'var(--mubs-blue)' }}>
-          {saving ? 'Saving…' : 'Save'}
+        <Button type="submit" variant="outline-primary" disabled={saving}>
+          {saving ? 'Saving…' : 'Save draft'}
+        </Button>
+        <Button type="button" variant="primary" disabled={saving} style={{ background: 'var(--mubs-blue)', borderColor: 'var(--mubs-blue)' }} onClick={() => save(true)}>
+          Submit for HOD review
         </Button>
       </Modal.Footer>
     </Form>

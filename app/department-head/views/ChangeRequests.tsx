@@ -12,7 +12,6 @@ import {
 } from '@/lib/ambassador/change-request-constants';
 
 const API_BASE = '/api/department-head/change-requests';
-const PAGE_PATH = '/department-head?pg=change-requests';
 
 function statusBadgeStyle(status: ChangeRequestStatus): { bg: string; color: string } {
   switch (status) {
@@ -39,10 +38,13 @@ const STATUS_FILTERS: { value: '' | ChangeRequestStatus; label: string }[] = [
   })),
 ];
 
-export default function ChangeRequestsView() {
+export default function ChangeRequestsView({ embedded = false }: { embedded?: boolean }) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const deepLinkId = Number(searchParams.get('id') || '');
+  const pagePath = embedded
+    ? '/department-head?pg=evaluations&tab=proposals'
+    : '/department-head?pg=change-requests';
 
   const [requests, setRequests] = useState<AdminChangeRequest[]>([]);
   const [loading, setLoading] = useState(true);
@@ -94,9 +96,9 @@ export default function ChangeRequestsView() {
     setSelected(null);
     setReviewError(null);
     if (searchParams.get('id')) {
-      router.replace(PAGE_PATH);
+      router.replace(pagePath);
     }
-  }, [router, saving, searchParams]);
+  }, [router, saving, searchParams, pagePath]);
 
   useEffect(() => {
     if (!Number.isFinite(deepLinkId) || deepLinkId <= 0 || loading) return;
@@ -147,7 +149,7 @@ export default function ChangeRequestsView() {
   };
 
   return (
-    <div className="page-section active-page">
+    <div className={embedded ? '' : 'page-section active-page'}>
       {success && (
         <div className="alert alert-success py-2 small d-flex align-items-center justify-content-between gap-2 mb-3">
           <span>{success}</span>
@@ -155,7 +157,8 @@ export default function ChangeRequestsView() {
         </div>
       )}
 
-      <div className="table-card shadow-sm border-0 bg-white" style={{ borderRadius: '16px', overflow: 'hidden' }}>
+      <div className="table-card shadow-sm border-0 bg-white" style={{ borderRadius: embedded ? '12px' : '16px', overflow: 'hidden' }}>
+        {!embedded ? (
         <div className="table-card-header flex-wrap gap-2">
           <div>
             <h5 className="mb-0 d-flex align-items-center gap-2">
@@ -173,6 +176,7 @@ export default function ChangeRequestsView() {
             </p>
           </div>
         </div>
+        ) : null}
 
         <div className="px-4 pt-3 pb-2 border-bottom bg-light">
           <div className="d-flex flex-wrap gap-2">

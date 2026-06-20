@@ -106,10 +106,6 @@ export async function PUT(
       target_fy29_30
     } = body;
 
-    const uom = normalizeActivityUnitOfMeasure(
-      typeof unit_of_measure === 'string' ? unit_of_measure : undefined
-    );
-
     // Default to the 5-year Uganda Financial span if no dates are provided
     const start_date = reqStartDate || '2025-07-01';
     const end_date = reqEndDate || '2030-06-30';
@@ -120,9 +116,24 @@ export async function PUT(
     const dbStatus = mapStatusToDb(status);
 
     const existing = await query({
-      query: 'SELECT id, parent_id, target_kpi, kpi_target_value FROM strategic_activities WHERE id = ?',
+      query: `
+        SELECT id, parent_id, target_kpi, kpi_target_value, unit_of_measure,
+               target_fy25_26, target_fy26_27, target_fy27_28, target_fy28_29, target_fy29_30
+        FROM strategic_activities WHERE id = ?
+      `,
       values: [id]
-    }) as { id: number; parent_id: number | null; target_kpi: string | null; kpi_target_value: number | null }[];
+    }) as {
+      id: number;
+      parent_id: number | null;
+      target_kpi: string | null;
+      kpi_target_value: number | null;
+      unit_of_measure: string | null;
+      target_fy25_26: number | null;
+      target_fy26_27: number | null;
+      target_fy27_28: number | null;
+      target_fy28_29: number | null;
+      target_fy29_30: number | null;
+    }[];
     if (!existing.length) {
       return NextResponse.json({ message: 'Activity not found' }, { status: 404 });
     }
@@ -154,12 +165,28 @@ export async function PUT(
         ? kpi_target_value || null
         : existing[0].kpi_target_value;
 
+    const row = existing[0];
+    const uom =
+      unit_of_measure !== undefined
+        ? normalizeActivityUnitOfMeasure(unit_of_measure)
+        : normalizeActivityUnitOfMeasure(row.unit_of_measure);
+    const finalTargetFy25_26 =
+      target_fy25_26 !== undefined ? target_fy25_26 || null : row.target_fy25_26;
+    const finalTargetFy26_27 =
+      target_fy26_27 !== undefined ? target_fy26_27 || null : row.target_fy26_27;
+    const finalTargetFy27_28 =
+      target_fy27_28 !== undefined ? target_fy27_28 || null : row.target_fy27_28;
+    const finalTargetFy28_29 =
+      target_fy28_29 !== undefined ? target_fy28_29 || null : row.target_fy28_29;
+    const finalTargetFy29_30 =
+      target_fy29_30 !== undefined ? target_fy29_30 || null : row.target_fy29_30;
+
     const runUpdate = async () => {
       const pillarVal = !pillar || !String(pillar).trim() ? null : pillar;
       const values = [
         title, desc, pillarVal, mainDeptId, finalTargetKpi, finalKpiTargetValue, dbStatus,
         newParentId, progress ?? 0, start_date || null, end_date || null, objective_id || null, standard_id || null, uom,
-        target_fy25_26 || null, target_fy26_27 || null, target_fy27_28 || null, target_fy28_29 || null, target_fy29_30 || null,
+        finalTargetFy25_26, finalTargetFy26_27, finalTargetFy27_28, finalTargetFy28_29, finalTargetFy29_30,
         id
       ];
 
@@ -198,11 +225,11 @@ export async function PUT(
                 uom,
                 finalTargetKpi,
                 finalKpiTargetValue,
-                target_fy25_26 || null,
-                target_fy26_27 || null,
-                target_fy27_28 || null,
-                target_fy28_29 || null,
-                target_fy29_30 || null,
+                finalTargetFy25_26,
+                finalTargetFy26_27,
+                finalTargetFy27_28,
+                finalTargetFy28_29,
+                finalTargetFy29_30,
                 childIds[i],
               ],
             });
@@ -214,7 +241,11 @@ export async function PUT(
         }
       }
       for (let i = childIds.length; i < childDeptIds.length; i++) {
-        const childInsertValues = [title, desc, pillarVal, childDeptIds[i], finalTargetKpi, finalKpiTargetValue, dbStatus, mainId, start_date || null, end_date || null, objective_id || null, standard_id || null, uom, target_fy25_26 || null, target_fy26_27 || null, target_fy27_28 || null, target_fy28_29 || null, target_fy29_30 || null];
+        const childInsertValues = [
+          title, desc, pillarVal, childDeptIds[i], finalTargetKpi, finalKpiTargetValue, dbStatus, mainId,
+          start_date || null, end_date || null, objective_id || null, standard_id || null, uom,
+          finalTargetFy25_26, finalTargetFy26_27, finalTargetFy27_28, finalTargetFy28_29, finalTargetFy29_30,
+        ];
         try {
           await query({
             query: `

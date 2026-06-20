@@ -50,7 +50,7 @@ const STATUS_BADGE: Record<string, string> = {
   rejected: 'danger',
 };
 
-export default function DepartmentTeachingData() {
+export default function DepartmentTeachingData({ embedded = false }: { embedded?: boolean }) {
   const [tab, setTab] = useState<Tab>('course-units');
   const [courseRecords, setCourseRecords] = useState<CourseRecord[]>([]);
   const [programmeRecords, setProgrammeRecords] = useState<ProgrammeRecord[]>([]);
@@ -74,7 +74,7 @@ export default function DepartmentTeachingData() {
       setProgrammeRecords(progRes.data.records ?? []);
       setAcademicYears(courseRes.data.academicYears ?? progRes.data.academicYears ?? []);
     } catch (e: unknown) {
-      setError(axios.isAxiosError(e) ? e.response?.data?.message ?? 'Could not load teaching data' : 'Could not load teaching data');
+      setError(axios.isAxiosError(e) ? e.response?.data?.message ?? 'Could not load lecturer teaching data' : 'Could not load lecturer teaching data');
     } finally {
       setLoading(false);
     }
@@ -124,7 +124,7 @@ export default function DepartmentTeachingData() {
     }
   };
 
-  if (loading) return <div className="text-muted small py-4">Loading academic teaching data…</div>;
+  if (loading) return <div className="text-muted small py-4">Loading lecturer teaching data…</div>;
   if (error) return <div className="alert alert-danger small">{error}</div>;
 
   const activeRecords = tab === 'course-units' ? courseRecords : programmeRecords;

@@ -4,6 +4,7 @@ import { verifyToken } from '@/lib/auth';
 import { canManageStrategicStandards } from '@/lib/role-routing';
 import { query } from '@/lib/db';
 import { normalizeFinancialYear } from '@/lib/questionnaire/fy-utils';
+import { ensureHodReviewWorkflowSchema } from '@/lib/hod-review-workflow';
 
 export const dynamic = 'force-dynamic';
 
@@ -22,6 +23,8 @@ export async function GET(request: Request) {
     if (!(await requireAdmin())) {
       return NextResponse.json({ message: 'Forbidden' }, { status: 403 });
     }
+
+    await ensureHodReviewWorkflowSchema();
 
     const { searchParams } = new URL(request.url);
     const departmentIdParam = searchParams.get('department_id');
@@ -70,10 +73,15 @@ export async function GET(request: Request) {
         ? `SELECT r.indicator_id, r.metric_id, r.department_id, r.financial_year, r.value,
                   r.submitted_at, r.updated_at
            FROM q_responses r
-           WHERE r.department_id = ?`
+           INNER JOIN q_indicator_submissions qis
+             ON qis.indicator_id = r.indicator_id AND qis.department_id = r.department_id
+           WHERE r.department_id = ? AND qis.hod_review_status = 'approved'`
         : `SELECT r.indicator_id, r.metric_id, r.department_id, r.financial_year, r.value,
                   r.submitted_at, r.updated_at
-           FROM q_responses r`;
+           FROM q_responses r
+           INNER JOIN q_indicator_submissions qis
+             ON qis.indicator_id = r.indicator_id AND qis.department_id = r.department_id
+           WHERE qis.hod_review_status = 'approved'`;
 
     const responses = (await query({
       query: responseQuery,

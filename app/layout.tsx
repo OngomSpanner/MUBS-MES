@@ -22,7 +22,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" data-bs-theme="light">
+    <html lang="en" data-bs-theme="light" suppressHydrationWarning>
       <head />
       <body style={{ fontFamily: "'DM Sans', sans-serif" }}>
         <IdleTimeout />

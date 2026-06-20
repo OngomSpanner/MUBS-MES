@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { Modal, Button, Form, Badge, Spinner } from 'react-bootstrap';
 import axios from 'axios';
 import { uomLabel, validateMetricValue, uomPlaceholder } from '@/lib/questionnaire/uom';
+import { HOD_REVIEW_STATUS_LABELS, type HodReviewStatus } from '@/lib/hod-review-workflow-constants';
 
 type Metric = { id: number; metric_text: string; unit_of_measure: string; sort_order: number };
 type Indicator = {
@@ -19,6 +20,8 @@ type Indicator = {
   total: number;
   department_id: number;
   department_name: string;
+  hod_review_status?: HodReviewStatus;
+  hod_review_comment?: string | null;
 };
 
 type ResponseMap = Record<string, string>; // key: `${metric_id}_${fy}`
@@ -77,9 +80,13 @@ export default function AmbassadorDataCollection() {
     }
   };
 
-  const handleSave = async () => {
+  const handleSave = async (submitForReview: boolean) => {
     if (!entryIndicator) return;
     if (Object.keys(validationErrors).length > 0) { setSaveErr('Fix validation errors before saving.'); return; }
+    if (submitForReview && entryIndicator.status !== 'complete') {
+      setSaveErr('Complete all metric cells before submitting for HOD review.');
+      return;
+    }
     setSaving(true); setSaveErr(null); setSaveOk(false);
     try {
       const entries = entryIndicator.metrics.flatMap((m) =>
@@ -89,7 +96,11 @@ export default function AmbassadorDataCollection() {
           value: responses[`${m.id}_${fy}`] ?? '',
         }))
       );
-      await axios.post('/api/questionnaire/responses', { indicator_id: entryIndicator.id, entries });
+      await axios.post('/api/questionnaire/responses', {
+        indicator_id: entryIndicator.id,
+        entries,
+        submitForReview,
+      });
       setSaveOk(true);
       void fetchIndicators();
       setTimeout(() => { setSaveOk(false); closeEntry(); }, 1200);
@@ -146,6 +157,15 @@ export default function AmbassadorDataCollection() {
                     <span className="material-symbols-outlined me-1" style={{ fontSize: '11px', verticalAlign: 'middle' }}>{sc.icon}</span>
                     {sc.label}
                   </Badge>
+                  {ind.hod_review_status && ind.hod_review_status !== 'draft' ? (
+                    <Badge
+                      bg={ind.hod_review_status === 'approved' ? 'success' : ind.hod_review_status === 'submitted' ? 'warning' : 'danger'}
+                      className={ind.hod_review_status === 'submitted' ? 'text-dark' : ''}
+                      style={{ fontSize: '0.62rem' }}
+                    >
+                      {HOD_REVIEW_STATUS_LABELS[ind.hod_review_status]}
+                    </Badge>
+                  ) : null}
                   <Button
                     size="sm"
                     variant={ind.is_locked ? 'outline-secondary' : 'primary'}
@@ -243,15 +263,25 @@ export default function AmbassadorDataCollection() {
             <Modal.Footer className="gap-2">
               <Button size="sm" variant="outline-secondary" onClick={closeEntry}>Close</Button>
               {!entryIndicator.is_locked && (
-                <Button
-                  size="sm"
-                  variant="primary"
-                  style={{ background: 'var(--mubs-blue)', borderColor: 'var(--mubs-blue)' }}
-                  onClick={handleSave}
-                  disabled={saving || Object.keys(validationErrors).length > 0}
-                >
-                  {saving ? <><Spinner animation="border" size="sm" className="me-1" />Saving…</> : 'Save Responses'}
-                </Button>
+                <>
+                  <Button
+                    size="sm"
+                    variant="outline-primary"
+                    onClick={() => void handleSave(false)}
+                    disabled={saving || Object.keys(validationErrors).length > 0}
+                  >
+                    {saving ? 'Saving…' : 'Save draft'}
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="primary"
+                    style={{ background: 'var(--mubs-blue)', borderColor: 'var(--mubs-blue)' }}
+                    onClick={() => void handleSave(true)}
+                    disabled={saving || Object.keys(validationErrors).length > 0 || entryIndicator.status !== 'complete'}
+                  >
+                    {saving ? 'Submitting…' : 'Submit for HOD review'}
+                  </Button>
+                </>
               )}
             </Modal.Footer>
           </>

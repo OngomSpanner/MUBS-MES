@@ -57,8 +57,6 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen, onLogoutClick }: 
     { key: 'tasks', href: '/department-head?pg=tasks', icon: 'checklist', label: 'Processes' },
     { key: 'staff', href: '/department-head?pg=staff', icon: 'group', label: 'Staff & Warnings' },
     { key: 'evaluations', href: '/department-head?pg=evaluations', icon: 'fact_check', label: 'Submissions & reviews' },
-    { key: 'teaching-data', href: '/department-head?pg=teaching-data', icon: 'school', label: 'Academic Teaching Data' },
-    { key: 'change-requests', href: '/department-head?pg=change-requests', icon: 'rate_review', label: 'Ambassador Proposals' },
     { key: 'reports', href: '/department-head?pg=reports', icon: 'analytics', label: 'Performance & Reports' },
   ];
 
@@ -88,7 +86,7 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen, onLogoutClick }: 
     { key: 'tasks', href: '/staff?pg=tasks', icon: 'checklist', label: 'Tasks' },
     { key: 'notifications', href: '/staff?pg=notifications', icon: 'notifications_active', label: 'Notifications & Deadlines' },
     { key: 'submissions', href: '/staff?pg=submissions', icon: 'history', label: 'Submissions & Feedback' },
-    { key: 'academic-teaching', href: '/staff?pg=academic-teaching', icon: 'school', label: 'Academic Teaching' },
+    { key: 'academic-teaching', href: '/staff?pg=academic-teaching', icon: 'school', label: 'Lecturer teaching data' },
   ];
 
   const isAmbassador = pathname.startsWith('/ambassador');
@@ -144,11 +142,8 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen, onLogoutClick }: 
   );
 
   const visibleDepartmentHeadMenuItems = useMemo(
-    () =>
-      departmentHeadMenuItems.filter(
-        (item) => item.key !== 'teaching-data' || hasAcademicTeachingScope === true
-      ),
-    [hasAcademicTeachingScope]
+    () => departmentHeadMenuItems,
+    []
   );
 
   const isActive = (key: string) => currentKey === key;

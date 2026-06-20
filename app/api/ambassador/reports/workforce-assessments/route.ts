@@ -2,6 +2,11 @@ import { NextResponse } from 'next/server';
 import { query } from '@/lib/db';
 import { requireHrAmbassador } from '@/lib/ambassador/hr-unit';
 import { labelsFromFyWindow, getPastFinancialYearWindow } from '@/lib/financial-year';
+import {
+  ensureHodReviewWorkflowSchema,
+  hodStatusForAmbassadorSave,
+  parseSubmitForReview,
+} from '@/lib/hod-review-workflow';
 
 function yearLabel(key: string) {
   const years = labelsFromFyWindow(getPastFinancialYearWindow(5));
@@ -47,22 +52,28 @@ export async function POST(request: Request) {
   const assessmentDetail = String(body.assessmentDetail || '').trim();
   const financialYearKey = String(body.financialYearKey || '').trim();
   const countValue = Math.max(0, Number(body.countValue ?? 0));
+  const submitForReview = parseSubmitForReview(body);
+  const hodStatus = hodStatusForAmbassadorSave(submitForReview);
 
   if (!assessmentDetail || !financialYearKey) {
     return NextResponse.json({ message: 'Assessment detail and financial year are required' }, { status: 400 });
   }
 
   try {
+    await ensureHodReviewWorkflowSchema();
     const result = (await query({
       query: `
         INSERT INTO staff_workforce_assessment_counts
-          (managed_unit_id, assessment_detail, financial_year_key, count_value)
-        VALUES (?, ?, ?, ?)
+          (managed_unit_id, assessment_detail, financial_year_key, count_value, hod_review_status)
+        VALUES (?, ?, ?, ?, ?)
       `,
-      values: [auth.managedUnitId, assessmentDetail, financialYearKey, countValue],
+      values: [auth.managedUnitId, assessmentDetail, financialYearKey, countValue, hodStatus],
     })) as { insertId: number };
 
-    return NextResponse.json({ id: result.insertId, message: 'Workforce assessment saved' }, { status: 201 });
+    return NextResponse.json({
+      id: result.insertId,
+      message: submitForReview ? 'Submitted for HOD review' : 'Draft saved',
+    }, { status: 201 });
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : '';
     if (msg.includes('Duplicate') || msg.includes('uq_workforce')) {

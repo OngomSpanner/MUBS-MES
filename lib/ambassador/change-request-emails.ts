@@ -27,7 +27,7 @@ function buildReviewerNotificationHtml(args: {
   description: string;
 }): string {
   const appBase = baseUrl();
-  const reviewUrl = `${appBase}/department-head?pg=change-requests&id=${args.requestId}`;
+  const reviewUrl = `${appBase}/department-head?pg=evaluations&tab=proposals&id=${args.requestId}`;
   const reviewerName = escapeHtml(args.reviewerName || 'Colleague');
   const ambassadorName = escapeHtml(args.ambassadorName || 'An ambassador');
   const unitName = escapeHtml(args.managedUnitName || 'Unknown unit');

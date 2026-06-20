@@ -1,4 +1,5 @@
 import React from 'react';
+import { redirect } from 'next/navigation';
 import Layout from '@/components/Layout';
 import DepartmentHeadDashboard from './views/DepartmentHeadDashboard';
 import DepartmentStrategicActivities from './views/DepartmentStrategicActivities';
@@ -7,8 +8,6 @@ import DepartmentTasks from './views/DepartmentTasks';
 import DepartmentStaff from './views/DepartmentStaff';
 import DepartmentEvaluations from './views/DepartmentEvaluations';
 import DepartmentReports from './views/DepartmentReports';
-import DepartmentTeachingDataGate from './views/DepartmentTeachingDataGate';
-import ChangeRequestsView from './views/ChangeRequests';
 
 interface DepartmentHeadPageProps {
     searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
@@ -35,9 +34,9 @@ export default async function DepartmentHeadPage({ searchParams }: DepartmentHea
             case 'reports':
                 return <DepartmentReports />;
             case 'teaching-data':
-                return <DepartmentTeachingDataGate />;
+                redirect('/department-head?pg=evaluations&tab=teaching');
             case 'change-requests':
-                return <ChangeRequestsView />;
+                redirect('/department-head?pg=evaluations&tab=proposals');
             case 'dashboard':
             default:
                 return <DepartmentHeadDashboard />;

@@ -6,6 +6,12 @@ import axios from 'axios';
 
 import StatCard from '@/components/StatCard';
 import { expandProcessAssignmentsForDisplay } from '@/lib/process-assignment-display';
+import { ACTIVITY_FY_TARGET_COLUMNS } from '@/lib/activity-fy-targets';
+import {
+    labelForActivityUnitOfMeasure,
+    symbolForActivityUnitOfMeasure,
+} from '@/lib/activity-unit-of-measure';
+import { formatFyRangeShort, fyRangeJulyJune } from '@/lib/financial-year';
 
 interface Activity {
     id: number;
@@ -28,6 +34,11 @@ interface Activity {
     source?: string;
     standard_id?: number | null;
     unit_of_measure?: string;
+    target_fy25_26?: string | number | null;
+    target_fy26_27?: string | number | null;
+    target_fy27_28?: string | number | null;
+    target_fy28_29?: string | number | null;
+    target_fy29_30?: string | number | null;
     /** From standard_processes for this activity's standard */
     process_tasks_total?: number;
     /** Distinct process tasks with assignment status evaluated or completed */
@@ -724,6 +735,59 @@ export default function DepartmentStrategicActivities() {
                                                     (selectedActivity.strategic_objective || selectedActivity.description || '').trim() || '—'
                                                 )}
                                             </p>
+                                        </div>
+                                    </div>
+
+                                    <div className="col-12 mt-3 border-top pt-3">
+                                        <label className="text-muted fw-bold mb-2 d-block" style={{ fontSize: '0.7rem', letterSpacing: '0.5px', textTransform: 'uppercase' }}>
+                                            Targets
+                                        </label>
+                                        <div className="small text-muted mb-2">
+                                            Unit of measure:{' '}
+                                            <span className="text-dark fw-medium">
+                                                {labelForActivityUnitOfMeasure(selectedActivity.unit_of_measure)}
+                                            </span>
+                                        </div>
+                                        <div className="table-responsive border rounded">
+                                            <table className="table table-sm table-bordered align-middle mb-0" style={{ fontSize: '0.72rem' }}>
+                                                <thead className="table-light">
+                                                    <tr>
+                                                        {ACTIVITY_FY_TARGET_COLUMNS.map(({ key, label }) => (
+                                                            <th
+                                                                key={key}
+                                                                className="text-center text-nowrap px-2 py-2"
+                                                                title={formatFyRangeShort(fyRangeJulyJune(label.replace('FY ', '')))}
+                                                            >
+                                                                {label.replace('FY ', '')}
+                                                            </th>
+                                                        ))}
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    <tr>
+                                                        {ACTIVITY_FY_TARGET_COLUMNS.map(({ key }) => {
+                                                            const v = selectedActivity[key as keyof Activity];
+                                                            const display = v != null && v !== '' ? String(v) : '—';
+                                                            return (
+                                                                <td key={key} className="p-0 align-middle">
+                                                                    <div className="d-flex align-items-stretch">
+                                                                        <span className="flex-grow-1 text-center fw-medium py-2 px-1">
+                                                                            {display}
+                                                                        </span>
+                                                                        <span
+                                                                            className="d-flex align-items-center justify-content-center text-secondary border-start bg-light px-1 fw-bold user-select-none"
+                                                                            style={{ fontSize: '0.65rem', minWidth: '2rem', letterSpacing: '-0.02em' }}
+                                                                            title={labelForActivityUnitOfMeasure(selectedActivity.unit_of_measure)}
+                                                                        >
+                                                                            {symbolForActivityUnitOfMeasure(selectedActivity.unit_of_measure)}
+                                                                        </span>
+                                                                    </div>
+                                                                </td>
+                                                            );
+                                                        })}
+                                                    </tr>
+                                                </tbody>
+                                            </table>
                                         </div>
                                     </div>
 

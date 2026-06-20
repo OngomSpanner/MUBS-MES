@@ -4,6 +4,11 @@ import { requireHrAmbassador } from '@/lib/ambassador/hr-unit';
 import { isSyncedStaff } from '@/lib/ambassador/faculty-staff';
 import { BENEFIT_TYPES, type BenefitType } from '@/lib/hrms/staff-benefits';
 import { labelsFromFyWindow, getPastFinancialYearWindow } from '@/lib/financial-year';
+import {
+  ensureHodReviewWorkflowSchema,
+  hodStatusForAmbassadorSave,
+  parseSubmitForReview,
+} from '@/lib/hod-review-workflow';
 
 const BENEFIT_LABELS = Object.fromEntries(BENEFIT_TYPES.map((b) => [b.value, b.label])) as Record<BenefitType, string>;
 
@@ -16,9 +21,12 @@ export async function GET() {
   const auth = await requireHrAmbassador();
   if ('error' in auth) return auth.error;
 
+  await ensureHodReviewWorkflowSchema();
+
   const rows = (await query({
     query: `
       SELECT e.id, e.user_id, e.financial_year_key, e.benefit_type, e.received,
+             e.hod_review_status, e.hod_review_comment,
              e.created_at, e.updated_at,
              TRIM(CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(u.surname, ''))) AS staff_name,
              COALESCE(NULLIF(TRIM(d.external_name), ''), d.name, '') AS department_name
@@ -34,6 +42,8 @@ export async function GET() {
     financial_year_key: string;
     benefit_type: BenefitType;
     received: number;
+    hod_review_status: string;
+    hod_review_comment: string | null;
     created_at: string;
     updated_at: string;
     staff_name: string;
@@ -51,6 +61,8 @@ export async function GET() {
       benefitType: r.benefit_type,
       benefitLabel: BENEFIT_LABELS[r.benefit_type] ?? r.benefit_type,
       received: Boolean(r.received),
+      hodReviewStatus: r.hod_review_status,
+      hodReviewComment: r.hod_review_comment,
       createdAt: r.created_at,
       updatedAt: r.updated_at,
     })),
@@ -66,6 +78,8 @@ export async function POST(request: Request) {
   const financialYearKey = String(body.financialYearKey || '').trim();
   const benefitType = String(body.benefitType || '').trim() as BenefitType;
   const received = body.received !== false ? 1 : 0;
+  const submitForReview = parseSubmitForReview(body);
+  const hodStatus = hodStatusForAmbassadorSave(submitForReview);
 
   if (!userId || !financialYearKey || !benefitType) {
     return NextResponse.json({ message: 'Staff, financial year, and benefit type are required' }, { status: 400 });
@@ -81,15 +95,19 @@ export async function POST(request: Request) {
   }
 
   try {
+    await ensureHodReviewWorkflowSchema();
     const result = (await query({
       query: `
-        INSERT INTO staff_benefit_entries (user_id, financial_year_key, benefit_type, received)
-        VALUES (?, ?, ?, ?)
+        INSERT INTO staff_benefit_entries (user_id, financial_year_key, benefit_type, received, hod_review_status)
+        VALUES (?, ?, ?, ?, ?)
       `,
-      values: [userId, financialYearKey, benefitType, received],
+      values: [userId, financialYearKey, benefitType, received, hodStatus],
     })) as { insertId: number };
 
-    return NextResponse.json({ id: result.insertId, message: 'Benefit entry saved' }, { status: 201 });
+    return NextResponse.json({
+      id: result.insertId,
+      message: submitForReview ? 'Submitted for HOD review' : 'Draft saved',
+    }, { status: 201 });
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : '';
     if (msg.includes('Duplicate') || msg.includes('uq_staff_benefit')) {

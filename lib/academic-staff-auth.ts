@@ -72,7 +72,7 @@ export async function requireAcademicStaffContext(): Promise<
   if (!profile) {
     return {
       error: NextResponse.json(
-        { message: 'Academic teaching data is only available for academic staff with a department.' },
+        { message: 'Lecturer teaching data is only available for academic staff with a department.' },
         { status: 403 }
       ),
     };

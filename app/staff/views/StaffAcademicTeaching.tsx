@@ -83,8 +83,8 @@ export default function StaffAcademicTeaching() {
     } catch (e: unknown) {
       setError(
         axios.isAxiosError(e)
-          ? e.response?.data?.message ?? 'Could not load academic teaching data'
-          : 'Could not load academic teaching data'
+          ? e.response?.data?.message ?? 'Could not load lecturer teaching data'
+          : 'Could not load lecturer teaching data'
       );
     } finally {
       setLoading(false);

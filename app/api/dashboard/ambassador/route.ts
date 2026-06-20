@@ -6,6 +6,8 @@ import { inPlaceholders } from '@/lib/department-head';
 import { ensureActivityRfNarrativesTable } from '@/lib/activity-rf-narratives';
 import { fyLabelForDateJulyJune } from '@/lib/financial-year';
 import { summarizeEnrollmentIndicators } from '@/lib/enrollment-indicators';
+import { isHrManagedUnit } from '@/lib/ambassador/hr-unit';
+import { isSchoolRegistrarManagedUnit } from '@/lib/ambassador/school-registrar';
 import {
   MAIN_STRATEGIC_ACTIVITY_FILTER,
   RESULTS_FRAMEWORK_KPI_FILTER,
@@ -25,8 +27,14 @@ export async function GET() {
     const scopedDepartmentIds = await getManagedUnitDepartmentIds(managedUnitId);
 
     if (scopedDepartmentIds.length === 0) {
+      const [canManageHrWorkforce, canManageEnrollment] = await Promise.all([
+        isHrManagedUnit(managedUnitId, managedUnitName),
+        isSchoolRegistrarManagedUnit(managedUnitId, managedUnitName),
+      ]);
       return NextResponse.json({
         managedUnitName,
+        canManageHrWorkforce,
+        canManageEnrollment,
         stats: {
           totalActivities: 0,
           overallProgress: 0,
@@ -151,10 +159,16 @@ export async function GET() {
       values: [fyKey, ...scopedDepartmentIds],
     })) as ResultsFrameworkDbRow[];
     const rfSummary = summarizeResultsFramework(mapResultsFrameworkRows(rfRows, fyKey));
-    const enrollment = await summarizeEnrollmentIndicators();
+    const [canManageHrWorkforce, canManageEnrollment] = await Promise.all([
+      isHrManagedUnit(managedUnitId, managedUnitName),
+      isSchoolRegistrarManagedUnit(managedUnitId, managedUnitName),
+    ]);
+    const enrollment = canManageEnrollment ? await summarizeEnrollmentIndicators() : null;
 
     return NextResponse.json({
       managedUnitName,
+      canManageHrWorkforce,
+      canManageEnrollment,
       stats: {
         totalActivities: Number(statsRow?.totalActivities ?? 0),
         overallProgress: Number(statsRow?.overallProgress ?? 0),
@@ -168,10 +182,10 @@ export async function GET() {
         rfUnderperformance: rfSummary.underperformance,
         rfAchievement: rfSummary.achievement,
         rfOverachievement: rfSummary.overachievement,
-        enrollmentProgrammes: enrollment.programme.programmes,
-        enrollmentProgrammeStudents: enrollment.programme.totalStudents,
-        enrollmentCourseUnits: enrollment.courseUnit.courseUnits,
-        enrollmentCourseUnitStudents: enrollment.courseUnit.totalStudents,
+        enrollmentProgrammes: enrollment?.programme.programmes ?? 0,
+        enrollmentProgrammeStudents: enrollment?.programme.totalStudents ?? 0,
+        enrollmentCourseUnits: enrollment?.courseUnit.courseUnits ?? 0,
+        enrollmentCourseUnitStudents: enrollment?.courseUnit.totalStudents ?? 0,
       },
       rfSummary,
       enrollment,

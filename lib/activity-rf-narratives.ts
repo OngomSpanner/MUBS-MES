@@ -1,6 +1,7 @@
 import { query } from '@/lib/db';
 import { isPracticeType, type PracticeType } from '@/lib/results-framework';
 import { fyLabelForDateJulyJune } from '@/lib/financial-year';
+import { ensureHodReviewWorkflowSchema, hodStatusForAmbassadorSave } from '@/lib/hod-review-workflow';
 
 let ensured = false;
 
@@ -75,6 +76,7 @@ export async function upsertActivityRfNarrative(input: {
   outcomeReason: string;
   practiceType: PracticeType | null;
   financialYearKey?: string;
+  submitForReview?: boolean;
 }): Promise<void> {
   await ensureActivityRfNarrativesTable();
   const fy = input.financialYearKey ?? fyLabelForDateJulyJune();
@@ -83,18 +85,22 @@ export async function upsertActivityRfNarrative(input: {
     throw new Error('Outcome explanation must be at least 10 characters.');
   }
 
+  await ensureHodReviewWorkflowSchema();
+  const hodStatus = hodStatusForAmbassadorSave(Boolean(input.submitForReview));
+
   await query({
     query: `
       INSERT INTO activity_rf_narratives
-        (activity_id, financial_year_key, outcome_reason, practice_type, recorded_by)
-      VALUES (?, ?, ?, ?, ?)
+        (activity_id, financial_year_key, outcome_reason, practice_type, recorded_by, hod_review_status)
+      VALUES (?, ?, ?, ?, ?, ?)
       ON DUPLICATE KEY UPDATE
         outcome_reason = VALUES(outcome_reason),
         practice_type = VALUES(practice_type),
         recorded_by = VALUES(recorded_by),
+        hod_review_status = VALUES(hod_review_status),
         updated_at = CURRENT_TIMESTAMP
     `,
-    values: [input.activityId, fy, reason, input.practiceType, input.userId],
+    values: [input.activityId, fy, reason, input.practiceType, input.userId, hodStatus],
   });
 }
 

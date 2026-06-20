@@ -7,6 +7,11 @@ import {
   type ProgrammeEnrollmentRecord,
 } from '@/lib/ambassador/enrollment-records';
 import { ensureEnrollmentFacultyColumns } from '@/lib/enrollment-indicators';
+import {
+  ensureHodReviewWorkflowSchema,
+  hodStatusForAmbassadorSave,
+  parseSubmitForReview,
+} from '@/lib/hod-review-workflow';
 
 function mapRow(r: {
   id: number;
@@ -84,13 +89,17 @@ export async function POST(request: Request) {
   }
 
   const pwdDetails = body.pwdDetails != null ? String(body.pwdDetails).trim() || null : null;
+  const submitForReview = parseSubmitForReview(body);
+  const hodStatus = hodStatusForAmbassadorSave(submitForReview);
 
   try {
+    await ensureEnrollmentFacultyColumns();
+    await ensureHodReviewWorkflowSchema();
     const result = (await query({
       query: `
         INSERT INTO staff_programme_enrollment
-          (faculty_name, programme_name, total_students, male_count, female_count, pwd_count, pwd_details)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
+          (faculty_name, programme_name, total_students, male_count, female_count, pwd_count, pwd_details, hod_review_status)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
       `,
       values: [
         facultyName,
@@ -100,10 +109,14 @@ export async function POST(request: Request) {
         counts.femaleCount,
         counts.pwdCount,
         pwdDetails,
+        hodStatus,
       ],
     })) as { insertId: number };
 
-    return NextResponse.json({ id: result.insertId, message: 'Programme enrollment saved' });
+    return NextResponse.json({
+      id: result.insertId,
+      message: submitForReview ? 'Submitted for HOD review' : 'Draft saved',
+    });
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : '';
     if (msg.includes('Duplicate') || msg.includes('uq_programme')) {

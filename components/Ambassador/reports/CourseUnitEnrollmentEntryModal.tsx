@@ -21,6 +21,7 @@ type CourseUnitEnrollmentEntryModalProps = {
     maleCount: number;
     femaleCount: number;
     pwdCount: number;
+    submitForReview?: boolean;
   }) => void;
 };
 
@@ -61,8 +62,7 @@ function CourseUnitEnrollmentForm({
   const [femaleCount, setFemaleCount] = useState(defaults.femaleCount);
   const [pwdCount, setPwdCount] = useState(defaults.pwdCount);
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
+  const save = (submitForReview: boolean) => {
     if (!courseUnitName.trim() || !facultyName.trim()) return;
     onSave({
       facultyName: facultyName.trim(),
@@ -71,7 +71,13 @@ function CourseUnitEnrollmentForm({
       maleCount: Math.max(0, Number(maleCount) || 0),
       femaleCount: Math.max(0, Number(femaleCount) || 0),
       pwdCount: Math.max(0, Number(pwdCount) || 0),
+      submitForReview,
     });
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    save(false);
   };
 
   return (
@@ -106,8 +112,11 @@ function CourseUnitEnrollmentForm({
         <Button variant="secondary" onClick={onHide} disabled={saving}>
           Cancel
         </Button>
-        <Button type="submit" variant="primary" disabled={saving} style={{ background: 'var(--mubs-blue)', borderColor: 'var(--mubs-blue)' }}>
-          {saving ? 'Saving…' : 'Save'}
+        <Button type="submit" variant="outline-primary" disabled={saving}>
+          {saving ? 'Saving…' : 'Save draft'}
+        </Button>
+        <Button type="button" variant="primary" disabled={saving} style={{ background: 'var(--mubs-blue)', borderColor: 'var(--mubs-blue)' }} onClick={() => save(true)}>
+          Submit for HOD review
         </Button>
       </Modal.Footer>
     </Form>

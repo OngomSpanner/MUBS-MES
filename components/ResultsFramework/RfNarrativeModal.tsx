@@ -40,7 +40,7 @@ export default function RfNarrativeModal({ show, row, financialYear, onHide, onS
   const needsPracticeType =
     row?.performanceStatus === 'achievement' || row?.performanceStatus === 'overachievement';
 
-  const handleSubmit = async (e: FormEvent) => {
+  const handleSubmit = async (e: FormEvent, submitForReview = true) => {
     e.preventDefault();
     if (!row) return;
     setSubmitting(true);
@@ -51,6 +51,7 @@ export default function RfNarrativeModal({ show, row, financialYear, onHide, onS
         financialYear,
         outcomeReason,
         practiceType: needsPracticeType ? practiceType : null,
+        submitForReview,
       });
       onSaved();
       onHide();
@@ -72,7 +73,7 @@ export default function RfNarrativeModal({ show, row, financialYear, onHide, onS
           Record Results Framework outcome
         </Modal.Title>
       </Modal.Header>
-      <form onSubmit={handleSubmit}>
+      <form onSubmit={(e) => void handleSubmit(e, true)}>
         <Modal.Body>
           {row ? (
             <>
@@ -118,8 +119,11 @@ export default function RfNarrativeModal({ show, row, financialYear, onHide, onS
           <Button variant="light" onClick={onHide} disabled={submitting}>
             Cancel
           </Button>
+          <Button type="button" variant="outline-primary" onClick={(e) => void handleSubmit(e, false)} disabled={submitting || !row}>
+            Save draft
+          </Button>
           <Button type="submit" variant="primary" disabled={submitting || !row}>
-            {submitting ? 'Saving…' : 'Save narrative'}
+            {submitting ? 'Submitting…' : 'Submit for HOD review'}
           </Button>
         </Modal.Footer>
       </form>

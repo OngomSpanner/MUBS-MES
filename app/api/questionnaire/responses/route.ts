@@ -1,6 +1,11 @@
 import { NextResponse } from 'next/server';
 import { query } from '@/lib/db';
 import { requireAmbassador } from '@/lib/ambassador/context';
+import {
+  ensureHodReviewWorkflowSchema,
+  hodStatusForAmbassadorSave,
+  parseSubmitForReview,
+} from '@/lib/hod-review-workflow';
 
 export const dynamic = 'force-dynamic';
 
@@ -54,6 +59,22 @@ export async function POST(request: Request) {
   }) as any[];
   if (!assigned.length) return NextResponse.json({ message: 'Not assigned to your department' }, { status: 403 });
 
+  await ensureHodReviewWorkflowSchema();
+  const submitForReview = parseSubmitForReview(body);
+  if (submitForReview) {
+    const locked = await query({
+      query: `SELECT 1 FROM q_indicator_submissions
+              WHERE indicator_id = ? AND department_id = ? AND hod_review_status = 'submitted'`,
+      values: [indicatorId, auth.managedUnitId],
+    }) as unknown[];
+    if (locked.length) {
+      return NextResponse.json(
+        { message: 'This indicator is awaiting HOD review. Wait for approval or return before editing.' },
+        { status: 409 }
+      );
+    }
+  }
+
   const now = new Date().toISOString().slice(0, 19).replace('T', ' ');
   for (const entry of entries) {
     const metricId = Number(entry.metric_id);
@@ -68,5 +89,19 @@ export async function POST(request: Request) {
     });
   }
 
-  return NextResponse.json({ message: 'Saved' });
+  const hodStatus = hodStatusForAmbassadorSave(submitForReview);
+  await query({
+    query: `INSERT INTO q_indicator_submissions (indicator_id, department_id, hod_review_status, submitted_by, submitted_at)
+            VALUES (?, ?, ?, ?, ?)
+            ON DUPLICATE KEY UPDATE
+              hod_review_status = VALUES(hod_review_status),
+              submitted_by = VALUES(submitted_by),
+              submitted_at = IF(VALUES(hod_review_status) = 'submitted', VALUES(submitted_at), submitted_at)`,
+    values: [indicatorId, auth.managedUnitId, hodStatus, auth.userId, submitForReview ? now : null],
+  });
+
+  return NextResponse.json({
+    message: submitForReview ? 'Submitted for HOD review' : 'Draft saved',
+    hodReviewStatus: hodStatus,
+  });
 }

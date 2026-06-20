@@ -68,6 +68,7 @@ export default function AmbassadorBenefitsDataPanel({
     financialYearKey: string;
     benefitType: string;
     received: boolean;
+    submitForReview?: boolean;
   }) => {
     setSaving(true);
     setModalError(null);

@@ -1,4 +1,5 @@
 import { query } from '@/lib/db';
+import { sqlAdminApprovedOnly } from '@/lib/hod-review-workflow';
 import { getRollingReportFyWindow, labelsFromFyWindow } from '@/lib/financial-year';
 
 export type BenefitType =
@@ -123,6 +124,7 @@ async function loadBenefitEntries(
         FROM staff_benefit_entries
         WHERE financial_year_key IN (${yearPlaceholders})
           AND received = 1
+          AND ${sqlAdminApprovedOnly('staff_benefit_entries')}
       `,
       values: yearKeys,
     })) as { user_id: number; financial_year_key: string; benefit_type: BenefitType }[];

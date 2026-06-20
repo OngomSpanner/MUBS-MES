@@ -12,11 +12,11 @@ import {
 import {
   ACTIVITY_FY_UNIT_OF_MEASURE_OPTIONS,
   normalizeActivityUnitOfMeasure,
-  symbolForActivityUnitOfMeasure,
-  labelForActivityUnitOfMeasure,
 } from '@/lib/activity-unit-of-measure';
+import ActivityFyTargetsFields, {
+  type ActivityFyTargetsFormValue,
+} from '@/components/Activities/ActivityFyTargetsFields';
 import axios from 'axios';
-import { fyRangeJulyJune, formatFyRangeShort } from '@/lib/financial-year';
 
 interface Activity {
   id?: number;
@@ -37,7 +37,7 @@ interface Activity {
   progress?: number;
 }
 
-type FormState = {
+type FormState = ActivityFyTargetsFormValue & {
   title: string;
   strategic_objective: string;
   standard_id: string;
@@ -45,8 +45,7 @@ type FormState = {
   department_ids: number[];
   status: string;
   parent_id: string;
-  unit_of_measure: string;
-} & Record<ActivityFyTargetKey, string>;
+};
 
 interface CreateActivityModalProps {
   show: boolean;
@@ -214,6 +213,14 @@ export default function CreateActivityModal({
   };
 
   const selectedStandard = standards.find(s => String(s.id) === formData.standard_id);
+  const fyTargetsValue: ActivityFyTargetsFormValue = {
+    unit_of_measure: formData.unit_of_measure,
+    target_fy25_26: formData.target_fy25_26,
+    target_fy26_27: formData.target_fy26_27,
+    target_fy27_28: formData.target_fy27_28,
+    target_fy28_29: formData.target_fy28_29,
+    target_fy29_30: formData.target_fy29_30,
+  };
 
   return (
     <Modal
@@ -298,67 +305,10 @@ export default function CreateActivityModal({
             </div>
 
             <div className="col-12">
-              <Form.Label className="fw-bold small mb-1">Unit of measure (FY targets)</Form.Label>
-              <Form.Select
-                size="sm"
-                value={formData.unit_of_measure}
-                onChange={(e) => setFormData({ ...formData, unit_of_measure: e.target.value })}
-                required
-              >
-                {ACTIVITY_FY_UNIT_OF_MEASURE_OPTIONS.map((opt) => (
-                  <option key={opt.value} value={opt.value}>
-                    {opt.label}
-                  </option>
-                ))}
-              </Form.Select>
-            </div>
-
-            <div className="col-12">
-              <Form.Label className="fw-bold small mb-1">Targets by financial year</Form.Label>
-              <div className="table-responsive border rounded">
-                <table className="table table-sm table-bordered align-middle mb-0" style={{ fontSize: '0.72rem' }}>
-                  <thead className="table-light">
-                    <tr>
-                      {ACTIVITY_FY_TARGET_COLUMNS.map(({ key, label }) => (
-                        <th key={key} className="text-center px-1 py-1">
-                          <span title={formatFyRangeShort(fyRangeJulyJune(label.replace('FY ', '')))}>
-                            {label.replace('FY ', '')}
-                          </span>
-                        </th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <tr>
-                      {ACTIVITY_FY_TARGET_COLUMNS.map(({ key }) => (
-                        <td key={key} className="p-0 align-middle">
-                          <div className="d-flex align-items-stretch">
-                            <Form.Control
-                              type="number"
-                              step="any"
-                              size="sm"
-                              className="text-center border-0 rounded-0 flex-grow-1"
-                              style={{ fontSize: '0.8rem', minWidth: 0 }}
-                              placeholder="—"
-                              value={formData[key]}
-                              onChange={(e) =>
-                                setFormData({ ...formData, [key]: e.target.value } as FormState)
-                              }
-                            />
-                            <span
-                              className="d-flex align-items-center justify-content-center text-secondary border-start bg-light px-1 fw-bold user-select-none"
-                              style={{ fontSize: '0.65rem', minWidth: '2rem', letterSpacing: '-0.02em' }}
-                              title={labelForActivityUnitOfMeasure(formData.unit_of_measure)}
-                            >
-                              {symbolForActivityUnitOfMeasure(formData.unit_of_measure)}
-                            </span>
-                          </div>
-                        </td>
-                      ))}
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
+              <ActivityFyTargetsFields
+                value={fyTargetsValue}
+                onChange={(next) => setFormData({ ...formData, ...next })}
+              />
             </div>
 
             <div className="col-12 pt-2 border-top">

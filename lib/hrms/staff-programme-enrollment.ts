@@ -1,6 +1,7 @@
 import { query } from '@/lib/db';
 import { ensureEnrollmentFacultyColumns } from '@/lib/enrollment-indicators';
 import { normalizeEnrollmentFacultyName } from '@/lib/ambassador/enrollment-records';
+import { sqlAdminApprovedOnly } from '@/lib/hod-review-workflow';
 
 export type ProgrammeEnrollmentGenderFilter = 'all' | 'male' | 'female';
 export type ProgrammeEnrollmentPwdFilter = 'all' | 'yes' | 'no' | 'not_recorded';
@@ -90,7 +91,7 @@ export async function generateStaffProgrammeEnrollmentReport(options?: {
           pwd_count,
           pwd_details
         FROM staff_programme_enrollment
-        ${facultySql}
+        ${facultySql ? `${facultySql} AND` : 'WHERE'} ${sqlAdminApprovedOnly('staff_programme_enrollment')}
         ORDER BY faculty_name ASC, programme_name ASC
       `,
       values,

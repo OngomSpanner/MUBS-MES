@@ -1,5 +1,6 @@
 import { query } from '@/lib/db';
 import { getRollingReportFyWindow, labelsFromFyWindow } from '@/lib/financial-year';
+import { sqlAdminApprovedOnly } from '@/lib/hod-review-workflow';
 
 export type EmploymentSkillYearCell = {
   yearKey: string;
@@ -40,6 +41,7 @@ async function loadYearCounts(
         SELECT financial_year_key, reports_produced, skills_missing
         FROM staff_employment_skill_status
         WHERE financial_year_key IN (${placeholders})${unitClause}
+          AND ${sqlAdminApprovedOnly('staff_employment_skill_status')}
       `,
       values,
     })) as { financial_year_key: string; reports_produced: number; skills_missing: number }[];

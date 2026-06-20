@@ -18,6 +18,8 @@ const quickActionHover = {
 
 interface AmbassadorData {
     managedUnitName: string;
+    canManageHrWorkforce?: boolean;
+    canManageEnrollment?: boolean;
     stats: {
         totalActivities: number;
         overallProgress: number;
@@ -38,6 +40,46 @@ interface AmbassadorData {
     };
     subUnits: Array<{ id: number; name: string; progress: number; activityCount: number }>;
     riskAlerts: Array<{ id: number; title: string; department: string; status: string; progress: number; dueDate: string | null }>;
+}
+
+type ReportingQuickCard = {
+    href: string;
+    title: string;
+    subtitle: string;
+    icon: string;
+    iconColor: string;
+    iconBg: string;
+};
+
+function reportingQuickCard(data: AmbassadorData): ReportingQuickCard {
+    if (data.canManageEnrollment && !data.canManageHrWorkforce) {
+        return {
+            href: '/ambassador?pg=reporting&tab=programme-enrollment',
+            title: 'Enrollment',
+            subtitle: 'Reporting · programmes & course units',
+            icon: 'school',
+            iconColor: 'var(--mubs-blue)',
+            iconBg: 'rgba(0, 86, 150, 0.1)',
+        };
+    }
+    if (data.canManageHrWorkforce) {
+        return {
+            href: '/ambassador?pg=reporting&tab=benefits',
+            title: 'HR & workforce',
+            subtitle: 'Reporting · benefits & assessments',
+            icon: 'groups',
+            iconColor: '#0d9488',
+            iconBg: 'rgba(13, 148, 136, 0.1)',
+        };
+    }
+    return {
+        href: '/ambassador?pg=reporting&tab=data-collection',
+        title: 'Performance indicators',
+        subtitle: 'Reporting · unit questionnaire data',
+        icon: 'bar_chart',
+        iconColor: 'var(--mubs-blue)',
+        iconBg: 'rgba(0, 86, 150, 0.1)',
+    };
 }
 
 export default function AmbassadorDashboard() {
@@ -85,6 +127,10 @@ export default function AmbassadorDashboard() {
     }
 
     const { managedUnitName, stats, subUnits, riskAlerts } = data;
+    const reportingCard = reportingQuickCard(data);
+    const showEnrollment =
+        Boolean(data.canManageEnrollment) &&
+        ((stats.enrollmentProgrammes ?? 0) > 0 || (stats.enrollmentCourseUnits ?? 0) > 0);
 
     return (
         <div id="page-dashboard" className="page-section active-page">
@@ -183,7 +229,7 @@ export default function AmbassadorDashboard() {
                 </div>
             ) : null}
 
-            {(stats.enrollmentProgrammes ?? 0) > 0 || (stats.enrollmentCourseUnits ?? 0) > 0 ? (
+            {showEnrollment ? (
                 <div className="row g-3 mb-4">
                     <div className="col-12">
                         <div className="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-1">
@@ -291,18 +337,18 @@ export default function AmbassadorDashboard() {
                     </Link>
                 </div>
                 <div className="col-12 col-sm-6 col-xl-3">
-                    <Link href="/ambassador?pg=reporting&tab=recruitment" className="text-decoration-none h-100">
+                    <Link href={reportingCard.href} className="text-decoration-none h-100">
                         <div
                             className="quick-action-card p-3 d-flex align-items-center gap-2 gap-sm-3 bg-white border rounded-4 shadow-sm h-100"
                             style={{ transition: 'all 0.2s', cursor: 'pointer', minHeight: '92px' }}
                             {...quickActionHover}
                         >
-                            <div className="icon-box d-flex align-items-center justify-content-center flex-shrink-0" style={{ width: '48px', height: '48px', borderRadius: '14px', background: 'rgba(0, 86, 150, 0.1)' }}>
-                                <span className="material-symbols-outlined" style={{ color: 'var(--mubs-blue)', fontSize: '22px' }}>bar_chart</span>
+                            <div className="icon-box d-flex align-items-center justify-content-center flex-shrink-0" style={{ width: '48px', height: '48px', borderRadius: '14px', background: reportingCard.iconBg }}>
+                                <span className="material-symbols-outlined" style={{ color: reportingCard.iconColor, fontSize: '22px' }}>{reportingCard.icon}</span>
                             </div>
                             <div className="min-w-0">
-                                <div className="fw-black text-dark" style={{ fontSize: '.95rem', lineHeight: 1.25 }}>Unit reporting</div>
-                                <div className="text-muted small" style={{ fontSize: '.78rem' }}>HR & M&E data entry</div>
+                                <div className="fw-black text-dark" style={{ fontSize: '.95rem', lineHeight: 1.25 }}>{reportingCard.title}</div>
+                                <div className="text-muted small" style={{ fontSize: '.78rem' }}>{reportingCard.subtitle}</div>
                             </div>
                         </div>
                     </Link>

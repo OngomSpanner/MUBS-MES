@@ -6,12 +6,17 @@ import {
   parseEnrollmentCounts,
 } from '@/lib/ambassador/enrollment-records';
 import { ensureEnrollmentFacultyColumns } from '@/lib/enrollment-indicators';
+import {
+  ensureHodReviewWorkflowSchema,
+  hodStatusForAmbassadorSave,
+  parseSubmitForReview,
+} from '@/lib/hod-review-workflow';
 
 async function getRecord(id: number) {
   const rows = (await query({
-    query: `SELECT id FROM staff_programme_enrollment WHERE id = ? LIMIT 1`,
+    query: `SELECT id, hod_review_status FROM staff_programme_enrollment WHERE id = ? LIMIT 1`,
     values: [id],
-  })) as { id: number }[];
+  })) as { id: number; hod_review_status: string }[];
   return rows[0] ?? null;
 }
 
@@ -43,12 +48,23 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   }
 
   const pwdDetails = body.pwdDetails != null ? String(body.pwdDetails).trim() || null : null;
+  const submitForReview = parseSubmitForReview(body);
+
+  if (existing.hod_review_status === 'submitted' && !submitForReview) {
+    return NextResponse.json(
+      { message: 'This entry is awaiting HOD review and cannot be edited.' },
+      { status: 409 }
+    );
+  }
+
+  const hodStatus = hodStatusForAmbassadorSave(submitForReview);
 
   try {
+    await ensureHodReviewWorkflowSchema();
     await query({
       query: `
         UPDATE staff_programme_enrollment
-        SET faculty_name = ?, programme_name = ?, total_students = ?, male_count = ?, female_count = ?, pwd_count = ?, pwd_details = ?
+        SET faculty_name = ?, programme_name = ?, total_students = ?, male_count = ?, female_count = ?, pwd_count = ?, pwd_details = ?, hod_review_status = ?
         WHERE id = ?
       `,
       values: [
@@ -59,10 +75,13 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
         counts.femaleCount,
         counts.pwdCount,
         pwdDetails,
+        hodStatus,
         id,
       ],
     });
-    return NextResponse.json({ message: 'Programme enrollment updated' });
+    return NextResponse.json({
+      message: submitForReview ? 'Submitted for HOD review' : 'Draft saved',
+    });
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : '';
     if (msg.includes('Duplicate') || msg.includes('uq_programme')) {
