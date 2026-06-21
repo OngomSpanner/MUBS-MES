@@ -61,18 +61,25 @@ export async function POST(request: Request) {
 
   await ensureHodReviewWorkflowSchema();
   const submitForReview = parseSubmitForReview(body);
-  if (submitForReview) {
-    const locked = await query({
-      query: `SELECT 1 FROM q_indicator_submissions
-              WHERE indicator_id = ? AND department_id = ? AND hod_review_status = 'submitted'`,
-      values: [indicatorId, auth.managedUnitId],
-    }) as unknown[];
-    if (locked.length) {
-      return NextResponse.json(
-        { message: 'This indicator is awaiting HOD review. Wait for approval or return before editing.' },
-        { status: 409 }
-      );
-    }
+
+  const existingSubmission = await query({
+    query: `SELECT hod_review_status FROM q_indicator_submissions
+            WHERE indicator_id = ? AND department_id = ?`,
+    values: [indicatorId, auth.managedUnitId],
+  }) as { hod_review_status: string }[];
+
+  const currentStatus = existingSubmission[0]?.hod_review_status;
+  if (currentStatus === 'submitted') {
+    return NextResponse.json(
+      { message: 'This indicator is awaiting HOD review. Wait for approval or return before editing.' },
+      { status: 409 }
+    );
+  }
+  if (currentStatus === 'approved') {
+    return NextResponse.json(
+      { message: 'This indicator has been approved by HOD. It cannot be edited unless the HOD returns it.' },
+      { status: 409 }
+    );
   }
 
   const now = new Date().toISOString().slice(0, 19).replace('T', ' ');
