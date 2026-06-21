@@ -1,8 +1,8 @@
 import { query } from '@/lib/db';
 import {
   attachAmbassadorGroup,
-  isOutreachCentre,
-  isRegionalCampus,
+  matchesOutreachCentreLabels,
+  matchesRegionalCampusLabels,
   type AmbassadorDepartmentRow,
   type AmbassadorGroupIdSets,
 } from '@/lib/department-ambassador-groups';
@@ -16,6 +16,12 @@ type DepartmentQueryRow = {
   is_active: number | null;
   external_name: string | null;
   parent_name: string | null;
+};
+
+type DepartmentIdRow = {
+  id: number;
+  name: string;
+  external_name: string | null;
 };
 
 function displayName(row: DepartmentQueryRow): string {
@@ -33,7 +39,8 @@ let cachedIdSetsAt = 0;
 const ID_SETS_CACHE_MS = 60_000;
 
 /**
- * Resolve outreach/regional department ids from registered rows in departments table.
+ * Resolve outreach/regional department ids from all registered departments (Option C).
+ * Matches departments.name and external_name against canonical names + aliases (Option B).
  * Server-only — do not import this module from client components.
  */
 export async function buildAmbassadorGroupIdSets(forceRefresh = false): Promise<AmbassadorGroupIdSets> {
@@ -43,19 +50,24 @@ export async function buildAmbassadorGroupIdSets(forceRefresh = false): Promise<
   }
 
   const rows = (await query({
-    query: `SELECT id, name FROM departments WHERE is_active = 1 OR is_active IS NULL`,
+    query: `
+      SELECT id, name, external_name
+      FROM departments
+      WHERE is_active = 1 OR is_active IS NULL
+    `,
     values: [],
-  })) as { id: number; name: string }[];
+  })) as DepartmentIdRow[];
 
   const outreach = new Set<number>();
   const regional = new Set<number>();
 
   for (const row of rows) {
-    const name = String(row.name || '').trim();
-    if (!name) continue;
     const id = Number(row.id);
-    if (isOutreachCentre(name)) outreach.add(id);
-    if (isRegionalCampus(name)) regional.add(id);
+    const name = String(row.name || '').trim();
+    const external = row.external_name?.trim() || null;
+
+    if (matchesOutreachCentreLabels(name, external)) outreach.add(id);
+    if (matchesRegionalCampusLabels(name, external)) regional.add(id);
   }
 
   cachedIdSets = { outreach, regional };
@@ -63,9 +75,15 @@ export async function buildAmbassadorGroupIdSets(forceRefresh = false): Promise<
   return cachedIdSets;
 }
 
+/** Clear cached id sets (e.g. after department rename in admin). */
+export function clearAmbassadorGroupIdSetsCache(): void {
+  cachedIdSets = null;
+  cachedIdSetsAt = 0;
+}
+
 /**
  * Departments that have at least one user with the Ambassador role assigned via managed_unit_id.
- * Grouping uses departments.id + departments.name (not external_name).
+ * Grouping uses departments.id (Option C) with name/alias resolution from registered labels.
  */
 export async function fetchDepartmentsWithAmbassador(activeOnly = true): Promise<AmbassadorDepartmentRow[]> {
   const activeClause = activeOnly ? ' AND (d.is_active = 1 OR d.is_active IS NULL)' : '';

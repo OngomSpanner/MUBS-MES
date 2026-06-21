@@ -24,8 +24,8 @@ export const AMBASSADOR_GROUP_BADGE_LABELS: Record<AmbassadorDepartmentGroup, st
 
 /** Tooltip text describing each group's matching rule. */
 export const AMBASSADOR_GROUP_TITLES: Record<AmbassadorDepartmentGroup, string> = {
-  outreach: 'Registered outreach centres from the system allowlist (by department id / name)',
-  regional: 'Registered regional campuses from the system allowlist (by department id / name)',
+  outreach: 'Registered outreach centres (matched by department id from system name + known aliases)',
+  regional: 'Registered regional campuses (matched by department id from system name + known aliases)',
   faculty: 'Registered units whose system name starts with Faculty of',
   department_of: 'Registered units whose system name starts with Department of',
 };
@@ -41,6 +41,11 @@ export const OUTREACH_CENTRE_NAMES = [
   'ICT CENTRE',
 ] as const;
 
+/** Known production / HR spelling variants (Option B). Matched same as canonical names. */
+export const OUTREACH_CENTRE_NAME_ALIASES = [
+  'DISABILITY RESOURCE AND LEARNING CENTRE',
+] as const;
+
 /** Registered regional campus names in departments.name (exact allowlist). */
 export const REGIONAL_CAMPUS_NAMES = [
   'MUBS REGIONAL CAMPUS-ARUA',
@@ -48,6 +53,18 @@ export const REGIONAL_CAMPUS_NAMES = [
   'MUBS REGIONAL CAMPUS-JINJA',
   'MUBS REGIONAL CAMPUS-MBALE',
 ] as const;
+
+/** Regional campus spelling variants (Option B). */
+export const REGIONAL_CAMPUS_NAME_ALIASES = [
+  'MUBS REGIONAL CAMPUS ARUA',
+  'MUBS REGIONAL CAMPUS - ARUA',
+  'MUBS REGIONAL CAMPUS - MBARARA',
+  'MUBS REGIONAL CAMPUS - JINJA',
+  'MUBS REGIONAL CAMPUS - MBALE',
+] as const;
+
+const ALL_OUTREACH_NAMES: readonly string[] = [...OUTREACH_CENTRE_NAMES, ...OUTREACH_CENTRE_NAME_ALIASES];
+const ALL_REGIONAL_NAMES: readonly string[] = [...REGIONAL_CAMPUS_NAMES, ...REGIONAL_CAMPUS_NAME_ALIASES];
 
 export type AmbassadorGroupIdSets = {
   outreach: ReadonlySet<number>;
@@ -73,12 +90,30 @@ function matchesStrictAllowlist(registeredName: string, allowlist: readonly stri
   return allowlist.some((entry) => normalizeAllowlistName(entry) === normalized);
 }
 
-export function isOutreachCentre(registeredName: string): boolean {
-  return matchesStrictAllowlist(registeredName, OUTREACH_CENTRE_NAMES);
+export function isOutreachCentre(name: string): boolean {
+  return matchesStrictAllowlist(name, ALL_OUTREACH_NAMES);
 }
 
-export function isRegionalCampus(registeredName: string): boolean {
-  return matchesStrictAllowlist(registeredName, REGIONAL_CAMPUS_NAMES);
+export function isRegionalCampus(name: string): boolean {
+  return matchesStrictAllowlist(name, ALL_REGIONAL_NAMES);
+}
+
+/** True when department id is in the resolved outreach/regional id sets (Option C). */
+export function isOutreachCentreId(id: number, idSets: AmbassadorGroupIdSets): boolean {
+  return idSets.outreach.has(id);
+}
+
+export function isRegionalCampusId(id: number, idSets: AmbassadorGroupIdSets): boolean {
+  return idSets.regional.has(id);
+}
+
+/** Match any candidate label (name, external_name) against outreach allowlist + aliases. */
+export function matchesOutreachCentreLabels(...labels: (string | null | undefined)[]): boolean {
+  return labels.some((label) => label && isOutreachCentre(label));
+}
+
+export function matchesRegionalCampusLabels(...labels: (string | null | undefined)[]): boolean {
+  return labels.some((label) => label && isRegionalCampus(label));
 }
 
 export function isFacultyDepartment(registeredName: string): boolean {
@@ -91,14 +126,16 @@ export function isDepartmentOfUnit(registeredName: string): boolean {
 
 /**
  * Classify a registered department record.
- * Outreach/regional use id sets resolved from departments.name; faculty/dept use registered name only.
+ * Outreach/regional: primary match by departments.id (Option C), fallback by name/alias labels.
  */
 export function classifyAmbassadorDepartmentGroupForRecord(
-  record: { id: number; registeredName: string },
+  record: { id: number; registeredName: string; displayName?: string | null },
   idSets: AmbassadorGroupIdSets,
 ): AmbassadorDepartmentGroup | null {
   if (idSets.outreach.has(record.id)) return 'outreach';
   if (idSets.regional.has(record.id)) return 'regional';
+  if (matchesOutreachCentreLabels(record.registeredName, record.displayName)) return 'outreach';
+  if (matchesRegionalCampusLabels(record.registeredName, record.displayName)) return 'regional';
   if (isFacultyDepartment(record.registeredName)) return 'faculty';
   if (isDepartmentOfUnit(record.registeredName)) return 'department_of';
   return null;
@@ -131,7 +168,7 @@ export function attachAmbassadorGroup(
   return {
     ...row,
     ambassador_group: classifyAmbassadorDepartmentGroupForRecord(
-      { id: row.id, registeredName: row.registered_name },
+      { id: row.id, registeredName: row.registered_name, displayName: row.name },
       idSets,
     ),
   };
