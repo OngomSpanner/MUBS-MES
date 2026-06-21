@@ -191,6 +191,29 @@ export async function PATCH(request: Request) {
       return NextResponse.json({ message: 'Comment required when returning' }, { status: 400 });
     }
 
+    const deptPlaceholders = inPlaceholders(auth.departmentIds.length);
+    let ownershipQuery: string;
+    let ownershipValues: unknown[];
+
+    if (category === 'benefits') {
+      ownershipQuery = `SELECT e.id FROM ${table} e INNER JOIN users u ON u.id = e.user_id WHERE e.id = ? AND u.department_id IN (${deptPlaceholders})`;
+      ownershipValues = [id, ...auth.departmentIds];
+    } else if (category === 'workforce' || category === 'skills') {
+      ownershipQuery = `SELECT id FROM ${table} WHERE id = ? AND managed_unit_id IN (${deptPlaceholders})`;
+      ownershipValues = [id, ...auth.departmentIds];
+    } else if (category === 'rf-narrative') {
+      ownershipQuery = `SELECT arn.id FROM ${table} arn INNER JOIN strategic_activities sa ON sa.id = arn.activity_id WHERE arn.id = ? AND sa.department_id IN (${deptPlaceholders})`;
+      ownershipValues = [id, ...auth.departmentIds];
+    } else {
+      ownershipQuery = `SELECT id FROM ${table} WHERE id = ?`;
+      ownershipValues = [id];
+    }
+
+    const owned = (await query({ query: ownershipQuery, values: ownershipValues })) as { id: number }[];
+    if (!owned.length) {
+      return NextResponse.json({ message: 'Record not found or not in your department scope' }, { status: 403 });
+    }
+
     const status = action === 'approve' ? 'approved' : 'returned';
     await query({
       query: `
