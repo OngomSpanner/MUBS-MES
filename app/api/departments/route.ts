@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { query } from '@/lib/db';
 import { cookies } from 'next/headers';
 import { verifyToken } from '@/lib/auth';
+import { fetchDepartmentsWithAmbassador } from '@/lib/departments-with-ambassador';
 
 export async function GET(request: Request) {
     try {
@@ -22,7 +23,14 @@ export async function GET(request: Request) {
         const parentsOnly = searchParams.get('parents_only') === 'true' || searchParams.get('parents_only') === '1';
         const childrenOnly = searchParams.get('children_only') === 'true' || searchParams.get('children_only') === '1';
         const activeOnly = searchParams.get('active_only') === 'true' || searchParams.get('active_only') === '1';
-        
+        const withAmbassador =
+            searchParams.get('with_ambassador') === 'true' || searchParams.get('with_ambassador') === '1';
+
+        if (withAmbassador) {
+            const departments = await fetchDepartmentsWithAmbassador(activeOnly || !searchParams.has('active_only'));
+            return NextResponse.json(departments);
+        }
+
         let departments: any[];
         try {
             let sql = `

@@ -1,11 +1,17 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Badge, Form, Spinner } from 'react-bootstrap';
+import { Badge, Spinner } from 'react-bootstrap';
 import axios from 'axios';
 import * as XLSX from 'xlsx';
 import CollectedDataFlatTable, { type CollectedDataRow } from '@/components/Reports/CollectedDataFlatTable';
 import ReportsSectionHeader from '@/components/Reports/ReportsSectionHeader';
+import AmbassadorDepartmentGroupFilter, {
+  ALL_AMBASSADOR_DEPARTMENTS_FILTER,
+  resolveAmbassadorDepartmentIds,
+  type AmbassadorDepartmentFilterValue,
+} from '@/components/AmbassadorDepartmentGroupFilter';
+import type { AmbassadorDepartmentRow } from '@/lib/department-ambassador-groups';
 import { UOM_OPTIONS } from '@/lib/questionnaire/uom';
 import { normalizeFinancialYear } from '@/lib/questionnaire/fy-utils';
 
@@ -61,9 +67,30 @@ export default function AmbassadorCollectedDataPanel() {
   const [loadingResponses, setLoadingResponses] = useState<Set<number>>(new Set());
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [departmentFilter, setDepartmentFilter] = useState<string>('all');
+  const [ambassadorDepartments, setAmbassadorDepartments] = useState<AmbassadorDepartmentRow[]>([]);
+  const [departmentFilter, setDepartmentFilter] = useState<AmbassadorDepartmentFilterValue>(
+    ALL_AMBASSADOR_DEPARTMENTS_FILTER,
+  );
   const [fyFilter, setFyFilter] = useState<string>('all');
   const [uomFilter, setUomFilter] = useState<string>('all');
+
+  const loadAmbassadorDepartments = useCallback(async () => {
+    try {
+      const res = await axios.get('/api/departments?with_ambassador=true&active_only=true');
+      const rows = Array.isArray(res.data) ? res.data : [];
+      setAmbassadorDepartments(
+        rows.map((d: AmbassadorDepartmentRow) => ({
+          id: Number(d.id),
+          name: String(d.name),
+          parent_id: d.parent_id != null ? Number(d.parent_id) : null,
+          unit_type: d.unit_type || 'department',
+          ambassador_group: d.ambassador_group ?? null,
+        })),
+      );
+    } catch {
+      setAmbassadorDepartments([]);
+    }
+  }, []);
 
   const loadIndicators = useCallback(async () => {
     setLoading(true);
@@ -82,7 +109,8 @@ export default function AmbassadorCollectedDataPanel() {
 
   useEffect(() => {
     void loadIndicators();
-  }, [loadIndicators]);
+    void loadAmbassadorDepartments();
+  }, [loadIndicators, loadAmbassadorDepartments]);
 
   const loadResponses = useCallback(async (indicatorId: number, force = false) => {
     if (!force && (responsesByIndicator[indicatorId] || loadingResponses.has(indicatorId))) return;
@@ -114,31 +142,24 @@ export default function AmbassadorCollectedDataPanel() {
     }
   }, [allIndicators]); // eslint-disable-line react-hooks/exhaustive-deps -- prefetch once per indicator set
 
-  const departments = useMemo(() => {
-    const byId = new Map<number, string>();
-    for (const ind of allIndicators) {
-      for (const d of ind.departments) {
-        byId.set(d.id, d.name);
-      }
-    }
-    return Array.from(byId.entries())
-      .map(([id, name]) => ({ id, name }))
-      .sort((a, b) => a.name.localeCompare(b.name));
-  }, [allIndicators]);
+  const activeDepartmentIds = useMemo(
+    () => resolveAmbassadorDepartmentIds(ambassadorDepartments, departmentFilter),
+    [ambassadorDepartments, departmentFilter],
+  );
 
   const indicators = useMemo(() => {
-    if (departmentFilter === 'all') return allIndicators;
-    const deptId = Number(departmentFilter);
-    return allIndicators.filter((ind) => ind.departments.some((d) => d.id === deptId));
-  }, [allIndicators, departmentFilter]);
+    if (!activeDepartmentIds) return allIndicators;
+    const idSet = new Set(activeDepartmentIds);
+    return allIndicators.filter((ind) => ind.departments.some((d) => idSet.has(d.id)));
+  }, [allIndicators, activeDepartmentIds]);
 
   const visibleDepartments = useCallback(
     (ind: Indicator) => {
-      if (departmentFilter === 'all') return ind.departments;
-      const deptId = Number(departmentFilter);
-      return ind.departments.filter((d) => d.id === deptId);
+      if (!activeDepartmentIds) return ind.departments;
+      const idSet = new Set(activeDepartmentIds);
+      return ind.departments.filter((d) => idSet.has(d.id));
     },
-    [departmentFilter],
+    [activeDepartmentIds],
   );
 
   const allFys = useMemo(
@@ -265,22 +286,16 @@ export default function AmbassadorCollectedDataPanel() {
         }
         filters={
           <>
-            <Form.Select
-              size="sm"
-              value={departmentFilter}
-              onChange={(e) => setDepartmentFilter(e.target.value)}
-              style={{ width: '220px' }}
-              title="Filter by department / unit"
-            >
-              <option value="all">All departments / units</option>
-              {departments.map((d) => (
-                <option key={d.id} value={String(d.id)}>
-                  {d.name}
-                </option>
-              ))}
-            </Form.Select>
-            <Form.Select
-              size="sm"
+            <div style={{ minWidth: '280px', maxWidth: '360px' }}>
+              <AmbassadorDepartmentGroupFilter
+                departments={ambassadorDepartments}
+                value={departmentFilter}
+                onChange={setDepartmentFilter}
+                compact
+              />
+            </div>
+            <select
+              className="form-select form-select-sm"
               value={fyFilter}
               onChange={(e) => setFyFilter(e.target.value)}
               style={{ width: '130px' }}
@@ -292,9 +307,9 @@ export default function AmbassadorCollectedDataPanel() {
                   {fy}
                 </option>
               ))}
-            </Form.Select>
-            <Form.Select
-              size="sm"
+            </select>
+            <select
+              className="form-select form-select-sm"
               value={uomFilter}
               onChange={(e) => setUomFilter(e.target.value)}
               style={{ width: '160px' }}
@@ -306,7 +321,7 @@ export default function AmbassadorCollectedDataPanel() {
                   {o.label}
                 </option>
               ))}
-            </Form.Select>
+            </select>
             <button
               type="button"
               className="btn btn-sm btn-outline-success fw-bold d-inline-flex align-items-center gap-1"

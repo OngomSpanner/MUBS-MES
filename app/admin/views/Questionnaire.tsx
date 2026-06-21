@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import Layout from '@/components/Layout';
 import StatCard from '@/components/StatCard';
 import { Modal, Button, Form, Badge } from 'react-bootstrap';
@@ -554,8 +554,8 @@ function IndicatorsPanel({
   indicators, onEdit, onCreate, onRefresh,
 }: { indicators: Indicator[]; onEdit: (ind: Indicator) => void; onCreate: () => void; onRefresh: () => void }) {
   const [expanded, setExpanded] = useState<Set<number>>(new Set());
-  const [fyFilter, setFyFilter] = useState<'all' | string>('all');
-  const [uomFilter, setUomFilter] = useState<'all' | string>('all');
+  const [objectiveFilter, setObjectiveFilter] = useState<'all' | string>('all');
+  const [outcomeFilter, setOutcomeFilter] = useState<'all' | string>('all');
   const [responsesByIndicator, setResponsesByIndicator] = useState<Record<number, IndicatorResponse[]>>({});
   const [loadingResponses, setLoadingResponses] = useState<Set<number>>(new Set());
   const [deleteTarget, setDeleteTarget] = useState<{ ind: Indicator; responseCount: number } | null>(null);
@@ -646,7 +646,47 @@ function IndicatorsPanel({
   };
 
   // Group by objective → outcome/output
-  const indicatorSections = groupIndicatorsByObjective(indicators);
+  const outcomeOptions = useMemo(() => {
+    const map = new Map<number, { id: number; type: string; label: string; objective: string | null }>();
+    for (const ind of indicators) {
+      if (!map.has(ind.outcome_id)) {
+        map.set(ind.outcome_id, {
+          id: ind.outcome_id,
+          type: ind.outcome_type,
+          label: ind.outcome_label,
+          objective: ind.outcome_strategic_objective,
+        });
+      }
+    }
+    return Array.from(map.values()).sort((a, b) => a.label.localeCompare(b.label));
+  }, [indicators]);
+
+  const outcomeOptionsForFilter = useMemo(() => {
+    if (objectiveFilter === 'all') return outcomeOptions;
+    if (objectiveFilter === 'unassigned') {
+      return outcomeOptions.filter((o) => !o.objective);
+    }
+    return outcomeOptions.filter((o) => o.objective === objectiveFilter);
+  }, [objectiveFilter, outcomeOptions]);
+
+  const filteredIndicators = useMemo(() => {
+    return indicators.filter((ind) => {
+      if (objectiveFilter !== 'all') {
+        if (objectiveFilter === 'unassigned') {
+          if (ind.outcome_strategic_objective) return false;
+        } else if (ind.outcome_strategic_objective !== objectiveFilter) {
+          return false;
+        }
+      }
+      if (outcomeFilter !== 'all' && ind.outcome_id !== Number(outcomeFilter)) {
+        return false;
+      }
+      return true;
+    });
+  }, [indicators, objectiveFilter, outcomeFilter]);
+
+  const indicatorSections = groupIndicatorsByObjective(filteredIndicators);
+  const hasUnassignedObjective = indicators.some((i) => !i.outcome_strategic_objective);
 
   if (indicators.length === 0) {
     return (
@@ -670,37 +710,98 @@ function IndicatorsPanel({
     );
   }
 
-  const allFys = Array.from(
-    new Set(indicators.flatMap((i) => i.financial_years || []))
-  ).sort();
+  if (filteredIndicators.length === 0) {
+    return (
+      <div>
+        <div className="mb-3 d-flex flex-wrap gap-2 align-items-center">
+          <h6 className="fw-bold mb-0">Indicators <Badge bg="secondary">0</Badge></h6>
+          <div className="ms-auto d-flex flex-wrap gap-2 align-items-center">
+            <Form.Select
+              size="sm"
+              value={objectiveFilter}
+              onChange={(e) => {
+                setObjectiveFilter(e.target.value);
+                setOutcomeFilter('all');
+              }}
+              style={{ width: '170px' }}
+              title="Filter by strategic objective"
+            >
+              <option value="all">All objectives</option>
+              {CORE_OBJECTIVES_2025_2030.map((obj, i) => (
+                <option key={obj} value={obj}>Objective {i + 1}</option>
+              ))}
+              {hasUnassignedObjective ? <option value="unassigned">Unassigned objective</option> : null}
+            </Form.Select>
+            <Form.Select
+              size="sm"
+              value={outcomeFilter}
+              onChange={(e) => setOutcomeFilter(e.target.value)}
+              style={{ width: '260px' }}
+              title="Filter by outcome or output"
+            >
+              <option value="all">All outcomes / outputs</option>
+              {outcomeOptionsForFilter.map((o) => (
+                <option key={o.id} value={String(o.id)}>{o.type}: {o.label}</option>
+              ))}
+            </Form.Select>
+            <Button
+              size="sm"
+              variant="primary"
+              style={{ background: 'var(--mubs-blue)', borderColor: 'var(--mubs-blue)' }}
+              onClick={onCreate}
+            >
+              <span className="material-symbols-outlined me-1" style={{ fontSize: '16px', verticalAlign: 'middle' }}>add</span>
+              Create Template
+            </Button>
+          </div>
+        </div>
+        <div className="text-center text-muted py-5 small">
+          No indicators match the selected filters.
+        </div>
+        <DeleteConfirmModal
+          show={!!deleteTarget}
+          onHide={() => setDeleteTarget(null)}
+          onConfirm={handleDeleteConfirm}
+          title="Delete Indicator"
+          responseCount={deleteTarget?.responseCount}
+          itemDescription={`"${deleteTarget?.ind.indicator_text}"`}
+          loading={deleting}
+        />
+      </div>
+    );
+  }
 
   return (
     <div>
       <div className="mb-3 d-flex flex-wrap gap-2 align-items-center">
-        <h6 className="fw-bold mb-0">Indicators <Badge bg="secondary">{indicators.length}</Badge></h6>
+        <h6 className="fw-bold mb-0">Indicators <Badge bg="secondary">{filteredIndicators.length}</Badge></h6>
         <div className="ms-auto d-flex flex-wrap gap-2 align-items-center">
           <Form.Select
             size="sm"
-            value={fyFilter}
-            onChange={(e) => setFyFilter(e.target.value)}
-            style={{ width: '150px' }}
-            title="Filter by financial year"
+            value={objectiveFilter}
+            onChange={(e) => {
+              setObjectiveFilter(e.target.value);
+              setOutcomeFilter('all');
+            }}
+            style={{ width: '170px' }}
+            title="Filter by strategic objective"
           >
-            <option value="all">All FYs</option>
-            {allFys.map((fy) => (
-              <option key={fy} value={fy}>{fy}</option>
+            <option value="all">All objectives</option>
+            {CORE_OBJECTIVES_2025_2030.map((obj, i) => (
+              <option key={obj} value={obj}>Objective {i + 1}</option>
             ))}
+            {hasUnassignedObjective ? <option value="unassigned">Unassigned objective</option> : null}
           </Form.Select>
           <Form.Select
             size="sm"
-            value={uomFilter}
-            onChange={(e) => setUomFilter(e.target.value)}
-            style={{ width: '190px' }}
-            title="Filter by unit of measure"
+            value={outcomeFilter}
+            onChange={(e) => setOutcomeFilter(e.target.value)}
+            style={{ width: '260px' }}
+            title="Filter by outcome or output"
           >
-            <option value="all">All metrics</option>
-            {UOM_OPTIONS.map((o) => (
-              <option key={o.value} value={o.value}>{o.label}</option>
+            <option value="all">All outcomes / outputs</option>
+            {outcomeOptionsForFilter.map((o) => (
+              <option key={o.id} value={String(o.id)}>{o.type}: {o.label}</option>
             ))}
           </Form.Select>
           <Button
@@ -777,12 +878,8 @@ function IndicatorsPanel({
                       ) : (
                         ind.departments.map((dept) => {
                           const responses = responsesByIndicator[ind.id] ?? [];
-                          const visibleFys = fyFilter === 'all'
-                            ? ind.financial_years
-                            : ind.financial_years.filter((fy) => fy === fyFilter);
-                          const visibleMetrics = ind.metrics.filter(
-                            (m) => uomFilter === 'all' || m.unit_of_measure === uomFilter
-                          );
+                          const visibleFys = ind.financial_years;
+                          const visibleMetrics = ind.metrics;
                           const hasAnyValue = visibleMetrics.some((m) =>
                             visibleFys.some((fy) => responseValue(responses, dept.id, m.id, fy) != null)
                           );
@@ -884,8 +981,17 @@ export default function QuestionnaireView() {
 
   const loadDepts = useCallback(async () => {
     try {
-      const res = await axios.get('/api/departments?active_only=true');
-      setAllDepartments(Array.isArray(res.data) ? res.data : []);
+      const res = await axios.get('/api/departments?with_ambassador=true&active_only=true');
+      const rows = Array.isArray(res.data) ? res.data : [];
+      setAllDepartments(
+        rows.map((d: DepartmentUnitOption & { ambassador_group?: string | null }) => ({
+          id: Number(d.id),
+          name: String(d.name),
+          parent_id: d.parent_id != null ? Number(d.parent_id) : null,
+          unit_type: d.unit_type || 'department',
+          ambassador_group: d.ambassador_group ?? null,
+        })),
+      );
     } catch { /* noop */ }
   }, []);
 

@@ -2,12 +2,18 @@
 
 import { useMemo, useState } from 'react';
 import { Form } from 'react-bootstrap';
+import {
+  AMBASSADOR_GROUP_LABELS,
+  filterDepartmentsByGroup,
+  type AmbassadorDepartmentGroup,
+} from '@/lib/department-ambassador-groups';
 
 export type DepartmentUnitOption = {
   id: number;
   name: string;
   parent_id: number | null;
   unit_type: string;
+  ambassador_group?: AmbassadorDepartmentGroup | null;
 };
 
 type Props = {
@@ -16,7 +22,10 @@ type Props = {
   onChange: (ids: number[]) => void;
   label?: string;
   emptyHint?: string;
+  showGroupChips?: boolean;
 };
+
+const GROUP_ORDER: AmbassadorDepartmentGroup[] = ['outreach', 'regional', 'faculty'];
 
 export default function DepartmentUnitMultiSelect({
   departments,
@@ -24,34 +33,37 @@ export default function DepartmentUnitMultiSelect({
   onChange,
   label = 'Department(s) / Unit(s)',
   emptyHint = 'No departments selected yet.',
+  showGroupChips = true,
 }: Props) {
   const [searchTerm, setSearchTerm] = useState('');
   const [showResults, setShowResults] = useState(false);
+  const [activeSearchGroup, setActiveSearchGroup] = useState<AmbassadorDepartmentGroup | null>(null);
 
-  const departmentOptions = useMemo(
-    () => departments.filter((d) => d.unit_type === 'department' || d.unit_type === 'unit'),
-    [departments]
-  );
-  const facultyOfficeOptions = useMemo(
-    () => departments.filter((d) => d.unit_type === 'faculty' || d.unit_type === 'office'),
-    [departments]
-  );
+  const groupCounts = useMemo(() => {
+    const counts: Record<AmbassadorDepartmentGroup, number> = {
+      outreach: 0,
+      regional: 0,
+      faculty: 0,
+    };
+    for (const d of departments) {
+      const group = d.ambassador_group ?? null;
+      if (group) counts[group] += 1;
+    }
+    return counts;
+  }, [departments]);
+
+  const searchableDepartments = useMemo(() => {
+    if (activeSearchGroup) return filterDepartmentsByGroup(departments, activeSearchGroup);
+    return departments;
+  }, [activeSearchGroup, departments]);
 
   const searchResults = useMemo(() => {
-    if (searchTerm.trim() === '') return [];
-    const term = searchTerm.toLowerCase();
-    return [
-      ...facultyOfficeOptions
-        .filter((fo) => fo.name.toLowerCase().includes(term))
-        .map((fo) => ({ ...fo, isGroup: true, subLabel: '' })),
-      ...departmentOptions
-        .filter((d) => d.name.toLowerCase().includes(term))
-        .map((d) => {
-          const parent = facultyOfficeOptions.find((p) => p.id === d.parent_id);
-          return { ...d, isGroup: false, subLabel: parent ? parent.name : '' };
-        }),
-    ].slice(0, 8);
-  }, [searchTerm, facultyOfficeOptions, departmentOptions]);
+    const term = searchTerm.trim().toLowerCase();
+    if (!term) return [];
+    return searchableDepartments
+      .filter((d) => d.name.toLowerCase().includes(term))
+      .slice(0, 8);
+  }, [searchTerm, searchableDepartments]);
 
   const addUnit = (id: number) => {
     if (!selectedIds.includes(id)) onChange([...selectedIds, id]);
@@ -59,11 +71,16 @@ export default function DepartmentUnitMultiSelect({
     setShowResults(false);
   };
 
-  const addByParent = (parentId: number) => {
-    const childIds = departments.filter((d) => d.parent_id === parentId).map((d) => d.id);
-    onChange(Array.from(new Set([...selectedIds, ...childIds])));
+  const addGroup = (group: AmbassadorDepartmentGroup) => {
+    const ids = filterDepartmentsByGroup(departments, group).map((d) => d.id);
+    onChange(Array.from(new Set([...selectedIds, ...ids])));
     setSearchTerm('');
     setShowResults(false);
+  };
+
+  const toggleSearchGroup = (group: AmbassadorDepartmentGroup) => {
+    setActiveSearchGroup((prev) => (prev === group ? null : group));
+    setSearchTerm('');
   };
 
   const removeUnit = (id: number) => {
@@ -75,14 +92,59 @@ export default function DepartmentUnitMultiSelect({
       <Form.Label className="fw-bold small d-flex justify-content-between align-items-center mb-1">
         <span>{label}</span>
         <span className="text-muted fw-normal" style={{ fontSize: '0.65rem' }}>
-          Search to add
+          Ambassador units only · search to add
         </span>
       </Form.Label>
+
+      {showGroupChips ? (
+        <div className="d-flex flex-wrap gap-1 mb-2">
+          {GROUP_ORDER.map((group) => {
+            const count = groupCounts[group];
+            if (count === 0) return null;
+            const active = activeSearchGroup === group;
+            return (
+              <span key={group} className="d-inline-flex">
+                <button
+                  type="button"
+                  className={`btn btn-sm ${active ? 'btn-primary' : 'btn-outline-primary'}`}
+                  onClick={() => toggleSearchGroup(group)}
+                  style={
+                    active
+                      ? { background: 'var(--mubs-blue)', borderColor: 'var(--mubs-blue)', borderTopRightRadius: 0, borderBottomRightRadius: 0 }
+                      : { fontSize: '0.72rem', borderTopRightRadius: 0, borderBottomRightRadius: 0 }
+                  }
+                  title="Narrow search to this group"
+                >
+                  {AMBASSADOR_GROUP_LABELS[group]}
+                  <span className="ms-1 opacity-75">({count})</span>
+                </button>
+                <button
+                  type="button"
+                  className={`btn btn-sm ${active ? 'btn-primary' : 'btn-outline-primary'}`}
+                  onClick={() => addGroup(group)}
+                  style={
+                    active
+                      ? { background: 'var(--mubs-blue)', borderColor: 'var(--mubs-blue)', fontSize: '0.72rem', borderTopLeftRadius: 0, borderBottomLeftRadius: 0, borderLeft: 0 }
+                      : { fontSize: '0.72rem', borderTopLeftRadius: 0, borderBottomLeftRadius: 0, borderLeft: 0 }
+                  }
+                  title={`Add all ${count} in this group`}
+                >
+                  +
+                </button>
+              </span>
+            );
+          })}
+        </div>
+      ) : null}
 
       <div className="position-relative mb-2">
         <Form.Control
           type="text"
-          placeholder="Search departments / units..."
+          placeholder={
+            activeSearchGroup
+              ? `Search within ${AMBASSADOR_GROUP_LABELS[activeSearchGroup]}…`
+              : 'Search ambassador departments / units…'
+          }
           value={searchTerm}
           onChange={(e) => {
             setSearchTerm(e.target.value);
@@ -100,17 +162,16 @@ export default function DepartmentUnitMultiSelect({
           >
             {searchResults.map((res) => (
               <button
-                key={`${res.isGroup ? 'g' : 'u'}-${res.id}`}
+                key={res.id}
                 type="button"
                 className="btn btn-white w-100 text-start px-2 py-1 border-bottom small d-flex justify-content-between align-items-center"
                 onMouseDown={(e) => e.preventDefault()}
-                onClick={() => (res.isGroup ? addByParent(res.id) : addUnit(res.id))}
+                onClick={() => addUnit(res.id)}
               >
-                <span className="small">
-                  {res.name}{' '}
-                  {res.subLabel ? <span className="text-muted">({res.subLabel})</span> : null}
-                </span>
-                {res.isGroup ? <span className="badge bg-primary opacity-75">Add all</span> : null}
+                <span className="small">{res.name}</span>
+                {selectedIds.includes(res.id) ? (
+                  <span className="badge bg-secondary opacity-75">Added</span>
+                ) : null}
               </button>
             ))}
           </div>
