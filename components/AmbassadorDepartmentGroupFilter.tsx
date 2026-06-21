@@ -2,7 +2,9 @@
 
 import { useMemo, useState } from 'react';
 import { Form } from 'react-bootstrap';
+import AmbassadorGroupBadgeChip from '@/components/AmbassadorGroupBadgeChip';
 import {
+  AMBASSADOR_GROUP_BADGE_LABELS,
   AMBASSADOR_GROUP_LABELS,
   AMBASSADOR_GROUP_ORDER,
   AMBASSADOR_GROUP_TITLES,
@@ -108,36 +110,31 @@ export default function AmbassadorDepartmentGroupFilter({
 
   return (
     <div className={compact ? '' : 'w-100'}>
-      <div className="d-flex flex-wrap gap-1 mb-2">
-        <button
-          type="button"
-          className={`btn btn-sm ${value.mode === 'all' ? 'btn-primary' : 'btn-outline-secondary'}`}
+      <div className="d-flex flex-wrap align-items-center gap-1 mb-2">
+        <AmbassadorGroupBadgeChip
+          label="All"
+          active={value.mode === 'all'}
+          title="Show all ambassador departments"
           onClick={() => onChange(ALL_AMBASSADOR_DEPARTMENTS_FILTER)}
-          style={value.mode === 'all' ? { background: 'var(--mubs-blue)', borderColor: 'var(--mubs-blue)' } : { fontSize: '0.72rem' }}
-        >
-          All
-        </button>
+        />
         {GROUP_ORDER.map((group) => {
           const count = groupCounts[group];
           if (count === 0) return null;
           const active = value.mode === 'group' && value.group === group;
           return (
-            <button
+            <AmbassadorGroupBadgeChip
               key={group}
-              type="button"
-              className={`btn btn-sm ${active ? 'btn-primary' : 'btn-outline-primary'}`}
+              label={AMBASSADOR_GROUP_BADGE_LABELS[group]}
+              count={count}
+              active={active}
+              title={`${AMBASSADOR_GROUP_TITLES[group]} — click to filter`}
               onClick={() => toggleGroup(group)}
-              style={active ? { background: 'var(--mubs-blue)', borderColor: 'var(--mubs-blue)' } : { fontSize: '0.72rem' }}
-              title={`${AMBASSADOR_GROUP_TITLES[group]} (${count} with ambassador)`}
-            >
-              {AMBASSADOR_GROUP_LABELS[group]}
-              <span className="ms-1 opacity-75">({count})</span>
-            </button>
+            />
           );
         })}
       </div>
 
-      <div className="position-relative" style={{ minWidth: compact ? '220px' : undefined }}>
+      <div className="position-relative" style={{ minWidth: compact ? '200px' : undefined }}>
         <Form.Control
           type="text"
           size="sm"
@@ -151,7 +148,7 @@ export default function AmbassadorDepartmentGroupFilter({
           onBlur={() => window.setTimeout(() => setShowResults(false), 150)}
         />
         {value.mode !== 'all' ? (
-          <div className="text-muted mt-1" style={{ fontSize: '0.65rem' }}>
+          <div className="text-muted mt-1" style={{ fontSize: '0.62rem' }}>
             Showing: <span className="fw-semibold text-primary">{selectedLabel}</span>
           </div>
         ) : null}
@@ -171,7 +168,9 @@ export default function AmbassadorDepartmentGroupFilter({
               >
                 {dept.name}
                 {dept.ambassador_group ? (
-                  <span className="text-muted ms-1">({AMBASSADOR_GROUP_LABELS[dept.ambassador_group]})</span>
+                  <span className="text-muted ms-1" style={{ fontSize: '0.65rem' }}>
+                    ({AMBASSADOR_GROUP_BADGE_LABELS[dept.ambassador_group]})
+                  </span>
                 ) : null}
               </button>
             ))}

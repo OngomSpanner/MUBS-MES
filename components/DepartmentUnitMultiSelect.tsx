@@ -2,8 +2,9 @@
 
 import { useMemo, useState } from 'react';
 import { Form } from 'react-bootstrap';
+import AmbassadorGroupBadgeChip from '@/components/AmbassadorGroupBadgeChip';
 import {
-  AMBASSADOR_GROUP_LABELS,
+  AMBASSADOR_GROUP_BADGE_LABELS,
   AMBASSADOR_GROUP_ORDER,
   AMBASSADOR_GROUP_TITLES,
   countAmbassadorDepartmentsByGroup,
@@ -40,25 +41,19 @@ export default function DepartmentUnitMultiSelect({
 }: Props) {
   const [searchTerm, setSearchTerm] = useState('');
   const [showResults, setShowResults] = useState(false);
-  const [activeSearchGroup, setActiveSearchGroup] = useState<AmbassadorDepartmentGroup | null>(null);
 
   const groupCounts = useMemo(
     () => countAmbassadorDepartmentsByGroup(departments),
     [departments],
   );
 
-  const searchableDepartments = useMemo(() => {
-    if (activeSearchGroup) return filterDepartmentsByGroup(departments, activeSearchGroup);
-    return departments;
-  }, [activeSearchGroup, departments]);
-
   const searchResults = useMemo(() => {
     const term = searchTerm.trim().toLowerCase();
     if (!term) return [];
-    return searchableDepartments
+    return departments
       .filter((d) => d.name.toLowerCase().includes(term))
       .slice(0, 8);
-  }, [searchTerm, searchableDepartments]);
+  }, [searchTerm, departments]);
 
   const addUnit = (id: number) => {
     if (!selectedIds.includes(id)) onChange([...selectedIds, id]);
@@ -73,11 +68,6 @@ export default function DepartmentUnitMultiSelect({
     setShowResults(false);
   };
 
-  const toggleSearchGroup = (group: AmbassadorDepartmentGroup) => {
-    setActiveSearchGroup((prev) => (prev === group ? null : group));
-    setSearchTerm('');
-  };
-
   const removeUnit = (id: number) => {
     onChange(selectedIds.filter((i) => i !== id));
   };
@@ -87,46 +77,23 @@ export default function DepartmentUnitMultiSelect({
       <Form.Label className="fw-bold small d-flex justify-content-between align-items-center mb-1">
         <span>{label}</span>
         <span className="text-muted fw-normal" style={{ fontSize: '0.65rem' }}>
-          Ambassador units only · search to add
+          Ambassador units only · click badge to add group
         </span>
       </Form.Label>
 
       {showGroupChips ? (
-        <div className="d-flex flex-wrap gap-1 mb-2">
+        <div className="d-flex flex-wrap align-items-center gap-1 mb-2">
           {GROUP_ORDER.map((group) => {
             const count = groupCounts[group];
             if (count === 0) return null;
-            const active = activeSearchGroup === group;
             return (
-              <span key={group} className="d-inline-flex">
-                <button
-                  type="button"
-                  className={`btn btn-sm ${active ? 'btn-primary' : 'btn-outline-primary'}`}
-                  onClick={() => toggleSearchGroup(group)}
-                  style={
-                    active
-                      ? { background: 'var(--mubs-blue)', borderColor: 'var(--mubs-blue)', borderTopRightRadius: 0, borderBottomRightRadius: 0 }
-                      : { fontSize: '0.72rem', borderTopRightRadius: 0, borderBottomRightRadius: 0 }
-                  }
-                  title={AMBASSADOR_GROUP_TITLES[group]}
-                >
-                  {AMBASSADOR_GROUP_LABELS[group]}
-                  <span className="ms-1 opacity-75">({count})</span>
-                </button>
-                <button
-                  type="button"
-                  className={`btn btn-sm ${active ? 'btn-primary' : 'btn-outline-primary'}`}
-                  onClick={() => addGroup(group)}
-                  style={
-                    active
-                      ? { background: 'var(--mubs-blue)', borderColor: 'var(--mubs-blue)', fontSize: '0.72rem', borderTopLeftRadius: 0, borderBottomLeftRadius: 0, borderLeft: 0 }
-                      : { fontSize: '0.72rem', borderTopLeftRadius: 0, borderBottomLeftRadius: 0, borderLeft: 0 }
-                  }
-                  title={`Add all ${count} in this group`}
-                >
-                  +
-                </button>
-              </span>
+              <AmbassadorGroupBadgeChip
+                key={group}
+                label={AMBASSADOR_GROUP_BADGE_LABELS[group]}
+                count={count}
+                title={`${AMBASSADOR_GROUP_TITLES[group]} — click to add all`}
+                onClick={() => addGroup(group)}
+              />
             );
           })}
         </div>
@@ -135,11 +102,7 @@ export default function DepartmentUnitMultiSelect({
       <div className="position-relative mb-2">
         <Form.Control
           type="text"
-          placeholder={
-            activeSearchGroup
-              ? `Search within ${AMBASSADOR_GROUP_LABELS[activeSearchGroup]}…`
-              : 'Search ambassador departments / units…'
-          }
+          placeholder="Search ambassador departments / units…"
           value={searchTerm}
           onChange={(e) => {
             setSearchTerm(e.target.value);
@@ -165,7 +128,7 @@ export default function DepartmentUnitMultiSelect({
               >
                 <span className="small">{res.name}</span>
                 {selectedIds.includes(res.id) ? (
-                  <span className="badge bg-secondary opacity-75">Added</span>
+                  <span className="badge bg-secondary opacity-75" style={{ fontSize: '0.6rem' }}>Added</span>
                 ) : null}
               </button>
             ))}
@@ -173,18 +136,19 @@ export default function DepartmentUnitMultiSelect({
         ) : null}
       </div>
 
-      <div className="d-flex flex-wrap gap-2" style={{ maxHeight: '100px', overflowY: 'auto' }}>
+      <div className="d-flex flex-wrap gap-1" style={{ maxHeight: '100px', overflowY: 'auto' }}>
         {selectedIds.map((id) => {
           const dept = departments.find((d) => d.id === id);
           return (
             <span
               key={id}
-              className="badge bg-light text-primary border d-flex align-items-center gap-2 py-1 px-2"
+              className="badge bg-light text-primary border d-inline-flex align-items-center gap-1 py-1 px-2"
+              style={{ fontSize: '0.62rem', maxWidth: '100%' }}
             >
-              {dept?.name || id}
+              <span className="text-truncate">{dept?.name || id}</span>
               <span
-                className="material-symbols-outlined p-0"
-                style={{ fontSize: '14px', cursor: 'pointer' }}
+                className="material-symbols-outlined flex-shrink-0"
+                style={{ fontSize: '12px', cursor: 'pointer', lineHeight: 1 }}
                 onClick={() => removeUnit(id)}
                 role="button"
                 aria-label="Remove"

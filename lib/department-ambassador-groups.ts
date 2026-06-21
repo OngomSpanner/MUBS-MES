@@ -14,15 +14,23 @@ export const AMBASSADOR_GROUP_LABELS: Record<AmbassadorDepartmentGroup, string> 
   department_of: 'All Departments',
 };
 
+/** Short labels for compact badge chips. */
+export const AMBASSADOR_GROUP_BADGE_LABELS: Record<AmbassadorDepartmentGroup, string> = {
+  outreach: 'All Outreach Centre',
+  regional: 'All Regional Campus',
+  faculty: 'All Faculties',
+  department_of: 'All Departments',
+};
+
 /** Tooltip text describing each group's name-matching rule. */
 export const AMBASSADOR_GROUP_TITLES: Record<AmbassadorDepartmentGroup, string> = {
-  outreach: 'Outreach centres with an assigned ambassador',
-  regional: 'Regional campuses with an assigned ambassador',
+  outreach: 'Listed outreach centres only (not every unit ending in Centre)',
+  regional: 'Listed regional campuses only',
   faculty: 'Units whose name starts with Faculty of',
   department_of: 'Units whose name starts with Department of',
 };
 
-/** Canonical outreach centre names (matched with normalized fuzzy compare). */
+/** Canonical outreach centre names — exact allowlist only (not every unit ending in Centre). */
 export const OUTREACH_CENTRE_NAMES = [
   'DISABILITY AND RESOURCE LEARNING CENTRE',
   'ENTREPRENEURSHIP, INNOVATION AND INCUBATION CENTRE',
@@ -33,7 +41,7 @@ export const OUTREACH_CENTRE_NAMES = [
   'ICT CENTRE',
 ] as const;
 
-/** Canonical regional campus names (matched with normalized fuzzy compare). */
+/** Canonical regional campus names — exact allowlist only. */
 export const REGIONAL_CAMPUS_NAMES = [
   'MUBS REGIONAL CAMPUS-ARUA',
   'MUBS REGIONAL CAMPUS MBARARA',
@@ -50,28 +58,22 @@ export function normalizeDepartmentName(name: string): string {
     .trim();
 }
 
-function normalizedTokens(name: string): string[] {
-  return normalizeDepartmentName(name).split(' ').filter(Boolean);
+function normalizeAllowlistName(name: string): string {
+  return normalizeDepartmentName(name).replace(/\bcentre\b/g, 'center');
 }
 
-function namesMatch(a: string, b: string): boolean {
-  const na = normalizeDepartmentName(a);
-  const nb = normalizeDepartmentName(b);
-  if (!na || !nb) return false;
-  if (na === nb) return true;
-  if (na.includes(nb) || nb.includes(na)) return true;
-
-  const ta = normalizedTokens(a);
-  const tb = normalizedTokens(b);
-  if (ta.length === 0 || tb.length === 0) return false;
-
-  const shorter = ta.length <= tb.length ? ta : tb;
-  const longer = ta.length <= tb.length ? tb : ta;
-  return shorter.every((t) => longer.includes(t));
+/** Strict allowlist match: normalized equality only (centre/center equivalent). */
+function matchesStrictAllowlist(name: string, allowlist: readonly string[]): boolean {
+  const normalized = normalizeAllowlistName(name);
+  return allowlist.some((entry) => normalizeAllowlistName(entry) === normalized);
 }
 
-function matchesAllowlist(name: string, allowlist: readonly string[]): boolean {
-  return allowlist.some((entry) => namesMatch(name, entry));
+export function isOutreachCentre(name: string): boolean {
+  return matchesStrictAllowlist(name, OUTREACH_CENTRE_NAMES);
+}
+
+export function isRegionalCampus(name: string): boolean {
+  return matchesStrictAllowlist(name, REGIONAL_CAMPUS_NAMES);
 }
 
 export function isFacultyDepartment(name: string): boolean {
@@ -85,8 +87,8 @@ export function isDepartmentOfUnit(name: string): boolean {
 export function classifyAmbassadorDepartmentGroup(name: string): AmbassadorDepartmentGroup | null {
   if (isFacultyDepartment(name)) return 'faculty';
   if (isDepartmentOfUnit(name)) return 'department_of';
-  if (matchesAllowlist(name, REGIONAL_CAMPUS_NAMES)) return 'regional';
-  if (matchesAllowlist(name, OUTREACH_CENTRE_NAMES)) return 'outreach';
+  if (isRegionalCampus(name)) return 'regional';
+  if (isOutreachCentre(name)) return 'outreach';
   return null;
 }
 
