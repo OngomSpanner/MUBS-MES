@@ -3,6 +3,8 @@ import { query } from '@/lib/db';
 import { cookies } from 'next/headers';
 import { verifyToken } from '@/lib/auth';
 import { canManageStrategicStandards } from '@/lib/role-routing';
+import { ensureQuestionnaireObjectiveSchema } from '@/lib/questionnaire-schema';
+import { parseCoreObjective } from '@/lib/strategic-plan';
 
 export const dynamic = 'force-dynamic';
 
@@ -18,12 +20,20 @@ async function requireAdmin() {
 export async function PUT(request: Request, context: { params: Promise<{ id: string }> }) {
   try {
     if (!await requireAdmin()) return NextResponse.json({ message: 'Forbidden' }, { status: 403 });
+    await ensureQuestionnaireObjectiveSchema();
     const { id } = await context.params;
     const body = await request.json();
     const type = body.type === 'Output' ? 'Output' : 'Outcome';
     const label = typeof body.label === 'string' ? body.label.trim() : '';
+    const strategicObjective = parseCoreObjective(body.strategic_objective);
     if (!label) return NextResponse.json({ message: 'Label is required' }, { status: 400 });
-    await query({ query: 'UPDATE q_outcomes SET type=?, label=? WHERE id=?', values: [type, label, id] });
+    if (!strategicObjective) {
+      return NextResponse.json({ message: 'Strategic objective is required' }, { status: 400 });
+    }
+    await query({
+      query: 'UPDATE q_outcomes SET type=?, label=?, strategic_objective=? WHERE id=?',
+      values: [type, label, strategicObjective, id],
+    });
     return NextResponse.json({ message: 'Updated' });
   } catch (e) {
     console.error('q_outcomes PUT', e);

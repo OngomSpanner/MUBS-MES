@@ -5,6 +5,7 @@ import { canManageStrategicStandards } from '@/lib/role-routing';
 import { query } from '@/lib/db';
 import { normalizeFinancialYear } from '@/lib/questionnaire/fy-utils';
 import { ensureHodReviewWorkflowSchema } from '@/lib/hod-review-workflow';
+import { ensureQuestionnaireObjectiveSchema } from '@/lib/questionnaire-schema';
 
 export const dynamic = 'force-dynamic';
 
@@ -25,6 +26,7 @@ export async function GET(request: Request) {
     }
 
     await ensureHodReviewWorkflowSchema();
+    await ensureQuestionnaireObjectiveSchema();
 
     const { searchParams } = new URL(request.url);
     const departmentIdParam = searchParams.get('department_id');
@@ -36,7 +38,8 @@ export async function GET(request: Request) {
 
     const indicators = (await query({
       query: `SELECT i.id, i.outcome_id, i.indicator_text, i.is_locked,
-                o.type AS outcome_type, o.label AS outcome_label
+                o.type AS outcome_type, o.label AS outcome_label,
+                o.strategic_objective AS outcome_strategic_objective
               FROM q_indicators i
               JOIN q_outcomes o ON o.id = i.outcome_id
               ORDER BY o.type, o.label, i.indicator_text`,

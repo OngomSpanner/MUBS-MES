@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { query } from '@/lib/db';
 import { requireAmbassador } from '@/lib/ambassador/context';
 import { ensureHodReviewWorkflowSchema } from '@/lib/hod-review-workflow';
+import { ensureQuestionnaireObjectiveSchema } from '@/lib/questionnaire-schema';
 
 export const dynamic = 'force-dynamic';
 
@@ -12,6 +13,7 @@ export async function GET(request: Request) {
   if ('error' in auth) return auth.error;
 
   await ensureHodReviewWorkflowSchema();
+  await ensureQuestionnaireObjectiveSchema();
 
   const url = new URL(request.url);
   const fyFilter = url.searchParams.get('fy') || 'all';

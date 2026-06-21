@@ -14,7 +14,9 @@ async function migrate() {
       id INT AUTO_INCREMENT PRIMARY KEY,
       type ENUM('Outcome','Output') NOT NULL DEFAULT 'Outcome',
       label TEXT NOT NULL,
-      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      strategic_objective VARCHAR(512) NULL,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      KEY idx_q_outcomes_objective (strategic_objective(191))
     )`,
 
     `CREATE TABLE IF NOT EXISTS q_indicators (
@@ -80,6 +82,24 @@ async function migrate() {
           throw e;
         }
       }
+    }
+    try {
+      const [cols] = await connection.execute(
+        `SELECT COUNT(*) AS c FROM information_schema.COLUMNS
+         WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'q_outcomes' AND COLUMN_NAME = 'strategic_objective'`
+      );
+      if (cols[0].c === 0) {
+        await connection.execute(`
+          ALTER TABLE q_outcomes
+          ADD COLUMN strategic_objective VARCHAR(512) NULL AFTER label,
+          ADD KEY idx_q_outcomes_objective (strategic_objective(191))
+        `);
+        console.log('  added q_outcomes.strategic_objective');
+      } else {
+        console.log('  skip (exists): q_outcomes.strategic_objective');
+      }
+    } catch (e) {
+      if (e.code !== 'ER_DUP_FIELDNAME') throw e;
     }
     console.log('Done.');
   } catch (err) {

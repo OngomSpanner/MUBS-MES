@@ -25,6 +25,28 @@ export const CORE_OBJECTIVES_2025_2030 = [
 
 export type CoreObjective = (typeof CORE_OBJECTIVES_2025_2030)[number];
 
+export function isCoreObjective(value: string): value is CoreObjective {
+  return (CORE_OBJECTIVES_2025_2030 as readonly string[]).includes(value);
+}
+
+export function parseCoreObjective(raw: unknown): CoreObjective | null {
+  const s = typeof raw === 'string' ? raw.trim() : '';
+  if (!s || !isCoreObjective(s)) return null;
+  return s;
+}
+
+/** 1-based objective number (1–4), or null if unset/unknown. */
+export function coreObjectiveNumber(objective: string | null | undefined): number | null {
+  if (!objective) return null;
+  const idx = CORE_OBJECTIVES_2025_2030.indexOf(objective as CoreObjective);
+  return idx >= 0 ? idx + 1 : null;
+}
+
+export function coreObjectiveShortTitle(objective: string | null | undefined): string {
+  const n = coreObjectiveNumber(objective);
+  return n ? `Objective ${n}` : 'Unassigned objective';
+}
+
 /** Optional: short labels for compact UI */
 export const PILLAR_LABELS: Record<StrategicPillar, string> = {
   'Teaching, Learning and Student Success': 'Teaching & Learning',

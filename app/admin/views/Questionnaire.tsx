@@ -9,15 +9,23 @@ import DeleteConfirmModal from '@/components/Questionnaire/DeleteConfirmModal';
 import DepartmentUnitMultiSelect, { type DepartmentUnitOption } from '@/components/DepartmentUnitMultiSelect';
 import { getAvailableFinancialYears } from '@/lib/questionnaire/fy-utils';
 import { UOM_OPTIONS } from '@/lib/questionnaire/uom';
+import { CORE_OBJECTIVES_2025_2030, coreObjectiveShortTitle } from '@/lib/strategic-plan';
 
 // ────────────────────────────────────────────────────────────
 // Types
 // ────────────────────────────────────────────────────────────
-type Outcome = { id: number; type: 'Outcome' | 'Output'; label: string; indicator_count: number };
+type Outcome = {
+  id: number;
+  type: 'Outcome' | 'Output';
+  label: string;
+  strategic_objective: string | null;
+  indicator_count: number;
+};
 type MetricFormRow = { id?: number; metric_text: string; unit_of_measure: string };
 type Indicator = {
   id: number; outcome_id: number; indicator_text: string; is_locked: boolean;
-  outcome_type: string; outcome_label: string; created_at: string;
+  outcome_type: string; outcome_label: string; outcome_strategic_objective: string | null;
+  created_at: string;
   metrics: { id: number; metric_text: string; unit_of_measure: string; sort_order: number }[];
   departments: { id: number; name: string }[];
   financial_years: string[];
@@ -39,6 +47,99 @@ function emptyMetricRow(): MetricFormRow {
   return { metric_text: '', unit_of_measure: 'numeric' };
 }
 
+function StrategicObjectiveSelect({
+  value,
+  onChange,
+  id,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  id?: string;
+}) {
+  return (
+    <Form.Select
+      id={id}
+      size="sm"
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      required
+    >
+      <option value="">Select strategic objective…</option>
+      {CORE_OBJECTIVES_2025_2030.map((obj, i) => (
+        <option key={obj} value={obj} title={obj}>
+          Objective {i + 1}
+        </option>
+      ))}
+    </Form.Select>
+  );
+}
+
+type OutcomeGroupSection = { objective: string | null; outcomes: Outcome[] };
+
+function groupOutcomesByObjective(outcomes: Outcome[]): OutcomeGroupSection[] {
+  const byObjective = new Map<string, Outcome[]>();
+  const unassigned: Outcome[] = [];
+  for (const o of outcomes) {
+    if (o.strategic_objective) {
+      const list = byObjective.get(o.strategic_objective) ?? [];
+      list.push(o);
+      byObjective.set(o.strategic_objective, list);
+    } else {
+      unassigned.push(o);
+    }
+  }
+  const sections: OutcomeGroupSection[] = [];
+  for (const obj of CORE_OBJECTIVES_2025_2030) {
+    const list = byObjective.get(obj);
+    if (list?.length) sections.push({ objective: obj, outcomes: list });
+  }
+  if (unassigned.length) sections.push({ objective: null, outcomes: unassigned });
+  return sections;
+}
+
+type IndicatorOutcomeGroup = {
+  outcomeId: number;
+  outcomeType: string;
+  outcomeLabel: string;
+  indicators: Indicator[];
+};
+
+function groupIndicatorsByObjective(indicators: Indicator[]): {
+  objective: string | null;
+  outcomes: IndicatorOutcomeGroup[];
+}[] {
+  const objectiveMap = new Map<string, Map<number, IndicatorOutcomeGroup>>();
+  const unassignedKey = '__unassigned__';
+
+  for (const ind of indicators) {
+    const objKey = ind.outcome_strategic_objective || unassignedKey;
+    if (!objectiveMap.has(objKey)) objectiveMap.set(objKey, new Map());
+    const outcomesMap = objectiveMap.get(objKey)!;
+    if (!outcomesMap.has(ind.outcome_id)) {
+      outcomesMap.set(ind.outcome_id, {
+        outcomeId: ind.outcome_id,
+        outcomeType: ind.outcome_type,
+        outcomeLabel: ind.outcome_label,
+        indicators: [],
+      });
+    }
+    outcomesMap.get(ind.outcome_id)!.indicators.push(ind);
+  }
+
+  const sections: { objective: string | null; outcomes: IndicatorOutcomeGroup[] }[] = [];
+  for (const obj of CORE_OBJECTIVES_2025_2030) {
+    const outcomesMap = objectiveMap.get(obj);
+    if (outcomesMap?.size) {
+      sections.push({ objective: obj, outcomes: Array.from(outcomesMap.values()) });
+    }
+  }
+  const unassigned = objectiveMap.get(unassignedKey);
+  if (unassigned?.size) {
+    sections.push({ objective: null, outcomes: Array.from(unassigned.values()) });
+  }
+  return sections;
+}
+
 // ────────────────────────────────────────────────────────────
 // Sub-panel: Manage Outcomes
 // ────────────────────────────────────────────────────────────
@@ -47,9 +148,11 @@ function ManageOutcomesPanel({
 }: { outcomes: Outcome[]; onRefresh: () => void }) {
   const [adding, setAdding] = useState(false);
   const [newType, setNewType] = useState<'Outcome' | 'Output'>('Outcome');
+  const [newObjective, setNewObjective] = useState('');
   const [newLabel, setNewLabel] = useState('');
   const [editId, setEditId] = useState<number | null>(null);
   const [editType, setEditType] = useState<'Outcome' | 'Output'>('Outcome');
+  const [editObjective, setEditObjective] = useState('');
   const [editLabel, setEditLabel] = useState('');
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState<string | null>(null);
@@ -57,20 +160,33 @@ function ManageOutcomesPanel({
   const [deleting, setDeleting] = useState(false);
 
   const handleAdd = async () => {
+    if (!newObjective) return setErr('Strategic objective is required');
     if (!newLabel.trim()) return setErr('Label is required');
     setSaving(true); setErr(null);
     try {
-      await axios.post('/api/questionnaire/outcomes', { type: newType, label: newLabel.trim() });
-      setAdding(false); setNewLabel(''); onRefresh();
+      await axios.post('/api/questionnaire/outcomes', {
+        type: newType,
+        label: newLabel.trim(),
+        strategic_objective: newObjective,
+      });
+      setAdding(false);
+      setNewLabel('');
+      setNewObjective('');
+      onRefresh();
     } catch (e: unknown) { setErr(axios.isAxiosError(e) ? e.response?.data?.message ?? 'Error' : 'Error'); }
     finally { setSaving(false); }
   };
 
   const handleEdit = async () => {
+    if (!editObjective) return setErr('Strategic objective is required');
     if (!editLabel.trim()) return setErr('Label is required');
     setSaving(true); setErr(null);
     try {
-      await axios.put(`/api/questionnaire/outcomes/${editId}`, { type: editType, label: editLabel.trim() });
+      await axios.put(`/api/questionnaire/outcomes/${editId}`, {
+        type: editType,
+        label: editLabel.trim(),
+        strategic_objective: editObjective,
+      });
       setEditId(null); onRefresh();
     } catch (e: unknown) { setErr(axios.isAxiosError(e) ? e.response?.data?.message ?? 'Error' : 'Error'); }
     finally { setSaving(false); }
@@ -108,13 +224,17 @@ function ManageOutcomesPanel({
                 <option value="Output">Output</option>
               </Form.Select>
             </div>
-            <div className="col-md-7">
-              <Form.Label className="small fw-bold mb-1">Label / Name *</Form.Label>
+            <div className="col-md-9">
+              <Form.Label className="small fw-bold mb-1">Strategic objective <span className="text-danger">*</span></Form.Label>
+              <StrategicObjectiveSelect value={newObjective} onChange={setNewObjective} />
+            </div>
+            <div className="col-md-10">
+              <Form.Label className="small fw-bold mb-1">Label / Name <span className="text-danger">*</span></Form.Label>
               <Form.Control size="sm" value={newLabel} onChange={(e) => setNewLabel(e.target.value)} placeholder="e.g. Outcome 6.1: Increased Participation in Sports…" autoFocus />
             </div>
             <div className="col-md-2 d-flex gap-1">
               <Button size="sm" variant="success" onClick={handleAdd} disabled={saving}>Save</Button>
-              <Button size="sm" variant="outline-secondary" onClick={() => { setAdding(false); setErr(null); }}>Cancel</Button>
+              <Button size="sm" variant="outline-secondary" onClick={() => { setAdding(false); setErr(null); setNewObjective(''); }}>Cancel</Button>
             </div>
           </div>
         </div>
@@ -127,36 +247,59 @@ function ManageOutcomesPanel({
         </div>
       )}
 
-      <div className="d-flex flex-column gap-2">
-        {outcomes.map((o) => (
-          <div key={o.id} className="border rounded-3 p-3 d-flex align-items-center gap-3 flex-wrap" style={{ background: '#f8fafc' }}>
-            {editId === o.id ? (
-              <>
-                <Form.Select size="sm" value={editType} onChange={(e) => setEditType(e.target.value as 'Outcome' | 'Output')} style={{ width: '110px', flexShrink: 0 }}>
-                  <option value="Outcome">Outcome</option>
-                  <option value="Output">Output</option>
-                </Form.Select>
-                <Form.Control size="sm" value={editLabel} onChange={(e) => setEditLabel(e.target.value)} className="flex-grow-1" autoFocus />
-                <div className="d-flex gap-1">
-                  <Button size="sm" variant="success" onClick={handleEdit} disabled={saving}>Save</Button>
-                  <Button size="sm" variant="outline-secondary" onClick={() => setEditId(null)}>Cancel</Button>
+      <div className="d-flex flex-column gap-4">
+        {groupOutcomesByObjective(outcomes).map((section) => (
+          <div key={section.objective ?? 'unassigned'}>
+            <div className="mb-2">
+              <div className="fw-bold small text-primary">{coreObjectiveShortTitle(section.objective)}</div>
+              {section.objective ? (
+                <div className="text-muted" style={{ fontSize: '0.72rem', lineHeight: 1.35 }}>{section.objective}</div>
+              ) : (
+                <div className="text-muted small">Assign an objective when editing these entries.</div>
+              )}
+            </div>
+            <div className="d-flex flex-column gap-2">
+              {section.outcomes.map((o) => (
+                <div key={o.id} className="border rounded-3 p-3 d-flex align-items-center gap-3 flex-wrap" style={{ background: '#f8fafc' }}>
+                  {editId === o.id ? (
+                    <>
+                      <Form.Select size="sm" value={editType} onChange={(e) => setEditType(e.target.value as 'Outcome' | 'Output')} style={{ width: '110px', flexShrink: 0 }}>
+                        <option value="Outcome">Outcome</option>
+                        <option value="Output">Output</option>
+                      </Form.Select>
+                      <div className="flex-grow-1 d-flex flex-column gap-2" style={{ minWidth: '220px' }}>
+                        <StrategicObjectiveSelect value={editObjective} onChange={setEditObjective} />
+                        <Form.Control size="sm" value={editLabel} onChange={(e) => setEditLabel(e.target.value)} autoFocus />
+                      </div>
+                      <div className="d-flex gap-1">
+                        <Button size="sm" variant="success" onClick={handleEdit} disabled={saving}>Save</Button>
+                        <Button size="sm" variant="outline-secondary" onClick={() => setEditId(null)}>Cancel</Button>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <Badge bg={o.type === 'Output' ? 'info' : 'warning'} className="text-dark" style={{ fontSize: '0.65rem' }}>{o.type}</Badge>
+                      <span className="flex-grow-1 small fw-semibold" style={{ minWidth: 0 }}>{o.label}</span>
+                      <span className="text-muted" style={{ fontSize: '0.72rem', flexShrink: 0 }}>{o.indicator_count} indicator{o.indicator_count !== 1 ? 's' : ''}</span>
+                      <div className="d-flex gap-1 flex-shrink-0">
+                        <Button size="sm" variant="outline-secondary" onClick={() => {
+                          setEditId(o.id);
+                          setEditType(o.type);
+                          setEditLabel(o.label);
+                          setEditObjective(o.strategic_objective ?? '');
+                          setErr(null);
+                        }}>
+                          <span className="material-symbols-outlined" style={{ fontSize: '14px', verticalAlign: 'middle' }}>edit</span>
+                        </Button>
+                        <Button size="sm" variant="outline-danger" onClick={() => setDeleteTarget(o)} disabled={o.indicator_count > 0} title={o.indicator_count > 0 ? 'Delete indicators first' : 'Delete'}>
+                          <span className="material-symbols-outlined" style={{ fontSize: '14px', verticalAlign: 'middle' }}>delete</span>
+                        </Button>
+                      </div>
+                    </>
+                  )}
                 </div>
-              </>
-            ) : (
-              <>
-                <Badge bg={o.type === 'Output' ? 'info' : 'warning'} className={o.type === 'Output' ? 'text-dark' : 'text-dark'} style={{ fontSize: '0.65rem' }}>{o.type}</Badge>
-                <span className="flex-grow-1 small fw-semibold" style={{ minWidth: 0 }}>{o.label}</span>
-                <span className="text-muted" style={{ fontSize: '0.72rem', flexShrink: 0 }}>{o.indicator_count} indicator{o.indicator_count !== 1 ? 's' : ''}</span>
-                <div className="d-flex gap-1 flex-shrink-0">
-                  <Button size="sm" variant="outline-secondary" onClick={() => { setEditId(o.id); setEditType(o.type); setEditLabel(o.label); setErr(null); }}>
-                    <span className="material-symbols-outlined" style={{ fontSize: '14px', verticalAlign: 'middle' }}>edit</span>
-                  </Button>
-                  <Button size="sm" variant="outline-danger" onClick={() => setDeleteTarget(o)} disabled={o.indicator_count > 0} title={o.indicator_count > 0 ? 'Delete indicators first' : 'Delete'}>
-                    <span className="material-symbols-outlined" style={{ fontSize: '14px', verticalAlign: 'middle' }}>delete</span>
-                  </Button>
-                </div>
-              </>
-            )}
+              ))}
+            </div>
           </div>
         ))}
       </div>
@@ -292,13 +435,24 @@ function TemplateModal({
               <Form.Label className="small fw-bold mb-1">Outcome / Output <span className="text-danger">*</span></Form.Label>
               <Form.Select size="sm" value={outcomeId} onChange={(e) => setOutcomeId(e.target.value)}>
                 <option value="">— Select —</option>
-                {['Outcome', 'Output'].map((type) => (
-                  <optgroup key={type} label={type + 's'}>
-                    {outcomes.filter((o) => o.type === type).map((o) => (
-                      <option key={o.id} value={o.id}>{o.label}</option>
+                {CORE_OBJECTIVES_2025_2030.map((obj, i) => {
+                  const opts = outcomes.filter((o) => o.strategic_objective === obj);
+                  if (!opts.length) return null;
+                  return (
+                    <optgroup key={obj} label={`Objective ${i + 1}`}>
+                      {opts.map((o) => (
+                        <option key={o.id} value={o.id}>{o.type}: {o.label}</option>
+                      ))}
+                    </optgroup>
+                  );
+                })}
+                {outcomes.filter((o) => !o.strategic_objective).length > 0 && (
+                  <optgroup label="Unassigned objective">
+                    {outcomes.filter((o) => !o.strategic_objective).map((o) => (
+                      <option key={o.id} value={o.id}>{o.type}: {o.label}</option>
                     ))}
                   </optgroup>
-                ))}
+                )}
               </Form.Select>
             </div>
             <div className="col-12">
@@ -491,13 +645,8 @@ function IndicatorsPanel({
     finally { setLockingId(null); }
   };
 
-  // Group by outcome
-  const grouped = indicators.reduce((acc, ind) => {
-    const key = `${ind.outcome_type}|${ind.outcome_label}|${ind.outcome_id}`;
-    if (!acc[key]) acc[key] = [];
-    acc[key].push(ind);
-    return acc;
-  }, {} as Record<string, Indicator[]>);
+  // Group by objective → outcome/output
+  const indicatorSections = groupIndicatorsByObjective(indicators);
 
   if (indicators.length === 0) {
     return (
@@ -565,16 +714,22 @@ function IndicatorsPanel({
           </Button>
         </div>
       </div>
-      {Object.entries(grouped).map(([key, inds]) => {
-        const [type, label] = key.split('|');
-        return (
-          <div key={key} className="mb-4">
-            <div className="d-flex align-items-center gap-2 mb-2 flex-wrap">
-              <Badge bg={type === 'Output' ? 'info' : 'warning'} className="text-dark" style={{ fontSize: '0.65rem' }}>{type}</Badge>
-              <span className="fw-bold text-primary small">{label}</span>
-            </div>
-            <div className="d-flex flex-column gap-2">
-              {inds.map((ind) => (
+      {indicatorSections.map((section) => (
+        <div key={section.objective ?? 'unassigned'} className="mb-4">
+          <div className="mb-3 pb-2 border-bottom">
+            <div className="fw-bold text-primary">{coreObjectiveShortTitle(section.objective)}</div>
+            {section.objective ? (
+              <div className="text-muted" style={{ fontSize: '0.72rem', lineHeight: 1.35 }}>{section.objective}</div>
+            ) : null}
+          </div>
+          {section.outcomes.map((outcomeGroup) => (
+            <div key={outcomeGroup.outcomeId} className="mb-4">
+              <div className="d-flex align-items-center gap-2 mb-2 flex-wrap">
+                <Badge bg={outcomeGroup.outcomeType === 'Output' ? 'info' : 'warning'} className="text-dark" style={{ fontSize: '0.65rem' }}>{outcomeGroup.outcomeType}</Badge>
+                <span className="fw-bold text-primary small">{outcomeGroup.outcomeLabel}</span>
+              </div>
+              <div className="d-flex flex-column gap-2">
+                {outcomeGroup.indicators.map((ind) => (
                 <div key={ind.id} className="border rounded-3 overflow-hidden">
                   <div
                     className="d-flex align-items-start p-3 gap-2"
@@ -686,11 +841,12 @@ function IndicatorsPanel({
                     </div>
                   )}
                 </div>
-              ))}
+                ))}
+              </div>
             </div>
-          </div>
-        );
-      })}
+          ))}
+        </div>
+      ))}
 
       <DeleteConfirmModal
         show={!!deleteTarget}

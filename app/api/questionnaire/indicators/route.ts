@@ -4,6 +4,7 @@ import { cookies } from 'next/headers';
 import { verifyToken } from '@/lib/auth';
 import { canManageStrategicStandards } from '@/lib/role-routing';
 import { normalizeFinancialYear } from '@/lib/questionnaire/fy-utils';
+import { ensureQuestionnaireObjectiveSchema } from '@/lib/questionnaire-schema';
 
 export const dynamic = 'force-dynamic';
 
@@ -23,12 +24,14 @@ export async function GET() {
     if (!token) return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
     if (!verifyToken(token)) return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
 
+    await ensureQuestionnaireObjectiveSchema();
     const indicators = await query({
       query: `SELECT i.id, i.outcome_id, i.indicator_text, i.is_locked, i.created_at,
-                o.type AS outcome_type, o.label AS outcome_label
+                o.type AS outcome_type, o.label AS outcome_label,
+                o.strategic_objective AS outcome_strategic_objective
               FROM q_indicators i
               JOIN q_outcomes o ON o.id = i.outcome_id
-              ORDER BY o.type, o.label, i.indicator_text`,
+              ORDER BY o.strategic_objective, o.type, o.label, i.indicator_text`,
     }) as any[];
 
     const metrics = await query({
