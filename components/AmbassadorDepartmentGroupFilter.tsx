@@ -112,6 +112,16 @@ export default function AmbassadorDepartmentGroupFilter({
     <div className={compact ? '' : 'w-100'}>
       <div className="d-flex flex-wrap align-items-center gap-1 mb-2">
         <AmbassadorGroupBadgeChip
+          label="Clear"
+          variant="clear"
+          title="Clear filter and search"
+          onClick={() => {
+            onChange(ALL_AMBASSADOR_DEPARTMENTS_FILTER);
+            setSearchTerm('');
+            setShowResults(false);
+          }}
+        />
+        <AmbassadorGroupBadgeChip
           label="All"
           active={value.mode === 'all'}
           title="Show all ambassador departments"

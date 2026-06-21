@@ -22,15 +22,15 @@ export const AMBASSADOR_GROUP_BADGE_LABELS: Record<AmbassadorDepartmentGroup, st
   department_of: 'All Departments',
 };
 
-/** Tooltip text describing each group's name-matching rule. */
+/** Tooltip text describing each group's matching rule. */
 export const AMBASSADOR_GROUP_TITLES: Record<AmbassadorDepartmentGroup, string> = {
-  outreach: 'Listed outreach centres only (not every unit ending in Centre)',
-  regional: 'Listed regional campuses only',
-  faculty: 'Units whose name starts with Faculty of',
-  department_of: 'Units whose name starts with Department of',
+  outreach: 'Registered outreach centres from the system allowlist (by department id / name)',
+  regional: 'Registered regional campuses from the system allowlist (by department id / name)',
+  faculty: 'Registered units whose system name starts with Faculty of',
+  department_of: 'Registered units whose system name starts with Department of',
 };
 
-/** Canonical outreach centre names — exact allowlist only (not every unit ending in Centre). */
+/** Registered outreach centre names in departments.name (exact allowlist). */
 export const OUTREACH_CENTRE_NAMES = [
   'DISABILITY AND RESOURCE LEARNING CENTRE',
   'ENTREPRENEURSHIP, INNOVATION AND INCUBATION CENTRE',
@@ -41,13 +41,18 @@ export const OUTREACH_CENTRE_NAMES = [
   'ICT CENTRE',
 ] as const;
 
-/** Canonical regional campus names — exact allowlist only. */
+/** Registered regional campus names in departments.name (exact allowlist). */
 export const REGIONAL_CAMPUS_NAMES = [
   'MUBS REGIONAL CAMPUS-ARUA',
   'MUBS REGIONAL CAMPUS MBARARA',
   'MUBS REGIONAL CAMPUS-JINJA',
   'MUBS REGIONAL CAMPUS-MBALE',
 ] as const;
+
+export type AmbassadorGroupIdSets = {
+  outreach: ReadonlySet<number>;
+  regional: ReadonlySet<number>;
+};
 
 export function normalizeDepartmentName(name: string): string {
   return name
@@ -62,62 +67,81 @@ function normalizeAllowlistName(name: string): string {
   return normalizeDepartmentName(name).replace(/\bcentre\b/g, 'center');
 }
 
-/** Strict allowlist match: normalized equality only (centre/center equivalent). */
-function matchesStrictAllowlist(name: string, allowlist: readonly string[]): boolean {
-  const normalized = normalizeAllowlistName(name);
+/** Strict allowlist match on registered departments.name (centre/center equivalent). */
+function matchesStrictAllowlist(registeredName: string, allowlist: readonly string[]): boolean {
+  const normalized = normalizeAllowlistName(registeredName);
   return allowlist.some((entry) => normalizeAllowlistName(entry) === normalized);
 }
 
-export function isOutreachCentre(name: string): boolean {
-  return matchesStrictAllowlist(name, OUTREACH_CENTRE_NAMES);
+export function isOutreachCentre(registeredName: string): boolean {
+  return matchesStrictAllowlist(registeredName, OUTREACH_CENTRE_NAMES);
 }
 
-export function isRegionalCampus(name: string): boolean {
-  return matchesStrictAllowlist(name, REGIONAL_CAMPUS_NAMES);
+export function isRegionalCampus(registeredName: string): boolean {
+  return matchesStrictAllowlist(registeredName, REGIONAL_CAMPUS_NAMES);
 }
 
-export function isFacultyDepartment(name: string): boolean {
-  return normalizeDepartmentName(name).startsWith('faculty of');
+export function isFacultyDepartment(registeredName: string): boolean {
+  return normalizeDepartmentName(registeredName).startsWith('faculty of');
 }
 
-export function isDepartmentOfUnit(name: string): boolean {
-  return normalizeDepartmentName(name).startsWith('department of');
+export function isDepartmentOfUnit(registeredName: string): boolean {
+  return normalizeDepartmentName(registeredName).startsWith('department of');
 }
 
-export function classifyAmbassadorDepartmentGroup(name: string): AmbassadorDepartmentGroup | null {
-  if (isFacultyDepartment(name)) return 'faculty';
-  if (isDepartmentOfUnit(name)) return 'department_of';
-  if (isRegionalCampus(name)) return 'regional';
-  if (isOutreachCentre(name)) return 'outreach';
+/**
+ * Classify a registered department record.
+ * Outreach/regional use id sets resolved from departments.name; faculty/dept use registered name only.
+ */
+export function classifyAmbassadorDepartmentGroupForRecord(
+  record: { id: number; registeredName: string },
+  idSets: AmbassadorGroupIdSets,
+): AmbassadorDepartmentGroup | null {
+  if (idSets.outreach.has(record.id)) return 'outreach';
+  if (idSets.regional.has(record.id)) return 'regional';
+  if (isFacultyDepartment(record.registeredName)) return 'faculty';
+  if (isDepartmentOfUnit(record.registeredName)) return 'department_of';
   return null;
 }
 
-export function departmentMatchesGroup(name: string, group: AmbassadorDepartmentGroup): boolean {
-  return classifyAmbassadorDepartmentGroup(name) === group;
+/** @deprecated Prefer classifyAmbassadorDepartmentGroupForRecord with id sets. */
+export function classifyAmbassadorDepartmentGroup(registeredName: string): AmbassadorDepartmentGroup | null {
+  if (isFacultyDepartment(registeredName)) return 'faculty';
+  if (isDepartmentOfUnit(registeredName)) return 'department_of';
+  if (isRegionalCampus(registeredName)) return 'regional';
+  if (isOutreachCentre(registeredName)) return 'outreach';
+  return null;
 }
 
 export type AmbassadorDepartmentRow = {
   id: number;
+  /** Display label (external_name when set, else registered name). */
   name: string;
+  /** Canonical departments.name used for grouping. */
+  registered_name: string;
   parent_id: number | null;
   unit_type: string;
   ambassador_group: AmbassadorDepartmentGroup | null;
 };
 
-export function withAmbassadorGroup<T extends { name: string }>(
-  row: T,
-): T & { ambassador_group: AmbassadorDepartmentGroup | null } {
+export function attachAmbassadorGroup(
+  row: Omit<AmbassadorDepartmentRow, 'ambassador_group'>,
+  idSets: AmbassadorGroupIdSets,
+): AmbassadorDepartmentRow {
   return {
     ...row,
-    ambassador_group: classifyAmbassadorDepartmentGroup(row.name),
+    ambassador_group: classifyAmbassadorDepartmentGroupForRecord(
+      { id: row.id, registeredName: row.registered_name },
+      idSets,
+    ),
   };
 }
 
-export function filterDepartmentsByGroup<T extends { name: string }>(
+export function filterDepartmentsByGroup<T extends { ambassador_group?: AmbassadorDepartmentGroup | null }>(
   departments: T[],
   group: AmbassadorDepartmentGroup,
 ): T[] {
-  return departments.filter((d) => departmentMatchesGroup(d.name, group));
+  return departments.filter((d) => d.ambassador_group === group);
 }
 
 export function createAmbassadorGroupCounts(): Record<AmbassadorDepartmentGroup, number> {

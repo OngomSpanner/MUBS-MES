@@ -82,6 +82,7 @@ export default function AmbassadorCollectedDataPanel() {
         rows.map((d: AmbassadorDepartmentRow) => ({
           id: Number(d.id),
           name: String(d.name),
+          registered_name: String(d.registered_name ?? d.name),
           parent_id: d.parent_id != null ? Number(d.parent_id) : null,
           unit_type: d.unit_type || 'department',
           ambassador_group: d.ambassador_group ?? null,

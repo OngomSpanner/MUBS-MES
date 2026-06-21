@@ -83,6 +83,12 @@ export default function DepartmentUnitMultiSelect({
 
       {showGroupChips ? (
         <div className="d-flex flex-wrap align-items-center gap-1 mb-2">
+          <AmbassadorGroupBadgeChip
+            label="Clear"
+            variant="clear"
+            title="Remove all selected departments"
+            onClick={() => onChange([])}
+          />
           {GROUP_ORDER.map((group) => {
             const count = groupCounts[group];
             if (count === 0) return null;

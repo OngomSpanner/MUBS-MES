@@ -1,5 +1,11 @@
 import { query } from '@/lib/db';
-import { withAmbassadorGroup, type AmbassadorDepartmentRow } from '@/lib/department-ambassador-groups';
+import {
+  attachAmbassadorGroup,
+  isOutreachCentre,
+  isRegionalCampus,
+  type AmbassadorDepartmentRow,
+  type AmbassadorGroupIdSets,
+} from '@/lib/department-ambassador-groups';
 
 type DepartmentQueryRow = {
   id: number;
@@ -18,11 +24,52 @@ function displayName(row: DepartmentQueryRow): string {
   return row.name?.trim() || '';
 }
 
+function registeredName(row: DepartmentQueryRow): string {
+  return row.name?.trim() || '';
+}
+
+let cachedIdSets: AmbassadorGroupIdSets | null = null;
+let cachedIdSetsAt = 0;
+const ID_SETS_CACHE_MS = 60_000;
+
+/**
+ * Resolve outreach/regional department ids from registered rows in departments table.
+ * Server-only — do not import this module from client components.
+ */
+export async function buildAmbassadorGroupIdSets(forceRefresh = false): Promise<AmbassadorGroupIdSets> {
+  const now = Date.now();
+  if (!forceRefresh && cachedIdSets && now - cachedIdSetsAt < ID_SETS_CACHE_MS) {
+    return cachedIdSets;
+  }
+
+  const rows = (await query({
+    query: `SELECT id, name FROM departments WHERE is_active = 1 OR is_active IS NULL`,
+    values: [],
+  })) as { id: number; name: string }[];
+
+  const outreach = new Set<number>();
+  const regional = new Set<number>();
+
+  for (const row of rows) {
+    const name = String(row.name || '').trim();
+    if (!name) continue;
+    const id = Number(row.id);
+    if (isOutreachCentre(name)) outreach.add(id);
+    if (isRegionalCampus(name)) regional.add(id);
+  }
+
+  cachedIdSets = { outreach, regional };
+  cachedIdSetsAt = now;
+  return cachedIdSets;
+}
+
 /**
  * Departments that have at least one user with the Ambassador role assigned via managed_unit_id.
+ * Grouping uses departments.id + departments.name (not external_name).
  */
 export async function fetchDepartmentsWithAmbassador(activeOnly = true): Promise<AmbassadorDepartmentRow[]> {
   const activeClause = activeOnly ? ' AND (d.is_active = 1 OR d.is_active IS NULL)' : '';
+  const idSets = await buildAmbassadorGroupIdSets();
 
   let rows: DepartmentQueryRow[] = [];
   try {
@@ -63,11 +110,15 @@ export async function fetchDepartmentsWithAmbassador(activeOnly = true): Promise
   }
 
   return rows.map((row) =>
-    withAmbassadorGroup({
-      id: Number(row.id),
-      name: displayName(row),
-      parent_id: row.parent_id != null ? Number(row.parent_id) : null,
-      unit_type: row.unit_type || 'department',
-    }),
+    attachAmbassadorGroup(
+      {
+        id: Number(row.id),
+        name: displayName(row),
+        registered_name: registeredName(row),
+        parent_id: row.parent_id != null ? Number(row.parent_id) : null,
+        unit_type: row.unit_type || 'department',
+      },
+      idSets,
+    ),
   );
 }
