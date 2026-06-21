@@ -4,6 +4,9 @@ import { useMemo, useState } from 'react';
 import { Form } from 'react-bootstrap';
 import {
   AMBASSADOR_GROUP_LABELS,
+  AMBASSADOR_GROUP_ORDER,
+  AMBASSADOR_GROUP_TITLES,
+  countAmbassadorDepartmentsByGroup,
   filterDepartmentsByGroup,
   type AmbassadorDepartmentGroup,
 } from '@/lib/department-ambassador-groups';
@@ -25,7 +28,7 @@ type Props = {
   showGroupChips?: boolean;
 };
 
-const GROUP_ORDER: AmbassadorDepartmentGroup[] = ['outreach', 'regional', 'faculty'];
+const GROUP_ORDER = AMBASSADOR_GROUP_ORDER;
 
 export default function DepartmentUnitMultiSelect({
   departments,
@@ -39,18 +42,10 @@ export default function DepartmentUnitMultiSelect({
   const [showResults, setShowResults] = useState(false);
   const [activeSearchGroup, setActiveSearchGroup] = useState<AmbassadorDepartmentGroup | null>(null);
 
-  const groupCounts = useMemo(() => {
-    const counts: Record<AmbassadorDepartmentGroup, number> = {
-      outreach: 0,
-      regional: 0,
-      faculty: 0,
-    };
-    for (const d of departments) {
-      const group = d.ambassador_group ?? null;
-      if (group) counts[group] += 1;
-    }
-    return counts;
-  }, [departments]);
+  const groupCounts = useMemo(
+    () => countAmbassadorDepartmentsByGroup(departments),
+    [departments],
+  );
 
   const searchableDepartments = useMemo(() => {
     if (activeSearchGroup) return filterDepartmentsByGroup(departments, activeSearchGroup);
@@ -113,7 +108,7 @@ export default function DepartmentUnitMultiSelect({
                       ? { background: 'var(--mubs-blue)', borderColor: 'var(--mubs-blue)', borderTopRightRadius: 0, borderBottomRightRadius: 0 }
                       : { fontSize: '0.72rem', borderTopRightRadius: 0, borderBottomRightRadius: 0 }
                   }
-                  title="Narrow search to this group"
+                  title={AMBASSADOR_GROUP_TITLES[group]}
                 >
                   {AMBASSADOR_GROUP_LABELS[group]}
                   <span className="ms-1 opacity-75">({count})</span>

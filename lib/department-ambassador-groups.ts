@@ -1,9 +1,25 @@
-export type AmbassadorDepartmentGroup = 'outreach' | 'regional' | 'faculty';
+export type AmbassadorDepartmentGroup = 'outreach' | 'regional' | 'faculty' | 'department_of';
+
+export const AMBASSADOR_GROUP_ORDER: AmbassadorDepartmentGroup[] = [
+  'outreach',
+  'regional',
+  'faculty',
+  'department_of',
+];
 
 export const AMBASSADOR_GROUP_LABELS: Record<AmbassadorDepartmentGroup, string> = {
   outreach: 'All Outreach Centres',
   regional: 'All Regional Campuses',
   faculty: 'All Faculties',
+  department_of: 'All Departments',
+};
+
+/** Tooltip text describing each group's name-matching rule. */
+export const AMBASSADOR_GROUP_TITLES: Record<AmbassadorDepartmentGroup, string> = {
+  outreach: 'Outreach centres with an assigned ambassador',
+  regional: 'Regional campuses with an assigned ambassador',
+  faculty: 'Units whose name starts with Faculty of',
+  department_of: 'Units whose name starts with Department of',
 };
 
 /** Canonical outreach centre names (matched with normalized fuzzy compare). */
@@ -62,8 +78,13 @@ export function isFacultyDepartment(name: string): boolean {
   return normalizeDepartmentName(name).startsWith('faculty of');
 }
 
+export function isDepartmentOfUnit(name: string): boolean {
+  return normalizeDepartmentName(name).startsWith('department of');
+}
+
 export function classifyAmbassadorDepartmentGroup(name: string): AmbassadorDepartmentGroup | null {
   if (isFacultyDepartment(name)) return 'faculty';
+  if (isDepartmentOfUnit(name)) return 'department_of';
   if (matchesAllowlist(name, REGIONAL_CAMPUS_NAMES)) return 'regional';
   if (matchesAllowlist(name, OUTREACH_CENTRE_NAMES)) return 'outreach';
   return null;
@@ -95,4 +116,23 @@ export function filterDepartmentsByGroup<T extends { name: string }>(
   group: AmbassadorDepartmentGroup,
 ): T[] {
   return departments.filter((d) => departmentMatchesGroup(d.name, group));
+}
+
+export function createAmbassadorGroupCounts(): Record<AmbassadorDepartmentGroup, number> {
+  return {
+    outreach: 0,
+    regional: 0,
+    faculty: 0,
+    department_of: 0,
+  };
+}
+
+export function countAmbassadorDepartmentsByGroup(
+  departments: { ambassador_group?: AmbassadorDepartmentGroup | null }[],
+): Record<AmbassadorDepartmentGroup, number> {
+  const counts = createAmbassadorGroupCounts();
+  for (const d of departments) {
+    if (d.ambassador_group) counts[d.ambassador_group] += 1;
+  }
+  return counts;
 }

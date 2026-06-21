@@ -4,6 +4,9 @@ import { useMemo, useState } from 'react';
 import { Form } from 'react-bootstrap';
 import {
   AMBASSADOR_GROUP_LABELS,
+  AMBASSADOR_GROUP_ORDER,
+  AMBASSADOR_GROUP_TITLES,
+  countAmbassadorDepartmentsByGroup,
   filterDepartmentsByGroup,
   type AmbassadorDepartmentGroup,
   type AmbassadorDepartmentRow,
@@ -31,7 +34,7 @@ type Props = {
   placeholder?: string;
 };
 
-const GROUP_ORDER: AmbassadorDepartmentGroup[] = ['outreach', 'regional', 'faculty'];
+const GROUP_ORDER = AMBASSADOR_GROUP_ORDER;
 
 export function resolveAmbassadorDepartmentIds(
   departments: AmbassadorDepartmentRow[],
@@ -57,17 +60,10 @@ export default function AmbassadorDepartmentGroupFilter({
   const [searchTerm, setSearchTerm] = useState('');
   const [showResults, setShowResults] = useState(false);
 
-  const groupCounts = useMemo(() => {
-    const counts: Record<AmbassadorDepartmentGroup, number> = {
-      outreach: 0,
-      regional: 0,
-      faculty: 0,
-    };
-    for (const d of departments) {
-      if (d.ambassador_group) counts[d.ambassador_group] += 1;
-    }
-    return counts;
-  }, [departments]);
+  const groupCounts = useMemo(
+    () => countAmbassadorDepartmentsByGroup(departments),
+    [departments],
+  );
 
   const searchableDepartments = useMemo(() => {
     if (value.mode === 'group' && value.group) {
@@ -132,7 +128,7 @@ export default function AmbassadorDepartmentGroupFilter({
               className={`btn btn-sm ${active ? 'btn-primary' : 'btn-outline-primary'}`}
               onClick={() => toggleGroup(group)}
               style={active ? { background: 'var(--mubs-blue)', borderColor: 'var(--mubs-blue)' } : { fontSize: '0.72rem' }}
-              title={`${AMBASSADOR_GROUP_LABELS[group]} (${count} with ambassador)`}
+              title={`${AMBASSADOR_GROUP_TITLES[group]} (${count} with ambassador)`}
             >
               {AMBASSADOR_GROUP_LABELS[group]}
               <span className="ms-1 opacity-75">({count})</span>
