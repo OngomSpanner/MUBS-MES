@@ -6,6 +6,7 @@ import Layout from '@/components/Layout';
 import { Modal, Button, Form } from 'react-bootstrap';
 import CreateUserModal from '@/components/Modals/CreateUserModal';
 import HrSyncControl from '@/components/HrSyncControl';
+import HodBulkAssignmentControl from '@/components/HodBulkAssignmentControl';
 import { formatRoleForDisplay } from '@/lib/role-routing';
 import { COMMITTEE_TYPES } from '@/lib/committee-types';
 import { STAFF_CATEGORIES } from '@/lib/staff-categories';
@@ -661,6 +662,12 @@ export default function UsersView() {
                         </select>
                         <HrSyncControl
                             onSynced={() => {
+                                fetchUsers();
+                                fetchStats();
+                            }}
+                        />
+                        <HodBulkAssignmentControl
+                            onCompleted={() => {
                                 fetchUsers();
                                 fetchStats();
                             }}
