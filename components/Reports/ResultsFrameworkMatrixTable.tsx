@@ -14,6 +14,7 @@ type AmbassadorRow = AmbassadorResultsFrameworkMatrixRow;
 
 type Props = {
   rows: ResultsFrameworkMatrixRow[];
+  showResponsibleOffice?: boolean;
   showStatus?: boolean;
   statusFyLabel?: string;
   showNarratives?: boolean;
@@ -31,14 +32,16 @@ function isAmbassadorRow(row: ResultsFrameworkMatrixRow): row is AmbassadorRow {
 
 export default function ResultsFrameworkMatrixTable({
   rows,
+  showResponsibleOffice = true,
   showStatus = false,
   statusFyLabel,
   showNarratives = false,
   canRecordNarrative = false,
   onRecordNarrative,
 }: Props) {
-  const trailingCols =
+  const trailingMetaCols =
     (showStatus ? 1 : 0) + (showNarratives ? 1 : 0) + (canRecordNarrative ? 1 : 0);
+  const budgetSectionCols = 1 + (showResponsibleOffice ? 1 : 0);
 
   if (rows.length === 0) {
     return (
@@ -70,7 +73,9 @@ export default function ResultsFrameworkMatrixTable({
               </th>
             ))}
             <th style={{ minWidth: '90px' }}>Budget</th>
-            <th style={{ minWidth: '140px' }}>Responsible Office</th>
+            {showResponsibleOffice ? (
+              <th style={{ minWidth: '140px' }}>Responsible Office</th>
+            ) : null}
             {showStatus ? (
               <th className="text-center" style={{ minWidth: '110px' }}>
                 Status
@@ -95,7 +100,7 @@ export default function ResultsFrameworkMatrixTable({
                 <th className="text-center small fw-semibold">Actual</th>
               </Fragment>
             ))}
-            <th colSpan={2 + trailingCols} />
+            <th colSpan={budgetSectionCols + trailingMetaCols} />
           </tr>
         </thead>
         <tbody>
@@ -104,11 +109,18 @@ export default function ResultsFrameworkMatrixTable({
             const badge = ambassadorRow
               ? performanceStatusBadgeStyle(ambassadorRow.performanceStatus)
               : null;
+            const canOpenNarrative = ambassadorRow
+              ? ambassadorRow.ambassadorNarrativeRecorded || ambassadorRow.performanceStatus != null
+              : false;
 
             return (
               <tr
                 key={row.id}
-                className={ambassadorRow?.needsAmbassadorNarrative ? 'table-warning' : undefined}
+                className={
+                  canRecordNarrative && ambassadorRow?.needsAmbassadorNarrative
+                    ? 'table-warning'
+                    : undefined
+                }
               >
                 <td className="small">{row.outcomeOutput}</td>
                 <td className="small fw-semibold">{row.indicator}</td>
@@ -120,7 +132,9 @@ export default function ResultsFrameworkMatrixTable({
                   </Fragment>
                 ))}
                 <td className="text-center text-muted">{row.budget ?? '—'}</td>
-                <td className="small">{row.responsibleOffice}</td>
+                {showResponsibleOffice ? (
+                  <td className="small">{row.responsibleOffice}</td>
+                ) : null}
                 {showStatus && ambassadorRow && badge ? (
                   <td className="text-center">
                     <span
@@ -165,7 +179,16 @@ export default function ResultsFrameworkMatrixTable({
                       type="button"
                       className={`btn btn-sm fw-bold ${ambassadorRow.needsAmbassadorNarrative ? 'btn-warning' : 'btn-outline-primary'}`}
                       style={{ fontSize: '0.65rem' }}
-                      onClick={() => onRecordNarrative?.(ambassadorRow)}
+                      disabled={!canOpenNarrative}
+                      title={
+                        canOpenNarrative
+                          ? undefined
+                          : 'Record actual performance for this FY before adding an outcome narrative'
+                      }
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onRecordNarrative?.(ambassadorRow);
+                      }}
                     >
                       {ambassadorRow.ambassadorNarrativeRecorded
                         ? 'Edit'

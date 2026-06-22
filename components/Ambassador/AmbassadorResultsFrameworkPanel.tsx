@@ -3,16 +3,14 @@
 import { useCallback, useEffect, useState } from 'react';
 import axios from 'axios';
 import ResultsFrameworkMatrixTable from '@/components/Reports/ResultsFrameworkMatrixTable';
-import ResultsFrameworkFyFilter, {
-  defaultResultsFrameworkFy,
-} from '@/components/ResultsFramework/ResultsFrameworkFyFilter';
+import { defaultResultsFrameworkFy } from '@/components/ResultsFramework/ResultsFrameworkFyFilter';
 import RfNarrativeModal from '@/components/ResultsFramework/RfNarrativeModal';
 import ReportsSectionHeader from '@/components/Reports/ReportsSectionHeader';
 import type { AmbassadorResultsFrameworkMatrixRow } from '@/lib/results-framework-query';
 
 export default function AmbassadorResultsFrameworkPanel() {
+  const financialYear = defaultResultsFrameworkFy();
   const [managedUnitName, setManagedUnitName] = useState('');
-  const [financialYear, setFinancialYear] = useState(defaultResultsFrameworkFy);
   const [rows, setRows] = useState<AmbassadorResultsFrameworkMatrixRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -23,7 +21,7 @@ export default function AmbassadorResultsFrameworkPanel() {
     setError(null);
     try {
       const res = await axios.get('/api/ambassador/results-framework', {
-        params: { financialYear },
+        params: { financialYear: defaultResultsFrameworkFy() },
       });
       setManagedUnitName(res.data.managedUnitName ?? '');
       setRows(res.data.rows ?? []);
@@ -33,11 +31,13 @@ export default function AmbassadorResultsFrameworkPanel() {
     } finally {
       setLoading(false);
     }
-  }, [financialYear]);
+  }, []);
 
   useEffect(() => {
     load();
   }, [load]);
+
+  const pendingNarratives = rows.filter((r) => r.needsAmbassadorNarrative).length;
 
   return (
     <div className="table-card p-3 p-md-4 mb-4">
@@ -48,27 +48,30 @@ export default function AmbassadorResultsFrameworkPanel() {
         description={
           <>
             Targets and actuals for <strong>{managedUnitName || 'your unit'}</strong> across the
-            strategic plan period. Status and outcome narratives use the selected financial year.
+            strategic plan period. Status for <strong>FY {financialYear}</strong> compares actuals to
+            targets (underperformance, achievement, overachievement). When assessed, record the outcome
+            explanation and — if on or above target — whether success came from existing practice or
+            innovation.
           </>
         }
         filters={
-          <>
-            <ResultsFrameworkFyFilter
-              value={financialYear}
-              onChange={setFinancialYear}
-              disabled={loading}
-            />
-            <button
-              type="button"
-              className="btn btn-sm btn-light border fw-bold"
-              onClick={() => void load()}
-              disabled={loading}
-            >
-              Refresh
-            </button>
-          </>
+          <button
+            type="button"
+            className="btn btn-sm btn-light border fw-bold"
+            onClick={() => void load()}
+            disabled={loading}
+          >
+            Refresh
+          </button>
         }
       />
+
+      {pendingNarratives > 0 ? (
+        <div className="alert alert-warning py-2 small mb-3">
+          {pendingNarratives} indicator{pendingNarratives === 1 ? '' : 's'} require an ambassador outcome
+          narrative for FY {financialYear}.
+        </div>
+      ) : null}
 
       {error && <div className="alert alert-danger py-2 small">{error}</div>}
 
@@ -81,6 +84,7 @@ export default function AmbassadorResultsFrameworkPanel() {
       ) : (
         <ResultsFrameworkMatrixTable
           rows={rows}
+          showResponsibleOffice={false}
           showStatus
           statusFyLabel={financialYear}
           showNarratives
@@ -90,6 +94,7 @@ export default function AmbassadorResultsFrameworkPanel() {
       )}
 
       <RfNarrativeModal
+        key={narrativeRow?.id ?? 'closed'}
         show={narrativeRow != null}
         row={narrativeRow}
         financialYear={financialYear}

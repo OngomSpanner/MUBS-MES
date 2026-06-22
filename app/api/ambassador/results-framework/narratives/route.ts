@@ -67,7 +67,7 @@ export async function POST(request: Request) {
     const validationError = validateNarrativeForStatus(
       indicator.performanceStatus,
       outcomeReason,
-      practiceType
+      practiceType,
     );
     if (validationError) {
       return NextResponse.json({ message: validationError }, { status: 400 });

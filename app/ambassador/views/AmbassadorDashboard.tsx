@@ -27,7 +27,9 @@ interface AmbassadorData {
         onTrack: number;
         inProgress: number;
         delayed: number;
+        requiresAttention: number;
         totalUnits: number;
+        departmentsReportedThisMonth: number;
         rfIndicators?: number;
         rfAssessed?: number;
         rfUnderperformance?: number;
@@ -39,7 +41,6 @@ interface AmbassadorData {
         enrollmentCourseUnitStudents?: number;
     };
     subUnits: Array<{ id: number; name: string; progress: number; activityCount: number }>;
-    riskAlerts: Array<{ id: number; title: string; department: string; status: string; progress: number; dueDate: string | null }>;
 }
 
 type ReportingQuickCard = {
@@ -126,7 +127,7 @@ export default function AmbassadorDashboard() {
         );
     }
 
-    const { managedUnitName, stats, subUnits, riskAlerts } = data;
+    const { managedUnitName, stats } = data;
     const reportingCard = reportingQuickCard(data);
     const showEnrollment =
         Boolean(data.canManageEnrollment) &&
@@ -180,7 +181,7 @@ export default function AmbassadorDashboard() {
                                     {stats.complianceRate}
                                     <span style={{ fontSize: '1.2rem' }}>%</span>
                                 </div>
-                                <div className="kpi-hero-label">Compliance Rate</div>
+                                <div className="kpi-hero-label">Monthly Reporting</div>
                             </div>
                         </div>
                     </div>
@@ -268,20 +269,20 @@ export default function AmbassadorDashboard() {
                 </div>
                 <div className="col-12 col-sm-6 col-xl-3">
                     <StatCard
-                        icon="crisis_alert"
-                        label="Area Risk Alerts"
-                        value={riskAlerts.length}
-                        badge={riskAlerts.length > 0 ? 'Critical' : 'Clear'}
-                        badgeIcon="notifications_active"
-                        color={riskAlerts.length > 0 ? 'red' : 'green'}
+                        icon="schedule"
+                        label="Requires Attention"
+                        value={stats.requiresAttention ?? 0}
+                        badge={stats.requiresAttention > 0 ? 'Review' : 'Clear'}
+                        badgeIcon="fact_check"
+                        color={stats.requiresAttention > 0 ? 'red' : 'green'}
                     />
                 </div>
                 <div className="col-12 col-sm-6 col-xl-3">
                     <StatCard
                         icon="fact_check"
-                        label="Compliance"
+                        label="Monthly Reporting"
                         value={`${stats.complianceRate}%`}
-                        badge="Average"
+                        badge={`${stats.departmentsReportedThisMonth ?? 0}/${stats.totalUnits} depts`}
                         badgeIcon="monitoring"
                         color="blue"
                     />
@@ -289,11 +290,11 @@ export default function AmbassadorDashboard() {
                 <div className="col-12 col-sm-6 col-xl-3">
                     <StatCard
                         icon="speed"
-                        label="Managed Units"
-                        value={subUnits.length}
+                        label="In Progress"
+                        value={stats.inProgress}
                         badge="Active"
-                        badgeIcon="check_circle"
-                        color="green"
+                        badgeIcon="pending"
+                        color="yellow"
                     />
                 </div>
             </div>
@@ -318,19 +319,19 @@ export default function AmbassadorDashboard() {
                     </Link>
                 </div>
                 <div className="col-12 col-sm-6 col-xl-3">
-                    <Link href="/ambassador?pg=tracking&tab=alerts" className="text-decoration-none h-100">
+                    <Link href="/ambassador?pg=tracking&tab=results" className="text-decoration-none h-100">
                         <div
                             className="quick-action-card p-3 d-flex align-items-center gap-2 gap-sm-3 bg-white border rounded-4 shadow-sm h-100"
                             style={{ transition: 'all 0.2s', cursor: 'pointer', minHeight: '92px' }}
                             {...quickActionHover}
                         >
-                            <div className="icon-box d-flex align-items-center justify-content-center flex-shrink-0" style={{ width: '48px', height: '48px', borderRadius: '14px', background: 'rgba(227, 24, 55, 0.1)' }}>
-                                <span className="material-symbols-outlined" style={{ color: 'var(--mubs-red)', fontSize: '22px' }}>warning</span>
+                            <div className="icon-box d-flex align-items-center justify-content-center flex-shrink-0" style={{ width: '48px', height: '48px', borderRadius: '14px', background: 'rgba(0, 86, 150, 0.1)' }}>
+                                <span className="material-symbols-outlined" style={{ color: 'var(--mubs-blue)', fontSize: '22px' }}>analytics</span>
                             </div>
                             <div className="min-w-0">
-                                <div className="fw-black text-dark" style={{ fontSize: '.95rem', lineHeight: 1.25 }}>Risk alerts</div>
+                                <div className="fw-black text-dark" style={{ fontSize: '.95rem', lineHeight: 1.25 }}>Results Framework</div>
                                 <div className="text-muted small" style={{ fontSize: '.78rem' }}>
-                                    Tracking · {riskAlerts.length > 0 ? `${riskAlerts.length} active` : 'none active'}
+                                    Tracking · indicator performance
                                 </div>
                             </div>
                         </div>

@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Fragment, useCallback, useEffect, useMemo, useState } from 'react';
 import axios from 'axios';
 import * as XLSX from 'xlsx';
 import StatCard from '@/components/StatCard';
@@ -15,6 +15,7 @@ type ComplianceSummary = {
   onTrack: number;
   inProgress: number;
   delayed: number;
+  requiresAttention: number;
   monthlyReportingRate: number;
   departmentsReportedThisMonth: number;
 };
@@ -32,14 +33,12 @@ type DepartmentRow = {
   submissionHistory: Array<{ month: string; year: number; status: 'submitted' | 'missing' }>;
 };
 
-type RiskAlert = {
-  id: number;
-  title: string;
-  department: string;
-  departmentId: number;
-  status: 'Critical' | 'Warning';
-  progress: number;
-  dueDate: string | null;
+type MilestoneTask = {
+  taskOrder: number;
+  taskName: string;
+  milestoneProgress: number | null;
+  assignmentStatus: string | null;
+  completed: boolean;
 };
 
 type ActivityRow = {
@@ -49,7 +48,14 @@ type ActivityRow = {
   departmentId: number;
   status: string;
   progress: number;
+  displayProgress: number;
   endDate: string | null;
+  attentionLevel: 'Critical' | 'Warning' | null;
+  hasMilestones: boolean;
+  totalTasks: number;
+  completedTasks: number;
+  pendingTasks: number;
+  tasks: MilestoneTask[];
 };
 
 type ActivityFilter = 'all' | 'delayed' | 'in-progress' | 'on-track';
@@ -82,6 +88,30 @@ function activityStatusBadgeClass(status: string): string {
   return 'bg-light text-muted border';
 }
 
+function attentionSortRank(activity: ActivityRow): number {
+  if (activity.attentionLevel === 'Critical') return 0;
+  if (activity.attentionLevel === 'Warning') return 1;
+  return 2;
+}
+
+function attentionRowClass(activity: ActivityRow): string | undefined {
+  if (activity.attentionLevel === 'Critical') return 'table-danger-subtle';
+  if (activity.attentionLevel === 'Warning') return 'table-warning-subtle';
+  return undefined;
+}
+
+function attentionBadge(level: ActivityRow['attentionLevel']) {
+  if (!level) return <span className="text-muted small">—</span>;
+  return (
+    <span
+      className={`badge rounded-pill ${level === 'Critical' ? 'bg-danger' : 'bg-warning text-dark'}`}
+      style={{ fontSize: '.6rem' }}
+    >
+      {level}
+    </span>
+  );
+}
+
 function submissionHistoryLabel(
   history: DepartmentRow['submissionHistory'],
   months: string[]
@@ -98,7 +128,6 @@ function submissionHistoryLabel(
 export default function AmbassadorCompliancePanel() {
   const [summary, setSummary] = useState<ComplianceSummary | null>(null);
   const [departments, setDepartments] = useState<DepartmentRow[]>([]);
-  const [riskAlerts, setRiskAlerts] = useState<RiskAlert[]>([]);
   const [submissionMonths, setSubmissionMonths] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -109,6 +138,7 @@ export default function AmbassadorCompliancePanel() {
   const [monthlyReportFilter, setMonthlyReportFilter] = useState<'all' | 'submitted' | 'pending'>('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [activities, setActivities] = useState<ActivityRow[]>([]);
+  const [expandedActivityId, setExpandedActivityId] = useState<number | null>(null);
 
   const reportingCycle = new Date().toLocaleString('en-US', { month: 'long', year: 'numeric' });
 
@@ -122,7 +152,6 @@ export default function AmbassadorCompliancePanel() {
       ]);
       setSummary(compRes.data.summary);
       setDepartments(compRes.data.departments ?? []);
-      setRiskAlerts(compRes.data.riskAlerts ?? []);
       setSubmissionMonths(compRes.data.submissionMonths ?? []);
       setActivities(actRes.data.activities ?? []);
     } catch (err: unknown) {
@@ -167,15 +196,25 @@ export default function AmbassadorCompliancePanel() {
     });
   }, [activities, departmentFilter, activityFilter, monthlyReportFilter, searchTerm, departmentByName]);
 
+  const sortedFilteredActivities = useMemo(
+    () =>
+      [...filteredActivities].sort((a, b) => {
+        const rankDiff = attentionSortRank(a) - attentionSortRank(b);
+        if (rankDiff !== 0) return rankDiff;
+        return a.title.localeCompare(b.title);
+      }),
+    [filteredActivities],
+  );
+
+  const attentionCount = useMemo(
+    () => sortedFilteredActivities.filter((a) => a.attentionLevel).length,
+    [sortedFilteredActivities],
+  );
+
   const selectedDepartment = useMemo(() => {
     if (departmentFilter === 'All Departments') return null;
     return departments.find((d) => d.name === departmentFilter) ?? null;
   }, [departments, departmentFilter]);
-
-  const filteredRiskAlerts = useMemo(() => {
-    if (departmentFilter === 'All Departments') return riskAlerts;
-    return riskAlerts.filter((a) => a.department === departmentFilter);
-  }, [riskAlerts, departmentFilter]);
 
   const filtersAtDefault =
     departmentFilter === 'All Departments' &&
@@ -190,7 +229,7 @@ export default function AmbassadorCompliancePanel() {
     setSearchTerm('');
   };
 
-  const getExportActivities = (): ActivityRow[] => filteredActivities;
+  const getExportActivities = (): ActivityRow[] => sortedFilteredActivities;
 
   const exportPDF = async () => {
     if (!summary) return;
@@ -236,38 +275,20 @@ export default function AmbassadorCompliancePanel() {
       if (allActivities.length > 0) {
         autoTable(doc, {
           startY: nextY,
-          head: [['Activity', 'Status', 'Progress', 'Due date']],
+          head: [['Activity', 'Department', 'Attention', 'Status', 'Progress', 'Tasks', 'Pending', 'Due date']],
           body: allActivities.map((a) => [
             a.title,
+            a.department,
+            a.attentionLevel ?? '—',
             a.status,
-            `${a.progress}%`,
+            `${a.displayProgress}%${a.hasMilestones ? ' (milestone)' : ''}`,
+            a.hasMilestones ? `${a.completedTasks}/${a.totalTasks}` : '—',
+            a.hasMilestones ? (a.pendingTasks > 0 ? `${a.pendingTasks} pending` : 'Complete') : '—',
             a.endDate ? new Date(a.endDate).toLocaleDateString() : '—',
           ]),
           styles: { fontSize: 7, cellPadding: 1.5 },
           headStyles: { fillColor: [30, 92, 164], textColor: 255, fontStyle: 'bold' },
         });
-        nextY =
-          (doc as unknown as { lastAutoTable?: { finalY: number } }).lastAutoTable?.finalY ?? nextY + 20;
-      }
-
-      if (filteredRiskAlerts.length > 0) {
-        doc.setFontSize(10);
-        doc.text('Activities requiring attention', 14, nextY + 10);
-        autoTable(doc, {
-          startY: nextY + 14,
-          head: [['Activity', 'Department', 'Due', 'Progress', 'Risk']],
-          body: filteredRiskAlerts.map((a) => [
-            a.title,
-            a.department,
-            a.dueDate ? new Date(a.dueDate).toLocaleDateString() : '—',
-            `${a.progress}%`,
-            a.status,
-          ]),
-          styles: { fontSize: 7, cellPadding: 1.5 },
-          headStyles: { fillColor: [185, 28, 28], textColor: 255, fontStyle: 'bold' },
-        });
-        nextY =
-          (doc as unknown as { lastAutoTable?: { finalY: number } }).lastAutoTable?.finalY ?? nextY + 20;
       }
 
       doc.save('Departmental_Compliance_Tracker.pdf');
@@ -323,24 +344,19 @@ export default function AmbassadorCompliancePanel() {
       ]);
       XLSX.utils.book_append_sheet(wb, summarySheet, 'Departments');
 
-      if (filteredRiskAlerts.length > 0) {
-        const alertsSheet = XLSX.utils.aoa_to_sheet([
-          ['Activity', 'Department', 'Due date', 'Progress %', 'Risk'],
-          ...filteredRiskAlerts.map((a) => [
-            a.title,
-            a.department,
-            a.dueDate || '',
-            a.progress,
-            a.status,
-          ]),
-        ]);
-        XLSX.utils.book_append_sheet(wb, alertsSheet, 'Risk alerts');
-      }
-
       if (allActivities.length > 0) {
         const actSheet = XLSX.utils.aoa_to_sheet([
-          ['Activity', 'Status', 'Progress %', 'Due date'],
-          ...allActivities.map((a) => [a.title, a.status, a.progress, a.endDate || '']),
+          ['Activity', 'Department', 'Attention', 'Status', 'Progress %', 'Tasks', 'Pending', 'Due date'],
+          ...allActivities.map((a) => [
+            a.title,
+            a.department,
+            a.attentionLevel ?? '',
+            a.status,
+            a.displayProgress,
+            a.hasMilestones ? `${a.completedTasks}/${a.totalTasks}` : '',
+            a.hasMilestones ? (a.pendingTasks > 0 ? a.pendingTasks : 'Complete') : '',
+            a.endDate || '',
+          ]),
         ]);
         XLSX.utils.book_append_sheet(wb, actSheet, 'Activities');
       }
@@ -390,7 +406,10 @@ export default function AmbassadorCompliancePanel() {
           <StatCard label="In Progress" value={summary.inProgress} color="yellow" />
         </div>
         <div className="col-12 col-sm-6 col-xl-3">
-          <StatCard label="Delayed / At Risk" value={summary.delayed} color="red" />
+          <StatCard label="Delayed" value={summary.delayed} color="red" />
+        </div>
+        <div className="col-12 col-sm-6 col-xl-3">
+          <StatCard label="Requires Attention" value={summary.requiresAttention ?? 0} color="red" />
         </div>
         <div className="col-12 col-sm-6 col-xl-3">
           <StatCard
@@ -404,55 +423,15 @@ export default function AmbassadorCompliancePanel() {
         </div>
       </div>
 
-      {filteredRiskAlerts.length > 0 && (
-        <div className="table-card shadow-sm border-0 bg-white mb-4" style={{ borderRadius: '16px', overflow: 'hidden' }}>
-          <div className="p-3 border-bottom bg-danger-subtle">
-            <h6 className="mb-0 fw-bold d-flex align-items-center gap-2">
-              <span className="material-symbols-outlined text-danger">crisis_alert</span>
-              Activities requiring attention
-            </h6>
-          </div>
-          <div className="table-responsive">
-            <table className="table table-sm align-middle mb-0">
-              <thead className="table-light">
-                <tr>
-                  <th className="px-3 py-2 border-0 small fw-bold">ACTIVITY</th>
-                  <th className="py-2 border-0 small fw-bold">DEPARTMENT</th>
-                  <th className="py-2 border-0 small fw-bold">DUE</th>
-                  <th className="py-2 border-0 small fw-bold">PROGRESS</th>
-                  <th className="px-3 py-2 border-0 small fw-bold">RISK</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredRiskAlerts.map((alert) => (
-                  <tr key={alert.id}>
-                    <td className="px-3 small fw-semibold">{alert.title}</td>
-                    <td className="small">{alert.department}</td>
-                    <td className="small">
-                      {alert.dueDate ? new Date(alert.dueDate).toLocaleDateString() : '—'}
-                    </td>
-                    <td className="small">{alert.progress}%</td>
-                    <td className="px-3">
-                      <span
-                        className={`badge rounded-pill ${alert.status === 'Critical' ? 'bg-danger' : 'bg-warning text-dark'}`}
-                        style={{ fontSize: '.6rem' }}
-                      >
-                        {alert.status}
-                      </span>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
-
       <div className="table-card shadow-sm border-0 bg-white" style={{ borderRadius: '16px', overflow: 'hidden' }}>
         <div className="table-card-header flex-wrap gap-2">
           <div>
             <h5 className="mb-0 fw-bold">Dept. / Unit Activity Progress</h5>
-            <p className="mb-0 small text-muted mt-1">Strategic activities across your managed departments</p>
+            <p className="mb-0 small text-muted mt-1">
+              Strategic activities and process milestones across your managed departments. Rows highlighted in
+              red or amber require attention (overdue or due within 7 days). Click a row with milestones to
+              expand process tasks.
+            </p>
           </div>
           <div className="d-flex gap-2 flex-wrap align-items-center">
             <input
@@ -583,7 +562,19 @@ export default function AmbassadorCompliancePanel() {
                   ACTIVITY
                 </th>
                 <th className="py-3 border-0" style={{ fontSize: '.7rem', fontWeight: 800 }}>
+                  DEPARTMENT
+                </th>
+                <th className="py-3 border-0" style={{ fontSize: '.7rem', fontWeight: 800 }}>
+                  ATTENTION
+                </th>
+                <th className="py-3 border-0" style={{ fontSize: '.7rem', fontWeight: 800 }}>
                   PROGRESS
+                </th>
+                <th className="py-3 border-0" style={{ fontSize: '.7rem', fontWeight: 800 }}>
+                  TASKS
+                </th>
+                <th className="py-3 border-0" style={{ fontSize: '.7rem', fontWeight: 800 }}>
+                  PENDING
                 </th>
                 <th className="py-3 border-0" style={{ fontSize: '.7rem', fontWeight: 800 }}>
                   STATUS
@@ -594,49 +585,130 @@ export default function AmbassadorCompliancePanel() {
               </tr>
             </thead>
             <tbody>
-              {filteredActivities.length === 0 ? (
+              {sortedFilteredActivities.length === 0 ? (
                 <tr>
-                  <td colSpan={4} className="text-center text-muted py-5 small">
+                  <td colSpan={8} className="text-center text-muted py-5 small">
                     No activities match the selected filters.
                   </td>
                 </tr>
               ) : (
-                filteredActivities.map((activity) => (
-                  <tr key={activity.id}>
-                    <td className="px-4">
-                      <div className="fw-bold text-dark" style={{ fontSize: '.9rem' }}>
-                        {activity.title}
-                      </div>
-                    </td>
-                    <td>
-                      <div className="d-flex align-items-center gap-2">
-                        <div
-                          className="progress flex-fill"
-                          style={{ height: '6px', width: '72px', background: '#f1f5f9' }}
-                        >
-                          <div
-                            className="progress-bar"
-                            style={{
-                              width: `${activity.progress}%`,
-                              background: progressBarColor(activity.progress),
-                            }}
-                          />
+                sortedFilteredActivities.map((activity) => (
+                  <Fragment key={activity.id}>
+                    <tr
+                      className={attentionRowClass(activity)}
+                      style={activity.hasMilestones ? { cursor: 'pointer' } : undefined}
+                      onClick={
+                        activity.hasMilestones
+                          ? () =>
+                              setExpandedActivityId(
+                                expandedActivityId === activity.id ? null : activity.id,
+                              )
+                          : undefined
+                      }
+                    >
+                      <td className="px-4">
+                        <div className="d-flex align-items-center gap-1">
+                          {activity.hasMilestones ? (
+                            <span
+                              className="material-symbols-outlined text-muted"
+                              style={{ fontSize: '16px' }}
+                            >
+                              {expandedActivityId === activity.id ? 'expand_less' : 'expand_more'}
+                            </span>
+                          ) : null}
+                          <div className="fw-bold text-dark" style={{ fontSize: '.9rem' }}>
+                            {activity.title}
+                          </div>
                         </div>
-                        <span className="small fw-bold">{activity.progress}%</span>
-                      </div>
-                    </td>
-                    <td>
-                      <span
-                        className={`badge rounded-pill px-2 py-1 ${activityStatusBadgeClass(activity.status)}`}
-                        style={{ fontSize: '.65rem', fontWeight: 800 }}
-                      >
-                        {activity.status.toUpperCase()}
-                      </span>
-                    </td>
-                    <td className="px-4 small">
-                      {activity.endDate ? new Date(activity.endDate).toLocaleDateString() : '—'}
-                    </td>
-                  </tr>
+                      </td>
+                      <td className="small">{activity.department}</td>
+                      <td>{attentionBadge(activity.attentionLevel)}</td>
+                      <td>
+                        <div className="d-flex align-items-center gap-2">
+                          <div
+                            className="progress flex-fill"
+                            style={{ height: '6px', width: '72px', background: '#f1f5f9' }}
+                          >
+                            <div
+                              className="progress-bar"
+                              style={{
+                                width: `${activity.displayProgress}%`,
+                                background: progressBarColor(activity.displayProgress),
+                              }}
+                            />
+                          </div>
+                          <span className="small fw-bold">{activity.displayProgress}%</span>
+                        </div>
+                      </td>
+                      <td className="small">
+                        {activity.hasMilestones
+                          ? `${activity.completedTasks}/${activity.totalTasks}`
+                          : '—'}
+                      </td>
+                      <td>
+                        {activity.hasMilestones ? (
+                          activity.pendingTasks > 0 ? (
+                            <span className="badge bg-warning text-dark" style={{ fontSize: '0.65rem' }}>
+                              {activity.pendingTasks} pending
+                            </span>
+                          ) : (
+                            <span className="badge bg-success" style={{ fontSize: '0.65rem' }}>
+                              Complete
+                            </span>
+                          )
+                        ) : (
+                          <span className="text-muted small">—</span>
+                        )}
+                      </td>
+                      <td>
+                        <span
+                          className={`badge rounded-pill px-2 py-1 ${activityStatusBadgeClass(activity.status)}`}
+                          style={{ fontSize: '.65rem', fontWeight: 800 }}
+                        >
+                          {activity.status.toUpperCase()}
+                        </span>
+                      </td>
+                      <td className="px-4 small">
+                        {activity.endDate ? new Date(activity.endDate).toLocaleDateString() : '—'}
+                      </td>
+                    </tr>
+                    {activity.hasMilestones && expandedActivityId === activity.id ? (
+                      <tr>
+                        <td colSpan={8} className="px-4 pb-3 bg-light bg-opacity-50">
+                          <div
+                            className="small fw-bold text-muted mb-2 text-uppercase"
+                            style={{ fontSize: '0.65rem' }}
+                          >
+                            Process tasks (milestone progress)
+                          </div>
+                          <ul className="list-unstyled mb-0">
+                            {activity.tasks.map((task) => (
+                              <li
+                                key={`${activity.id}-${task.taskOrder}`}
+                                className="d-flex align-items-center gap-2 py-1 small"
+                              >
+                                <span
+                                  className="material-symbols-outlined"
+                                  style={{
+                                    fontSize: 16,
+                                    color: task.completed ? '#15803d' : '#94a3b8',
+                                  }}
+                                >
+                                  {task.completed ? 'check_circle' : 'radio_button_unchecked'}
+                                </span>
+                                <span className={task.completed ? 'text-dark' : 'text-muted'}>
+                                  {task.taskName}
+                                </span>
+                                {task.milestoneProgress != null ? (
+                                  <span className="text-muted ms-auto">{task.milestoneProgress}%</span>
+                                ) : null}
+                              </li>
+                            ))}
+                          </ul>
+                        </td>
+                      </tr>
+                    ) : null}
+                  </Fragment>
                 ))
               )}
             </tbody>
@@ -645,7 +717,8 @@ export default function AmbassadorCompliancePanel() {
 
         <div className="table-card-footer d-flex flex-wrap justify-content-between gap-2">
           <span className="footer-label">
-            Showing {filteredActivities.length} of {activities.length} activities
+            Showing {sortedFilteredActivities.length} of {activities.length} activities
+            {attentionCount > 0 ? ` · ${attentionCount} require attention` : ''}
           </span>
           {!filtersAtDefault && (
             <span className="text-muted small">Filters applied — export uses current view</span>

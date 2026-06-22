@@ -24,10 +24,8 @@ function LayoutContent({ children, sidebarOpen, setSidebarOpen }: any) {
       if (key === 'tracking' || key === 'dashboard') {
         const tab = searchParams.get('tab') || 'dashboard';
         if (tab === 'dashboard') return 'Dept. / Unit Dashboard';
-        if (tab === 'alerts') return 'Risk Alerts';
         if (tab === 'results') return 'Results Framework';
-        if (tab === 'milestones') return 'Milestone progress';
-        if (tab === 'compliance') return 'Dept. / Unit Activity Progress';
+        if (tab === 'compliance' || tab === 'milestones' || tab === 'alerts') return 'Dept. / Unit Activity Progress';
         return 'Tracking';
       }
       if (key === 'reporting' || key === 'reports') {

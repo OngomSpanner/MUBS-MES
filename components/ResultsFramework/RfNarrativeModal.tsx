@@ -13,6 +13,7 @@ export type RfNarrativeRow = {
   outcomeReason?: string | null;
   narrativeSource?: 'ambassador' | 'staff' | null;
   practiceType?: PracticeType | null;
+  ambassadorNarrativeRecorded?: boolean;
 };
 
 type Props = {
@@ -31,8 +32,10 @@ export default function RfNarrativeModal({ show, row, financialYear, onHide, onS
 
   useEffect(() => {
     if (show && row) {
-      setOutcomeReason(row.outcomeReason && row.narrativeSource === 'ambassador' ? row.outcomeReason : '');
-      setPracticeType(row.practiceType && row.narrativeSource === 'ambassador' ? row.practiceType : '');
+      const ambassadorText =
+        row.ambassadorNarrativeRecorded || row.narrativeSource === 'ambassador';
+      setOutcomeReason(ambassadorText && row.outcomeReason ? row.outcomeReason : '');
+      setPracticeType(ambassadorText && row.practiceType ? row.practiceType : '');
       setError('');
     }
   }, [show, row]);
@@ -67,7 +70,13 @@ export default function RfNarrativeModal({ show, row, financialYear, onHide, onS
   };
 
   return (
-    <Modal show={show} onHide={() => !submitting && onHide()} centered backdrop="static">
+    <Modal
+      show={show}
+      onHide={() => !submitting && onHide()}
+      centered
+      backdrop="static"
+      container={typeof document !== 'undefined' ? document.body : undefined}
+    >
       <Modal.Header closeButton>
         <Modal.Title className="fw-bold" style={{ fontSize: '1rem' }}>
           Record Results Framework outcome
@@ -80,7 +89,10 @@ export default function RfNarrativeModal({ show, row, financialYear, onHide, onS
               <p className="small text-muted mb-3">
                 <strong>{row.title}</strong>
                 {row.performanceStatus ? (
-                  <> · Status: <span className="text-dark">{row.performanceStatusLabel}</span></>
+                  <>
+                    {' '}
+                    · Status: <span className="text-dark">{row.performanceStatusLabel}</span>
+                  </>
                 ) : null}
               </p>
               {error ? <div className="alert alert-danger py-2 small">{error}</div> : null}
@@ -104,11 +116,13 @@ export default function RfNarrativeModal({ show, row, financialYear, onHide, onS
                     required
                   >
                     <option value="">Select…</option>
-                    {(Object.entries(PRACTICE_TYPE_LABELS) as [PracticeType, string][]).map(([val, label]) => (
-                      <option key={val} value={val}>
-                        {label}
-                      </option>
-                    ))}
+                    {(Object.entries(PRACTICE_TYPE_LABELS) as [PracticeType, string][]).map(
+                      ([val, label]) => (
+                        <option key={val} value={val}>
+                          {label}
+                        </option>
+                      ),
+                    )}
                   </Form.Select>
                 </Form.Group>
               ) : null}
@@ -119,7 +133,12 @@ export default function RfNarrativeModal({ show, row, financialYear, onHide, onS
           <Button variant="light" onClick={onHide} disabled={submitting}>
             Cancel
           </Button>
-          <Button type="button" variant="outline-primary" onClick={(e) => void handleSubmit(e, false)} disabled={submitting || !row}>
+          <Button
+            type="button"
+            variant="outline-primary"
+            onClick={(e) => void handleSubmit(e, false)}
+            disabled={submitting || !row}
+          >
             Save draft
           </Button>
           <Button type="submit" variant="primary" disabled={submitting || !row}>

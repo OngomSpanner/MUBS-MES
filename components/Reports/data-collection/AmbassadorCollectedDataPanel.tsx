@@ -8,21 +8,25 @@ import CollectedDataFlatTable, { type CollectedDataRow } from '@/components/Repo
 import ReportsSectionHeader from '@/components/Reports/ReportsSectionHeader';
 import AmbassadorDepartmentGroupFilter, {
   ALL_AMBASSADOR_DEPARTMENTS_FILTER,
+  AmbassadorDepartmentSearch,
   resolveAmbassadorDepartmentIds,
   type AmbassadorDepartmentFilterValue,
 } from '@/components/AmbassadorDepartmentGroupFilter';
 import type { AmbassadorDepartmentRow } from '@/lib/department-ambassador-groups';
 import { UOM_OPTIONS } from '@/lib/questionnaire/uom';
 import { normalizeFinancialYear } from '@/lib/questionnaire/fy-utils';
+import { CORE_OBJECTIVES_2025_2030 } from '@/lib/strategic-plan';
 
 type Metric = { id: number; metric_text: string; unit_of_measure: string; sort_order: number };
 type Department = { id: number; name: string };
 type Indicator = {
   id: number;
+  outcome_id: number;
   indicator_text: string;
   is_locked: boolean;
   outcome_type: string;
   outcome_label: string;
+  outcome_strategic_objective: string | null;
   metrics: Metric[];
   departments: Department[];
   financial_years: string[];
@@ -55,6 +59,8 @@ function normalizeIndicator(raw: Indicator): Indicator {
   return {
     ...raw,
     id: Number(raw.id),
+    outcome_id: Number(raw.outcome_id),
+    outcome_strategic_objective: raw.outcome_strategic_objective ?? null,
     metrics: (raw.metrics ?? []).map((m) => ({ ...m, id: Number(m.id) })),
     departments: (raw.departments ?? []).map((d) => ({ ...d, id: Number(d.id) })),
     financial_years: (raw.financial_years ?? []).map((fy) => normalizeFinancialYear(fy)),
@@ -71,8 +77,9 @@ export default function AmbassadorCollectedDataPanel() {
   const [departmentFilter, setDepartmentFilter] = useState<AmbassadorDepartmentFilterValue>(
     ALL_AMBASSADOR_DEPARTMENTS_FILTER,
   );
-  const [fyFilter, setFyFilter] = useState<string>('all');
   const [uomFilter, setUomFilter] = useState<string>('all');
+  const [objectiveFilter, setObjectiveFilter] = useState<'all' | string>('all');
+  const [outcomeFilter, setOutcomeFilter] = useState<'all' | string>('all');
 
   const loadAmbassadorDepartments = useCallback(async () => {
     try {
@@ -148,11 +155,52 @@ export default function AmbassadorCollectedDataPanel() {
     [ambassadorDepartments, departmentFilter],
   );
 
-  const indicators = useMemo(() => {
+  const departmentFilteredIndicators = useMemo(() => {
     if (!activeDepartmentIds) return allIndicators;
     const idSet = new Set(activeDepartmentIds);
     return allIndicators.filter((ind) => ind.departments.some((d) => idSet.has(d.id)));
   }, [allIndicators, activeDepartmentIds]);
+
+  const outcomeOptions = useMemo(() => {
+    const map = new Map<number, { id: number; type: string; label: string; objective: string | null }>();
+    for (const ind of departmentFilteredIndicators) {
+      if (!map.has(ind.outcome_id)) {
+        map.set(ind.outcome_id, {
+          id: ind.outcome_id,
+          type: ind.outcome_type,
+          label: ind.outcome_label,
+          objective: ind.outcome_strategic_objective,
+        });
+      }
+    }
+    return Array.from(map.values()).sort((a, b) => a.label.localeCompare(b.label));
+  }, [departmentFilteredIndicators]);
+
+  const outcomeOptionsForFilter = useMemo(() => {
+    if (objectiveFilter === 'all') return outcomeOptions;
+    if (objectiveFilter === 'unassigned') {
+      return outcomeOptions.filter((o) => !o.objective);
+    }
+    return outcomeOptions.filter((o) => o.objective === objectiveFilter);
+  }, [objectiveFilter, outcomeOptions]);
+
+  const indicators = useMemo(() => {
+    return departmentFilteredIndicators.filter((ind) => {
+      if (objectiveFilter !== 'all') {
+        if (objectiveFilter === 'unassigned') {
+          if (ind.outcome_strategic_objective) return false;
+        } else if (ind.outcome_strategic_objective !== objectiveFilter) {
+          return false;
+        }
+      }
+      if (outcomeFilter !== 'all' && ind.outcome_id !== Number(outcomeFilter)) {
+        return false;
+      }
+      return true;
+    });
+  }, [departmentFilteredIndicators, objectiveFilter, outcomeFilter]);
+
+  const hasUnassignedObjective = departmentFilteredIndicators.some((i) => !i.outcome_strategic_objective);
 
   const visibleDepartments = useCallback(
     (ind: Indicator) => {
@@ -163,17 +211,9 @@ export default function AmbassadorCollectedDataPanel() {
     [activeDepartmentIds],
   );
 
-  const allFys = useMemo(
+  const visibleFys = useMemo(
     () => Array.from(new Set(indicators.flatMap((i) => i.financial_years))).sort(),
     [indicators],
-  );
-
-  const visibleFys = useMemo(
-    () =>
-      fyFilter === 'all'
-        ? allFys
-        : allFys.filter((fy) => normalizeFinancialYear(fy) === normalizeFinancialYear(fyFilter)),
-    [allFys, fyFilter],
   );
 
   const grouped = useMemo(() => {
@@ -237,13 +277,9 @@ export default function AmbassadorCollectedDataPanel() {
     for (const ind of indicators) {
       const responses = getResponses(ind.id);
       for (const dept of visibleDepartments(ind)) {
-        const visibleFys =
-          fyFilter === 'all'
-            ? ind.financial_years
-            : ind.financial_years.filter((fy) => normalizeFinancialYear(fy) === normalizeFinancialYear(fyFilter));
         const visibleMetrics = ind.metrics.filter((m) => uomFilter === 'all' || m.unit_of_measure === uomFilter);
         for (const m of visibleMetrics) {
-          for (const fy of visibleFys) {
+          for (const fy of ind.financial_years) {
             const val = responseValue(responses, dept.id, m.id, fy);
             rows.push({
               Outcome: ind.outcome_label,
@@ -286,26 +322,50 @@ export default function AmbassadorCollectedDataPanel() {
           </>
         }
         filters={
-          <>
-            <div style={{ minWidth: '280px', maxWidth: '360px' }}>
+          <div className="d-flex flex-wrap gap-2 align-items-start">
+            <div className="d-flex flex-column align-items-start gap-1">
+              <AmbassadorDepartmentSearch
+                departments={ambassadorDepartments}
+                value={departmentFilter}
+                onChange={setDepartmentFilter}
+              />
               <AmbassadorDepartmentGroupFilter
                 departments={ambassadorDepartments}
                 value={departmentFilter}
                 onChange={setDepartmentFilter}
                 compact
+                showSearch={false}
               />
             </div>
             <select
               className="form-select form-select-sm"
-              value={fyFilter}
-              onChange={(e) => setFyFilter(e.target.value)}
-              style={{ width: '130px' }}
-              title="Filter by financial year"
+              value={objectiveFilter}
+              onChange={(e) => {
+                setObjectiveFilter(e.target.value);
+                setOutcomeFilter('all');
+              }}
+              style={{ width: '170px' }}
+              title="Filter by strategic objective"
             >
-              <option value="all">All FYs</option>
-              {allFys.map((fy) => (
-                <option key={fy} value={fy}>
-                  {fy}
+              <option value="all">All objectives</option>
+              {CORE_OBJECTIVES_2025_2030.map((obj, i) => (
+                <option key={obj} value={obj}>
+                  Objective {i + 1}
+                </option>
+              ))}
+              {hasUnassignedObjective ? <option value="unassigned">Unassigned objective</option> : null}
+            </select>
+            <select
+              className="form-select form-select-sm"
+              value={outcomeFilter}
+              onChange={(e) => setOutcomeFilter(e.target.value)}
+              style={{ width: '260px' }}
+              title="Filter by outcome or output"
+            >
+              <option value="all">All outcomes / outputs</option>
+              {outcomeOptionsForFilter.map((o) => (
+                <option key={o.id} value={String(o.id)}>
+                  {o.type}: {o.label}
                 </option>
               ))}
             </select>
@@ -332,7 +392,7 @@ export default function AmbassadorCollectedDataPanel() {
               <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>table_chart</span>
               Export
             </button>
-          </>
+          </div>
         }
       />
 
@@ -343,7 +403,7 @@ export default function AmbassadorCollectedDataPanel() {
           <span className="material-symbols-outlined d-block mb-2" style={{ fontSize: '2rem' }}>
             assignment
           </span>
-          No questionnaire indicators found for the selected department.
+          No questionnaire indicators found for the selected filters.
         </div>
       ) : (
         Object.entries(grouped).map(([key, inds]) => {
