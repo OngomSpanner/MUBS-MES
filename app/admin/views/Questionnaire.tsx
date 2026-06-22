@@ -10,6 +10,7 @@ import DepartmentUnitMultiSelect, { type DepartmentUnitOption } from '@/componen
 import { getAvailableFinancialYears } from '@/lib/questionnaire/fy-utils';
 import { UOM_OPTIONS } from '@/lib/questionnaire/uom';
 import { CORE_OBJECTIVES_2025_2030, coreObjectiveShortTitle } from '@/lib/strategic-plan';
+import { summarizeIndicatorDepartments } from '@/lib/summarize-indicator-departments';
 
 // ────────────────────────────────────────────────────────────
 // Types
@@ -551,8 +552,14 @@ function TemplateModal({
 // Indicators list
 // ────────────────────────────────────────────────────────────
 function IndicatorsPanel({
-  indicators, onEdit, onCreate, onRefresh,
-}: { indicators: Indicator[]; onEdit: (ind: Indicator) => void; onCreate: () => void; onRefresh: () => void }) {
+  indicators, ambassadorCatalog, onEdit, onCreate, onRefresh,
+}: {
+  indicators: Indicator[];
+  ambassadorCatalog: DepartmentUnitOption[];
+  onEdit: (ind: Indicator) => void;
+  onCreate: () => void;
+  onRefresh: () => void;
+}) {
   const [expanded, setExpanded] = useState<Set<number>>(new Set());
   const [objectiveFilter, setObjectiveFilter] = useState<'all' | string>('all');
   const [outcomeFilter, setOutcomeFilter] = useState<'all' | string>('all');
@@ -561,6 +568,15 @@ function IndicatorsPanel({
   const [deleteTarget, setDeleteTarget] = useState<{ ind: Indicator; responseCount: number } | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [lockingId, setLockingId] = useState<number | null>(null);
+
+  const groupCatalog = useMemo(
+    () =>
+      ambassadorCatalog.map((d) => ({
+        id: d.id,
+        ambassador_group: d.ambassador_group ?? null,
+      })),
+    [ambassadorCatalog],
+  );
 
   const loadResponses = async (indicatorId: number, force = false) => {
     if (!force && (responsesByIndicator[indicatorId] || loadingResponses.has(indicatorId))) return;
@@ -847,9 +863,27 @@ function IndicatorsPanel({
                         )}
                       </div>
                       <div className="mt-1 d-flex flex-wrap gap-1">
-                        {ind.departments.map((d) => (
-                          <Badge key={d.id} bg="light" className="text-dark border" style={{ fontSize: '0.62rem' }}>{d.name}</Badge>
-                        ))}
+                        {summarizeIndicatorDepartments(ind.departments, groupCatalog).map((badge) =>
+                          badge.kind === 'group' ? (
+                            <Badge
+                              key={`group-${badge.group}-${ind.id}`}
+                              bg="light"
+                              className="text-primary border border-primary"
+                              style={{ fontSize: '0.62rem', fontWeight: 600 }}
+                            >
+                              {badge.label}
+                            </Badge>
+                          ) : (
+                            <Badge
+                              key={`unit-${badge.id}`}
+                              bg="light"
+                              className="text-dark border"
+                              style={{ fontSize: '0.62rem' }}
+                            >
+                              {badge.name}
+                            </Badge>
+                          ),
+                        )}
                         {ind.financial_years.map((fy) => (
                           <Badge key={fy} bg="primary" style={{ fontSize: '0.62rem', background: 'var(--mubs-blue)' }}>{fy}</Badge>
                         ))}
@@ -1075,6 +1109,7 @@ export default function QuestionnaireView() {
           {activeTab === 'indicators' && (
             <IndicatorsPanel
               indicators={indicators}
+              ambassadorCatalog={allDepartments}
               onEdit={handleEdit}
               onCreate={handleCreate}
               onRefresh={() => { void fetchIndicators(); void fetchOutcomes(); }}
