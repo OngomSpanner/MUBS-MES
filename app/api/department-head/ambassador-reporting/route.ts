@@ -4,6 +4,7 @@ import { verifyToken } from '@/lib/auth';
 import { getVisibleDepartmentIds, inPlaceholders } from '@/lib/department-head';
 import { query } from '@/lib/db';
 import { ensureHodReviewWorkflowSchema } from '@/lib/hod-review-workflow';
+import { departmentHeadHasEnrollmentScope } from '@/lib/department-head-auth';
 import { BENEFIT_TYPES } from '@/lib/hrms/staff-benefits';
 
 export const dynamic = 'force-dynamic';
@@ -112,35 +113,41 @@ export async function GET(request: Request) {
         subtitle: `${r.department_name} · ${r.financial_year_key}`,
       }));
     } else if (category === 'programme-enrollment') {
-      items = (await query({
-        query: `
-          SELECT id, programme_name, faculty_name, financial_year_key, hod_review_status, updated_at
-          FROM staff_programme_enrollment
-          WHERE hod_review_status IN ('submitted', 'approved', 'returned')
-          ORDER BY CASE hod_review_status WHEN 'submitted' THEN 0 WHEN 'returned' THEN 1 ELSE 2 END, updated_at DESC
-        `,
-      })) as Record<string, unknown>[];
-      items = items.map((r) => ({
-        ...r,
-        category,
-        title: r.programme_name,
-        subtitle: `${r.faculty_name} · ${r.financial_year_key}`,
-      }));
+      const hasScope = await departmentHeadHasEnrollmentScope(auth.departmentIds);
+      if (hasScope) {
+        items = (await query({
+          query: `
+            SELECT id, programme_name, faculty_name, financial_year_key, hod_review_status, updated_at
+            FROM staff_programme_enrollment
+            WHERE hod_review_status IN ('submitted', 'approved', 'returned')
+            ORDER BY CASE hod_review_status WHEN 'submitted' THEN 0 WHEN 'returned' THEN 1 ELSE 2 END, updated_at DESC
+          `,
+        })) as Record<string, unknown>[];
+        items = items.map((r) => ({
+          ...r,
+          category,
+          title: r.programme_name,
+          subtitle: `${r.faculty_name} · ${r.financial_year_key}`,
+        }));
+      }
     } else if (category === 'course-unit-enrollment') {
-      items = (await query({
-        query: `
-          SELECT id, course_unit_name, faculty_name, financial_year_key, hod_review_status, updated_at
-          FROM staff_course_unit_enrollment
-          WHERE hod_review_status IN ('submitted', 'approved', 'returned')
-          ORDER BY CASE hod_review_status WHEN 'submitted' THEN 0 WHEN 'returned' THEN 1 ELSE 2 END, updated_at DESC
-        `,
-      })) as Record<string, unknown>[];
-      items = items.map((r) => ({
-        ...r,
-        category,
-        title: r.course_unit_name,
-        subtitle: `${r.faculty_name} · ${r.financial_year_key}`,
-      }));
+      const hasScope = await departmentHeadHasEnrollmentScope(auth.departmentIds);
+      if (hasScope) {
+        items = (await query({
+          query: `
+            SELECT id, course_unit_name, faculty_name, financial_year_key, hod_review_status, updated_at
+            FROM staff_course_unit_enrollment
+            WHERE hod_review_status IN ('submitted', 'approved', 'returned')
+            ORDER BY CASE hod_review_status WHEN 'submitted' THEN 0 WHEN 'returned' THEN 1 ELSE 2 END, updated_at DESC
+          `,
+        })) as Record<string, unknown>[];
+        items = items.map((r) => ({
+          ...r,
+          category,
+          title: r.course_unit_name,
+          subtitle: `${r.faculty_name} · ${r.financial_year_key}`,
+        }));
+      }
     } else if (category === 'rf-narrative') {
       items = (await query({
         query: `
@@ -171,6 +178,60 @@ export async function GET(request: Request) {
   }
 }
 
+async function verifyRecordOwnership(
+  category: string,
+  recordId: number,
+  departmentIds: number[],
+): Promise<boolean> {
+  const placeholders = inPlaceholders(departmentIds.length);
+
+  if (category === 'benefits') {
+    const rows = (await query({
+      query: `
+        SELECT 1 FROM staff_benefit_entries e
+        INNER JOIN users u ON u.id = e.user_id
+        WHERE e.id = ? AND u.department_id IN (${placeholders})
+      `,
+      values: [recordId, ...departmentIds],
+    })) as unknown[];
+    return rows.length > 0;
+  }
+
+  if (category === 'workforce') {
+    const rows = (await query({
+      query: `SELECT 1 FROM staff_workforce_assessment_counts WHERE id = ? AND managed_unit_id IN (${placeholders})`,
+      values: [recordId, ...departmentIds],
+    })) as unknown[];
+    return rows.length > 0;
+  }
+
+  if (category === 'skills') {
+    const rows = (await query({
+      query: `SELECT 1 FROM staff_employment_skill_status WHERE id = ? AND managed_unit_id IN (${placeholders})`,
+      values: [recordId, ...departmentIds],
+    })) as unknown[];
+    return rows.length > 0;
+  }
+
+  if (category === 'programme-enrollment' || category === 'course-unit-enrollment') {
+    return departmentHeadHasEnrollmentScope(departmentIds);
+  }
+
+  if (category === 'rf-narrative') {
+    const rows = (await query({
+      query: `
+        SELECT 1 FROM activity_rf_narratives arn
+        INNER JOIN strategic_activities sa ON sa.id = arn.activity_id
+        WHERE arn.id = ? AND sa.department_id IN (${placeholders})
+      `,
+      values: [recordId, ...departmentIds],
+    })) as unknown[];
+    return rows.length > 0;
+  }
+
+  return false;
+}
+
 export async function PATCH(request: Request) {
   try {
     const auth = await authReviewer();
@@ -189,6 +250,14 @@ export async function PATCH(request: Request) {
     }
     if (action === 'return' && !comment) {
       return NextResponse.json({ message: 'Comment required when returning' }, { status: 400 });
+    }
+
+    const owns = await verifyRecordOwnership(category, id, auth.departmentIds);
+    if (!owns) {
+      return NextResponse.json(
+        { message: 'You do not have permission to review this submission' },
+        { status: 403 }
+      );
     }
 
     const status = action === 'approve' ? 'approved' : 'returned';
