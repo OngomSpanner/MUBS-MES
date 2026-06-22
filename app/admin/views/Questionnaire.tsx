@@ -9,7 +9,7 @@ import DeleteConfirmModal from '@/components/Questionnaire/DeleteConfirmModal';
 import DepartmentUnitMultiSelect, { type DepartmentUnitOption } from '@/components/DepartmentUnitMultiSelect';
 import { getAvailableFinancialYears } from '@/lib/questionnaire/fy-utils';
 import { UOM_OPTIONS } from '@/lib/questionnaire/uom';
-import { CORE_OBJECTIVES_2025_2030, coreObjectiveShortTitle } from '@/lib/strategic-plan';
+import { CORE_OBJECTIVES_2025_2030, coreObjectiveNumber, coreObjectiveShortTitle } from '@/lib/strategic-plan';
 import { summarizeIndicatorDepartments } from '@/lib/summarize-indicator-departments';
 
 // ────────────────────────────────────────────────────────────
@@ -139,6 +139,20 @@ function groupIndicatorsByObjective(indicators: Indicator[]): {
     sections.push({ objective: null, outcomes: Array.from(unassigned.values()) });
   }
   return sections;
+}
+
+function indicatorSearchHaystack(ind: Indicator): string {
+  const objNum = coreObjectiveNumber(ind.outcome_strategic_objective);
+  return [
+    ind.indicator_text,
+    ind.outcome_label,
+    ind.outcome_type,
+    ind.outcome_strategic_objective ?? '',
+    coreObjectiveShortTitle(ind.outcome_strategic_objective),
+    objNum != null ? `objective ${objNum}` : '',
+  ]
+    .join(' ')
+    .toLowerCase();
 }
 
 // ────────────────────────────────────────────────────────────
@@ -563,6 +577,7 @@ function IndicatorsPanel({
   const [expanded, setExpanded] = useState<Set<number>>(new Set());
   const [objectiveFilter, setObjectiveFilter] = useState<'all' | string>('all');
   const [outcomeFilter, setOutcomeFilter] = useState<'all' | string>('all');
+  const [searchTerm, setSearchTerm] = useState('');
   const [responsesByIndicator, setResponsesByIndicator] = useState<Record<number, IndicatorResponse[]>>({});
   const [loadingResponses, setLoadingResponses] = useState<Set<number>>(new Set());
   const [deleteTarget, setDeleteTarget] = useState<{ ind: Indicator; responseCount: number } | null>(null);
@@ -686,6 +701,7 @@ function IndicatorsPanel({
   }, [objectiveFilter, outcomeOptions]);
 
   const filteredIndicators = useMemo(() => {
+    const term = searchTerm.trim().toLowerCase();
     return indicators.filter((ind) => {
       if (objectiveFilter !== 'all') {
         if (objectiveFilter === 'unassigned') {
@@ -697,12 +713,69 @@ function IndicatorsPanel({
       if (outcomeFilter !== 'all' && ind.outcome_id !== Number(outcomeFilter)) {
         return false;
       }
+      if (term && !indicatorSearchHaystack(ind).includes(term)) {
+        return false;
+      }
       return true;
     });
-  }, [indicators, objectiveFilter, outcomeFilter]);
+  }, [indicators, objectiveFilter, outcomeFilter, searchTerm]);
 
   const indicatorSections = groupIndicatorsByObjective(filteredIndicators);
   const hasUnassignedObjective = indicators.some((i) => !i.outcome_strategic_objective);
+
+  const renderToolbar = (badgeCount: number) => (
+    <div className="mb-3 d-flex flex-wrap gap-2 align-items-center">
+      <h6 className="fw-bold mb-0">Indicators <Badge bg="secondary">{badgeCount}</Badge></h6>
+      <div className="ms-auto d-flex flex-wrap gap-2 align-items-center">
+        <Form.Control
+          type="search"
+          size="sm"
+          placeholder="Search objective, outcome/output, indicator…"
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          style={{ width: '240px' }}
+          aria-label="Search indicators"
+        />
+        <Form.Select
+          size="sm"
+          value={objectiveFilter}
+          onChange={(e) => {
+            setObjectiveFilter(e.target.value);
+            setOutcomeFilter('all');
+          }}
+          style={{ width: '170px' }}
+          title="Filter by strategic objective"
+        >
+          <option value="all">All objectives</option>
+          {CORE_OBJECTIVES_2025_2030.map((obj, i) => (
+            <option key={obj} value={obj}>Objective {i + 1}</option>
+          ))}
+          {hasUnassignedObjective ? <option value="unassigned">Unassigned objective</option> : null}
+        </Form.Select>
+        <Form.Select
+          size="sm"
+          value={outcomeFilter}
+          onChange={(e) => setOutcomeFilter(e.target.value)}
+          style={{ width: '260px' }}
+          title="Filter by outcome or output"
+        >
+          <option value="all">All outcomes / outputs</option>
+          {outcomeOptionsForFilter.map((o) => (
+            <option key={o.id} value={String(o.id)}>{o.type}: {o.label}</option>
+          ))}
+        </Form.Select>
+        <Button
+          size="sm"
+          variant="primary"
+          style={{ background: 'var(--mubs-blue)', borderColor: 'var(--mubs-blue)' }}
+          onClick={onCreate}
+        >
+          <span className="material-symbols-outlined me-1" style={{ fontSize: '16px', verticalAlign: 'middle' }}>add</span>
+          Create Template
+        </Button>
+      </div>
+    </div>
+  );
 
   if (indicators.length === 0) {
     return (
@@ -729,50 +802,9 @@ function IndicatorsPanel({
   if (filteredIndicators.length === 0) {
     return (
       <div>
-        <div className="mb-3 d-flex flex-wrap gap-2 align-items-center">
-          <h6 className="fw-bold mb-0">Indicators <Badge bg="secondary">0</Badge></h6>
-          <div className="ms-auto d-flex flex-wrap gap-2 align-items-center">
-            <Form.Select
-              size="sm"
-              value={objectiveFilter}
-              onChange={(e) => {
-                setObjectiveFilter(e.target.value);
-                setOutcomeFilter('all');
-              }}
-              style={{ width: '170px' }}
-              title="Filter by strategic objective"
-            >
-              <option value="all">All objectives</option>
-              {CORE_OBJECTIVES_2025_2030.map((obj, i) => (
-                <option key={obj} value={obj}>Objective {i + 1}</option>
-              ))}
-              {hasUnassignedObjective ? <option value="unassigned">Unassigned objective</option> : null}
-            </Form.Select>
-            <Form.Select
-              size="sm"
-              value={outcomeFilter}
-              onChange={(e) => setOutcomeFilter(e.target.value)}
-              style={{ width: '260px' }}
-              title="Filter by outcome or output"
-            >
-              <option value="all">All outcomes / outputs</option>
-              {outcomeOptionsForFilter.map((o) => (
-                <option key={o.id} value={String(o.id)}>{o.type}: {o.label}</option>
-              ))}
-            </Form.Select>
-            <Button
-              size="sm"
-              variant="primary"
-              style={{ background: 'var(--mubs-blue)', borderColor: 'var(--mubs-blue)' }}
-              onClick={onCreate}
-            >
-              <span className="material-symbols-outlined me-1" style={{ fontSize: '16px', verticalAlign: 'middle' }}>add</span>
-              Create Template
-            </Button>
-          </div>
-        </div>
+        {renderToolbar(0)}
         <div className="text-center text-muted py-5 small">
-          No indicators match the selected filters.
+          No indicators match the selected filters{searchTerm.trim() ? ' or search' : ''}.
         </div>
         <DeleteConfirmModal
           show={!!deleteTarget}
@@ -789,48 +821,7 @@ function IndicatorsPanel({
 
   return (
     <div>
-      <div className="mb-3 d-flex flex-wrap gap-2 align-items-center">
-        <h6 className="fw-bold mb-0">Indicators <Badge bg="secondary">{filteredIndicators.length}</Badge></h6>
-        <div className="ms-auto d-flex flex-wrap gap-2 align-items-center">
-          <Form.Select
-            size="sm"
-            value={objectiveFilter}
-            onChange={(e) => {
-              setObjectiveFilter(e.target.value);
-              setOutcomeFilter('all');
-            }}
-            style={{ width: '170px' }}
-            title="Filter by strategic objective"
-          >
-            <option value="all">All objectives</option>
-            {CORE_OBJECTIVES_2025_2030.map((obj, i) => (
-              <option key={obj} value={obj}>Objective {i + 1}</option>
-            ))}
-            {hasUnassignedObjective ? <option value="unassigned">Unassigned objective</option> : null}
-          </Form.Select>
-          <Form.Select
-            size="sm"
-            value={outcomeFilter}
-            onChange={(e) => setOutcomeFilter(e.target.value)}
-            style={{ width: '260px' }}
-            title="Filter by outcome or output"
-          >
-            <option value="all">All outcomes / outputs</option>
-            {outcomeOptionsForFilter.map((o) => (
-              <option key={o.id} value={String(o.id)}>{o.type}: {o.label}</option>
-            ))}
-          </Form.Select>
-          <Button
-            size="sm"
-            variant="primary"
-            style={{ background: 'var(--mubs-blue)', borderColor: 'var(--mubs-blue)' }}
-            onClick={onCreate}
-          >
-            <span className="material-symbols-outlined me-1" style={{ fontSize: '16px', verticalAlign: 'middle' }}>add</span>
-            Create Template
-          </Button>
-        </div>
-      </div>
+      {renderToolbar(filteredIndicators.length)}
       {indicatorSections.map((section) => (
         <div key={section.objective ?? 'unassigned'} className="mb-4">
           <div className="mb-3 pb-2 border-bottom">
