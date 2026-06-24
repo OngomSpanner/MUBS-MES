@@ -81,25 +81,48 @@ export async function GET(request: Request) {
     const placeholders = inPlaceholders(auth.departmentIds.length);
     const rows = (await query({
       query: `
-        SELECT qis.indicator_id, qis.department_id, qis.hod_review_status, qis.submitted_at,
+        SELECT qid.indicator_id, qid.department_id,
+               COALESCE(qis.hod_review_status, 'draft') AS hod_review_status,
+               qis.submitted_at,
                i.indicator_text, o.type AS outcome_type, o.label AS outcome_label,
                COALESCE(NULLIF(TRIM(d.external_name), ''), d.name) AS department_name,
-               u.full_name AS submitted_by_name
-        FROM q_indicator_submissions qis
-        JOIN q_indicators i ON i.id = qis.indicator_id
+               u.full_name AS submitted_by_name,
+               (SELECT COUNT(*) FROM q_metrics m WHERE m.indicator_id = i.id) AS metric_count,
+               (SELECT COUNT(*) FROM q_indicator_fys f WHERE f.indicator_id = i.id) AS fy_count,
+               (SELECT COUNT(*)
+                FROM q_responses r
+                WHERE r.indicator_id = i.id AND r.department_id = qid.department_id
+                  AND r.value IS NOT NULL AND TRIM(r.value) <> '') AS filled
+        FROM q_indicator_departments qid
+        JOIN q_indicators i ON i.id = qid.indicator_id
         JOIN q_outcomes o ON o.id = i.outcome_id
-        JOIN departments d ON d.id = qis.department_id
+        JOIN departments d ON d.id = qid.department_id
+        LEFT JOIN q_indicator_submissions qis
+          ON qis.indicator_id = qid.indicator_id AND qis.department_id = qid.department_id
         LEFT JOIN users u ON u.id = qis.submitted_by
-        WHERE qis.department_id IN (${placeholders})
-          AND qis.hod_review_status IN ('submitted', 'approved', 'returned')
+        WHERE qid.department_id IN (${placeholders})
+          AND (qis.hod_review_status IS NULL
+               OR qis.hod_review_status IN ('draft', 'submitted', 'approved', 'returned'))
         ORDER BY
-          CASE qis.hod_review_status WHEN 'submitted' THEN 0 WHEN 'returned' THEN 1 ELSE 2 END,
-          qis.submitted_at DESC
+          CASE COALESCE(qis.hod_review_status, 'draft')
+            WHEN 'submitted' THEN 0 WHEN 'returned' THEN 1 WHEN 'draft' THEN 2 ELSE 3 END,
+          qis.submitted_at DESC,
+          i.indicator_text
       `,
       values: auth.departmentIds,
     })) as Record<string, unknown>[];
 
-    return NextResponse.json({ submissions: rows });
+    const submissions = rows.map((row) => {
+      const metricCount = Number(row.metric_count ?? 0);
+      const fyCount = Number(row.fy_count ?? 0);
+      return {
+        ...row,
+        filled: Number(row.filled ?? 0),
+        total: metricCount * fyCount,
+      };
+    });
+
+    return NextResponse.json({ submissions });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Unknown error';
     return NextResponse.json({ message: 'Error loading questionnaire submissions', detail: message }, { status: 500 });

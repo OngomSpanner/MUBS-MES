@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import axios from 'axios';
 import { Badge, Button, Form, Modal, Spinner } from 'react-bootstrap';
 import { uomLabel } from '@/lib/questionnaire/uom';
@@ -16,7 +16,19 @@ type Submission = {
   outcome_label: string;
   department_name: string;
   submitted_by_name: string | null;
+  filled: number;
+  total: number;
 };
+
+type SubmissionFilter = 'all' | 'not-completed' | 'awaiting-review' | 'completed' | 'needs-revision';
+
+const FILTER_TABS: { key: SubmissionFilter; label: string }[] = [
+  { key: 'all', label: 'All' },
+  { key: 'not-completed', label: 'Not completed' },
+  { key: 'awaiting-review', label: 'Awaiting review' },
+  { key: 'completed', label: 'Completed' },
+  { key: 'needs-revision', label: 'Needs revision' },
+];
 
 type Metric = { id: number; metric_text: string; unit_of_measure: string; sort_order: number };
 
@@ -30,6 +42,24 @@ type SubmissionDetail = {
   reviewed_by_name: string | null;
 };
 
+function submissionCategory(row: Submission): Exclude<SubmissionFilter, 'all'> {
+  const hod = row.hod_review_status ?? 'draft';
+  if (hod === 'returned') return 'needs-revision';
+  if (hod === 'submitted') return 'awaiting-review';
+  if (hod === 'approved') return 'completed';
+  return 'not-completed';
+}
+
+function matchesFilter(row: Submission, filter: SubmissionFilter): boolean {
+  if (filter === 'all') return true;
+  return submissionCategory(row) === filter;
+}
+
+function listStatusLabel(status: HodReviewStatus): string {
+  if (status === 'draft') return 'Not submitted';
+  return HOD_REVIEW_STATUS_LABELS[status];
+}
+
 function statusBadge(status: HodReviewStatus) {
   switch (status) {
     case 'submitted':
@@ -38,6 +68,8 @@ function statusBadge(status: HodReviewStatus) {
       return 'success';
     case 'returned':
       return 'warning';
+    case 'draft':
+      return 'secondary';
     default:
       return 'secondary';
   }
@@ -106,6 +138,7 @@ export default function HodQuestionnaireSubmissionsTab() {
   const [rows, setRows] = useState<Submission[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [activeFilter, setActiveFilter] = useState<SubmissionFilter>('all');
   const [selected, setSelected] = useState<Submission | null>(null);
   const [viewOnly, setViewOnly] = useState(false);
   const [detail, setDetail] = useState<SubmissionDetail | null>(null);
@@ -119,7 +152,13 @@ export default function HodQuestionnaireSubmissionsTab() {
     setError(null);
     try {
       const res = await axios.get('/api/department-head/questionnaire-submissions');
-      setRows(res.data.submissions ?? []);
+      const list = (res.data.submissions ?? []) as Submission[];
+      setRows(list.map((r) => ({
+        ...r,
+        hod_review_status: (r.hod_review_status ?? 'draft') as HodReviewStatus,
+        filled: Number(r.filled ?? 0),
+        total: Number(r.total ?? 0),
+      })));
     } catch {
       setError('Failed to load performance indicator submissions.');
       setRows([]);
@@ -131,6 +170,25 @@ export default function HodQuestionnaireSubmissionsTab() {
   useEffect(() => {
     void load();
   }, [load]);
+
+  const counts = useMemo(() => {
+    const tally = {
+      all: rows.length,
+      'not-completed': 0,
+      'awaiting-review': 0,
+      completed: 0,
+      'needs-revision': 0,
+    };
+    for (const row of rows) {
+      tally[submissionCategory(row)] += 1;
+    }
+    return tally;
+  }, [rows]);
+
+  const filteredRows = useMemo(
+    () => rows.filter((r) => matchesFilter(r, activeFilter)),
+    [rows, activeFilter],
+  );
 
   const openSubmission = async (submission: Submission, readOnly: boolean) => {
     setSelected(submission);
@@ -206,6 +264,28 @@ export default function HodQuestionnaireSubmissionsTab() {
   return (
     <div>
       {error && <div className="alert alert-danger py-2 small">{error}</div>}
+
+      <div className="d-flex flex-wrap gap-2 mb-3">
+        {FILTER_TABS.map(({ key, label }) => (
+          <button
+            key={key}
+            type="button"
+            className={`btn btn-sm fw-semibold ${activeFilter === key ? 'btn-primary' : 'btn-outline-secondary'}`}
+            style={activeFilter === key ? { background: 'var(--mubs-blue)', borderColor: 'var(--mubs-blue)' } : { fontSize: '0.78rem' }}
+            onClick={() => setActiveFilter(key)}
+          >
+            {label}
+            <Badge
+              bg={activeFilter === key ? 'light' : 'secondary'}
+              className={`ms-2 ${activeFilter === key ? 'text-dark' : ''}`}
+              style={{ fontSize: '0.62rem', verticalAlign: 'middle' }}
+            >
+              {counts[key]}
+            </Badge>
+          </button>
+        ))}
+      </div>
+
       <div className="table-responsive">
         <table className="table table-hover align-middle mb-0">
           <thead className="table-light">
@@ -222,11 +302,17 @@ export default function HodQuestionnaireSubmissionsTab() {
             {rows.length === 0 ? (
               <tr>
                 <td colSpan={6} className="text-center text-muted py-4 small">
-                  No performance indicator submissions yet.
+                  No performance indicators assigned to your departments yet.
+                </td>
+              </tr>
+            ) : filteredRows.length === 0 ? (
+              <tr>
+                <td colSpan={6} className="text-center text-muted py-4 small">
+                  No submissions match this filter.
                 </td>
               </tr>
             ) : (
-              rows.map((r) => (
+              filteredRows.map((r) => (
                 <tr key={`${r.indicator_id}-${r.department_id}`}>
                   <td className="small fw-semibold">{r.indicator_text}</td>
                   <td className="small text-muted">
@@ -242,7 +328,7 @@ export default function HodQuestionnaireSubmissionsTab() {
                       className={r.hod_review_status === 'submitted' || r.hod_review_status === 'returned' ? 'text-dark' : ''}
                       style={{ fontSize: '0.65rem' }}
                     >
-                      {HOD_REVIEW_STATUS_LABELS[r.hod_review_status]}
+                      {listStatusLabel(r.hod_review_status)}
                     </Badge>
                   </td>
                   <td className="text-end">
@@ -250,6 +336,8 @@ export default function HodQuestionnaireSubmissionsTab() {
                       <Button size="sm" variant="outline-primary" onClick={() => void openSubmission(r, false)}>
                         Review
                       </Button>
+                    ) : r.hod_review_status === 'draft' && r.filled === 0 ? (
+                      <span className="text-muted small">—</span>
                     ) : (
                       <Button size="sm" variant="outline-secondary" onClick={() => void openSubmission(r, true)}>
                         View
@@ -276,7 +364,8 @@ export default function HodQuestionnaireSubmissionsTab() {
                 <strong>{selected.indicator_text}</strong>
               </p>
               <p className="small text-muted mb-3">
-                {selected.department_name} · submitted by {selected.submitted_by_name || 'Ambassador'}
+                {selected.department_name}
+                {selected.submitted_by_name ? ` · submitted by ${selected.submitted_by_name}` : ' · not yet submitted'}
               </p>
 
               {detail?.hod_review_status && detail.hod_review_status !== 'draft' ? (
@@ -286,7 +375,7 @@ export default function HodQuestionnaireSubmissionsTab() {
                     className={detail.hod_review_status === 'submitted' || detail.hod_review_status === 'returned' ? 'text-dark' : ''}
                     style={{ fontSize: '0.65rem' }}
                   >
-                    {HOD_REVIEW_STATUS_LABELS[detail.hod_review_status]}
+                    {listStatusLabel(detail.hod_review_status)}
                   </Badge>
                   {detail.hod_reviewed_at ? (
                     <span className="text-muted small">

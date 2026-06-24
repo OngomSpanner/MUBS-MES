@@ -59,42 +59,6 @@ function matchesFilter(ind: Indicator, filter: IndicatorFilter): boolean {
   return indicatorCategory(ind) === filter;
 }
 
-function buildFilterSummary(filter: IndicatorFilter, items: Indicator[]): string {
-  if (items.length === 0) {
-    return filter === 'all'
-      ? 'No performance indicators assigned to your office yet.'
-      : `No indicators in the "${FILTER_TABS.find((t) => t.key === filter)?.label}" category.`;
-  }
-
-  const filled = items.reduce((sum, ind) => sum + ind.filled, 0);
-  const total = items.reduce((sum, ind) => sum + ind.total, 0);
-  const metrics = items.reduce((sum, ind) => sum + ind.metrics.length, 0);
-  const countLabel = `${items.length} indicator${items.length !== 1 ? 's' : ''}`;
-
-  switch (filter) {
-    case 'all':
-      return `${countLabel} assigned · ${filled}/${total} cells filled across ${metrics} metric${metrics !== 1 ? 's' : ''}.`;
-    case 'not-completed': {
-      const notStarted = items.filter((i) => i.status === 'not-started').length;
-      const inProgress = items.filter((i) => i.status === 'partial').length;
-      const ready = items.filter((i) => i.status === 'complete').length;
-      const parts = [];
-      if (notStarted) parts.push(`${notStarted} not started`);
-      if (inProgress) parts.push(`${inProgress} in progress`);
-      if (ready) parts.push(`${ready} ready to submit`);
-      return `${countLabel} · ${filled}/${total} cells filled${parts.length ? ` · ${parts.join(', ')}` : ''}.`;
-    }
-    case 'awaiting-review':
-      return `${countLabel} submitted for ${HOD_UNIT_HEAD_LABEL} review · ${filled}/${total} cells filled.`;
-    case 'completed':
-      return `${countLabel} approved by ${HOD_UNIT_HEAD_LABEL} · ${filled}/${total} cells recorded.`;
-    case 'needs-revision':
-      return `${countLabel} sent back for revision · update the data and resubmit for review.`;
-    default:
-      return countLabel;
-  }
-}
-
 function IndicatorCard({ ind, onOpen }: { ind: Indicator; onOpen: (ind: Indicator) => void }) {
   const sc = STATUS_CONFIG[ind.status];
   const readOnly = isSubmissionReadOnly(ind);
@@ -194,11 +158,6 @@ export default function AmbassadorDataCollection() {
   const filteredIndicators = useMemo(
     () => indicators.filter((ind) => matchesFilter(ind, activeFilter)),
     [indicators, activeFilter],
-  );
-
-  const summaryText = useMemo(
-    () => buildFilterSummary(activeFilter, filteredIndicators),
-    [activeFilter, filteredIndicators],
   );
 
   const openEntry = async (ind: Indicator) => {
@@ -301,11 +260,6 @@ export default function AmbassadorDataCollection() {
               </button>
             ))}
           </div>
-
-          <p className="small text-muted mb-3">
-            <span className="fw-semibold text-dark">{FILTER_TABS.find((t) => t.key === activeFilter)?.label}:</span>{' '}
-            {summaryText}
-          </p>
 
           {indicators.length === 0 ? (
             <div className="text-center text-muted py-5 small">
