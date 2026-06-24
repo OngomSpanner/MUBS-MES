@@ -512,9 +512,8 @@ function TemplateModal({
 
         {/* Section 3 */}
         <div className="border rounded-3 p-3">
-          <div className="d-flex justify-content-between align-items-center mb-2">
+          <div className="mb-2">
             <h6 className="fw-bold text-primary small mb-0">3. Performance Metrics <span className="text-danger">*</span></h6>
-            <Button type="button" size="sm" variant="outline-primary" onClick={addMetric}>+ Add Metric</Button>
           </div>
           <p className="text-muted small mb-2" style={{ fontSize: '0.78rem' }}>List metrics in order. Set the Unit of Measure for each.</p>
           <div className="d-flex flex-column gap-2">
@@ -546,7 +545,10 @@ function TemplateModal({
         </div>
         </div>
       </Modal.Body>
-      <Modal.Footer className="py-2 gap-2">
+      <Modal.Footer className="py-2 gap-2 justify-content-end">
+        <Button type="button" variant="outline-primary" size="sm" onClick={addMetric} disabled={saving}>
+          + Add Metric
+        </Button>
         <Button variant="outline-secondary" size="sm" onClick={onHide} disabled={saving}>Cancel</Button>
         <Button
           variant="primary"
