@@ -1,10 +1,9 @@
 import { query } from '@/lib/db';
 import {
-  AMBASSADOR_GROUP_ORDER,
   type AmbassadorDepartmentGroup,
   type AmbassadorDepartmentRow,
 } from '@/lib/department-ambassador-groups';
-import { expandAmbassadorGroupSelection } from '@/lib/expand-ambassador-group-selection';
+import { expandAmbassadorGroupSelection, inferSubscribedAmbassadorGroups } from '@/lib/expand-ambassador-group-selection';
 import { fetchDepartmentsWithAmbassador } from '@/lib/departments-with-ambassador';
 
 let schemaEnsured = false;
@@ -41,29 +40,24 @@ async function getSelectedDepartmentIds(indicatorId: number): Promise<Set<number
   return new Set(rows.map((r) => Number(r.department_id)));
 }
 
-/** Persist which groups were fully selected when the indicator was last saved. */
+/** Persist ambassador groups this indicator is subscribed to (any unit selected → full group). */
 export async function refreshIndicatorAssignedGroupFlags(
   indicatorId: number,
   departmentIds: number[],
   catalog: AmbassadorDepartmentRow[],
 ): Promise<void> {
   await ensureIndicatorGroupSchema();
-  const selected = new Set(departmentIds);
 
   await query({
     query: 'DELETE FROM q_indicator_assigned_groups WHERE indicator_id = ?',
     values: [indicatorId],
   });
 
-  for (const group of AMBASSADOR_GROUP_ORDER) {
-    const backed = catalog.filter((c) => c.ambassador_group === group).map((c) => c.id);
-    if (backed.length === 0) continue;
-    if (backed.every((id) => selected.has(id))) {
-      await query({
-        query: 'INSERT INTO q_indicator_assigned_groups (indicator_id, ambassador_group) VALUES (?, ?)',
-        values: [indicatorId, group],
-      });
-    }
+  for (const group of inferSubscribedAmbassadorGroups(departmentIds, catalog)) {
+    await query({
+      query: 'INSERT INTO q_indicator_assigned_groups (indicator_id, ambassador_group) VALUES (?, ?)',
+      values: [indicatorId, group],
+    });
   }
 }
 
@@ -84,9 +78,8 @@ async function insertDepartmentAssignment(indicatorId: number, departmentId: num
 }
 
 /**
- * Add new ambassador units when an indicator already includes every other member of that group
- * (e.g. had all 10 faculties; 11th gets an ambassador → auto-assign 11th).
- * Also expands indicators flagged as full-group on last save.
+ * Add all ambassador units for any group that already has at least one assigned unit,
+ * and keep groups up to date when the ambassador catalog grows.
  */
 export async function syncIndicatorDepartmentGroups(
   indicatorId: number,

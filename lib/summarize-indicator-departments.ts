@@ -17,8 +17,8 @@ export type IndicatorDepartmentBadge =
 
 /**
  * Collapse ambassador group selections into summary labels.
- * Full group → "All Faculties (12)". Partial → "All Faculties (10/12)" so the list
- * stays compact when the catalog grows after the indicator was saved.
+ * Full group → "All Faculties (12)". Partial counts should not appear after sync;
+ * they are only shown briefly if the catalog changed before the next refresh.
  * Unclassified or lone units are returned individually by name.
  */
 export function summarizeIndicatorDepartments(

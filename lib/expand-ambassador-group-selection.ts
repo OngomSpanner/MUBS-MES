@@ -16,8 +16,9 @@ function groupMemberIds(
 }
 
 /**
- * Expand selected ambassador units when a full group was subscribed and the catalog grew,
- * or when every other member of a group is already selected (new ambassador on one unit).
+ * When an indicator includes any ambassador unit from a group (e.g. 19 of 24 departments),
+ * treat that as a full-group assignment and add every other member of that group.
+ * New ambassador units in the group are included automatically on the next sync.
  */
 export function expandAmbassadorGroupSelection(
   selectedIds: Iterable<number>,
@@ -34,22 +35,15 @@ export function expandAmbassadorGroupSelection(
       const backed = groupMemberIds(catalog, group);
       if (backed.length === 0) continue;
 
-      if (assigned.has(group)) {
-        for (const id of backed) {
-          if (!selected.has(id)) {
-            selected.add(id);
-            loop = true;
-          }
-        }
-        continue;
-      }
+      const hasAnyInGroup = backed.some((id) => selected.has(id));
+      const subscribed = assigned.has(group) || hasAnyInGroup;
+      if (!subscribed) continue;
 
-      for (const missingId of backed) {
-        if (selected.has(missingId)) continue;
-        const others = backed.filter((id) => id !== missingId);
-        if (others.length > 0 && others.every((id) => selected.has(id))) {
-          selected.add(missingId);
-          assigned.add(group);
+      if (hasAnyInGroup) assigned.add(group);
+
+      for (const id of backed) {
+        if (!selected.has(id)) {
+          selected.add(id);
           loop = true;
         }
       }
@@ -57,4 +51,16 @@ export function expandAmbassadorGroupSelection(
   }
 
   return Array.from(selected);
+}
+
+/** Groups that should auto-complete when the catalog grows. */
+export function inferSubscribedAmbassadorGroups(
+  selectedIds: Iterable<number>,
+  catalog: AmbassadorGroupCatalogEntry[],
+): AmbassadorDepartmentGroup[] {
+  const selected = new Set(selectedIds);
+  return AMBASSADOR_GROUP_ORDER.filter((group) => {
+    const backed = groupMemberIds(catalog, group);
+    return backed.length > 0 && backed.some((id) => selected.has(id));
+  });
 }
