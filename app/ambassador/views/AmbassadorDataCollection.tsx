@@ -28,7 +28,9 @@ type Indicator = {
 type ResponseMap = Record<string, string>;
 type IndicatorFilter = 'all' | 'not-completed' | 'awaiting-review' | 'completed' | 'needs-revision';
 
-const STATUS_CONFIG = {
+type StatusConfig = { label: string; bg: string; icon: string; textDark?: boolean };
+
+const STATUS_CONFIG: Record<Indicator['status'], StatusConfig> = {
   'not-started': { label: 'Not started', bg: 'secondary', icon: 'circle' },
   'partial': { label: 'In progress', bg: 'warning', icon: 'more_horiz', textDark: true },
   'complete': { label: 'Complete', bg: 'success', icon: 'check_circle' },
