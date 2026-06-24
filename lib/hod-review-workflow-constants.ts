@@ -7,7 +7,7 @@ export const HOD_REVIEW_STATUS_LABELS: Record<HodReviewStatus, string> = {
   draft: 'Draft',
   submitted: 'Awaiting HOD',
   approved: 'Approved',
-  returned: 'Returned',
+  returned: 'Revision requested',
 };
 
 /** SQL fragment: only rows visible to admin after HOD approval (legacy rows without column pass through). */

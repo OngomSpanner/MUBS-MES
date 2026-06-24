@@ -20,11 +20,63 @@ async function authReviewer() {
   return { userId: decoded.userId, departmentIds };
 }
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
     const auth = await authReviewer();
     if ('error' in auth) return auth.error;
     await ensureHodReviewWorkflowSchema();
+
+    const url = new URL(request.url);
+    const indicatorId = Number(url.searchParams.get('indicatorId'));
+    const departmentId = Number(url.searchParams.get('departmentId'));
+
+    if (indicatorId && departmentId) {
+      if (!auth.departmentIds.includes(departmentId)) {
+        return NextResponse.json({ message: 'Not authorized for this department' }, { status: 403 });
+      }
+
+      const metrics = (await query({
+        query: `SELECT id, metric_text, unit_of_measure, sort_order
+                FROM q_metrics WHERE indicator_id = ? ORDER BY sort_order`,
+        values: [indicatorId],
+      })) as { id: number; metric_text: string; unit_of_measure: string; sort_order: number }[];
+
+      const financialYears = (await query({
+        query: 'SELECT financial_year FROM q_indicator_fys WHERE indicator_id = ? ORDER BY financial_year',
+        values: [indicatorId],
+      })) as { financial_year: string }[];
+
+      const responses = (await query({
+        query: `SELECT metric_id, financial_year, value
+                FROM q_responses
+                WHERE indicator_id = ? AND department_id = ?`,
+        values: [indicatorId, departmentId],
+      })) as { metric_id: number; financial_year: string; value: string | null }[];
+
+      const submission = (await query({
+        query: `SELECT qis.hod_review_status, qis.hod_review_comment, qis.hod_reviewed_at,
+                       ru.full_name AS reviewed_by_name
+                FROM q_indicator_submissions qis
+                LEFT JOIN users ru ON ru.id = qis.hod_reviewed_by
+                WHERE qis.indicator_id = ? AND qis.department_id = ?`,
+        values: [indicatorId, departmentId],
+      })) as {
+        hod_review_status: string;
+        hod_review_comment: string | null;
+        hod_reviewed_at: string | null;
+        reviewed_by_name: string | null;
+      }[];
+
+      return NextResponse.json({
+        metrics,
+        financial_years: financialYears.map((r) => r.financial_year),
+        responses,
+        hod_review_status: submission[0]?.hod_review_status ?? null,
+        hod_review_comment: submission[0]?.hod_review_comment ?? null,
+        hod_reviewed_at: submission[0]?.hod_reviewed_at ?? null,
+        reviewed_by_name: submission[0]?.reviewed_by_name ?? null,
+      });
+    }
 
     const placeholders = inPlaceholders(auth.departmentIds.length);
     const rows = (await query({
@@ -70,7 +122,7 @@ export async function PATCH(request: Request) {
       return NextResponse.json({ message: 'indicatorId, departmentId, and action (approve|return) required' }, { status: 400 });
     }
     if (action === 'return' && !comment) {
-      return NextResponse.json({ message: 'Comment required when returning' }, { status: 400 });
+      return NextResponse.json({ message: 'Feedback required when requesting revision' }, { status: 400 });
     }
 
     if (!auth.departmentIds.includes(departmentId)) {
@@ -87,7 +139,7 @@ export async function PATCH(request: Request) {
       values: [status, auth.userId, comment || null, indicatorId, departmentId],
     });
 
-    return NextResponse.json({ message: action === 'approve' ? 'Approved' : 'Returned to ambassador' });
+    return NextResponse.json({ message: action === 'approve' ? 'Approved' : 'Sent back for revision' });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Unknown error';
     return NextResponse.json({ message: 'Error updating submission', detail: message }, { status: 500 });
