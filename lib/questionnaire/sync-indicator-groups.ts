@@ -4,6 +4,7 @@ import {
   type AmbassadorDepartmentGroup,
   type AmbassadorDepartmentRow,
 } from '@/lib/department-ambassador-groups';
+import { expandAmbassadorGroupSelection } from '@/lib/expand-ambassador-group-selection';
 import { fetchDepartmentsWithAmbassador } from '@/lib/departments-with-ambassador';
 
 let schemaEnsured = false;
@@ -40,13 +41,6 @@ async function getSelectedDepartmentIds(indicatorId: number): Promise<Set<number
   return new Set(rows.map((r) => Number(r.department_id)));
 }
 
-function groupMemberIds(
-  catalog: AmbassadorDepartmentRow[],
-  group: AmbassadorDepartmentGroup,
-): number[] {
-  return catalog.filter((c) => c.ambassador_group === group).map((c) => c.id);
-}
-
 /** Persist which groups were fully selected when the indicator was last saved. */
 export async function refreshIndicatorAssignedGroupFlags(
   indicatorId: number,
@@ -62,7 +56,7 @@ export async function refreshIndicatorAssignedGroupFlags(
   });
 
   for (const group of AMBASSADOR_GROUP_ORDER) {
-    const backed = groupMemberIds(catalog, group);
+    const backed = catalog.filter((c) => c.ambassador_group === group).map((c) => c.id);
     if (backed.length === 0) continue;
     if (backed.every((id) => selected.has(id))) {
       await query({
@@ -100,47 +94,29 @@ export async function syncIndicatorDepartmentGroups(
 ): Promise<boolean> {
   await ensureIndicatorGroupSchema();
   const assignedGroups = await getAssignedGroupFlags(indicatorId);
-  let selected = await getSelectedDepartmentIds(indicatorId);
+  const before = await getSelectedDepartmentIds(indicatorId);
+  const expanded = expandAmbassadorGroupSelection(before, catalog, assignedGroups);
+
   let changed = false;
-
-  let loop = true;
-  while (loop) {
-    loop = false;
-    for (const group of AMBASSADOR_GROUP_ORDER) {
-      const backed = groupMemberIds(catalog, group);
-      if (backed.length === 0) continue;
-
-      if (assignedGroups.has(group)) {
-        for (const id of backed) {
-          if (!selected.has(id)) {
-            await insertDepartmentAssignment(indicatorId, id);
-            selected.add(id);
-            changed = true;
-            loop = true;
-          }
-        }
-        continue;
-      }
-
-      for (const missingId of backed) {
-        if (selected.has(missingId)) continue;
-        const others = backed.filter((id) => id !== missingId);
-        if (others.length > 0 && others.every((id) => selected.has(id))) {
-          await insertDepartmentAssignment(indicatorId, missingId);
-          selected.add(missingId);
-          assignedGroups.add(group);
-          await query({
-            query: `INSERT IGNORE INTO q_indicator_assigned_groups (indicator_id, ambassador_group) VALUES (?, ?)`,
-            values: [indicatorId, group],
-          });
-          changed = true;
-          loop = true;
-        }
-      }
+  for (const id of expanded) {
+    if (!before.has(id)) {
+      await insertDepartmentAssignment(indicatorId, id);
+      changed = true;
     }
   }
 
+  if (changed) {
+    await refreshIndicatorAssignedGroupFlags(indicatorId, expanded, catalog);
+  }
+
   return changed;
+}
+
+export async function getIndicatorAssignedGroups(
+  indicatorId: number,
+): Promise<AmbassadorDepartmentGroup[]> {
+  const flags = await getAssignedGroupFlags(indicatorId);
+  return Array.from(flags);
 }
 
 /** After a new ambassador is assigned to a unit, update all indicators that subscribe to that group. */

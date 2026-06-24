@@ -3,8 +3,11 @@ import { query } from '@/lib/db';
 import { cookies } from 'next/headers';
 import { verifyToken } from '@/lib/auth';
 import { canManageStrategicStandards } from '@/lib/role-routing';
+import { normalizeFinancialYear } from '@/lib/questionnaire/fy-utils';
+import { ensureQuestionnaireObjectiveSchema } from '@/lib/questionnaire-schema';
 import { fetchDepartmentsWithAmbassador } from '@/lib/departments-with-ambassador';
 import {
+  getIndicatorAssignedGroups,
   refreshIndicatorAssignedGroupFlags,
   syncIndicatorDepartmentGroups,
 } from '@/lib/questionnaire/sync-indicator-groups';
@@ -18,6 +21,75 @@ async function requireAdmin() {
   const decoded = verifyToken(token) as { role?: string } | null;
   if (!decoded || !canManageStrategicStandards(decoded.role)) return null;
   return decoded;
+}
+
+async function requireAuth() {
+  const cookieStore = await cookies();
+  const token = cookieStore.get('token')?.value;
+  if (!token) return null;
+  return verifyToken(token);
+}
+
+export async function GET(_request: Request, context: { params: Promise<{ id: string }> }) {
+  try {
+    if (!await requireAuth()) return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
+    const { id } = await context.params;
+    const indicatorId = Number(id);
+    if (!Number.isFinite(indicatorId) || indicatorId <= 0) {
+      return NextResponse.json({ message: 'Invalid indicator id' }, { status: 400 });
+    }
+
+    await ensureQuestionnaireObjectiveSchema();
+    const catalog = await fetchDepartmentsWithAmbassador(true);
+    await syncIndicatorDepartmentGroups(indicatorId, catalog);
+
+    const rows = await query({
+      query: `SELECT i.id, i.outcome_id, i.indicator_text, i.is_locked, i.created_at,
+                o.type AS outcome_type, o.label AS outcome_label,
+                o.strategic_objective AS outcome_strategic_objective
+              FROM q_indicators i
+              JOIN q_outcomes o ON o.id = i.outcome_id
+              WHERE i.id = ?`,
+      values: [indicatorId],
+    }) as any[];
+
+    if (!rows.length) return NextResponse.json({ message: 'Not found' }, { status: 404 });
+    const ind = rows[0];
+
+    const metrics = await query({
+      query: 'SELECT id, metric_text, unit_of_measure, sort_order FROM q_metrics WHERE indicator_id = ? ORDER BY sort_order',
+      values: [indicatorId],
+    }) as any[];
+
+    const departments = await query({
+      query: `SELECT d.id, COALESCE(NULLIF(TRIM(d.external_name),''), d.name) AS name
+              FROM q_indicator_departments qid
+              JOIN departments d ON d.id = qid.department_id
+              WHERE qid.indicator_id = ?
+              ORDER BY name`,
+      values: [indicatorId],
+    }) as { id: number; name: string }[];
+
+    const financialYears = await query({
+      query: 'SELECT financial_year FROM q_indicator_fys WHERE indicator_id = ? ORDER BY financial_year',
+      values: [indicatorId],
+    }) as { financial_year: string }[];
+
+    const assignedGroups = await getIndicatorAssignedGroups(indicatorId);
+
+    return NextResponse.json({
+      ...ind,
+      id: indicatorId,
+      is_locked: Boolean(ind.is_locked),
+      metrics: metrics.map((m) => ({ ...m, id: Number(m.id) })),
+      departments: departments.map((d) => ({ id: Number(d.id), name: d.name })),
+      financial_years: financialYears.map((f) => normalizeFinancialYear(f.financial_year)),
+      assigned_groups: assignedGroups,
+    });
+  } catch (e) {
+    console.error('q_indicators GET [id]', e);
+    return NextResponse.json({ message: 'Error' }, { status: 500 });
+  }
 }
 
 export async function PUT(request: Request, context: { params: Promise<{ id: string }> }) {

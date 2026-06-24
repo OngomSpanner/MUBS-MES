@@ -11,6 +11,8 @@ import { getAvailableFinancialYears } from '@/lib/questionnaire/fy-utils';
 import { UOM_OPTIONS } from '@/lib/questionnaire/uom';
 import { CORE_OBJECTIVES_2025_2030, coreObjectiveNumber, coreObjectiveShortTitle } from '@/lib/strategic-plan';
 import { summarizeIndicatorDepartments } from '@/lib/summarize-indicator-departments';
+import { expandAmbassadorGroupSelection } from '@/lib/expand-ambassador-group-selection';
+import type { AmbassadorDepartmentGroup } from '@/lib/department-ambassador-groups';
 
 // ────────────────────────────────────────────────────────────
 // Types
@@ -30,6 +32,7 @@ type Indicator = {
   metrics: { id: number; metric_text: string; unit_of_measure: string; sort_order: number }[];
   departments: { id: number; name: string }[];
   financial_years: string[];
+  assigned_groups?: AmbassadorDepartmentGroup[];
 };
 
 type IndicatorResponse = {
@@ -336,7 +339,7 @@ function ManageOutcomesPanel({
 // Create / Edit Template modal
 // ────────────────────────────────────────────────────────────
 function TemplateModal({
-  show, onHide, outcomes, allDepartments, editingIndicator, onSaved,
+  show, onHide, outcomes, allDepartments, editingIndicator, onSaved, onDepartmentSync,
 }: {
   show: boolean;
   onHide: () => void;
@@ -344,13 +347,16 @@ function TemplateModal({
   allDepartments: DepartmentUnitOption[];
   editingIndicator: Indicator | null;
   onSaved: () => void;
+  onDepartmentSync?: () => void;
 }) {
   const [outcomeId, setOutcomeId] = useState<string>('');
   const [indicatorText, setIndicatorText] = useState('');
   const [deptIds, setDeptIds] = useState<number[]>([]);
+  const [subscribedGroups, setSubscribedGroups] = useState<AmbassadorDepartmentGroup[]>([]);
   const [selectedFYs, setSelectedFYs] = useState<string[]>([]);
   const [metrics, setMetrics] = useState<MetricFormRow[]>([emptyMetricRow()]);
   const [saving, setSaving] = useState(false);
+  const [loadingDetail, setLoadingDetail] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
 
@@ -358,22 +364,67 @@ function TemplateModal({
 
   useEffect(() => {
     if (!show) return;
-    if (editingIndicator) {
-      setOutcomeId(String(editingIndicator.outcome_id));
-      setIndicatorText(editingIndicator.indicator_text);
-      setDeptIds(editingIndicator.departments.map((d) => d.id));
-      setSelectedFYs([...editingIndicator.financial_years]);
-      setMetrics(editingIndicator.metrics.length > 0
-        ? editingIndicator.metrics.map((m) => ({ id: m.id, metric_text: m.metric_text, unit_of_measure: m.unit_of_measure }))
-        : [emptyMetricRow()]);
-    } else {
+    if (!editingIndicator) {
       resetForm();
+      return;
     }
-  }, [editingIndicator, show]);
+
+    let cancelled = false;
+    setLoadingDetail(true);
+    setErr(null);
+
+    (async () => {
+      try {
+        const res = await axios.get(`/api/questionnaire/indicators/${editingIndicator.id}`);
+        if (cancelled) return;
+        const ind = res.data as Indicator;
+        const groups = ind.assigned_groups ?? [];
+        const baseIds = ind.departments.map((d) => d.id);
+        const expandedIds = expandAmbassadorGroupSelection(baseIds, allDepartments, groups);
+
+        setOutcomeId(String(ind.outcome_id));
+        setIndicatorText(ind.indicator_text);
+        setSubscribedGroups(groups);
+        setDeptIds(expandedIds);
+        setSelectedFYs([...ind.financial_years]);
+        setMetrics(ind.metrics.length > 0
+          ? ind.metrics.map((m) => ({ id: m.id, metric_text: m.metric_text, unit_of_measure: m.unit_of_measure }))
+          : [emptyMetricRow()]);
+
+        if (expandedIds.length !== editingIndicator.departments.length) {
+          onDepartmentSync?.();
+        }
+      } catch {
+        if (cancelled) return;
+        const baseIds = editingIndicator.departments.map((d) => d.id);
+        setOutcomeId(String(editingIndicator.outcome_id));
+        setIndicatorText(editingIndicator.indicator_text);
+        setSubscribedGroups(editingIndicator.assigned_groups ?? []);
+        setDeptIds(expandAmbassadorGroupSelection(baseIds, allDepartments, editingIndicator.assigned_groups));
+        setSelectedFYs([...editingIndicator.financial_years]);
+        setMetrics(editingIndicator.metrics.length > 0
+          ? editingIndicator.metrics.map((m) => ({ id: m.id, metric_text: m.metric_text, unit_of_measure: m.unit_of_measure }))
+          : [emptyMetricRow()]);
+      } finally {
+        if (!cancelled) setLoadingDetail(false);
+      }
+    })();
+
+    return () => { cancelled = true; };
+  }, [show, editingIndicator?.id, allDepartments, onDepartmentSync]);
+
+  useEffect(() => {
+    if (!show || !isEditing || deptIds.length === 0 || allDepartments.length === 0) return;
+    setDeptIds((prev) => {
+      const expanded = expandAmbassadorGroupSelection(prev, allDepartments, subscribedGroups);
+      if (expanded.length === prev.length && expanded.every((id) => prev.includes(id))) return prev;
+      return expanded;
+    });
+  }, [show, isEditing, allDepartments, subscribedGroups]);
 
   function resetForm() {
-    setOutcomeId(''); setIndicatorText(''); setDeptIds([]); setSelectedFYs([]);
-    setMetrics([emptyMetricRow()]); setErr(null); setSuccess(false);
+    setOutcomeId(''); setIndicatorText(''); setDeptIds([]); setSubscribedGroups([]);
+    setSelectedFYs([]); setMetrics([emptyMetricRow()]); setErr(null); setSuccess(false);
   }
 
   const toggleFY = (fy: string) =>
@@ -433,6 +484,9 @@ function TemplateModal({
         </Modal.Title>
       </Modal.Header>
       <Modal.Body>
+        {loadingDetail && (
+          <div className="text-muted small mb-2">Loading latest department assignments…</div>
+        )}
         {isEditing && (
           <div className="alert alert-info py-2 small mb-3">
             Changes to departments and financial years will not affect collected data.
@@ -485,6 +539,7 @@ function TemplateModal({
             selectedIds={deptIds}
             onChange={setDeptIds}
             label="Responsible Department(s) / Unit(s)"
+            disabled={loadingDetail}
           />
           <Form.Label className="small fw-bold mb-1 mt-2">Financial Year(s) <span className="text-danger">*</span></Form.Label>
           <div className="d-flex flex-wrap gap-2">
@@ -1042,6 +1097,7 @@ export default function QuestionnaireView() {
   };
 
   const handleEdit = (ind: Indicator) => {
+    void loadDepts();
     setEditingIndicator(ind);
     setShowTemplateModal(true);
   };
@@ -1053,6 +1109,10 @@ export default function QuestionnaireView() {
     setEditingIndicator(null);
     setActiveTab('indicators');
   };
+
+  const handleDepartmentSync = useCallback(() => {
+    void fetchIndicators();
+  }, [fetchIndicators]);
 
   const lockedCount = indicators.filter((i) => i.is_locked).length;
   const totalMetrics = indicators.reduce((sum, i) => sum + i.metrics.length, 0);
@@ -1125,6 +1185,7 @@ export default function QuestionnaireView() {
           allDepartments={allDepartments}
           editingIndicator={editingIndicator}
           onSaved={handleTemplateSaved}
+          onDepartmentSync={handleDepartmentSync}
         />
       </div>
     </Layout>

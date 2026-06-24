@@ -27,6 +27,7 @@ type Props = {
   label?: string;
   emptyHint?: string;
   showGroupChips?: boolean;
+  disabled?: boolean;
 };
 
 const GROUP_ORDER = AMBASSADOR_GROUP_ORDER;
@@ -38,6 +39,7 @@ export default function DepartmentUnitMultiSelect({
   label = 'Department(s) / Unit(s)',
   emptyHint = 'No departments selected yet.',
   showGroupChips = true,
+  disabled = false,
 }: Props) {
   const [searchTerm, setSearchTerm] = useState('');
   const [showResults, setShowResults] = useState(false);
@@ -56,12 +58,14 @@ export default function DepartmentUnitMultiSelect({
   }, [searchTerm, departments]);
 
   const addUnit = (id: number) => {
+    if (disabled) return;
     if (!selectedIds.includes(id)) onChange([...selectedIds, id]);
     setSearchTerm('');
     setShowResults(false);
   };
 
   const addGroup = (group: AmbassadorDepartmentGroup) => {
+    if (disabled) return;
     const ids = filterDepartmentsByGroup(departments, group).map((d) => d.id);
     onChange(Array.from(new Set([...selectedIds, ...ids])));
     setSearchTerm('');
@@ -69,6 +73,7 @@ export default function DepartmentUnitMultiSelect({
   };
 
   const removeUnit = (id: number) => {
+    if (disabled) return;
     onChange(selectedIds.filter((i) => i !== id));
   };
 
@@ -87,7 +92,7 @@ export default function DepartmentUnitMultiSelect({
             label="Clear"
             variant="clear"
             title="Remove all selected departments"
-            onClick={() => onChange([])}
+            onClick={() => { if (!disabled) onChange([]); }}
           />
           {GROUP_ORDER.map((group) => {
             const count = groupCounts[group];
@@ -117,6 +122,7 @@ export default function DepartmentUnitMultiSelect({
           onFocus={() => setShowResults(true)}
           onBlur={() => window.setTimeout(() => setShowResults(false), 150)}
           size="sm"
+          disabled={disabled}
         />
 
         {showResults && searchResults.length > 0 ? (
