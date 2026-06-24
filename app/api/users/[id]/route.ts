@@ -13,6 +13,7 @@ import {
 } from '@/lib/staff-biodata';
 import { normalizeUserAccountStatus } from '@/lib/user-account-status';
 import { extractActivationRolesFromRoleField, sendRoleActivationEmail } from '@/lib/activation-emails';
+import { syncAllIndicatorsForAmbassadorCatalog } from '@/lib/questionnaire/sync-indicator-groups';
 
 export async function GET(
   request: Request,
@@ -231,6 +232,15 @@ export async function PUT(
       }
     } catch (roleErr) {
       console.error('user_roles sync failed during PUT:', roleErr);
+    }
+
+    const isAmbassador = roleListNormalized.includes('ambassador');
+    if (isAmbassador && managedUnitId) {
+      try {
+        await syncAllIndicatorsForAmbassadorCatalog();
+      } catch (syncErr) {
+        console.error('sync indicators after ambassador user update', syncErr);
+      }
     }
 
     // Sync committee assignments when provided

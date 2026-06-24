@@ -14,6 +14,7 @@ import {
   normalizeOptionalString,
 } from '@/lib/staff-biodata';
 import { normalizeUserAccountStatus } from '@/lib/user-account-status';
+import { syncAllIndicatorsForAmbassadorCatalog } from '@/lib/questionnaire/sync-indicator-groups';
 
 export async function GET(request: Request) {
   try {
@@ -305,6 +306,14 @@ export async function POST(request: Request) {
         } catch (e: any) {
           if (e?.code !== 'ER_NO_SUCH_TABLE') console.error('user_committee_assignments insert:', e);
         }
+      }
+    }
+
+    if (roleListNormalized.includes('ambassador') && managedUnitId) {
+      try {
+        await syncAllIndicatorsForAmbassadorCatalog();
+      } catch (syncErr) {
+        console.error('sync indicators after ambassador user create', syncErr);
       }
     }
 

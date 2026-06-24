@@ -5,6 +5,11 @@ import { verifyToken } from '@/lib/auth';
 import { canManageStrategicStandards } from '@/lib/role-routing';
 import { normalizeFinancialYear } from '@/lib/questionnaire/fy-utils';
 import { ensureQuestionnaireObjectiveSchema } from '@/lib/questionnaire-schema';
+import { fetchDepartmentsWithAmbassador } from '@/lib/departments-with-ambassador';
+import {
+  refreshIndicatorAssignedGroupFlags,
+  syncIndicatorDepartmentGroups,
+} from '@/lib/questionnaire/sync-indicator-groups';
 
 export const dynamic = 'force-dynamic';
 
@@ -25,7 +30,8 @@ export async function GET() {
     if (!verifyToken(token)) return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
 
     await ensureQuestionnaireObjectiveSchema();
-    const indicators = await query({
+    const catalog = await fetchDepartmentsWithAmbassador(true);
+    const indicatorRows = await query({
       query: `SELECT i.id, i.outcome_id, i.indicator_text, i.is_locked, i.created_at,
                 o.type AS outcome_type, o.label AS outcome_label,
                 o.strategic_objective AS outcome_strategic_objective
@@ -33,6 +39,12 @@ export async function GET() {
               JOIN q_outcomes o ON o.id = i.outcome_id
               ORDER BY o.strategic_objective, o.type, o.label, i.indicator_text`,
     }) as any[];
+
+    for (const ind of indicatorRows) {
+      await syncIndicatorDepartmentGroups(Number(ind.id), catalog);
+    }
+
+    const indicators = indicatorRows;
 
     const metrics = await query({
       query: 'SELECT id, indicator_id, metric_text, unit_of_measure, sort_order FROM q_metrics ORDER BY indicator_id, sort_order',
@@ -124,6 +136,10 @@ export async function POST(request: Request) {
         values: [indicatorId, validMetrics[i].metric_text.trim(), uom, i],
       });
     }
+
+    const catalog = await fetchDepartmentsWithAmbassador(true);
+    await refreshIndicatorAssignedGroupFlags(indicatorId, departmentIds, catalog);
+    await syncIndicatorDepartmentGroups(indicatorId, catalog);
 
     return NextResponse.json({ id: indicatorId }, { status: 201 });
   } catch (e) {

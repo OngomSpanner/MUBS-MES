@@ -3,6 +3,11 @@ import { query } from '@/lib/db';
 import { cookies } from 'next/headers';
 import { verifyToken } from '@/lib/auth';
 import { canManageStrategicStandards } from '@/lib/role-routing';
+import { fetchDepartmentsWithAmbassador } from '@/lib/departments-with-ambassador';
+import {
+  refreshIndicatorAssignedGroupFlags,
+  syncIndicatorDepartmentGroups,
+} from '@/lib/questionnaire/sync-indicator-groups';
 
 export const dynamic = 'force-dynamic';
 
@@ -70,6 +75,10 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
         await query({ query: 'INSERT INTO q_metrics (indicator_id, metric_text, unit_of_measure, sort_order) VALUES (?, ?, ?, ?)', values: [id, m.metric_text.trim(), uom, i] });
       }
     }
+
+    const catalog = await fetchDepartmentsWithAmbassador(true);
+    await refreshIndicatorAssignedGroupFlags(Number(id), departmentIds, catalog);
+    await syncIndicatorDepartmentGroups(Number(id), catalog);
 
     return NextResponse.json({ message: 'Updated' });
   } catch (e) {
