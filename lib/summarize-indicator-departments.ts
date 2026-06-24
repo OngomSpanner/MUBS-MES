@@ -12,12 +12,14 @@ export type GroupCatalogEntry = {
 };
 
 export type IndicatorDepartmentBadge =
-  | { kind: 'group'; group: AmbassadorDepartmentGroup; label: string }
+  | { kind: 'group'; group: AmbassadorDepartmentGroup; label: string; complete: boolean }
   | { kind: 'unit'; id: number; name: string };
 
 /**
- * Collapse full ambassador group selections into summary labels (no counts).
- * Remaining units are returned individually by name.
+ * Collapse ambassador group selections into summary labels.
+ * Full group → "All Faculties (12)". Partial → "All Faculties (10/12)" so the list
+ * stays compact when the catalog grows after the indicator was saved.
+ * Unclassified or lone units are returned individually by name.
  */
 export function summarizeIndicatorDepartments(
   selected: IndicatorDeptRef[],
@@ -25,7 +27,6 @@ export function summarizeIndicatorDepartments(
 ): IndicatorDepartmentBadge[] {
   if (selected.length === 0) return [];
 
-  const selectedIds = new Set(selected.map((d) => d.id));
   const remaining = new Map(selected.map((d) => [d.id, d.name]));
   const badges: IndicatorDepartmentBadge[] = [];
 
@@ -34,14 +35,18 @@ export function summarizeIndicatorDepartments(
       .filter((c) => c.ambassador_group === group)
       .map((c) => c.id);
     if (groupIds.length === 0) continue;
-    if (groupIds.every((id) => selectedIds.has(id))) {
-      badges.push({
-        kind: 'group',
-        group,
-        label: AMBASSADOR_GROUP_BADGE_LABELS[group],
-      });
-      for (const id of groupIds) remaining.delete(id);
-    }
+
+    const selectedInGroup = groupIds.filter((id) => remaining.has(id));
+    if (selectedInGroup.length === 0) continue;
+
+    const baseLabel = AMBASSADOR_GROUP_BADGE_LABELS[group];
+    const complete = selectedInGroup.length === groupIds.length;
+    const label = complete
+      ? `${baseLabel} (${groupIds.length})`
+      : `${baseLabel} (${selectedInGroup.length}/${groupIds.length})`;
+
+    badges.push({ kind: 'group', group, label, complete });
+    for (const id of selectedInGroup) remaining.delete(id);
   }
 
   const individuals = Array.from(remaining.entries())

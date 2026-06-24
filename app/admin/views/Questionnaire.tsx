@@ -512,8 +512,11 @@ function TemplateModal({
 
         {/* Section 3 */}
         <div className="border rounded-3 p-3">
-          <div className="mb-2">
+          <div className="d-flex justify-content-between align-items-center mb-2">
             <h6 className="fw-bold text-primary small mb-0">3. Performance Metrics <span className="text-danger">*</span></h6>
+            <Button type="button" size="sm" variant="outline-primary" onClick={addMetric} disabled={saving}>
+              + Add Metric
+            </Button>
           </div>
           <p className="text-muted small mb-2" style={{ fontSize: '0.78rem' }}>List metrics in order. Set the Unit of Measure for each.</p>
           <div className="d-flex flex-column gap-2">
@@ -861,8 +864,13 @@ function IndicatorsPanel({
                             <Badge
                               key={`group-${badge.group}-${ind.id}`}
                               bg="light"
-                              className="text-primary border border-primary"
-                              style={{ fontSize: '0.62rem', fontWeight: 600 }}
+                              className={`text-primary border ${badge.complete ? 'border-primary' : 'border-primary border-opacity-50'}`}
+                              style={{ fontSize: '0.62rem', fontWeight: 600, ...(badge.complete ? {} : { borderStyle: 'dashed' }) }}
+                              title={
+                                badge.complete
+                                  ? undefined
+                                  : 'Partial group selection — open Edit and re-apply the group chip to include new ambassador units.'
+                              }
                             >
                               {badge.label}
                             </Badge>
