@@ -6,6 +6,7 @@ import {
   hodStatusForAmbassadorSave,
   parseSubmitForReview,
 } from '@/lib/hod-review-workflow';
+import { HOD_UNIT_HEAD_LABEL } from '@/lib/hod-review-workflow-constants';
 
 export const dynamic = 'force-dynamic';
 
@@ -70,7 +71,7 @@ export async function POST(request: Request) {
   const currentHodStatus = submissionRows[0]?.hod_review_status;
   if (currentHodStatus === 'submitted' || currentHodStatus === 'approved') {
     return NextResponse.json(
-      { message: 'This submission is under review or approved. View only until the HOD requests revision.' },
+      { message: `This submission is under review or approved. View only until the ${HOD_UNIT_HEAD_LABEL} requests revision.` },
       { status: 409 },
     );
   }
@@ -101,7 +102,7 @@ export async function POST(request: Request) {
   });
 
   return NextResponse.json({
-    message: submitForReview ? 'Submitted for HOD review' : 'Draft saved',
+    message: submitForReview ? `Submitted for ${HOD_UNIT_HEAD_LABEL} review` : 'Draft saved',
     hodReviewStatus: hodStatus,
   });
 }

@@ -1,11 +1,14 @@
 /** Client-safe HOD review workflow constants (no database imports). */
 
+/** User-facing label for the reviewing role (avoid bare "HOD" in UI copy). */
+export const HOD_UNIT_HEAD_LABEL = 'Head of Department / Unit Head';
+
 export const HOD_REVIEW_STATUSES = ['draft', 'submitted', 'approved', 'returned'] as const;
 export type HodReviewStatus = (typeof HOD_REVIEW_STATUSES)[number];
 
 export const HOD_REVIEW_STATUS_LABELS: Record<HodReviewStatus, string> = {
   draft: 'Draft',
-  submitted: 'Awaiting HOD',
+  submitted: 'Awaiting review',
   approved: 'Approved',
   returned: 'Revision requested',
 };

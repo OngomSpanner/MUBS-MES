@@ -5,7 +5,7 @@ import { Modal, Button, Form, Badge, Spinner } from 'react-bootstrap';
 import axios from 'axios';
 import StatCard from '@/components/StatCard';
 import { uomLabel, validateMetricValue, uomPlaceholder } from '@/lib/questionnaire/uom';
-import { HOD_REVIEW_STATUS_LABELS, type HodReviewStatus } from '@/lib/hod-review-workflow-constants';
+import { HOD_REVIEW_STATUS_LABELS, HOD_UNIT_HEAD_LABEL, type HodReviewStatus } from '@/lib/hod-review-workflow-constants';
 
 type Metric = { id: number; metric_text: string; unit_of_measure: string; sort_order: number };
 type Indicator = {
@@ -85,9 +85,9 @@ function buildFilterSummary(filter: IndicatorFilter, items: Indicator[]): string
       return `${countLabel} · ${filled}/${total} cells filled${parts.length ? ` · ${parts.join(', ')}` : ''}.`;
     }
     case 'awaiting-review':
-      return `${countLabel} submitted for HOD review · ${filled}/${total} cells filled.`;
+      return `${countLabel} submitted for ${HOD_UNIT_HEAD_LABEL} review · ${filled}/${total} cells filled.`;
     case 'completed':
-      return `${countLabel} approved by HOD · ${filled}/${total} cells recorded.`;
+      return `${countLabel} approved by ${HOD_UNIT_HEAD_LABEL} · ${filled}/${total} cells recorded.`;
     case 'needs-revision':
       return `${countLabel} sent back for revision · update the data and resubmit for review.`;
     default:
@@ -230,7 +230,7 @@ export default function AmbassadorDataCollection() {
     if (!entryIndicator) return;
     if (Object.keys(validationErrors).length > 0) { setSaveErr('Fix validation errors before saving.'); return; }
     if (submitForReview && entryIndicator.status !== 'complete') {
-      setSaveErr('Complete all metric cells before submitting for HOD review.');
+      setSaveErr(`Complete all metric cells before submitting for ${HOD_UNIT_HEAD_LABEL} review.`);
       return;
     }
     setSaving(true); setSaveErr(null); setSaveOk(false);
@@ -357,19 +357,19 @@ export default function AmbassadorDataCollection() {
 
               {entryIndicator.hod_review_status === 'submitted' && (
                 <div className="alert alert-info small py-2 mb-3">
-                  This submission is awaiting HOD review. You can view the data but cannot edit until a revision is requested.
+                  This submission is awaiting {HOD_UNIT_HEAD_LABEL} review. You can view the data but cannot edit until a revision is requested.
                 </div>
               )}
 
               {entryIndicator.hod_review_status === 'approved' && (
                 <div className="alert alert-success small py-2 mb-3">
-                  This submission has been approved by the HOD. View only.
+                  This submission has been approved by the {HOD_UNIT_HEAD_LABEL}. View only.
                 </div>
               )}
 
               {entryIndicator.hod_review_status === 'returned' && entryIndicator.hod_review_comment?.trim() && (
                 <div className="alert alert-warning small py-2 mb-3">
-                  <span className="fw-semibold d-block mb-1">Revision requested by HOD</span>
+                  <span className="fw-semibold d-block mb-1">Revision requested by {HOD_UNIT_HEAD_LABEL}</span>
                   {entryIndicator.hod_review_comment}
                 </div>
               )}
@@ -462,7 +462,7 @@ export default function AmbassadorDataCollection() {
                     onClick={() => void handleSave(true)}
                     disabled={saving || Object.keys(validationErrors).length > 0 || entryIndicator.status !== 'complete'}
                   >
-                    {saving ? 'Submitting…' : 'Submit for HOD review'}
+                    {saving ? 'Submitting…' : `Submit for ${HOD_UNIT_HEAD_LABEL} review`}
                   </Button>
                 </>
               )}

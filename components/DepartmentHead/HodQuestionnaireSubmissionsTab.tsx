@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import axios from 'axios';
 import { Badge, Button, Form, Modal, Spinner } from 'react-bootstrap';
 import { uomLabel } from '@/lib/questionnaire/uom';
-import { HOD_REVIEW_STATUS_LABELS, type HodReviewStatus } from '@/lib/hod-review-workflow-constants';
+import { HOD_REVIEW_STATUS_LABELS, HOD_UNIT_HEAD_LABEL, type HodReviewStatus } from '@/lib/hod-review-workflow-constants';
 
 type Submission = {
   indicator_id: number;
@@ -300,7 +300,7 @@ export default function HodQuestionnaireSubmissionsTab() {
               {detail?.hod_review_comment?.trim() ? (
                 <div className={`alert small py-2 mb-3 ${detail.hod_review_status === 'returned' ? 'alert-warning' : 'alert-light border'}`}>
                   <span className="fw-semibold d-block mb-1">
-                    {detail.hod_review_status === 'returned' ? 'HOD feedback' : 'Review comment'}
+                    {detail.hod_review_status === 'returned' ? `${HOD_UNIT_HEAD_LABEL} feedback` : 'Review comment'}
                   </span>
                   {detail.hod_review_comment}
                 </div>
