@@ -29,7 +29,13 @@ export async function GET() {
                 SELECT 
                     sr.id,
                     sr.achievements as description,
-                    COALESCE(sa.title, sp.step_name) as report_name,
+                    COALESCE(
+                        sa.title,
+                        CASE
+                          WHEN sps.id IS NOT NULL THEN CONCAT_WS(' — ', NULLIF(sp.step_name, ''), NULLIF(sps.title, ''))
+                          ELSE sp.step_name
+                        END
+                    ) as report_name,
                     COALESCE(p.title, psa_sa.title) as activity_title,
                     u.full_name as staff_name,
                     sr.updated_at as submitted_at,
@@ -42,13 +48,14 @@ export async function GET() {
                 LEFT JOIN activity_assignments aa ON sr.activity_assignment_id = aa.id
                 LEFT JOIN strategic_activities sa ON aa.activity_id = sa.id
                 LEFT JOIN strategic_activities p ON sa.parent_id = p.id
-                LEFT JOIN staff_process_assignments spa ON sr.process_assignment_id = spa.id
+                LEFT JOIN staff_process_subtasks sps ON sr.process_subtask_id = sps.id
+                LEFT JOIN staff_process_assignments spa ON COALESCE(sr.process_assignment_id, sps.process_assignment_id) = spa.id
                 LEFT JOIN standard_processes sp ON spa.standard_process_id = sp.id
                 LEFT JOIN strategic_activities psa_sa ON spa.activity_id = psa_sa.id
-                JOIN users u ON COALESCE(aa.assigned_to_user_id, spa.staff_id) = u.id
+                JOIN users u ON COALESCE(aa.assigned_to_user_id, spa.staff_id, sps.assigned_to) = u.id
                 LEFT JOIN evaluations e ON e.staff_report_id = sr.id
                 WHERE (sa.department_id IN (${placeholders}) OR p.department_id IN (${placeholders}) OR psa_sa.department_id IN (${placeholders}))
-                AND (sr.status IN ('submitted', 'evaluated') OR (sr.status = 'draft' AND e.id IS NOT NULL))
+                AND (sr.status IN ('submitted', 'evaluated', 'incomplete', 'not_done') OR (sr.status = 'draft' AND e.id IS NOT NULL))
                 ORDER BY sr.updated_at DESC
             `,
             values: [...departmentIds, ...departmentIds, ...departmentIds]
@@ -57,7 +64,9 @@ export async function GET() {
         const statusMap: Record<string, string> = {
             'draft': 'Returned',
             'submitted': 'Under Review',
-            'evaluated': 'Completed'
+            'evaluated': 'Completed',
+            'incomplete': 'Incomplete',
+            'not_done': 'Not Done'
         };
 
         const submissions = submissionsQuery.map((s: any) => {
