@@ -77,7 +77,7 @@ export async function syncUserFromHrmsRecord(
         designation_grade = ?,
         employment_status = ?,
         faculty_office = ?,
-        department_id = ?
+        department_id = COALESCE(?, department_id)
       WHERE id = ?`,
       values: [
         mapped.hrms_staff_id,
