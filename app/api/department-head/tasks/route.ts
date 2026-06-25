@@ -554,8 +554,9 @@ export async function POST(req: Request) {
             : (assigned_to != null && assigned_to !== '' ? [Number(assigned_to)] : []).filter((x) => !Number.isNaN(x) && x > 0);
         const assigneeUserIds = [...new Set(rawIds)];
 
-        // HOD / Unit Head cannot assign tasks to themselves; only to staff
-        const filteredAssigneeIds = (role === 'hod' || role === 'unit head')
+        // HOD / Unit Head / Department Head cannot assign tasks to themselves; only to staff
+        const isHeadRole = role === 'hod' || role === 'unit head' || role === 'department head';
+        const filteredAssigneeIds = isHeadRole
             ? assigneeUserIds.filter((id) => id !== userId)
             : assigneeUserIds;
 
@@ -580,7 +581,7 @@ export async function POST(req: Request) {
         } else {
             const deptPlaceholders = inPlaceholders(departmentIds.length);
             for (const st of cleanedSubtasks) {
-                if ((role === 'hod' || role === 'unit head') && st.assigned_to === userId) {
+                if (isHeadRole && st.assigned_to === userId) {
                     return NextResponse.json(
                         { message: 'You cannot assign a sub-task to yourself. Assign to a staff member.' },
                         { status: 403 }
@@ -723,6 +724,17 @@ export async function POST(req: Request) {
             }
         } else {
             const assignedToId = filteredAssigneeIds[0];
+            const deptPlaceholders = inPlaceholders(departmentIds.length);
+            const inDept = (await query({
+                query: `SELECT id FROM users WHERE id = ? AND department_id IN (${deptPlaceholders})`,
+                values: [assignedToId, ...departmentIds],
+            })) as { id: number }[];
+            if (!inDept.length) {
+                return NextResponse.json(
+                    { message: 'Assignee is not in your department.' },
+                    { status: 400 }
+                );
+            }
             await query({
                 query: `
                     INSERT INTO activity_assignments
@@ -754,8 +766,9 @@ export async function PUT(req: Request) {
             return NextResponse.json({ message: 'Task ID is required' }, { status: 400 });
         }
 
-        // HOD / Unit Head cannot assign tasks to themselves; only to staff
-        if ((role === 'hod' || role === 'unit head') && assigned_to != null && Number(assigned_to) === userId) {
+        // HOD / Unit Head / Department Head cannot assign tasks to themselves; only to staff
+        const isHeadRole = role === 'hod' || role === 'unit head' || role === 'department head';
+        if (isHeadRole && assigned_to != null && Number(assigned_to) === userId) {
             return NextResponse.json({ message: 'You cannot assign a task to yourself. Assign to a staff member.' }, { status: 403 });
         }
 
@@ -839,6 +852,20 @@ export async function PUT(req: Request) {
 
         // Then update activity assignments if changed
         if (assigned_to !== undefined || status !== undefined) {
+            if (assigned_to !== undefined && assigned_to != null && assigned_to !== '') {
+                const deptPlaceholders = inPlaceholders(departmentIds.length);
+                const inDept = (await query({
+                    query: `SELECT id FROM users WHERE id = ? AND department_id IN (${deptPlaceholders})`,
+                    values: [Number(assigned_to), ...departmentIds],
+                })) as { id: number }[];
+                if (!inDept.length) {
+                    return NextResponse.json(
+                        { message: 'Assignee is not in your department.' },
+                        { status: 400 }
+                    );
+                }
+            }
+
             // check if assignment exists
             const aaCheck = await query({
                 query: 'SELECT id FROM activity_assignments WHERE activity_id = ?',
