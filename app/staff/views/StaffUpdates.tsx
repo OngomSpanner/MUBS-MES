@@ -99,6 +99,19 @@ export default function StaffUpdates() {
         }
     };
 
+    const clearAllNotifications = async () => {
+        if (notifications.length === 0) return;
+        if (!window.confirm('Clear all notifications? This cannot be undone.')) return;
+        try {
+            await axios.delete('/api/notifications', { data: { clearAll: true } });
+            setNotifications([]);
+            setUnreadCount(0);
+            dispatchNotificationsChanged();
+        } catch (e) {
+            console.error('Failed to clear notifications', e);
+        }
+    };
+
     if (loading) {
         return (
             <div className="d-flex justify-content-center align-items-center vh-100">
@@ -225,6 +238,16 @@ export default function StaffUpdates() {
                                 <option value="Tasks">Tasks</option>
                                 <option value="Deadlines">Deadlines</option>
                             </select>
+                            {notifications.length > 0 && (
+                                <button
+                                    className="btn btn-sm btn-outline-danger fw-bold d-flex align-items-center gap-1"
+                                    style={{ borderRadius: '8px', fontSize: '.75rem' }}
+                                    onClick={() => void clearAllNotifications()}
+                                >
+                                    <span className="material-symbols-outlined" style={{ fontSize: '15px' }}>delete_sweep</span>
+                                    Clear all
+                                </button>
+                            )}
                             {unreadCount > 0 && (
                                 <button
                                     className="btn btn-sm btn-outline-primary fw-bold d-flex align-items-center gap-1"

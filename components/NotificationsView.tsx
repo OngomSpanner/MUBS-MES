@@ -1,7 +1,6 @@
 'use client';
 
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import axios from 'axios';
 import { dispatchNotificationsChanged } from '@/hooks/useUnreadNotificationCount';
@@ -51,11 +50,11 @@ function iconAndBg(type: string) {
 }
 
 export default function NotificationsView({ showDeadlineFilters = true }: { showDeadlineFilters?: boolean }) {
-  const router = useRouter();
   const [notifications, setNotifications] = useState<Notif[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [filter, setFilter] = useState('All');
   const [loading, setLoading] = useState(true);
+  const [clearing, setClearing] = useState(false);
 
   const fetchNotifs = async () => {
     try {
@@ -100,6 +99,39 @@ export default function NotificationsView({ showDeadlineFilters = true }: { show
     }
   };
 
+  const clearAll = async () => {
+    if (notifications.length === 0) return;
+    if (!window.confirm('Clear all notifications? This cannot be undone.')) return;
+    setClearing(true);
+    try {
+      await axios.delete('/api/notifications', { data: { clearAll: true } });
+      setNotifications([]);
+      setUnreadCount(0);
+      dispatchNotificationsChanged();
+    } catch (e) {
+      console.error('Failed to clear notifications', e);
+    } finally {
+      setClearing(false);
+    }
+  };
+
+  const clearOne = async (id: number, title: string) => {
+    if (!window.confirm(`Remove this notification?\n\n"${title}"`)) return;
+    try {
+      await axios.delete('/api/notifications', { data: { id } });
+      setNotifications((prev) => {
+        const removed = prev.find((n) => n.id === id);
+        if (removed && !removed.is_read) {
+          setUnreadCount((c) => Math.max(0, c - 1));
+        }
+        return prev.filter((n) => n.id !== id);
+      });
+      dispatchNotificationsChanged();
+    } catch (e) {
+      console.error('Failed to delete notification', e);
+    }
+  };
+
   const taskCount = notifications.filter(
     (n) => n.title.toLowerCase().includes('task') || n.type === 'info'
   ).length;
@@ -137,9 +169,22 @@ export default function NotificationsView({ showDeadlineFilters = true }: { show
                 </span>
                 All Notifications
               </h5>
-              <div className="d-flex gap-2">
-                <button type="button" className="btn btn-sm btn-outline-secondary" onClick={() => void markAllRead()}>
+              <div className="d-flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  className="btn btn-sm btn-outline-secondary"
+                  disabled={notifications.length === 0 || clearing}
+                  onClick={() => void markAllRead()}
+                >
                   Mark all read
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-sm btn-outline-danger"
+                  disabled={notifications.length === 0 || clearing}
+                  onClick={() => void clearAll()}
+                >
+                  {clearing ? 'Clearing…' : 'Clear all'}
                 </button>
                 <select
                   className="form-select form-select-sm"
@@ -179,8 +224,11 @@ export default function NotificationsView({ showDeadlineFilters = true }: { show
                       <th className="px-3 text-nowrap" style={{ width: '120px' }}>
                         When
                       </th>
-                      <th className="pe-4 text-end" style={{ width: '140px' }}>
-                        Action
+                      <th className="px-3 text-end" style={{ width: '100px' }}>
+                        Open
+                      </th>
+                      <th className="pe-4 text-center" style={{ width: '52px' }}>
+                        <span className="visually-hidden">Remove</span>
                       </th>
                     </tr>
                   </thead>
@@ -193,28 +241,15 @@ export default function NotificationsView({ showDeadlineFilters = true }: { show
                         if (!n.is_read) void markOneRead(n.id);
                       };
 
-                      const goToAction = () => {
-                        onRowActivate();
-                        if (n.action_url) router.push(n.action_url);
-                      };
-
                       return (
                         <tr
                           key={n.id}
                           className={rowClass}
-                          role={n.action_url ? 'link' : 'button'}
-                          tabIndex={0}
-                          style={{ cursor: n.action_url ? 'pointer' : 'default' }}
-                          onClick={() => {
-                            if (n.action_url) goToAction();
-                            else onRowActivate();
-                          }}
+                          onClick={() => onRowActivate()}
                           onKeyDown={(e) => {
-                            if (e.key === 'Enter') {
-                              if (n.action_url) goToAction();
-                              else onRowActivate();
-                            }
+                            if (e.key === 'Enter') onRowActivate();
                           }}
+                          style={{ cursor: 'default' }}
                         >
                           <td className="ps-4 py-3">
                             <div
@@ -254,22 +289,32 @@ export default function NotificationsView({ showDeadlineFilters = true }: { show
                           <td className="px-3 py-3 text-muted text-nowrap" style={{ fontSize: '0.78rem' }}>
                             {formatNotifDate(n.created_at)}
                           </td>
-                          <td className="pe-4 py-3 text-end">
+                          <td className="px-3 py-3 text-end" onClick={(e) => e.stopPropagation()}>
                             {n.action_url ? (
                               <Link
                                 href={n.action_url}
-                                className="fw-semibold text-decoration-none"
-                                style={{ fontSize: '0.8rem', color: 'var(--mubs-blue)' }}
-                                onClick={(e) => {
-                                  e.stopPropagation();
+                                className="btn btn-sm btn-outline-primary fw-semibold"
+                                style={{ fontSize: '0.78rem', minWidth: '72px' }}
+                                onClick={() => {
                                   if (!n.is_read) void markOneRead(n.id);
                                 }}
                               >
-                                View →
+                                View
                               </Link>
                             ) : (
                               <span className="text-muted small">—</span>
                             )}
+                          </td>
+                          <td className="pe-4 py-3 text-center" onClick={(e) => e.stopPropagation()}>
+                            <button
+                              type="button"
+                              className="btn btn-sm notif-clear-btn"
+                              title="Remove notification"
+                              aria-label={`Remove notification: ${n.title}`}
+                              onClick={() => void clearOne(n.id, n.title)}
+                            >
+                              <span className="material-symbols-outlined">close</span>
+                            </button>
                           </td>
                         </tr>
                       );

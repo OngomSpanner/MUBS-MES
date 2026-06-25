@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { verifyToken } from '@/lib/auth';
 import {
+  deleteAllNotificationsForUser,
+  deleteNotificationForUser,
   listNotificationsForUser,
   markAllNotificationsRead,
   markNotificationRead,
@@ -83,5 +85,36 @@ export async function PATCH(req: Request) {
     const message = error instanceof Error ? error.message : 'Unknown error';
     console.error('Notifications API PATCH Error:', error);
     return NextResponse.json({ message: message || 'Error updating notifications' }, { status: 500 });
+  }
+}
+
+export async function DELETE(req: Request) {
+  try {
+    const userId = await requireUserId();
+    if (!userId) {
+      return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
+    }
+
+    const body = await req.json().catch(() => ({}));
+    const { clearAll, id } = body as { clearAll?: boolean; id?: number };
+
+    if (clearAll) {
+      const deleted = await deleteAllNotificationsForUser(userId);
+      return NextResponse.json({ success: true, message: 'Notifications cleared', deleted });
+    }
+
+    if (id) {
+      const ok = await deleteNotificationForUser(userId, Number(id));
+      if (!ok) {
+        return NextResponse.json({ message: 'Notification not found' }, { status: 404 });
+      }
+      return NextResponse.json({ success: true });
+    }
+
+    return NextResponse.json({ message: 'clearAll or id is required' }, { status: 400 });
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    console.error('Notifications API DELETE Error:', error);
+    return NextResponse.json({ message: message || 'Error clearing notifications' }, { status: 500 });
   }
 }

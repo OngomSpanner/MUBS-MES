@@ -100,3 +100,22 @@ export async function markNotificationRead(userId: number, notificationId: numbe
     values: [notificationId, userId],
   });
 }
+
+export async function deleteAllNotificationsForUser(userId: number): Promise<number> {
+  const result = (await query({
+    query: 'DELETE FROM notifications WHERE user_id = ?',
+    values: [userId],
+  })) as { affectedRows?: number };
+  return Number(result?.affectedRows ?? 0);
+}
+
+export async function deleteNotificationForUser(
+  userId: number,
+  notificationId: number
+): Promise<boolean> {
+  const result = (await query({
+    query: 'DELETE FROM notifications WHERE id = ? AND user_id = ?',
+    values: [notificationId, userId],
+  })) as { affectedRows?: number };
+  return Number(result?.affectedRows ?? 0) > 0;
+}
