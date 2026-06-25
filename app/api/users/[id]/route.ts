@@ -323,6 +323,26 @@ export async function PATCH(
 ) {
   const { id } = await params;
   try {
+    const cookieStore = await cookies();
+    const token = cookieStore.get('token')?.value;
+    if (!token) {
+      return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
+    }
+    const decoded = verifyToken(token) as any;
+    if (!decoded) {
+      return NextResponse.json({ message: 'Invalid token' }, { status: 401 });
+    }
+
+    const roles = typeof decoded.role === 'string' ? decoded.role.split(',') : (Array.isArray(decoded.role) ? decoded.role : []);
+    const hasAccess = roles.some((r: string) => {
+      const role = r.trim().toLowerCase();
+      return role === 'system_admin' || role === 'system administrator' ||
+             role === 'strategy_manager' || role === 'strategy manager';
+    });
+    if (!hasAccess) {
+      return NextResponse.json({ message: 'Forbidden' }, { status: 403 });
+    }
+
     const { status } = await request.json();
     const accountStatus = normalizeUserAccountStatus(status);
 
@@ -347,6 +367,26 @@ export async function DELETE(
 ) {
   const { id } = await params;
   try {
+    const cookieStore = await cookies();
+    const token = cookieStore.get('token')?.value;
+    if (!token) {
+      return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
+    }
+    const decoded = verifyToken(token) as any;
+    if (!decoded) {
+      return NextResponse.json({ message: 'Invalid token' }, { status: 401 });
+    }
+
+    const roles = typeof decoded.role === 'string' ? decoded.role.split(',') : (Array.isArray(decoded.role) ? decoded.role : []);
+    const hasAccess = roles.some((r: string) => {
+      const role = r.trim().toLowerCase();
+      return role === 'system_admin' || role === 'system administrator' ||
+             role === 'strategy_manager' || role === 'strategy manager';
+    });
+    if (!hasAccess) {
+      return NextResponse.json({ message: 'Forbidden' }, { status: 403 });
+    }
+
     await query({
       query: 'DELETE FROM users WHERE id = ?',
       values: [id]
