@@ -11,6 +11,7 @@ import {
   isFeatureEnabled,
 } from '@/lib/portal-features';
 import { normalizeRoleForCookie } from '@/lib/role-routing';
+import { useUnreadNotificationCount } from '@/hooks/useUnreadNotificationCount';
 
 interface SidebarProps {
   sidebarOpen: boolean;
@@ -108,6 +109,8 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen, onLogoutClick }: 
   const isDepartmentHead = pathname.startsWith('/department-head');
   const isStaff = pathname.startsWith('/staff');
   const isAdmin = pathname.startsWith('/admin');
+  const showNotificationBadge = isAmbassador || isDepartmentHead || isStaff;
+  const { unreadCount } = useUnreadNotificationCount(showNotificationBadge);
   const { flags: portalFlags } = usePortalFeatures();
   const [isSystemAdmin, setIsSystemAdmin] = useState(false);
   const [isAcademicStaff, setIsAcademicStaff] = useState<boolean | null>(null);
@@ -200,17 +203,34 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen, onLogoutClick }: 
   const isActive = (key: string) => currentKey === key;
 
   const renderFlatMenu = (items: MenuItem[]) =>
-    items.map((item) => (
-      <Link
-        href={item.href}
-        key={item.key}
-        className={`sidebar-link ${isActive(item.key) ? 'active' : ''}`}
-        onClick={() => setSidebarOpen(false)}
-      >
-        <span className="material-symbols-outlined ms-icon">{item.icon}</span>
-        {item.label}
-      </Link>
-    ));
+    items.map((item) => {
+      const isNotifications = item.key === 'notifications';
+      const showBadge = isNotifications && unreadCount > 0;
+      const badgeLabel = unreadCount > 99 ? '99+' : String(unreadCount);
+
+      return (
+        <Link
+          href={item.href}
+          key={item.key}
+          className={`sidebar-link ${isActive(item.key) ? 'active' : ''}`}
+          onClick={() => setSidebarOpen(false)}
+        >
+          <span className="sidebar-icon-wrap">
+            <span
+              className={`material-symbols-outlined ms-icon${showBadge ? ' sidebar-bell-ring' : ''}`}
+            >
+              {item.icon}
+            </span>
+            {showBadge ? (
+              <span className="sidebar-notif-badge" aria-label={`${unreadCount} unread notifications`}>
+                {badgeLabel}
+              </span>
+            ) : null}
+          </span>
+          <span className="sidebar-link-label flex-grow-1">{item.label}</span>
+        </Link>
+      );
+    });
 
   return (
     <>

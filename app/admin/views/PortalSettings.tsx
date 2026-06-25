@@ -10,6 +10,9 @@ import {
   type PortalId,
 } from '@/lib/portal-features';
 import { usePortalFeatures } from '@/components/PortalFeaturesProvider';
+import NotificationDeliveriesPanel from './NotificationDeliveriesPanel';
+
+type SettingsTab = PortalId | 'notifications';
 
 function FeatureToggleGroup({
   title,
@@ -114,7 +117,7 @@ export default function PortalSettingsView() {
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
-  const [activePortal, setActivePortal] = useState<PortalId>('hod');
+  const [activeTab, setActiveTab] = useState<SettingsTab>('hod');
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -195,9 +198,10 @@ export default function PortalSettingsView() {
           <div>
             <h4 className="fw-bold text-dark mb-1">Settings</h4>
             <p className="text-muted small mb-0">
-              Show or hide HOD and Ambassador menu items and sections until they are ready for use.
+              Portal visibility, and notification delivery log with resend for performance indicators.
             </p>
           </div>
+          {activeTab !== 'notifications' ? (
           <button
             type="button"
             className="btn btn-primary fw-bold"
@@ -206,12 +210,13 @@ export default function PortalSettingsView() {
           >
             {saving ? 'Saving…' : 'Save changes'}
           </button>
+          ) : null}
         </div>
 
         {err && <div className="alert alert-danger py-2 small">{err}</div>}
         {success && <div className="alert alert-success py-2 small">Settings saved. Users will see changes on their next page load.</div>}
 
-        {loading ? (
+        {loading && activeTab !== 'notifications' ? (
           <div className="d-flex justify-content-center p-5">
             <div className="spinner-border text-primary" role="status" />
           </div>
@@ -221,8 +226,8 @@ export default function PortalSettingsView() {
               <li className="nav-item">
                 <button
                   type="button"
-                  className={`nav-link fw-bold ${activePortal === 'hod' ? 'active' : ''}`}
-                  onClick={() => setActivePortal('hod')}
+                  className={`nav-link fw-bold ${activeTab === 'hod' ? 'active' : ''}`}
+                  onClick={() => setActiveTab('hod')}
                 >
                   HOD portal
                 </button>
@@ -230,15 +235,26 @@ export default function PortalSettingsView() {
               <li className="nav-item">
                 <button
                   type="button"
-                  className={`nav-link fw-bold ${activePortal === 'ambassador' ? 'active' : ''}`}
-                  onClick={() => setActivePortal('ambassador')}
+                  className={`nav-link fw-bold ${activeTab === 'ambassador' ? 'active' : ''}`}
+                  onClick={() => setActiveTab('ambassador')}
                 >
                   Ambassador portal
                 </button>
               </li>
+              <li className="nav-item">
+                <button
+                  type="button"
+                  className={`nav-link fw-bold ${activeTab === 'notifications' ? 'active' : ''}`}
+                  onClick={() => setActiveTab('notifications')}
+                >
+                  Notifications
+                </button>
+              </li>
             </ul>
 
-            {activePortal === 'hod' ? (
+            {activeTab === 'notifications' ? (
+              <NotificationDeliveriesPanel />
+            ) : activeTab === 'hod' ? (
               <PortalPanel
                 portal="hod"
                 label="Head of Department (HOD)"

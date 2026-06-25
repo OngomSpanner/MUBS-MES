@@ -22,8 +22,8 @@ export async function insertAppNotification(args: {
   relatedEntityId?: number;
   actionUrl?: string | null;
   isUrgent?: boolean;
-}): Promise<void> {
-  await query({
+}): Promise<number | null> {
+  const result = (await query({
     query: `
       INSERT INTO notifications (
         user_id, title, message, related_entity_type, related_entity_id, type, is_urgent, action_url
@@ -39,7 +39,9 @@ export async function insertAppNotification(args: {
       args.isUrgent ? 1 : 0,
       args.actionUrl ?? null,
     ],
-  });
+  })) as { insertId?: number };
+  const id = result?.insertId;
+  return id != null && Number(id) > 0 ? Number(id) : null;
 }
 
 export async function listNotificationsForUser(

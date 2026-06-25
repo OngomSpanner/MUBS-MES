@@ -1,8 +1,11 @@
 'use client';
 
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import axios from 'axios';
+import { dispatchNotificationsChanged } from '@/hooks/useUnreadNotificationCount';
+import StatCard from '@/components/StatCard';
 
 export interface Notif {
   id: number;
@@ -48,6 +51,7 @@ function iconAndBg(type: string) {
 }
 
 export default function NotificationsView({ showDeadlineFilters = true }: { showDeadlineFilters?: boolean }) {
+  const router = useRouter();
   const [notifications, setNotifications] = useState<Notif[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [filter, setFilter] = useState('All');
@@ -59,6 +63,7 @@ export default function NotificationsView({ showDeadlineFilters = true }: { show
       const res = await axios.get(`/api/notifications${params}`);
       setNotifications(res.data.notifications || []);
       setUnreadCount(res.data.unreadCount ?? 0);
+      dispatchNotificationsChanged();
     } catch (e) {
       console.error('Failed to fetch notifications', e);
     } finally {
@@ -76,6 +81,7 @@ export default function NotificationsView({ showDeadlineFilters = true }: { show
       await axios.patch('/api/notifications', { markAllRead: true });
       setUnreadCount(0);
       setNotifications((prev) => prev.map((n) => ({ ...n, is_read: true })));
+      dispatchNotificationsChanged();
     } catch (e) {
       console.error('Failed to mark all read', e);
     }
@@ -88,6 +94,7 @@ export default function NotificationsView({ showDeadlineFilters = true }: { show
         prev.map((n) => (n.id === id ? { ...n, is_read: true } : n))
       );
       setUnreadCount((c) => Math.max(0, c - 1));
+      dispatchNotificationsChanged();
     } catch (e) {
       console.error('Failed to mark notification read', e);
     }
@@ -106,10 +113,23 @@ export default function NotificationsView({ showDeadlineFilters = true }: { show
   ).length;
 
   return (
-    <div className="content-area w-100">
-      <div className="row g-4">
-        <div className="col-12 col-lg-8">
-          <div className="table-card">
+    <div className="w-100">
+      <div className="row g-3 mb-4">
+        <div className="col-6 col-lg-3">
+          <StatCard label="Unread" value={unreadCount} color="blue" />
+        </div>
+        <div className="col-6 col-lg-3">
+          <StatCard label="Task alerts" value={taskCount} color="red" />
+        </div>
+        <div className="col-6 col-lg-3">
+          <StatCard label="Feedback" value={feedbackCount} color="green" />
+        </div>
+        <div className="col-6 col-lg-3">
+          <StatCard label="Total" value={notifications.length} color="yellow" />
+        </div>
+      </div>
+
+      <div className="table-card">
             <div className="table-card-header">
               <h5>
                 <span className="material-symbols-outlined me-2" style={{ color: 'var(--mubs-blue)' }}>
@@ -139,150 +159,125 @@ export default function NotificationsView({ showDeadlineFilters = true }: { show
                 </select>
               </div>
             </div>
-            <div>
-              {loading ? (
-                <div className="p-4 text-center text-muted">Loading...</div>
-              ) : notifications.length === 0 ? (
-                <div className="p-4 text-center text-muted">No notifications.</div>
-              ) : (
-                notifications.map((n) => {
-                  const { icon, bg, color } = iconAndBg(n.type);
-                  const inner = (
-                    <>
-                      <div className="notif-icon" style={{ background: bg }}>
-                        <span className="material-symbols-outlined" style={{ color }}>
-                          {icon}
-                        </span>
-                      </div>
-                      <div className="flex-fill">
-                        <div className="notif-title">{n.title}</div>
-                        {n.message && <div className="notif-meta">{n.message}</div>}
-                        <div className="notif-meta mt-1">{formatNotifDate(n.created_at)}</div>
-                        {n.action_url ? (
-                          <div className="mt-1">
-                            <span className="small fw-semibold text-primary">View related page →</span>
-                          </div>
-                        ) : null}
-                      </div>
-                      {!n.is_read && <div className="unread-dot" />}
-                    </>
-                  );
 
-                  if (n.action_url) {
-                    return (
-                      <Link
-                        key={n.id}
-                        href={n.action_url}
-                        className={`notif-item text-decoration-none text-reset d-flex ${n.is_read ? '' : 'unread'}`}
-                        onClick={() => {
-                          if (!n.is_read) void markOneRead(n.id);
-                        }}
-                      >
-                        {inner}
-                      </Link>
-                    );
-                  }
-
-                  return (
-                    <div
-                      key={n.id}
-                      className={`notif-item d-flex ${n.is_read ? '' : 'unread'}`}
-                      role="button"
-                      tabIndex={0}
-                      onClick={() => {
-                        if (!n.is_read) void markOneRead(n.id);
-                      }}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter' && !n.is_read) void markOneRead(n.id);
-                      }}
-                    >
-                      {inner}
-                    </div>
-                  );
-                })
-              )}
-            </div>
-          </div>
-        </div>
-
-        <div className="col-12 col-lg-4">
-          <div className="table-card">
-            <div className="table-card-header">
-              <h5>
-                <span className="material-symbols-outlined me-2" style={{ color: 'var(--mubs-blue)' }}>
-                  inbox
+            {loading ? (
+              <div className="p-4 text-center text-muted">Loading...</div>
+            ) : notifications.length === 0 ? (
+              <div className="p-5 text-center text-muted">
+                <span className="material-symbols-outlined d-block mb-2" style={{ fontSize: '2.5rem', opacity: 0.35 }}>
+                  notifications_off
                 </span>
-                Notification Stats
-              </h5>
-            </div>
-            <div className="p-4">
-              <div className="d-flex flex-column gap-3">
-                <div>
-                  <div className="d-flex justify-content-between mb-1">
-                    <span style={{ fontSize: '.82rem', fontWeight: '700', color: '#0f172a' }}>Unread</span>
-                    <span className="fw-black" style={{ color: 'var(--mubs-blue)' }}>
-                      {unreadCount}
-                    </span>
-                  </div>
-                  <div className="progress-bar-custom">
-                    <div
-                      className="progress-bar-fill"
-                      style={{
-                        width: `${notifications.length ? Math.min(100, (unreadCount / notifications.length) * 100) : 0}%`,
-                        background: 'var(--mubs-blue)',
-                      }}
-                    />
-                  </div>
-                </div>
-                <div>
-                  <div className="d-flex justify-content-between mb-1">
-                    <span style={{ fontSize: '.82rem', fontWeight: '700', color: '#0f172a' }}>Task Alerts</span>
-                    <span className="fw-black" style={{ color: '#b45309' }}>
-                      {taskCount}
-                    </span>
-                  </div>
-                  <div className="progress-bar-custom">
-                    <div
-                      className="progress-bar-fill"
-                      style={{
-                        width: `${notifications.length ? (taskCount / notifications.length) * 100 : 0}%`,
-                        background: 'var(--mubs-yellow)',
-                      }}
-                    />
-                  </div>
-                </div>
-                <div>
-                  <div className="d-flex justify-content-between mb-1">
-                    <span style={{ fontSize: '.82rem', fontWeight: '700', color: '#0f172a' }}>Feedback</span>
-                    <span className="fw-black" style={{ color: '#059669' }}>
-                      {feedbackCount}
-                    </span>
-                  </div>
-                  <div className="progress-bar-custom">
-                    <div
-                      className="progress-bar-fill"
-                      style={{
-                        width: `${notifications.length ? (feedbackCount / notifications.length) * 100 : 0}%`,
-                        background: '#10b981',
-                      }}
-                    />
-                  </div>
-                </div>
-                <div>
-                  <div className="d-flex justify-content-between mb-1">
-                    <span style={{ fontSize: '.82rem', fontWeight: '700', color: '#0f172a' }}>Total</span>
-                    <span className="fw-black" style={{ color: '#64748b' }}>
-                      {notifications.length}
-                    </span>
-                  </div>
-                  <div className="progress-bar-custom">
-                    <div className="progress-bar-fill" style={{ width: '100%', background: '#94a3b8' }} />
-                  </div>
-                </div>
+                No notifications yet.
               </div>
-            </div>
-          </div>
-        </div>
+            ) : (
+              <div className="table-responsive">
+                <table className="table table-hover align-middle mb-0 notif-table">
+                  <thead>
+                    <tr>
+                      <th className="ps-4" style={{ width: '56px' }} />
+                      <th className="px-3">Notification</th>
+                      <th className="px-3 text-nowrap" style={{ width: '120px' }}>
+                        When
+                      </th>
+                      <th className="pe-4 text-end" style={{ width: '140px' }}>
+                        Action
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {notifications.map((n) => {
+                      const { icon, bg, color } = iconAndBg(n.type);
+                      const rowClass = n.is_read ? '' : 'notif-table-row--unread';
+
+                      const onRowActivate = () => {
+                        if (!n.is_read) void markOneRead(n.id);
+                      };
+
+                      const goToAction = () => {
+                        onRowActivate();
+                        if (n.action_url) router.push(n.action_url);
+                      };
+
+                      return (
+                        <tr
+                          key={n.id}
+                          className={rowClass}
+                          role={n.action_url ? 'link' : 'button'}
+                          tabIndex={0}
+                          style={{ cursor: n.action_url ? 'pointer' : 'default' }}
+                          onClick={() => {
+                            if (n.action_url) goToAction();
+                            else onRowActivate();
+                          }}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              if (n.action_url) goToAction();
+                              else onRowActivate();
+                            }
+                          }}
+                        >
+                          <td className="ps-4 py-3">
+                            <div
+                              className="d-flex align-items-center justify-content-center flex-shrink-0"
+                              style={{
+                                width: '40px',
+                                height: '40px',
+                                borderRadius: '12px',
+                                background: bg,
+                              }}
+                            >
+                              <span className="material-symbols-outlined" style={{ color, fontSize: '22px' }}>
+                                {icon}
+                              </span>
+                            </div>
+                          </td>
+                          <td className="px-3 py-3">
+                            <div className="d-flex align-items-start gap-2">
+                              {!n.is_read ? (
+                                <span
+                                  className="rounded-circle flex-shrink-0 mt-1"
+                                  style={{ width: '8px', height: '8px', background: 'var(--mubs-blue)' }}
+                                />
+                              ) : null}
+                              <div className="min-w-0">
+                                <div className="fw-bold text-dark" style={{ fontSize: '0.9rem' }}>
+                                  {n.title}
+                                </div>
+                                {n.message ? (
+                                  <div className="text-muted mt-1" style={{ fontSize: '0.82rem', lineHeight: 1.45 }}>
+                                    {n.message}
+                                  </div>
+                                ) : null}
+                              </div>
+                            </div>
+                          </td>
+                          <td className="px-3 py-3 text-muted text-nowrap" style={{ fontSize: '0.78rem' }}>
+                            {formatNotifDate(n.created_at)}
+                          </td>
+                          <td className="pe-4 py-3 text-end">
+                            {n.action_url ? (
+                              <Link
+                                href={n.action_url}
+                                className="fw-semibold text-decoration-none"
+                                style={{ fontSize: '0.8rem', color: 'var(--mubs-blue)' }}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  if (!n.is_read) void markOneRead(n.id);
+                                }}
+                              >
+                                View →
+                              </Link>
+                            ) : (
+                              <span className="text-muted small">—</span>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
       </div>
     </div>
   );

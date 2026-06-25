@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 
 import StatCard from '@/components/StatCard';
+import { dispatchNotificationsChanged } from '@/hooks/useUnreadNotificationCount';
 
 interface Task {
     id: number;
@@ -77,6 +78,7 @@ export default function StaffUpdates() {
             setStats(tasksRes.data.stats || { assigned: 0, overdue: 0, inProgress: 0, completed: 0 });
             setNotifications(notifsRes.data.notifications || []);
             setUnreadCount(notifsRes.data.unreadCount ?? 0);
+            dispatchNotificationsChanged();
         } catch (error) {
             console.error('Error fetching staff updates:', error);
         } finally {
@@ -91,6 +93,7 @@ export default function StaffUpdates() {
             await axios.patch('/api/notifications', { markAllRead: true });
             setUnreadCount(0);
             setNotifications(prev => prev.map(n => ({ ...n, is_read: true })));
+            dispatchNotificationsChanged();
         } catch (e) {
             console.error('Failed to mark all read', e);
         }

@@ -1,6 +1,8 @@
-import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState, useEffect, useMemo } from 'react';
+import Link from 'next/link';
+import { useRouter, usePathname } from 'next/navigation';
 import { formatRoleForDisplay, dashboardPathForRole, normalizeRoleForCookie } from '@/lib/role-routing';
+import { useUnreadNotificationCount } from '@/hooks/useUnreadNotificationCount';
 
 
 interface TopbarProps {
@@ -10,6 +12,21 @@ interface TopbarProps {
 
 export default function Topbar({ pageTitle, toggleSidebar }: TopbarProps) {
   const router = useRouter();
+  const pathname = usePathname();
+  const showNotifications =
+    pathname.startsWith('/department-head') ||
+    pathname.startsWith('/ambassador') ||
+    pathname.startsWith('/staff');
+  const { unreadCount } = useUnreadNotificationCount(showNotifications);
+
+  const notificationsHref = useMemo(() => {
+    if (pathname.startsWith('/department-head')) return '/department-head?pg=notifications';
+    if (pathname.startsWith('/ambassador')) return '/ambassador?pg=notifications';
+    if (pathname.startsWith('/staff')) return '/staff?pg=notifications';
+    return '/staff?pg=notifications';
+  }, [pathname]);
+
+  const notifBadgeLabel = unreadCount > 99 ? '99+' : String(unreadCount);
   const [user, setUser] = useState<any>(null);
   const [activeRole, setActiveRole] = useState<string>('');
   const [roles, setRoles] = useState<string[]>([]);
@@ -77,7 +94,24 @@ export default function Topbar({ pageTitle, toggleSidebar }: TopbarProps) {
       </div>
 
       <div className="d-flex align-items-center gap-3">
-
+        {showNotifications ? (
+          <Link
+            href={notificationsHref}
+            className="notif-btn"
+            title="Notifications"
+            aria-label={unreadCount > 0 ? `${unreadCount} unread notifications` : 'Notifications'}
+          >
+            <span
+              className={`material-symbols-outlined${unreadCount > 0 ? ' sidebar-bell-ring' : ''}`}
+              style={{ color: '#fff', fontSize: '22px' }}
+            >
+              notifications_active
+            </span>
+            {unreadCount > 0 ? (
+              <span className="topbar-notif-badge">{notifBadgeLabel}</span>
+            ) : null}
+          </Link>
+        ) : null}
 
         <button className="avatar-btn" data-bs-toggle="dropdown">
           <div className="text-end d-none d-sm-block">
