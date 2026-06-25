@@ -79,15 +79,16 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
     await updateStandardRow(id, parsed);
 
     if (body.processes !== undefined) {
+      const processParsed = parseStandardProcessesPayload(body.processes);
+      if (!processParsed.ok) {
+        return NextResponse.json({ message: processParsed.message }, { status: 400 });
+      }
+
       await query({
         query: `DELETE FROM standard_processes WHERE standard_id = ?`,
         values: [id],
       });
 
-      const processParsed = parseStandardProcessesPayload(body.processes);
-      if (!processParsed.ok) {
-        return NextResponse.json({ message: processParsed.message }, { status: 400 });
-      }
       const sid = Number(id);
       for (let i = 0; i < processParsed.items.length; i++) {
         const row = processParsed.items[i];
