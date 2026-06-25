@@ -3,6 +3,7 @@
 import { useState, Suspense } from 'react';
 import Sidebar from './Sidebar';
 import Topbar from './Topbar';
+import { PortalFeaturesProvider } from './PortalFeaturesProvider';
 import { usePathname, useSearchParams } from 'next/navigation';
 
 function LayoutContent({ children, sidebarOpen, setSidebarOpen }: any) {
@@ -56,6 +57,7 @@ function LayoutContent({ children, sidebarOpen, setSidebarOpen }: any) {
       'users': 'User Management',
       'reports': 'Reports & Analytics',
       'questionnaire': 'Questionnaire Templates',
+      'settings': 'Settings',
       'reporting': 'Unit Reporting',
       'propose-changes': 'Propose Changes',
 
@@ -108,19 +110,21 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
 
   return (
-    <div className="app-shell">
-      <Suspense fallback={<div className="p-4 flex-fill d-flex align-items-center justify-content-center"><div className="spinner-border text-primary" role="status"></div></div>}>
-        <Sidebar
-          sidebarOpen={sidebarOpen}
-          setSidebarOpen={setSidebarOpen}
-          onLogoutClick={handleLogout}
-        />
-        <div className="main-area">
-          <LayoutContent sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen}>
-            {children}
-          </LayoutContent>
-        </div>
-      </Suspense>
-    </div>
+    <PortalFeaturesProvider>
+      <div className="app-shell">
+        <Suspense fallback={<div className="p-4 flex-fill d-flex align-items-center justify-content-center"><div className="spinner-border text-primary" role="status"></div></div>}>
+          <Sidebar
+            sidebarOpen={sidebarOpen}
+            setSidebarOpen={setSidebarOpen}
+            onLogoutClick={handleLogout}
+          />
+          <div className="main-area">
+            <LayoutContent sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen}>
+              {children}
+            </LayoutContent>
+          </div>
+        </Suspense>
+      </div>
+    </PortalFeaturesProvider>
   );
 }

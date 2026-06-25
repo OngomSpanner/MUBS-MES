@@ -4,6 +4,13 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { useMemo, useEffect, useState } from 'react';
 import { usePathname, useSearchParams } from 'next/navigation';
+import { usePortalFeatures } from '@/components/PortalFeaturesProvider';
+import {
+  AMBASSADOR_MENU_FEATURE_KEYS,
+  HOD_MENU_FEATURE_KEYS,
+  isFeatureEnabled,
+} from '@/lib/portal-features';
+import { normalizeRoleForCookie } from '@/lib/role-routing';
 
 interface SidebarProps {
   sidebarOpen: boolean;
@@ -16,6 +23,7 @@ type MenuItem = {
   href: string;
   icon: string;
   label: string;
+  featureKey?: string;
 };
 
 export default function Sidebar({ sidebarOpen, setSidebarOpen, onLogoutClick }: SidebarProps) {
@@ -42,22 +50,23 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen, onLogoutClick }: 
         ? ambassadorCurrentKey || 'dashboard'
         : pathname.substring(1) || 'dashboard';
 
-  const adminMenuItems = [
+  const adminMenuItems: MenuItem[] = [
     { key: 'dashboard', href: '/admin?pg=dashboard', icon: 'dashboard', label: 'Dashboard' },
     { key: 'strategic', href: '/admin?pg=strategic', icon: 'track_changes', label: 'Standard and Activities' },
     { key: 'questionnaire', href: '/admin?pg=questionnaire', icon: 'help_outline', label: 'Questionnaire' },
     { key: 'reports', href: '/admin?pg=reports', icon: 'bar_chart', label: 'Reports & Monitoring' },
     { key: 'users', href: '/admin?pg=users', icon: 'manage_accounts', label: 'User & Role Mgmt' },
+    { key: 'settings', href: '/admin?pg=settings', icon: 'tune', label: 'Settings' },
   ];
 
-  const departmentHeadMenuItems = [
-    { key: 'dashboard', href: '/department-head?pg=dashboard', icon: 'dashboard', label: 'Dashboard' },
-    { key: 'activities', href: '/department-head?pg=activities', icon: 'track_changes', label: 'Strategic Activities' },
-    { key: 'departmental-activities', href: '/department-head?pg=departmental-activities', icon: 'apartment', label: 'Departmental Activities' },
-    { key: 'tasks', href: '/department-head?pg=tasks', icon: 'checklist', label: 'Processes' },
-    { key: 'staff', href: '/department-head?pg=staff', icon: 'group', label: 'Staff & Warnings' },
-    { key: 'evaluations', href: '/department-head?pg=evaluations', icon: 'fact_check', label: 'Submissions & reviews' },
-    { key: 'reports', href: '/department-head?pg=reports', icon: 'analytics', label: 'Performance & Reports' },
+  const departmentHeadMenuItems: MenuItem[] = [
+    { key: 'dashboard', href: '/department-head?pg=dashboard', icon: 'dashboard', label: 'Dashboard', featureKey: HOD_MENU_FEATURE_KEYS.dashboard },
+    { key: 'activities', href: '/department-head?pg=activities', icon: 'track_changes', label: 'Strategic Activities', featureKey: HOD_MENU_FEATURE_KEYS.activities },
+    { key: 'departmental-activities', href: '/department-head?pg=departmental-activities', icon: 'apartment', label: 'Departmental Activities', featureKey: HOD_MENU_FEATURE_KEYS['departmental-activities'] },
+    { key: 'tasks', href: '/department-head?pg=tasks', icon: 'checklist', label: 'Processes', featureKey: HOD_MENU_FEATURE_KEYS.tasks },
+    { key: 'staff', href: '/department-head?pg=staff', icon: 'group', label: 'Staff & Warnings', featureKey: HOD_MENU_FEATURE_KEYS.staff },
+    { key: 'evaluations', href: '/department-head?pg=evaluations', icon: 'fact_check', label: 'Submissions & reviews', featureKey: HOD_MENU_FEATURE_KEYS.evaluations },
+    { key: 'reports', href: '/department-head?pg=reports', icon: 'analytics', label: 'Performance & Reports', featureKey: HOD_MENU_FEATURE_KEYS.reports },
   ];
 
   const ambassadorMenuItems: MenuItem[] = [
@@ -66,18 +75,21 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen, onLogoutClick }: 
       href: '/ambassador?pg=tracking&tab=dashboard',
       icon: 'monitoring',
       label: 'Tracking',
+      featureKey: AMBASSADOR_MENU_FEATURE_KEYS.tracking,
     },
     {
       key: 'reporting',
       href: '/ambassador?pg=reporting&tab=data-collection',
       icon: 'bar_chart',
       label: 'Reporting',
+      featureKey: AMBASSADOR_MENU_FEATURE_KEYS.reporting,
     },
     {
       key: 'propose-changes',
       href: '/ambassador?pg=propose-changes',
       icon: 'edit_note',
       label: 'Propose Changes',
+      featureKey: AMBASSADOR_MENU_FEATURE_KEYS['propose-changes'],
     },
   ];
 
@@ -92,8 +104,31 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen, onLogoutClick }: 
   const isAmbassador = pathname.startsWith('/ambassador');
   const isDepartmentHead = pathname.startsWith('/department-head');
   const isStaff = pathname.startsWith('/staff');
+  const isAdmin = pathname.startsWith('/admin');
+  const { flags: portalFlags } = usePortalFeatures();
+  const [isSystemAdmin, setIsSystemAdmin] = useState(false);
   const [isAcademicStaff, setIsAcademicStaff] = useState<boolean | null>(null);
   const [hasAcademicTeachingScope, setHasAcademicTeachingScope] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    if (!isAdmin) {
+      setIsSystemAdmin(false);
+      return;
+    }
+    let cancelled = false;
+    void fetch('/api/auth/me', { credentials: 'include' })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data: { activeRole?: string } | null) => {
+        if (cancelled) return;
+        setIsSystemAdmin(normalizeRoleForCookie(data?.activeRole) === 'System Administrator');
+      })
+      .catch(() => {
+        if (!cancelled) setIsSystemAdmin(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [isAdmin]);
 
   useEffect(() => {
     if (!isStaff) {
@@ -141,9 +176,22 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen, onLogoutClick }: 
     [isAcademicStaff]
   );
 
+  const filterByPortalFeatures = (items: MenuItem[]) =>
+    items.filter((item) => !item.featureKey || isFeatureEnabled(portalFlags, item.featureKey));
+
   const visibleDepartmentHeadMenuItems = useMemo(
-    () => departmentHeadMenuItems,
-    []
+    () => filterByPortalFeatures(departmentHeadMenuItems),
+    [portalFlags]
+  );
+
+  const visibleAmbassadorMenuItems = useMemo(
+    () => filterByPortalFeatures(ambassadorMenuItems),
+    [portalFlags]
+  );
+
+  const visibleAdminMenuItems = useMemo(
+    () => adminMenuItems.filter((item) => item.key !== 'settings' || isSystemAdmin),
+    [isSystemAdmin]
   );
 
   const isActive = (key: string) => currentKey === key;
@@ -183,12 +231,12 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen, onLogoutClick }: 
 
         <nav className="sidebar-nav">
           {isAmbassador
-            ? renderFlatMenu(ambassadorMenuItems)
+            ? renderFlatMenu(visibleAmbassadorMenuItems)
             : isDepartmentHead
               ? renderFlatMenu(visibleDepartmentHeadMenuItems)
               : isStaff
                 ? renderFlatMenu(visibleStaffMenuItems)
-                : renderFlatMenu(adminMenuItems)}
+                : renderFlatMenu(visibleAdminMenuItems)}
 
           <a
             className="sidebar-link"

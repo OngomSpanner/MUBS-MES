@@ -20,6 +20,11 @@ import EvaluateSubmissionModal, {
 } from '@/components/Department/EvaluateSubmissionModal';
 import { linkify } from '@/lib/linkify';
 import type { PerformanceStatus, PracticeType } from '@/lib/results-framework';
+import { usePortalFeatures } from '@/components/PortalFeaturesProvider';
+import {
+    HOD_EVALUATION_TAB_FEATURE_KEYS,
+    isFeatureEnabled,
+} from '@/lib/portal-features';
 
 /** URLs pasted only in report text (not in attachments column). */
 function extractEvidenceUrlsFromSummary(text: string | null | undefined): { label: string; url: string }[] {
@@ -109,7 +114,13 @@ type HodTabScopes = {
     canManageEnrollment: boolean;
 };
 
-function isTabVisible(tab: (typeof HOD_SUBMISSION_TABS)[number], scopes: HodTabScopes | null): boolean {
+function isTabVisible(
+    tab: (typeof HOD_SUBMISSION_TABS)[number],
+    scopes: HodTabScopes | null,
+    flags: Record<string, boolean>,
+): boolean {
+    const featureKey = HOD_EVALUATION_TAB_FEATURE_KEYS[tab.key];
+    if (featureKey && !isFeatureEnabled(flags, featureKey)) return false;
     if (!tab.scope) return true;
     if (!scopes) return false;
     if (tab.scope === 'teaching') return scopes.hasAcademicTeachingScope;
@@ -118,11 +129,18 @@ function isTabVisible(tab: (typeof HOD_SUBMISSION_TABS)[number], scopes: HodTabS
     return true;
 }
 
-function parseHodSubmissionTab(raw: string | null, scopes: HodTabScopes | null): HodSubmissionTab {
+function parseHodSubmissionTab(
+    raw: string | null,
+    scopes: HodTabScopes | null,
+    flags: Record<string, boolean>,
+): HodSubmissionTab {
     const valid = new Set(HOD_SUBMISSION_TABS.map((t) => t.key));
     if (raw && valid.has(raw as HodSubmissionTab)) {
         const tab = HOD_SUBMISSION_TABS.find((t) => t.key === raw);
-        if (tab && isTabVisible(tab, scopes)) return raw as HodSubmissionTab;
+        if (tab && isTabVisible(tab, scopes, flags)) return raw as HodSubmissionTab;
+    }
+    for (const tab of HOD_SUBMISSION_TABS) {
+        if (isTabVisible(tab, scopes, flags)) return tab.key;
     }
     return 'staff-reports';
 }
@@ -130,9 +148,10 @@ function parseHodSubmissionTab(raw: string | null, scopes: HodTabScopes | null):
 export default function DepartmentEvaluations() {
     const router = useRouter();
     const searchParams = useSearchParams();
+    const { flags: portalFlags } = usePortalFeatures();
     const [tabScopes, setTabScopes] = useState<HodTabScopes | null>(null);
     const rawTab = searchParams.get('tab');
-    const activeTab = parseHodSubmissionTab(rawTab, tabScopes);
+    const activeTab = parseHodSubmissionTab(rawTab, tabScopes, portalFlags);
     const [pendingCounts, setPendingCounts] = useState<Record<string, number>>({});
     const [data, setData] = useState<EvaluationData | null>(null);
     const [loading, setLoading] = useState(true);
@@ -178,8 +197,8 @@ export default function DepartmentEvaluations() {
     }, []);
 
     const visibleTabs = useMemo(
-        () => HOD_SUBMISSION_TABS.filter((tab) => isTabVisible(tab, tabScopes)),
-        [tabScopes]
+        () => HOD_SUBMISSION_TABS.filter((tab) => isTabVisible(tab, tabScopes, portalFlags)),
+        [tabScopes, portalFlags]
     );
 
     useEffect(() => {

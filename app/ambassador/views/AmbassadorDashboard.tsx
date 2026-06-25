@@ -4,6 +4,13 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import axios from 'axios';
 import StatCard from '@/components/StatCard';
+import { usePortalFeatures } from '@/components/PortalFeaturesProvider';
+import {
+  AMBASSADOR_MENU_FEATURE_KEYS,
+  AMBASSADOR_REPORTING_TAB_FEATURE_KEYS,
+  AMBASSADOR_TRACKING_TAB_FEATURE_KEYS,
+  isFeatureEnabled,
+} from '@/lib/portal-features';
 
 const quickActionHover = {
     onMouseOver: (e: React.MouseEvent<HTMLDivElement>) => {
@@ -87,6 +94,13 @@ export default function AmbassadorDashboard() {
     const [data, setData] = useState<AmbassadorData | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+    const { flags: portalFlags } = usePortalFeatures();
+
+    const showResultsTracking = isFeatureEnabled(portalFlags, AMBASSADOR_TRACKING_TAB_FEATURE_KEYS.results);
+    const showComplianceTracking = isFeatureEnabled(portalFlags, AMBASSADOR_TRACKING_TAB_FEATURE_KEYS.compliance);
+    const showReportingMenu = isFeatureEnabled(portalFlags, AMBASSADOR_MENU_FEATURE_KEYS.reporting);
+    const showProposeChanges = isFeatureEnabled(portalFlags, AMBASSADOR_MENU_FEATURE_KEYS['propose-changes']);
+    const showEnrollmentReporting = isFeatureEnabled(portalFlags, AMBASSADOR_REPORTING_TAB_FEATURE_KEYS['programme-enrollment']);
 
     useEffect(() => {
         const fetchData = async () => {
@@ -130,6 +144,7 @@ export default function AmbassadorDashboard() {
     const { managedUnitName, stats } = data;
     const reportingCard = reportingQuickCard(data);
     const showEnrollment =
+        showEnrollmentReporting &&
         Boolean(data.canManageEnrollment) &&
         ((stats.enrollmentProgrammes ?? 0) > 0 || (stats.enrollmentCourseUnits ?? 0) > 0);
 
@@ -205,7 +220,7 @@ export default function AmbassadorDashboard() {
             </div>
 
             {/* Results Framework snapshot */}
-            {(stats.rfIndicators ?? 0) > 0 ? (
+            {showResultsTracking && (stats.rfIndicators ?? 0) > 0 ? (
                 <div className="row g-3 mb-4">
                     <div className="col-12">
                         <div className="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-1">
@@ -301,6 +316,7 @@ export default function AmbassadorDashboard() {
 
             {/* Quick actions — Tracking / Reporting / Propose changes */}
             <div className="row g-3">
+                {showComplianceTracking ? (
                 <div className="col-12 col-sm-6 col-xl-3">
                     <Link href="/ambassador?pg=tracking&tab=compliance" className="text-decoration-none h-100">
                         <div
@@ -318,6 +334,8 @@ export default function AmbassadorDashboard() {
                         </div>
                     </Link>
                 </div>
+                ) : null}
+                {showResultsTracking ? (
                 <div className="col-12 col-sm-6 col-xl-3">
                     <Link href="/ambassador?pg=tracking&tab=results" className="text-decoration-none h-100">
                         <div
@@ -337,6 +355,8 @@ export default function AmbassadorDashboard() {
                         </div>
                     </Link>
                 </div>
+                ) : null}
+                {showReportingMenu ? (
                 <div className="col-12 col-sm-6 col-xl-3">
                     <Link href={reportingCard.href} className="text-decoration-none h-100">
                         <div
@@ -354,6 +374,8 @@ export default function AmbassadorDashboard() {
                         </div>
                     </Link>
                 </div>
+                ) : null}
+                {showProposeChanges ? (
                 <div className="col-12 col-sm-6 col-xl-3">
                     <Link href="/ambassador?pg=propose-changes" className="text-decoration-none h-100">
                         <div
@@ -371,6 +393,7 @@ export default function AmbassadorDashboard() {
                         </div>
                     </Link>
                 </div>
+                ) : null}
             </div>
         </div>
     );

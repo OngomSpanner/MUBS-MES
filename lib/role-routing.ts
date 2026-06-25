@@ -122,3 +122,9 @@ export function canManageStrategicStandards(role: string | undefined | null): bo
   return t === 'admin';
 }
 
+/** Who may change HOD / Ambassador portal visibility (admin Settings page). */
+export function canManagePortalSettings(role: string | undefined | null): boolean {
+  if (role == null || typeof role !== 'string' || !role.trim()) return false;
+  return normalizeRoleForCookie(role) === 'System Administrator';
+}
+

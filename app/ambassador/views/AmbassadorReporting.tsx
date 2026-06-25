@@ -12,6 +12,12 @@ import AmbassadorStaffProfilePanel from '@/components/Ambassador/reports/Ambassa
 import AmbassadorProgrammeEnrollmentPanel from '@/components/Ambassador/reports/AmbassadorProgrammeEnrollmentPanel';
 import AmbassadorCourseUnitEnrollmentPanel from '@/components/Ambassador/reports/AmbassadorCourseUnitEnrollmentPanel';
 import AmbassadorDataCollection from './AmbassadorDataCollection';
+import { usePortalFeatures } from '@/components/PortalFeaturesProvider';
+import {
+  AMBASSADOR_REPORTING_TAB_FEATURE_KEYS,
+  isAmbassadorReportingTabEnabled,
+  isFeatureEnabled,
+} from '@/lib/portal-features';
 
 export type AmbassadorReportingTab =
   | 'data-collection'
@@ -65,6 +71,7 @@ function parseTab(value: string | null): AmbassadorReportingTab {
 export default function AmbassadorReporting() {
   const searchParams = useSearchParams();
   const activeTab = parseTab(searchParams.get('tab'));
+  const { flags: portalFlags } = usePortalFeatures();
 
   const [managedUnitName, setManagedUnitName] = useState<string | null>(null);
   const [managedUnitId, setManagedUnitId] = useState<number | null>(null);
@@ -96,24 +103,34 @@ export default function AmbassadorReporting() {
   }, []);
 
   const visibleTabs = useMemo(() => {
-    const tabs: AmbassadorReportingTab[] = ['data-collection'];
+    const tabs: AmbassadorReportingTab[] = [];
+    if (isFeatureEnabled(portalFlags, AMBASSADOR_REPORTING_TAB_FEATURE_KEYS['data-collection'])) {
+      tabs.push('data-collection');
+    }
     if (canManageHrWorkforce) {
-      tabs.push(
+      for (const t of [
         'recruitment',
         'benefits',
         'workforce-assessments',
         'employment-skill-status',
-        'staff-profiles'
-      );
+        'staff-profiles',
+      ] as AmbassadorReportingTab[]) {
+        const key = AMBASSADOR_REPORTING_TAB_FEATURE_KEYS[t];
+        if (key && isFeatureEnabled(portalFlags, key)) tabs.push(t);
+      }
     }
     if (canManageEnrollment) {
-      tabs.push('programme-enrollment', 'course-unit-enrollment');
+      for (const t of ['programme-enrollment', 'course-unit-enrollment'] as AmbassadorReportingTab[]) {
+        const key = AMBASSADOR_REPORTING_TAB_FEATURE_KEYS[t];
+        if (key && isFeatureEnabled(portalFlags, key)) tabs.push(t);
+      }
     }
     return tabs;
-  }, [canManageEnrollment, canManageHrWorkforce]);
+  }, [canManageEnrollment, canManageHrWorkforce, portalFlags]);
 
   const hrTabDenied = HR_ONLY_TABS.has(activeTab) && !canManageHrWorkforce;
   const enrollmentTabDenied = REGISTRAR_ONLY_TABS.has(activeTab) && !canManageEnrollment;
+  const portalTabDenied = !isAmbassadorReportingTabEnabled(portalFlags, activeTab);
 
   return (
     <div className="page-section active-page">
@@ -144,29 +161,45 @@ export default function AmbassadorReporting() {
         </div>
       )}
 
-      {activeTab === 'data-collection' && <AmbassadorDataCollection />}
+      {portalTabDenied && (
+        <div className="alert alert-info">
+          This reporting section is not available yet. Choose another tab or contact your system administrator.
+        </div>
+      )}
 
-      {activeTab === 'staff-profiles' && canManageHrWorkforce && <AmbassadorStaffProfilePanel />}
+      {activeTab === 'data-collection' && isFeatureEnabled(portalFlags, AMBASSADOR_REPORTING_TAB_FEATURE_KEYS['data-collection']) && (
+        <AmbassadorDataCollection />
+      )}
 
-      {activeTab === 'recruitment' && canManageHrWorkforce && <StaffRecruitmentPanel {...scopeProps} />}
+      {activeTab === 'staff-profiles' && canManageHrWorkforce && isFeatureEnabled(portalFlags, AMBASSADOR_REPORTING_TAB_FEATURE_KEYS['staff-profiles']) && (
+        <AmbassadorStaffProfilePanel />
+      )}
 
-      {activeTab === 'benefits' && canManageHrWorkforce && <AmbassadorBenefitsDataPanel {...scopeProps} />}
+      {activeTab === 'recruitment' && canManageHrWorkforce && isFeatureEnabled(portalFlags, AMBASSADOR_REPORTING_TAB_FEATURE_KEYS.recruitment) && (
+        <StaffRecruitmentPanel {...scopeProps} />
+      )}
 
-      {activeTab === 'workforce-assessments' && canManageHrWorkforce && (
+      {activeTab === 'benefits' && canManageHrWorkforce && isFeatureEnabled(portalFlags, AMBASSADOR_REPORTING_TAB_FEATURE_KEYS.benefits) && (
+        <AmbassadorBenefitsDataPanel {...scopeProps} />
+      )}
+
+      {activeTab === 'workforce-assessments' && canManageHrWorkforce && isFeatureEnabled(portalFlags, AMBASSADOR_REPORTING_TAB_FEATURE_KEYS['workforce-assessments']) && (
         <AmbassadorWorkforceDataPanel
           managedUnitId={canManageHrWorkforce ? undefined : managedUnitId ?? undefined}
         />
       )}
 
-      {activeTab === 'employment-skill-status' && canManageHrWorkforce && (
+      {activeTab === 'employment-skill-status' && canManageHrWorkforce && isFeatureEnabled(portalFlags, AMBASSADOR_REPORTING_TAB_FEATURE_KEYS['employment-skill-status']) && (
         <AmbassadorSkillsDataPanel
           managedUnitId={canManageHrWorkforce ? undefined : managedUnitId ?? undefined}
         />
       )}
 
-      {activeTab === 'programme-enrollment' && canManageEnrollment && <AmbassadorProgrammeEnrollmentPanel />}
+      {activeTab === 'programme-enrollment' && canManageEnrollment && isFeatureEnabled(portalFlags, AMBASSADOR_REPORTING_TAB_FEATURE_KEYS['programme-enrollment']) && (
+        <AmbassadorProgrammeEnrollmentPanel />
+      )}
 
-      {activeTab === 'course-unit-enrollment' && canManageEnrollment && (
+      {activeTab === 'course-unit-enrollment' && canManageEnrollment && isFeatureEnabled(portalFlags, AMBASSADOR_REPORTING_TAB_FEATURE_KEYS['course-unit-enrollment']) && (
         <AmbassadorCourseUnitEnrollmentPanel />
       )}
     </div>
