@@ -232,6 +232,10 @@ export async function PUT(
       }
     } catch (roleErr) {
       console.error('user_roles sync failed during PUT:', roleErr);
+      return NextResponse.json(
+        { message: 'User profile updated but role assignment failed. User roles may be missing — please retry the update.' },
+        { status: 500 }
+      );
     }
 
     const isAmbassador = roleListNormalized.includes('ambassador');
@@ -261,7 +265,15 @@ export async function PUT(
           });
         }
       } catch (e: any) {
-        if (e?.code !== 'ER_NO_SUCH_TABLE') console.error('user_committee_assignments update:', e);
+        if (e?.code === 'ER_NO_SUCH_TABLE') {
+          // Table not migrated yet — skip silently
+        } else {
+          console.error('user_committee_assignments update:', e);
+          return NextResponse.json(
+            { message: 'User updated but committee assignment failed. Committees may be missing — please retry.' },
+            { status: 500 }
+          );
+        }
       }
     }
 
