@@ -71,7 +71,7 @@ export default function StaffUpdates() {
         try {
             const [tasksRes, notifsRes] = await Promise.all([
                 axios.get('/api/staff/tasks'),
-                axios.get(`/api/staff/notifications${notifFilter !== 'All' ? `?filter=${encodeURIComponent(notifFilter)}` : ''}`)
+                axios.get(`/api/notifications${notifFilter !== 'All' ? `?filter=${encodeURIComponent(notifFilter)}` : ''}`)
             ]);
             setTasks(tasksRes.data.tasks || []);
             setStats(tasksRes.data.stats || { assigned: 0, overdue: 0, inProgress: 0, completed: 0 });
@@ -88,7 +88,7 @@ export default function StaffUpdates() {
 
     const markAllRead = async () => {
         try {
-            await axios.patch('/api/staff/notifications', { markAllRead: true });
+            await axios.patch('/api/notifications', { markAllRead: true });
             setUnreadCount(0);
             setNotifications(prev => prev.map(n => ({ ...n, is_read: true })));
         } catch (e) {

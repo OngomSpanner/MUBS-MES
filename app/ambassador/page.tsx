@@ -4,6 +4,7 @@ import Layout from '@/components/Layout';
 import AmbassadorTracking from './views/AmbassadorTracking';
 import AmbassadorReporting from './views/AmbassadorReporting';
 import AmbassadorProposeChanges from './views/AmbassadorProposeChanges';
+import PortalNotifications from '@/components/PortalNotifications';
 import { getMergedPortalFlags } from '@/lib/portal-feature-flags';
 import {
   firstEnabledAmbassadorMenuPg,
@@ -49,6 +50,8 @@ function resolvePage(searchParams: { [key: string]: string | string[] | undefine
             );
         case 'propose-changes':
             return <AmbassadorProposeChanges />;
+        case 'notifications':
+            return <PortalNotifications />;
         case 'reports':
             if (tab === 'compliance' || !tab) {
                 return (

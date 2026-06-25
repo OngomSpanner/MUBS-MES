@@ -114,7 +114,7 @@ export function featuresForPortal(portal: PortalId): PortalFeatureDef[] {
 
 export function isHodMenuEnabled(flags: PortalFeatureFlags, pg: string): boolean {
   const key = HOD_MENU_FEATURE_KEYS[pg];
-  if (!key) return pg === 'dashboard';
+  if (!key) return pg === 'dashboard' || pg === 'notifications';
   return isFeatureEnabled(flags, key);
 }
 
@@ -122,6 +122,7 @@ export function isAmbassadorMenuEnabled(flags: PortalFeatureFlags, pg: string): 
   if (pg === 'dashboard' || pg === 'reports') {
     return isFeatureEnabled(flags, 'ambassador.menu.tracking');
   }
+  if (pg === 'notifications') return true;
   const key = AMBASSADOR_MENU_FEATURE_KEYS[pg];
   if (!key) return false;
   return isFeatureEnabled(flags, key);

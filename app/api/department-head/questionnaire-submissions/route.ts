@@ -4,6 +4,7 @@ import { verifyToken } from '@/lib/auth';
 import { getVisibleDepartmentIds, inPlaceholders } from '@/lib/department-head';
 import { query } from '@/lib/db';
 import { ensureHodReviewWorkflowSchema } from '@/lib/hod-review-workflow';
+import { notifyAmbassadorOfIndicatorReview } from '@/lib/questionnaire-submission-notifications';
 
 export const dynamic = 'force-dynamic';
 
@@ -152,6 +153,12 @@ export async function PATCH(request: Request) {
       return NextResponse.json({ message: 'Not authorized for this department' }, { status: 403 });
     }
 
+    const existing = (await query({
+      query: `SELECT submitted_by FROM q_indicator_submissions
+              WHERE indicator_id = ? AND department_id = ?`,
+      values: [indicatorId, departmentId],
+    })) as { submitted_by: number | null }[];
+
     const status = action === 'approve' ? 'approved' : 'returned';
     await query({
       query: `
@@ -161,6 +168,18 @@ export async function PATCH(request: Request) {
       `,
       values: [status, auth.userId, comment || null, indicatorId, departmentId],
     });
+
+    const ambassadorUserId = existing[0]?.submitted_by;
+    if (ambassadorUserId) {
+      void notifyAmbassadorOfIndicatorReview({
+        indicatorId,
+        departmentId,
+        ambassadorUserId,
+        reviewerUserId: auth.userId,
+        action: action as 'approve' | 'return',
+        comment: comment || null,
+      });
+    }
 
     return NextResponse.json({ message: action === 'approve' ? 'Approved' : 'Sent back for revision' });
   } catch (error: unknown) {

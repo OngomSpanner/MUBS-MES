@@ -36,6 +36,7 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen, onLogoutClick }: 
   const ambassadorCurrentKey = useMemo(() => {
     if (!pathname.startsWith('/ambassador')) return null;
     const pg = ambassadorPg || 'dashboard';
+    if (pg === 'notifications') return 'notifications';
     if (pg === 'propose-changes') return 'propose-changes';
     if (pg === 'reporting' || (pg === 'reports' && ambassadorTab && ambassadorTab !== 'compliance')) {
       return 'reporting';
@@ -67,6 +68,7 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen, onLogoutClick }: 
     { key: 'staff', href: '/department-head?pg=staff', icon: 'group', label: 'Staff & Warnings', featureKey: HOD_MENU_FEATURE_KEYS.staff },
     { key: 'evaluations', href: '/department-head?pg=evaluations', icon: 'fact_check', label: 'Submissions & reviews', featureKey: HOD_MENU_FEATURE_KEYS.evaluations },
     { key: 'reports', href: '/department-head?pg=reports', icon: 'analytics', label: 'Performance & Reports', featureKey: HOD_MENU_FEATURE_KEYS.reports },
+    { key: 'notifications', href: '/department-head?pg=notifications', icon: 'notifications_active', label: 'Notifications' },
   ];
 
   const ambassadorMenuItems: MenuItem[] = [
@@ -91,6 +93,7 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen, onLogoutClick }: 
       label: 'Propose Changes',
       featureKey: AMBASSADOR_MENU_FEATURE_KEYS['propose-changes'],
     },
+    { key: 'notifications', href: '/ambassador?pg=notifications', icon: 'notifications_active', label: 'Notifications' },
   ];
 
   const staffMenuItems = [

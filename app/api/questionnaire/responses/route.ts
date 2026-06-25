@@ -7,6 +7,7 @@ import {
   parseSubmitForReview,
 } from '@/lib/hod-review-workflow';
 import { HOD_UNIT_HEAD_LABEL } from '@/lib/hod-review-workflow-constants';
+import { notifyHodsOfIndicatorSubmission } from '@/lib/questionnaire-submission-notifications';
 
 export const dynamic = 'force-dynamic';
 
@@ -100,6 +101,14 @@ export async function POST(request: Request) {
               submitted_at = IF(VALUES(hod_review_status) = 'submitted', VALUES(submitted_at), submitted_at)`,
     values: [indicatorId, auth.managedUnitId, hodStatus, auth.userId, submitForReview ? now : null],
   });
+
+  if (hodStatus === 'submitted') {
+    void notifyHodsOfIndicatorSubmission({
+      indicatorId,
+      departmentId: auth.managedUnitId,
+      submittedByUserId: auth.userId,
+    });
+  }
 
   return NextResponse.json({
     message: submitForReview ? `Submitted for ${HOD_UNIT_HEAD_LABEL} review` : 'Draft saved',

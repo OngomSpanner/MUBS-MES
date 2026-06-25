@@ -8,6 +8,7 @@ import DepartmentTasks from './views/DepartmentTasks';
 import DepartmentStaff from './views/DepartmentStaff';
 import DepartmentEvaluations from './views/DepartmentEvaluations';
 import DepartmentReports from './views/DepartmentReports';
+import PortalNotifications from '@/components/PortalNotifications';
 import { getMergedPortalFlags } from '@/lib/portal-feature-flags';
 import {
   firstEnabledHodEvaluationTab,
@@ -63,6 +64,8 @@ export default async function DepartmentHeadPage({ searchParams }: DepartmentHea
                 return <DepartmentEvaluations />;
             case 'reports':
                 return <DepartmentReports />;
+            case 'notifications':
+                return <PortalNotifications />;
             case 'dashboard':
             default:
                 return <DepartmentHeadDashboard />;

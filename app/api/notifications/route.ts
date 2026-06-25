@@ -17,21 +17,26 @@ function parseFilter(raw: string | null): NotificationFilter {
   return 'All';
 }
 
-/** @deprecated Use GET /api/notifications */
+async function requireUserId(): Promise<number | null> {
+  const cookieStore = await cookies();
+  const token = cookieStore.get('token')?.value;
+  if (!token) return null;
+  const decoded = verifyToken(token) as { userId?: number } | null;
+  return decoded?.userId ?? null;
+}
+
 export async function GET(req: Request) {
   try {
-    const cookieStore = await cookies();
-    const token = cookieStore.get('token')?.value;
-    if (!token) throw new Error('Unauthorized');
-
-    const decoded = verifyToken(token) as { userId?: number } | null;
-    if (!decoded?.userId) throw new Error('Invalid token');
+    const userId = await requireUserId();
+    if (!userId) {
+      return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
+    }
 
     const { searchParams } = new URL(req.url);
     const filter = parseFilter(searchParams.get('filter'));
 
-    const notifications = await listNotificationsForUser(decoded.userId, filter);
-    const unreadCount = await unreadNotificationCount(decoded.userId);
+    const notifications = await listNotificationsForUser(userId, filter);
+    const unreadCount = await unreadNotificationCount(userId);
 
     return NextResponse.json({
       notifications: notifications.map((n) => ({
@@ -48,44 +53,35 @@ export async function GET(req: Request) {
     });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Unknown error';
-    console.error('Staff Notifications API Error:', error);
-    return NextResponse.json(
-      { message: 'Error fetching notifications', detail: message },
-      { status: message === 'Unauthorized' ? 401 : 500 }
-    );
+    console.error('Notifications API GET Error:', error);
+    return NextResponse.json({ message: 'Error fetching notifications', detail: message }, { status: 500 });
   }
 }
 
-/** @deprecated Use PATCH /api/notifications */
 export async function PATCH(req: Request) {
   try {
-    const cookieStore = await cookies();
-    const token = cookieStore.get('token')?.value;
-    if (!token) throw new Error('Unauthorized');
-
-    const decoded = verifyToken(token) as { userId?: number } | null;
-    if (!decoded?.userId) throw new Error('Invalid token');
+    const userId = await requireUserId();
+    if (!userId) {
+      return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
+    }
 
     const body = await req.json().catch(() => ({}));
     const { markAllRead, id } = body as { markAllRead?: boolean; id?: number };
 
     if (markAllRead) {
-      await markAllNotificationsRead(decoded.userId);
+      await markAllNotificationsRead(userId);
       return NextResponse.json({ success: true, message: 'All notifications marked as read' });
     }
 
     if (id) {
-      await markNotificationRead(decoded.userId, Number(id));
+      await markNotificationRead(userId, Number(id));
       return NextResponse.json({ success: true });
     }
 
     return NextResponse.json({ message: 'Nothing to update' }, { status: 400 });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Unknown error';
-    console.error('Staff Notifications PATCH Error:', error);
-    return NextResponse.json(
-      { message: message || 'Error updating notifications' },
-      { status: message === 'Unauthorized' ? 401 : 500 }
-    );
+    console.error('Notifications API PATCH Error:', error);
+    return NextResponse.json({ message: message || 'Error updating notifications' }, { status: 500 });
   }
 }

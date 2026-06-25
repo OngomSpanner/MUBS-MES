@@ -20,6 +20,9 @@ function LayoutContent({ children, sidebarOpen, setSidebarOpen }: any) {
 
   const getPageTitle = () => {
     const key = getPageKey();
+    if (key === 'notifications') {
+      return pathname.startsWith('/staff') ? 'Notifications & Deadlines' : 'Notifications';
+    }
     if (pathname.startsWith('/ambassador')) {
       if (key === 'propose-changes') return 'Propose Changes';
       if (key === 'tracking' || key === 'dashboard') {
@@ -73,7 +76,6 @@ function LayoutContent({ children, sidebarOpen, setSidebarOpen }: any) {
 
       // Staff specific
       'deadlines': 'Notifications & Deadlines',
-      'notifications': 'Notifications & Deadlines',
       'academic-teaching': 'Lecturer teaching data',
     };
     return pageTitles[key] || 'Dashboard';
