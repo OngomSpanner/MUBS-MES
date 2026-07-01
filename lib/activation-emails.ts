@@ -28,7 +28,7 @@ function buildActivationHtml(args: { fullName: string; role: ActivationRole; dep
   return brandEmailWrapper(`
     <p style="color:#333;font-size:16px;line-height:1.6;margin:0 0 12px;">Hello ${name},</p>
     <p style="color:#333;font-size:15px;line-height:1.6;margin:0 0 12px;">
-      ${args.role === 'Ambassador' && deptUnitLabel
+      ${deptUnitLabel
         ? `You have been assigned the <strong>${roleLabel}</strong> role in the MUBS M&amp;E System for department/unit <strong>${deptUnitLabel}</strong>.`
         : `You have been assigned the <strong>${roleLabel}</strong> role in the MUBS M&amp;E System.`}
     </p>

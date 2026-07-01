@@ -293,7 +293,7 @@ export async function PUT(
           to: email.trim(),
           fullName: finalFullName,
           role: r,
-          departmentUnit: r === 'Ambassador' ? departmentUnitLabel : undefined,
+          departmentUnit: departmentUnitLabel || undefined,
         });
         sent[r] = Boolean(res.sent);
       }
