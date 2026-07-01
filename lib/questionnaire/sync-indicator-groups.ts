@@ -19,8 +19,8 @@ async function ensureIndicatorGroupSchema(): Promise<void> {
             indicator_id INT NOT NULL,
             ambassador_group ENUM('outreach', 'regional', 'faculty', 'department_of') NOT NULL,
             PRIMARY KEY (indicator_id, ambassador_group),
-            CONSTRAINT fk_qiag_indicator FOREIGN KEY (indicator_id) REFERENCES q_indicators(id) ON DELETE CASCADE
-          ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+            KEY idx_qiag_indicator (indicator_id)
+          ) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4
         `,
       });
       schemaEnsured = true;

@@ -72,9 +72,9 @@ export async function ensureHodReviewWorkflowSchema(): Promise<void> {
           updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
           PRIMARY KEY (indicator_id, department_id),
           KEY idx_q_ind_sub_status (hod_review_status),
-          CONSTRAINT fk_q_ind_sub_indicator FOREIGN KEY (indicator_id) REFERENCES q_indicators(id) ON DELETE CASCADE,
-          CONSTRAINT fk_q_ind_sub_department FOREIGN KEY (department_id) REFERENCES departments(id) ON DELETE CASCADE
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+          KEY idx_q_ind_sub_indicator (indicator_id),
+          KEY idx_q_ind_sub_department (department_id)
+        ) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4
       `,
     });
   }
