@@ -6,6 +6,7 @@ import Layout from '@/components/Layout';
 import StatCard from '@/components/StatCard';
 import ReportsSectionHeader from '@/components/Reports/ReportsSectionHeader';
 import AmbassadorCollectedDataPanel from '@/components/Reports/data-collection/AmbassadorCollectedDataPanel';
+import SortablePaginatedTable, { sortDepartmentsByProgress } from '@/components/Reports/SortablePaginatedTable';
 import { Badge, Button, Modal, Spinner } from 'react-bootstrap';
 import axios from 'axios';
 import * as XLSX from 'xlsx';
@@ -109,7 +110,7 @@ function ProgressDonut({ totals }: { totals: AmbassadorReportsSummary['totals'] 
 }
 
 function DepartmentBarChart({ rows }: { rows: DepartmentRollup[] }) {
-  const data = rows.slice(0, 12);
+  const data = sortDepartmentsByProgress(rows).slice(0, 12);
   const barHeight = 22;
   const gap = 8;
   const labelWidth = 160;
@@ -436,7 +437,7 @@ export default function AmbassadorReportsView() {
                     <ReportsSectionHeader
                       icon="stacked_bar_chart"
                       title="Fill rate by department"
-                      description="Top departments by data entry completion (metric cells filled)."
+                      description="Departments with reporting activity first, ranked by fill rate."
                     />
                     <DepartmentBarChart rows={summary.byDepartment} />
                   </div>
@@ -468,41 +469,44 @@ export default function AmbassadorReportsView() {
                     </Button>
                   }
                 />
-                <div className="table-responsive">
-                  <table className="table table-sm table-hover align-middle mb-0">
-                    <thead className="table-light">
-                      <tr>
-                        <th>Department / unit</th>
-                        <th>Ambassador</th>
-                        <th className="text-center">Assignments</th>
-                        <th className="text-center">Not started</th>
-                        <th className="text-center">In progress</th>
-                        <th className="text-center">Awaiting HOD</th>
-                        <th className="text-center">Approved</th>
-                        <th className="text-center">Fill %</th>
-                        <th className="text-center">Approved %</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {summary.byDepartment.map((d) => (
-                        <tr key={d.departmentId}>
-                          <td className="fw-medium">{d.departmentName}</td>
-                          <td>
-                            {d.ambassadorName || <span className="text-muted">—</span>}
-                            {d.ambassadorEmail ? <div className="small text-muted">{d.ambassadorEmail}</div> : null}
-                          </td>
-                          <td className="text-center">{d.assignments}</td>
-                          <td className="text-center">{d.notStarted > 0 ? <Badge bg="secondary">{d.notStarted}</Badge> : 0}</td>
-                          <td className="text-center">{d.inProgress > 0 ? <Badge bg="warning" text="dark">{d.inProgress}</Badge> : 0}</td>
-                          <td className="text-center">{d.awaitingReview > 0 ? <Badge bg="info">{d.awaitingReview}</Badge> : 0}</td>
-                          <td className="text-center">{d.approved > 0 ? <Badge bg="success">{d.approved}</Badge> : 0}</td>
-                          <td className="text-center">{d.fillRatePct}%</td>
-                          <td className="text-center">{d.approvalRatePct}%</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                <SortablePaginatedTable
+                  rows={summary.byDepartment}
+                  defaultSortKey="fillRatePct"
+                  defaultSortDir="desc"
+                  pageSize={25}
+                  getSortValue={(d, key) => {
+                    if (key === 'departmentName') return d.departmentName;
+                    return Number((d as Record<string, unknown>)[key] ?? 0);
+                  }}
+                  rowKey={(d) => d.departmentId}
+                  columns={[
+                    { key: 'departmentName', label: 'Department / unit' },
+                    { key: 'ambassadorName', label: 'Ambassador', sortable: false },
+                    { key: 'assignments', label: 'Assignments', className: 'text-center' },
+                    { key: 'notStarted', label: 'Not started', className: 'text-center' },
+                    { key: 'inProgress', label: 'In progress', className: 'text-center' },
+                    { key: 'awaitingReview', label: 'Awaiting HOD', className: 'text-center' },
+                    { key: 'approved', label: 'Approved', className: 'text-center' },
+                    { key: 'fillRatePct', label: 'Fill %', className: 'text-center' },
+                    { key: 'approvalRatePct', label: 'Approved %', className: 'text-center' },
+                  ]}
+                  renderRow={(d) => (
+                    <>
+                      <td className="fw-medium">{d.departmentName}</td>
+                      <td>
+                        {d.ambassadorName || <span className="text-muted">—</span>}
+                        {d.ambassadorEmail ? <div className="small text-muted">{d.ambassadorEmail}</div> : null}
+                      </td>
+                      <td className="text-center">{d.assignments}</td>
+                      <td className="text-center">{d.notStarted > 0 ? <Badge bg="secondary">{d.notStarted}</Badge> : 0}</td>
+                      <td className="text-center">{d.inProgress > 0 ? <Badge bg="warning" text="dark">{d.inProgress}</Badge> : 0}</td>
+                      <td className="text-center">{d.awaitingReview > 0 ? <Badge bg="info">{d.awaitingReview}</Badge> : 0}</td>
+                      <td className="text-center">{d.approved > 0 ? <Badge bg="success">{d.approved}</Badge> : 0}</td>
+                      <td className="text-center">{d.fillRatePct}%</td>
+                      <td className="text-center">{d.approvalRatePct}%</td>
+                    </>
+                  )}
+                />
               </div>
             )}
 
@@ -518,37 +522,39 @@ export default function AmbassadorReportsView() {
                     </Button>
                   }
                 />
-                <div className="table-responsive">
-                  <table className="table table-sm table-hover align-middle mb-0">
-                    <thead className="table-light">
-                      <tr>
-                        <th>Objective</th>
-                        <th className="text-center">Assignments</th>
-                        <th className="text-center">Not started</th>
-                        <th className="text-center">In progress</th>
-                        <th className="text-center">Awaiting HOD</th>
-                        <th className="text-center">Approved</th>
-                        <th className="text-center">Fill %</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {summary.byObjective.map((o) => (
-                        <tr key={o.objective}>
-                          <td>
-                            <div className="fw-medium">{o.objectiveShort}</div>
-                            <div className="small text-muted text-truncate" style={{ maxWidth: 420 }} title={o.objective}>{o.objective}</div>
-                          </td>
-                          <td className="text-center">{o.assignments}</td>
-                          <td className="text-center">{o.notStarted}</td>
-                          <td className="text-center">{o.inProgress}</td>
-                          <td className="text-center">{o.awaitingReview}</td>
-                          <td className="text-center">{o.approved}</td>
-                          <td className="text-center">{o.fillRatePct}%</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                <SortablePaginatedTable
+                  rows={summary.byObjective}
+                  defaultSortKey="fillRatePct"
+                  defaultSortDir="desc"
+                  getSortValue={(o, key) => {
+                    if (key === 'objective') return o.objectiveShort;
+                    return Number((o as Record<string, unknown>)[key] ?? 0);
+                  }}
+                  rowKey={(o) => o.objective}
+                  columns={[
+                    { key: 'objective', label: 'Objective' },
+                    { key: 'assignments', label: 'Assignments', className: 'text-center' },
+                    { key: 'notStarted', label: 'Not started', className: 'text-center' },
+                    { key: 'inProgress', label: 'In progress', className: 'text-center' },
+                    { key: 'awaitingReview', label: 'Awaiting HOD', className: 'text-center' },
+                    { key: 'approved', label: 'Approved', className: 'text-center' },
+                    { key: 'fillRatePct', label: 'Fill %', className: 'text-center' },
+                  ]}
+                  renderRow={(o) => (
+                    <>
+                      <td>
+                        <div className="fw-medium">{o.objectiveShort}</div>
+                        <div className="small text-muted text-truncate" style={{ maxWidth: 420 }} title={o.objective}>{o.objective}</div>
+                      </td>
+                      <td className="text-center">{o.assignments}</td>
+                      <td className="text-center">{o.notStarted}</td>
+                      <td className="text-center">{o.inProgress}</td>
+                      <td className="text-center">{o.awaitingReview}</td>
+                      <td className="text-center">{o.approved}</td>
+                      <td className="text-center">{o.fillRatePct}%</td>
+                    </>
+                  )}
+                />
               </div>
             )}
 
@@ -564,39 +570,42 @@ export default function AmbassadorReportsView() {
                     </Button>
                   }
                 />
-                <div className="table-responsive">
-                  <table className="table table-sm table-hover align-middle mb-0">
-                    <thead className="table-light">
-                      <tr>
-                        <th>Outcome / output</th>
-                        <th>Objective</th>
-                        <th className="text-center">Assignments</th>
-                        <th className="text-center">Not started</th>
-                        <th className="text-center">In progress</th>
-                        <th className="text-center">Awaiting HOD</th>
-                        <th className="text-center">Approved</th>
-                        <th className="text-center">Fill %</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {summary.byOutcome.map((o) => (
-                        <tr key={o.outcomeKey}>
-                          <td>
-                            <Badge bg="light" text="dark" className="me-1">{o.outcomeType}</Badge>
-                            {o.outcomeLabel}
-                          </td>
-                          <td className="small text-muted">{o.objectiveShort}</td>
-                          <td className="text-center">{o.assignments}</td>
-                          <td className="text-center">{o.notStarted}</td>
-                          <td className="text-center">{o.inProgress}</td>
-                          <td className="text-center">{o.awaitingReview}</td>
-                          <td className="text-center">{o.approved}</td>
-                          <td className="text-center">{o.fillRatePct}%</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                <SortablePaginatedTable
+                  rows={summary.byOutcome}
+                  defaultSortKey="fillRatePct"
+                  defaultSortDir="desc"
+                  getSortValue={(o, key) => {
+                    if (key === 'outcome') return o.outcomeLabel;
+                    if (key === 'objective') return o.objectiveShort;
+                    return Number((o as Record<string, unknown>)[key] ?? 0);
+                  }}
+                  rowKey={(o) => o.outcomeKey}
+                  columns={[
+                    { key: 'outcome', label: 'Outcome / output' },
+                    { key: 'objective', label: 'Objective' },
+                    { key: 'assignments', label: 'Assignments', className: 'text-center' },
+                    { key: 'notStarted', label: 'Not started', className: 'text-center' },
+                    { key: 'inProgress', label: 'In progress', className: 'text-center' },
+                    { key: 'awaitingReview', label: 'Awaiting HOD', className: 'text-center' },
+                    { key: 'approved', label: 'Approved', className: 'text-center' },
+                    { key: 'fillRatePct', label: 'Fill %', className: 'text-center' },
+                  ]}
+                  renderRow={(o) => (
+                    <>
+                      <td>
+                        <Badge bg="light" text="dark" className="me-1">{o.outcomeType}</Badge>
+                        {o.outcomeLabel}
+                      </td>
+                      <td className="small text-muted">{o.objectiveShort}</td>
+                      <td className="text-center">{o.assignments}</td>
+                      <td className="text-center">{o.notStarted}</td>
+                      <td className="text-center">{o.inProgress}</td>
+                      <td className="text-center">{o.awaitingReview}</td>
+                      <td className="text-center">{o.approved}</td>
+                      <td className="text-center">{o.fillRatePct}%</td>
+                    </>
+                  )}
+                />
               </div>
             )}
 
@@ -616,34 +625,36 @@ export default function AmbassadorReportsView() {
                     </>
                   }
                 />
-                <div className="table-responsive">
-                  <table className="table table-sm table-hover align-middle mb-0">
-                    <thead className="table-light">
-                      <tr>
-                        <th>Department / unit</th>
-                        <th className="text-center">Pending review</th>
-                        <th className="text-center">Approved</th>
-                        <th className="text-center">Returned</th>
-                        <th className="text-center">Still in draft</th>
-                        <th className="text-center">Approval rate</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {summary.hodByDepartment.map((h) => (
-                        <tr key={h.departmentId} className={h.pendingReview > 0 ? 'table-warning' : undefined}>
-                          <td className="fw-medium">{h.departmentName}</td>
-                          <td className="text-center">
-                            {h.pendingReview > 0 ? <Badge bg="warning" text="dark">{h.pendingReview}</Badge> : 0}
-                          </td>
-                          <td className="text-center">{h.approved}</td>
-                          <td className="text-center">{h.returned}</td>
-                          <td className="text-center">{h.draft}</td>
-                          <td className="text-center">{h.approvalRatePct}%</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                <SortablePaginatedTable
+                  rows={summary.hodByDepartment}
+                  defaultSortKey="pendingReview"
+                  defaultSortDir="desc"
+                  getSortValue={(h, key) => {
+                    if (key === 'departmentName') return h.departmentName;
+                    return Number((h as Record<string, unknown>)[key] ?? 0);
+                  }}
+                  rowKey={(h) => h.departmentId}
+                  columns={[
+                    { key: 'departmentName', label: 'Department / unit' },
+                    { key: 'pendingReview', label: 'Pending review', className: 'text-center' },
+                    { key: 'approved', label: 'Approved', className: 'text-center' },
+                    { key: 'returned', label: 'Returned', className: 'text-center' },
+                    { key: 'draft', label: 'Still in draft', className: 'text-center' },
+                    { key: 'approvalRatePct', label: 'Approval rate', className: 'text-center' },
+                  ]}
+                  renderRow={(h) => (
+                    <>
+                      <td className="fw-medium">{h.departmentName}</td>
+                      <td className="text-center">
+                        {h.pendingReview > 0 ? <Badge bg="warning" text="dark">{h.pendingReview}</Badge> : 0}
+                      </td>
+                      <td className="text-center">{h.approved}</td>
+                      <td className="text-center">{h.returned}</td>
+                      <td className="text-center">{h.draft}</td>
+                      <td className="text-center">{h.approvalRatePct}%</td>
+                    </>
+                  )}
+                />
               </div>
             )}
 
@@ -665,39 +676,43 @@ export default function AmbassadorReportsView() {
                     </>
                   }
                 />
-                <div className="table-responsive">
-                  <table className="table table-sm table-hover align-middle mb-0">
-                    <thead className="table-light">
-                      <tr>
-                        <th>Department</th>
-                        <th>Ambassador</th>
-                        <th>Indicator</th>
-                        <th>Submitted</th>
-                        <th className="text-center">Days pending</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {summary.agingQueue.length === 0 ? (
-                        <tr><td colSpan={5} className="text-muted text-center py-4">No submissions currently awaiting HOD review.</td></tr>
-                      ) : summary.agingQueue.map((r) => (
-                        <tr key={`${r.indicatorId}-${r.departmentId}`} className={r.daysPending >= 7 ? 'table-warning' : undefined}>
-                          <td>{r.departmentName}</td>
-                          <td>{r.ambassadorName || '—'}</td>
-                          <td>
-                            <div className="small text-muted">{r.outcomeLabel}</div>
-                            {r.indicatorText}
-                          </td>
-                          <td className="small">{new Date(r.submittedAt).toLocaleDateString()}</td>
-                          <td className="text-center">
-                            <Badge bg={r.daysPending >= 14 ? 'danger' : r.daysPending >= 7 ? 'warning' : 'secondary'} text={r.daysPending >= 7 ? 'dark' : undefined}>
-                              {r.daysPending}d
-                            </Badge>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                <SortablePaginatedTable
+                  rows={summary.agingQueue}
+                  defaultSortKey="daysPending"
+                  defaultSortDir="desc"
+                  emptyMessage="No submissions currently awaiting HOD review."
+                  getSortValue={(r, key) => {
+                    if (key === 'departmentName') return r.departmentName;
+                    if (key === 'ambassadorName') return r.ambassadorName || '';
+                    if (key === 'indicatorText') return r.indicatorText;
+                    if (key === 'submittedAt') return r.submittedAt;
+                    return Number((r as Record<string, unknown>)[key] ?? 0);
+                  }}
+                  rowKey={(r) => `${r.indicatorId}-${r.departmentId}`}
+                  columns={[
+                    { key: 'departmentName', label: 'Department' },
+                    { key: 'ambassadorName', label: 'Ambassador' },
+                    { key: 'indicatorText', label: 'Indicator' },
+                    { key: 'submittedAt', label: 'Submitted' },
+                    { key: 'daysPending', label: 'Days pending', className: 'text-center' },
+                  ]}
+                  renderRow={(r) => (
+                    <>
+                      <td>{r.departmentName}</td>
+                      <td>{r.ambassadorName || '—'}</td>
+                      <td>
+                        <div className="small text-muted">{r.outcomeLabel}</div>
+                        {r.indicatorText}
+                      </td>
+                      <td className="small">{new Date(r.submittedAt).toLocaleDateString()}</td>
+                      <td className="text-center">
+                        <Badge bg={r.daysPending >= 14 ? 'danger' : r.daysPending >= 7 ? 'warning' : 'secondary'} text={r.daysPending >= 7 ? 'dark' : undefined}>
+                          {r.daysPending}d
+                        </Badge>
+                      </td>
+                    </>
+                  )}
+                />
               </div>
             )}
 
@@ -734,42 +749,50 @@ export default function AmbassadorReportsView() {
                     </>
                   }
                 />
-                <div className="table-responsive">
-                  <table className="table table-sm table-hover align-middle mb-0">
-                    <thead className="table-light">
-                      <tr>
-                        <th>Department</th>
-                        <th>Ambassador</th>
-                        <th>Indicator</th>
-                        <th>Progress</th>
-                        <th>HOD</th>
-                        <th>Status</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {filteredAssignments.map((a) => (
-                        <tr key={`${a.indicatorId}-${a.departmentId}`}>
-                          <td>{a.departmentName}</td>
-                          <td>{a.ambassadorName || '—'}</td>
-                          <td>
-                            <div className="small text-muted">{a.outcomeLabel}</div>
-                            <div>{a.indicatorText}</div>
-                          </td>
-                          <td>
-                            {PROGRESS_LABELS[a.progressStatus]}
-                            <div className="small text-muted">{a.filled}/{a.total} cells</div>
-                          </td>
-                          <td>{HOD_REVIEW_STATUS_LABELS[a.hodReviewStatus]}</td>
-                          <td>
-                            <Badge bg={CATEGORY_BADGE[a.reportingCategory].bg}>
-                              {CATEGORY_BADGE[a.reportingCategory].label}
-                            </Badge>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                <SortablePaginatedTable
+                  rows={filteredAssignments}
+                  defaultSortKey="filled"
+                  defaultSortDir="desc"
+                  pageSize={50}
+                  getSortValue={(a, key) => {
+                    if (key === 'departmentName') return a.departmentName;
+                    if (key === 'ambassadorName') return a.ambassadorName || '';
+                    if (key === 'indicatorText') return a.indicatorText;
+                    if (key === 'progressStatus') return a.progressStatus;
+                    if (key === 'hodReviewStatus') return a.hodReviewStatus;
+                    if (key === 'reportingCategory') return a.reportingCategory;
+                    return Number((a as Record<string, unknown>)[key] ?? 0);
+                  }}
+                  rowKey={(a) => `${a.indicatorId}-${a.departmentId}`}
+                  columns={[
+                    { key: 'departmentName', label: 'Department' },
+                    { key: 'ambassadorName', label: 'Ambassador' },
+                    { key: 'indicatorText', label: 'Indicator' },
+                    { key: 'filled', label: 'Progress', className: 'text-center' },
+                    { key: 'hodReviewStatus', label: 'HOD' },
+                    { key: 'reportingCategory', label: 'Status' },
+                  ]}
+                  renderRow={(a) => (
+                    <>
+                      <td>{a.departmentName}</td>
+                      <td>{a.ambassadorName || '—'}</td>
+                      <td>
+                        <div className="small text-muted">{a.outcomeLabel}</div>
+                        <div>{a.indicatorText}</div>
+                      </td>
+                      <td>
+                        {PROGRESS_LABELS[a.progressStatus]}
+                        <div className="small text-muted">{a.filled}/{a.total} cells</div>
+                      </td>
+                      <td>{HOD_REVIEW_STATUS_LABELS[a.hodReviewStatus]}</td>
+                      <td>
+                        <Badge bg={CATEGORY_BADGE[a.reportingCategory].bg}>
+                          {CATEGORY_BADGE[a.reportingCategory].label}
+                        </Badge>
+                      </td>
+                    </>
+                  )}
+                />
               </div>
             )}
 

@@ -278,7 +278,19 @@ function rollupDepartments(assignments: AssignmentRow[]): DepartmentRollup[] {
       fillRatePct: total > 0 ? Math.round((filled / total) * 100) : 0,
       approvalRatePct: d.assignments > 0 ? Math.round((d.approved / d.assignments) * 100) : 0,
     };
-  }).sort((a, b) => a.departmentName.localeCompare(b.departmentName));
+  }).sort((a, b) => {
+    const activity = (d: typeof a) =>
+      (d.fillRatePct > 0 ? 1 : 0)
+      + (d.approved > 0 ? 1 : 0)
+      + (d.inProgress > 0 ? 1 : 0)
+      + (d.awaitingReview > 0 ? 1 : 0)
+      + (d.completeDraft > 0 ? 1 : 0);
+    const actDiff = activity(b) - activity(a);
+    if (actDiff !== 0) return actDiff;
+    if (b.fillRatePct !== a.fillRatePct) return b.fillRatePct - a.fillRatePct;
+    if (b.approved !== a.approved) return b.approved - a.approved;
+    return a.departmentName.localeCompare(b.departmentName);
+  });
 }
 
 function rollupObjectives(assignments: AssignmentRow[]): ObjectiveRollup[] {
