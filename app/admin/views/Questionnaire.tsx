@@ -7,7 +7,7 @@ import { Modal, Button, Form, Badge } from 'react-bootstrap';
 import axios from 'axios';
 import DeleteConfirmModal from '@/components/Questionnaire/DeleteConfirmModal';
 import DepartmentUnitMultiSelect, { type DepartmentUnitOption } from '@/components/DepartmentUnitMultiSelect';
-import { getAvailableFinancialYears } from '@/lib/questionnaire/fy-utils';
+import { getAvailableFinancialYears, normalizeFinancialYear, fyShortLabel } from '@/lib/questionnaire/fy-utils';
 import { UOM_OPTIONS } from '@/lib/questionnaire/uom';
 import { CORE_OBJECTIVES_2025_2030, coreObjectiveNumber, coreObjectiveShortTitle } from '@/lib/strategic-plan';
 import { summarizeIndicatorDepartments } from '@/lib/summarize-indicator-departments';
@@ -24,12 +24,13 @@ type Outcome = {
   strategic_objective: string | null;
   indicator_count: number;
 };
-type MetricFormRow = { id?: number; metric_text: string; unit_of_measure: string };
+type MetricTarget = { financial_year: string; target_value: string | null };
+type MetricFormRow = { id?: number; metric_text: string; unit_of_measure: string; targetsByFy?: Record<string, string> };
 type Indicator = {
   id: number; outcome_id: number; indicator_text: string; is_locked: boolean;
   outcome_type: string; outcome_label: string; outcome_strategic_objective: string | null;
   created_at: string;
-  metrics: { id: number; metric_text: string; unit_of_measure: string; sort_order: number }[];
+  metrics: { id: number; metric_text: string; unit_of_measure: string; sort_order: number; targets?: MetricTarget[] }[];
   departments: { id: number; name: string }[];
   financial_years: string[];
   assigned_groups?: AmbassadorDepartmentGroup[];
@@ -48,7 +49,25 @@ type IndicatorResponse = {
 const AVAILABLE_FYS = getAvailableFinancialYears();
 
 function emptyMetricRow(): MetricFormRow {
-  return { metric_text: '', unit_of_measure: 'numeric' };
+  return { metric_text: '', unit_of_measure: 'numeric', targetsByFy: {} };
+}
+
+function metricTargetValue(
+  metric: { targets?: MetricTarget[] },
+  fy: string,
+): string | null {
+  const normalized = normalizeFinancialYear(fy);
+  const row = metric.targets?.find((t) => normalizeFinancialYear(t.financial_year) === normalized);
+  const v = row?.target_value;
+  return v != null && String(v).trim() !== '' ? String(v) : null;
+}
+
+function targetsByFyFromMetric(metric: { targets?: MetricTarget[] }): Record<string, string> {
+  const map: Record<string, string> = {};
+  for (const t of metric.targets ?? []) {
+    map[normalizeFinancialYear(t.financial_year)] = t.target_value ?? '';
+  }
+  return map;
 }
 
 function StrategicObjectiveSelect({
@@ -388,7 +407,12 @@ function TemplateModal({
         setDeptIds(expandedIds);
         setSelectedFYs([...ind.financial_years]);
         setMetrics(ind.metrics.length > 0
-          ? ind.metrics.map((m) => ({ id: m.id, metric_text: m.metric_text, unit_of_measure: m.unit_of_measure }))
+          ? ind.metrics.map((m) => ({
+            id: m.id,
+            metric_text: m.metric_text,
+            unit_of_measure: m.unit_of_measure,
+            targetsByFy: targetsByFyFromMetric(m),
+          }))
           : [emptyMetricRow()]);
 
         if (expandedIds.length !== editingIndicator.departments.length) {
@@ -403,7 +427,12 @@ function TemplateModal({
         setDeptIds(expandAmbassadorGroupSelection(baseIds, allDepartments, editingIndicator.assigned_groups));
         setSelectedFYs([...editingIndicator.financial_years]);
         setMetrics(editingIndicator.metrics.length > 0
-          ? editingIndicator.metrics.map((m) => ({ id: m.id, metric_text: m.metric_text, unit_of_measure: m.unit_of_measure }))
+          ? editingIndicator.metrics.map((m) => ({
+            id: m.id,
+            metric_text: m.metric_text,
+            unit_of_measure: m.unit_of_measure,
+            targetsByFy: targetsByFyFromMetric(m),
+          }))
           : [emptyMetricRow()]);
       } finally {
         if (!cancelled) setLoadingDetail(false);
@@ -434,6 +463,10 @@ function TemplateModal({
   const removeMetric = (i: number) => setMetrics((prev) => prev.filter((_, idx) => idx !== i));
   const updateMetric = (i: number, field: keyof MetricFormRow, val: string) =>
     setMetrics((prev) => prev.map((m, idx) => idx === i ? { ...m, [field]: val } : m));
+  const updateMetricTarget = (i: number, fy: string, val: string) =>
+    setMetrics((prev) => prev.map((m, idx) => idx === i
+      ? { ...m, targetsByFy: { ...m.targetsByFy, [fy]: val } }
+      : m));
   const moveMetric = (i: number, dir: -1 | 1) => {
     const arr = [...metrics];
     const target = i + dir;
@@ -458,7 +491,15 @@ function TemplateModal({
         indicator_text: indicatorText.trim(),
         department_ids: deptIds,
         financial_years: selectedFYs,
-        metrics: validMetrics,
+        metrics: validMetrics.map((m) => ({
+          id: m.id,
+          metric_text: m.metric_text,
+          unit_of_measure: m.unit_of_measure,
+          targets: selectedFYs.map((fy) => ({
+            financial_year: fy,
+            target_value: (m.targetsByFy?.[fy] ?? '').trim() || null,
+          })),
+        })),
       };
       if (isEditing && editingIndicator) {
         await axios.put(`/api/questionnaire/indicators/${editingIndicator.id}`, payload);
@@ -573,10 +614,13 @@ function TemplateModal({
               + Add Metric
             </Button>
           </div>
-          <p className="text-muted small mb-2" style={{ fontSize: '0.78rem' }}>List metrics in order. Set the Unit of Measure for each.</p>
+          <p className="text-muted small mb-2" style={{ fontSize: '0.78rem' }}>
+            List metrics in order. Set the Unit of Measure for each. After selecting financial years above, you can enter optional targets per year.
+          </p>
           <div className="d-flex flex-column gap-2">
             {metrics.map((m, i) => (
-              <div key={i} className="border rounded-2 p-2 bg-light bg-opacity-50 d-flex gap-2 align-items-start">
+              <div key={i} className="border rounded-2 p-2 bg-light bg-opacity-50">
+                <div className="d-flex gap-2 align-items-start">
                 <div className="bg-white border rounded-circle text-center fw-bold flex-shrink-0" style={{ width: '24px', height: '24px', lineHeight: '22px', fontSize: '0.72rem', marginTop: '4px' }}>{i + 1}</div>
                 <Form.Control
                   size="sm"
@@ -596,6 +640,25 @@ function TemplateModal({
                 </div>
                 {metrics.length > 1 && (
                   <Button size="sm" variant="outline-danger" className="flex-shrink-0 p-1" style={{ width: '28px', height: '28px', lineHeight: '1' }} onClick={() => removeMetric(i)} title="Remove">×</Button>
+                )}
+                </div>
+                {selectedFYs.length > 0 && (
+                  <div className="mt-2 ps-4 border-top pt-2">
+                    <div className="small fw-semibold text-muted mb-2">Targets per financial year <span className="fw-normal">(optional)</span></div>
+                    <div className="d-flex flex-wrap gap-2">
+                      {selectedFYs.map((fy) => (
+                        <div key={fy} style={{ minWidth: '130px', flex: '1 1 130px', maxWidth: '180px' }}>
+                          <Form.Label className="small mb-0 text-muted">{fy}</Form.Label>
+                          <Form.Control
+                            size="sm"
+                            value={m.targetsByFy?.[fy] ?? ''}
+                            onChange={(e) => updateMetricTarget(i, fy, e.target.value)}
+                            placeholder="Target"
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  </div>
                 )}
               </div>
             ))}
@@ -623,14 +686,177 @@ function TemplateModal({
 }
 
 // ────────────────────────────────────────────────────────────
+// Set targets modal (existing indicators)
+// ────────────────────────────────────────────────────────────
+function SetTargetsModal({
+  show, indicator, onHide, onSaved,
+}: {
+  show: boolean;
+  indicator: Indicator | null;
+  onHide: () => void;
+  onSaved: () => void;
+}) {
+  const [financialYears, setFinancialYears] = useState<string[]>([]);
+  const [metrics, setMetrics] = useState<Indicator['metrics']>([]);
+  const [targetsByKey, setTargetsByKey] = useState<Record<string, string>>({});
+  const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  const [success, setSuccess] = useState(false);
+
+  useEffect(() => {
+    if (!show || !indicator) return;
+    let cancelled = false;
+    setLoading(true);
+    setErr(null);
+    setSuccess(false);
+
+    (async () => {
+      try {
+        const res = await axios.get(`/api/questionnaire/indicators/${indicator.id}/targets`);
+        if (cancelled) return;
+        const fys = (res.data.financial_years ?? []) as string[];
+        const metricRows = (res.data.metrics ?? []) as Indicator['metrics'];
+        const targetRows = (res.data.targets ?? []) as { metric_id: number; financial_year: string; target_value: string | null }[];
+        const map: Record<string, string> = {};
+        for (const t of targetRows) {
+          map[`${t.metric_id}_${normalizeFinancialYear(t.financial_year)}`] = t.target_value ?? '';
+        }
+        setFinancialYears(fys);
+        setMetrics(metricRows);
+        setTargetsByKey(map);
+      } catch {
+        if (cancelled) return;
+        setFinancialYears([...indicator.financial_years]);
+        setMetrics(indicator.metrics);
+        const map: Record<string, string> = {};
+        for (const m of indicator.metrics) {
+          for (const t of m.targets ?? []) {
+            map[`${m.id}_${normalizeFinancialYear(t.financial_year)}`] = t.target_value ?? '';
+          }
+        }
+        setTargetsByKey(map);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+
+    return () => { cancelled = true; };
+  }, [show, indicator?.id]);
+
+  const setTarget = (metricId: number, fy: string, val: string) => {
+    const key = `${metricId}_${fy}`;
+    setTargetsByKey((prev) => ({ ...prev, [key]: val }));
+  };
+
+  const handleSave = async () => {
+    if (!indicator) return;
+    setSaving(true);
+    setErr(null);
+    try {
+      const targets = metrics.flatMap((m) =>
+        financialYears.map((fy) => ({
+          metric_id: m.id,
+          financial_year: fy,
+          target_value: (targetsByKey[`${m.id}_${fy}`] ?? '').trim() || null,
+        })),
+      );
+      await axios.put(`/api/questionnaire/indicators/${indicator.id}/targets`, { targets });
+      setSuccess(true);
+      onSaved();
+      window.setTimeout(() => setSuccess(false), 2000);
+    } catch (e: unknown) {
+      setErr(axios.isAxiosError(e) ? e.response?.data?.message ?? 'Save failed' : 'Save failed');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Modal show={show} onHide={onHide} size="xl" scrollable centered>
+      <Modal.Header closeButton>
+        <Modal.Title className="fs-6 fw-bold">Set targets — {indicator?.indicator_text}</Modal.Title>
+      </Modal.Header>
+      <Modal.Body>
+        {loading ? (
+          <div className="text-muted small py-3">Loading…</div>
+        ) : (
+          <>
+            {err && <div className="alert alert-danger py-2 small">{err}</div>}
+            {success && <div className="alert alert-success py-2 small">Targets saved.</div>}
+            <p className="text-muted small">
+              Enter institution targets for each metric and financial year. Ambassadors will see these when entering actual values.
+            </p>
+            {financialYears.length === 0 ? (
+              <div className="alert alert-warning py-2 small">This indicator has no financial years. Edit the indicator first.</div>
+            ) : (
+              <div className="table-responsive">
+                <table className="table table-sm table-bordered" style={{ fontSize: '0.8rem' }}>
+                  <thead className="table-dark">
+                    <tr>
+                      <th style={{ minWidth: '220px' }}>Metric</th>
+                      <th style={{ width: '110px' }}>UoM</th>
+                      {financialYears.map((fy) => (
+                        <th key={fy} className="text-center" style={{ minWidth: '120px' }}>{fy} target</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {metrics.map((m, mi) => (
+                      <tr key={m.id}>
+                        <td>
+                          <span className="fw-semibold me-1" style={{ color: 'var(--mubs-gold)' }}>{mi + 1}.</span>
+                          {m.metric_text}
+                        </td>
+                        <td>
+                          <Badge bg="light" className="text-dark border" style={{ fontSize: '0.62rem' }}>
+                            {UOM_OPTIONS.find((o) => o.value === m.unit_of_measure)?.label ?? m.unit_of_measure}
+                          </Badge>
+                        </td>
+                        {financialYears.map((fy) => (
+                          <td key={fy}>
+                            <Form.Control
+                              size="sm"
+                              value={targetsByKey[`${m.id}_${fy}`] ?? ''}
+                              onChange={(e) => setTarget(m.id, fy, e.target.value)}
+                              placeholder="Target"
+                            />
+                          </td>
+                        ))}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </>
+        )}
+      </Modal.Body>
+      <Modal.Footer>
+        <Button variant="outline-secondary" onClick={onHide} disabled={saving}>Cancel</Button>
+        <Button
+          variant="primary"
+          style={{ background: 'var(--mubs-blue)', borderColor: 'var(--mubs-blue)' }}
+          onClick={() => void handleSave()}
+          disabled={saving || loading || financialYears.length === 0}
+        >
+          {saving ? 'Saving…' : 'Save targets'}
+        </Button>
+      </Modal.Footer>
+    </Modal>
+  );
+}
+
+// ────────────────────────────────────────────────────────────
 // Indicators list
 // ────────────────────────────────────────────────────────────
 function IndicatorsPanel({
-  indicators, ambassadorCatalog, onEdit, onCreate, onRefresh,
+  indicators, ambassadorCatalog, onEdit, onSetTargets, onCreate, onRefresh,
 }: {
   indicators: Indicator[];
   ambassadorCatalog: DepartmentUnitOption[];
   onEdit: (ind: Indicator) => void;
+  onSetTargets: (ind: Indicator) => void;
   onCreate: () => void;
   onRefresh: () => void;
 }) {
@@ -949,6 +1175,9 @@ function IndicatorsPanel({
                       <Button size="sm" variant="outline-secondary" title={ind.is_locked ? 'Unlock' : 'Lock'} onClick={() => handleLock(ind)} disabled={lockingId === ind.id}>
                         <span className="material-symbols-outlined" style={{ fontSize: '14px', verticalAlign: 'middle' }}>{ind.is_locked ? 'lock_open' : 'lock'}</span>
                       </Button>
+                      <Button size="sm" variant="outline-success" title="Set targets" onClick={() => onSetTargets(ind)}>
+                        <span className="material-symbols-outlined" style={{ fontSize: '14px', verticalAlign: 'middle' }}>flag</span>
+                      </Button>
                       <Button size="sm" variant="outline-primary" title="Edit" onClick={() => onEdit(ind)}>
                         <span className="material-symbols-outlined" style={{ fontSize: '14px', verticalAlign: 'middle' }}>edit</span>
                       </Button>
@@ -991,9 +1220,14 @@ function IndicatorsPanel({
                                     <tr>
                                       <th style={{ width: '30px' }}>#</th>
                                       <th>Metric</th>
-                                      {visibleFys.map((fy) => (
-                                        <th key={fy} className="text-center" style={{ width: '90px' }}>{fy}</th>
-                                      ))}
+                                      {visibleFys.flatMap((fy) => ([
+                                        <th key={`${fy}-target`} className="text-center" style={{ width: '95px', fontSize: '0.68rem', whiteSpace: 'nowrap' }}>
+                                          {fyShortLabel(fy)} Target
+                                        </th>,
+                                        <th key={`${fy}-actual`} className="text-center" style={{ width: '95px', fontSize: '0.68rem', whiteSpace: 'nowrap' }}>
+                                          {fyShortLabel(fy)} Actual
+                                        </th>,
+                                      ]))}
                                     </tr>
                                   </thead>
                                   <tbody>
@@ -1001,17 +1235,25 @@ function IndicatorsPanel({
                                       <tr key={m.id}>
                                         <td className="text-center fw-bold" style={{ color: 'var(--mubs-gold, #C8922A)' }}>{mi + 1}</td>
                                         <td>{m.metric_text}</td>
-                                        {visibleFys.map((fy) => {
+                                        {visibleFys.flatMap((fy) => {
+                                          const target = metricTargetValue(m, fy);
                                           const val = responseValue(responses, dept.id, m.id, fy);
-                                          return (
+                                          return [
                                             <td
-                                              key={fy}
+                                              key={`${fy}-target`}
+                                              className={`text-center ${target ? 'fw-semibold' : 'text-muted'}`}
+                                              style={{ fontSize: '0.72rem', background: '#f8fafc', fontStyle: target ? 'normal' : 'italic' }}
+                                            >
+                                              {target ?? '—'}
+                                            </td>,
+                                            <td
+                                              key={`${fy}-actual`}
                                               className={`text-center ${val ? 'fw-semibold' : 'text-muted'}`}
                                               style={{ fontSize: '0.72rem', fontStyle: val ? 'normal' : 'italic' }}
                                             >
                                               {val ?? '—'}
-                                            </td>
-                                          );
+                                            </td>,
+                                          ];
                                         })}
                                       </tr>
                                     ))}
@@ -1060,6 +1302,8 @@ export default function QuestionnaireView() {
   const [allDepartments, setAllDepartments] = useState<DepartmentUnitOption[]>([]);
   const [editingIndicator, setEditingIndicator] = useState<Indicator | null>(null);
   const [showTemplateModal, setShowTemplateModal] = useState(false);
+  const [showTargetsModal, setShowTargetsModal] = useState(false);
+  const [targetsIndicator, setTargetsIndicator] = useState<Indicator | null>(null);
 
   const fetchOutcomes = useCallback(async () => {
     try { const res = await axios.get('/api/questionnaire/outcomes'); setOutcomes(res.data); } catch { /* noop */ }
@@ -1100,6 +1344,15 @@ export default function QuestionnaireView() {
     void loadDepts();
     setEditingIndicator(ind);
     setShowTemplateModal(true);
+  };
+
+  const handleSetTargets = (ind: Indicator) => {
+    setTargetsIndicator(ind);
+    setShowTargetsModal(true);
+  };
+
+  const handleTargetsSaved = () => {
+    void fetchIndicators();
   };
 
   const handleTemplateSaved = () => {
@@ -1172,6 +1425,7 @@ export default function QuestionnaireView() {
               indicators={indicators}
               ambassadorCatalog={allDepartments}
               onEdit={handleEdit}
+              onSetTargets={handleSetTargets}
               onCreate={handleCreate}
               onRefresh={() => { void fetchIndicators(); void fetchOutcomes(); }}
             />
@@ -1186,6 +1440,12 @@ export default function QuestionnaireView() {
           editingIndicator={editingIndicator}
           onSaved={handleTemplateSaved}
           onDepartmentSync={handleDepartmentSync}
+        />
+        <SetTargetsModal
+          show={showTargetsModal}
+          indicator={targetsIndicator}
+          onHide={() => { setShowTargetsModal(false); setTargetsIndicator(null); }}
+          onSaved={handleTargetsSaved}
         />
       </div>
     </Layout>

@@ -22,6 +22,13 @@ interface DashboardStats {
   inProgressActivities: number;
   pendingProposals: number;
   delayedActivities: number;
+  ambassadorAssignments?: number;
+  ambassadorNotStarted?: number;
+  ambassadorInProgress?: number;
+  ambassadorAwaitingHod?: number;
+  ambassadorApproved?: number;
+  ambassadorFillRatePct?: number;
+  ambassadorHodPendingDays?: number;
 }
 
 interface DepartmentPerformance {
@@ -139,6 +146,56 @@ export default function Dashboard() {
         </div>
       </div>
 
+      {(stats.ambassadorAssignments ?? 0) > 0 ? (
+        <>
+          <div className="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
+            <div>
+              <h6 className="fw-bold mb-0">Ambassador questionnaire reporting</h6>
+              <p className="text-muted small mb-0">Track who has started, who is waiting on HOD approval, and overall fill rate.</p>
+            </div>
+            <Link href="/admin?pg=ambassador-reports" className="btn btn-sm btn-outline-primary">
+              Open Ambassador Reports
+            </Link>
+          </div>
+          <div className="row g-4 mb-4">
+            <div className="col-12 col-sm-6 col-xl-2">
+              <Link href="/admin?pg=ambassador-reports&section=assignments&filter=not_started" className="text-decoration-none">
+                <StatCard label="Not started" value={stats.ambassadorNotStarted ?? 0} color="red" />
+              </Link>
+            </div>
+            <div className="col-12 col-sm-6 col-xl-2">
+              <Link href="/admin?pg=ambassador-reports&section=assignments&filter=in_progress" className="text-decoration-none">
+                <StatCard label="In progress" value={stats.ambassadorInProgress ?? 0} color="yellow" />
+              </Link>
+            </div>
+            <div className="col-12 col-sm-6 col-xl-2">
+              <Link href="/admin?pg=ambassador-reports&section=aging&filter=awaiting_hod" className="text-decoration-none">
+                <StatCard label="Awaiting HOD" value={stats.ambassadorAwaitingHod ?? 0} color="blue" />
+              </Link>
+            </div>
+            <div className="col-12 col-sm-6 col-xl-2">
+              <Link href="/admin?pg=ambassador-reports&section=assignments&category=completed" className="text-decoration-none">
+                <StatCard label="Approved" value={stats.ambassadorApproved ?? 0} color="green" />
+              </Link>
+            </div>
+            <div className="col-12 col-sm-6 col-xl-2">
+              <Link href="/admin?pg=ambassador-reports&section=overview" className="text-decoration-none">
+                <StatCard label="Fill rate" value={`${stats.ambassadorFillRatePct ?? 0}%`} color="green" />
+              </Link>
+            </div>
+            <div className="col-12 col-sm-6 col-xl-2">
+              <Link href="/admin?pg=ambassador-reports&section=aging" className="text-decoration-none">
+                <StatCard
+                  label="Avg HOD wait"
+                  value={(stats.ambassadorHodPendingDays ?? 0) > 0 ? `${stats.ambassadorHodPendingDays}d` : '—'}
+                  color="yellow"
+                />
+              </Link>
+            </div>
+          </div>
+        </>
+      ) : null}
+
       {/* Quick Actions (Staff-style) */}
       <div className="row g-3 mb-4">
         <div className="col-12 col-sm-6 col-xl-3">
@@ -174,6 +231,25 @@ export default function Dashboard() {
               <div className="min-w-0">
                 <div className="fw-black text-dark text-truncate" style={{ fontSize: '.95rem', lineHeight: 1.25, whiteSpace: 'nowrap' }}>Users</div>
                 <div className="text-muted small text-truncate" style={{ fontSize: '.78rem', whiteSpace: 'nowrap' }}>Manage roles & access</div>
+              </div>
+            </div>
+          </Link>
+        </div>
+
+        <div className="col-12 col-sm-6 col-xl-3">
+          <Link href="/admin?pg=ambassador-reports" className="text-decoration-none h-100">
+            <div
+              className="quick-action-card p-3 d-flex align-items-center gap-2 gap-sm-3 bg-white border rounded-4 shadow-sm h-100"
+              style={{ transition: 'all 0.2s', cursor: 'pointer', minHeight: '92px' }}
+              onMouseOver={(e) => { (e.currentTarget as HTMLDivElement).style.transform = 'translateY(-4px)'; (e.currentTarget as HTMLDivElement).style.boxShadow = '0 12px 24px rgba(0,0,0,0.1)'; }}
+              onMouseOut={(e) => { (e.currentTarget as HTMLDivElement).style.transform = 'translateY(0)'; (e.currentTarget as HTMLDivElement).style.boxShadow = '0 4px 12px rgba(0,0,0,0.05)'; }}
+            >
+              <div className="icon-box d-flex align-items-center justify-content-center flex-shrink-0" style={{ width: '48px', height: '48px', borderRadius: '14px', background: 'rgba(124, 58, 237, 0.1)' }}>
+                <span className="material-symbols-outlined" style={{ color: '#7c3aed', fontSize: '22px' }}>monitoring</span>
+              </div>
+              <div className="min-w-0">
+                <div className="fw-black text-dark text-truncate" style={{ fontSize: '.95rem', lineHeight: 1.25, whiteSpace: 'nowrap' }}>Ambassador Reports</div>
+                <div className="text-muted small text-truncate" style={{ fontSize: '.78rem', whiteSpace: 'nowrap' }}>Progress & HOD approvals</div>
               </div>
             </div>
           </Link>

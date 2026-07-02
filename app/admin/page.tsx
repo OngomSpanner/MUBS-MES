@@ -1,6 +1,7 @@
 import StrategicView from './views/Strategic';
 import UsersView from './views/Users';
 import ReportsView from './views/Reports';
+import AmbassadorReportsView from './views/AmbassadorReports';
 import AdminDashboardView from './views/Dashboard';
 import QuestionnaireView from './views/Questionnaire';
 import PortalSettingsView from './views/PortalSettings';
@@ -26,6 +27,8 @@ export default async function AdminDashboard({ searchParams }: AdminPageProps) {
       return <UsersView />;
     case 'reports':
       return <ReportsView />;
+    case 'ambassador-reports':
+      return <AmbassadorReportsView />;
     case 'questionnaire':
       return <QuestionnaireView />;
     case 'settings': {

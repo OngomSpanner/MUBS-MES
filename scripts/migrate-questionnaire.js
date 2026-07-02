@@ -67,6 +67,26 @@ async function migrate() {
       FOREIGN KEY (metric_id) REFERENCES q_metrics(id) ON DELETE RESTRICT,
       FOREIGN KEY (department_id) REFERENCES departments(id) ON DELETE RESTRICT
     )`,
+
+    `CREATE TABLE IF NOT EXISTS q_metric_comments (
+      metric_id INT NOT NULL,
+      department_id INT NOT NULL,
+      indicator_id INT NOT NULL,
+      comment TEXT NULL,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      PRIMARY KEY (metric_id, department_id),
+      KEY idx_qmc_indicator_dept (indicator_id, department_id)
+    )`,
+
+    `CREATE TABLE IF NOT EXISTS q_metric_fy_targets (
+      metric_id INT NOT NULL,
+      financial_year VARCHAR(20) NOT NULL,
+      indicator_id INT NOT NULL,
+      target_value TEXT NULL,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      PRIMARY KEY (metric_id, financial_year),
+      KEY idx_qmft_indicator (indicator_id)
+    )`,
   ];
 
   try {

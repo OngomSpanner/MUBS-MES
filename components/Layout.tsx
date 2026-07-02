@@ -59,6 +59,7 @@ function LayoutContent({ children, sidebarOpen, setSidebarOpen }: any) {
       'change-requests': 'Ambassador Proposals',
       'users': 'User Management',
       'reports': 'Reports & Analytics',
+      'ambassador-reports': 'Ambassador Reports',
       'questionnaire': 'Questionnaire Templates',
       'settings': 'Settings',
       'reporting': 'Unit Reporting',

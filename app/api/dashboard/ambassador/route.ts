@@ -12,6 +12,7 @@ import { fyLabelForDateJulyJune } from '@/lib/financial-year';
 import { summarizeEnrollmentIndicators } from '@/lib/enrollment-indicators';
 import { isHrManagedUnit } from '@/lib/ambassador/hr-unit';
 import { isSchoolRegistrarManagedUnit } from '@/lib/ambassador/school-registrar';
+import { getAmbassadorQuestionnaireProgress } from '@/lib/ambassador/questionnaire-progress';
 import {
   MAIN_STRATEGIC_ACTIVITY_FILTER,
   RESULTS_FRAMEWORK_KPI_FILTER,
@@ -63,6 +64,22 @@ export async function GET() {
         enrollment: null,
         financialYear: fyLabelForDateJulyJune(),
         subUnits: [],
+        questionnaireProgress: {
+          totals: {
+            assignments: 0,
+            notStarted: 0,
+            inProgress: 0,
+            completeDraft: 0,
+            awaitingReview: 0,
+            approved: 0,
+            needsRevision: 0,
+            fillRatePct: 0,
+            approvalRatePct: 0,
+          },
+          byOutcome: [],
+          priorityAssignments: [],
+          insights: [],
+        },
       });
     }
 
@@ -111,6 +128,7 @@ export async function GET() {
       isSchoolRegistrarManagedUnit(managedUnitId, managedUnitName),
     ]);
     const enrollment = canManageEnrollment ? await summarizeEnrollmentIndicators() : null;
+    const questionnaireProgress = await getAmbassadorQuestionnaireProgress(managedUnitId);
 
     return NextResponse.json({
       managedUnitName,
@@ -145,6 +163,7 @@ export async function GET() {
         progress: Math.min(100, Math.max(0, Number(u.progress || 0))),
         activityCount: Number(u.activityCount || 0),
       })),
+      questionnaireProgress,
     });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Unknown error';

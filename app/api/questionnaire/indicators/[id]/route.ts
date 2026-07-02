@@ -11,6 +11,13 @@ import {
   refreshIndicatorAssignedGroupFlags,
   syncIndicatorDepartmentGroups,
 } from '@/lib/questionnaire/sync-indicator-groups';
+import {
+  attachTargetsToMetrics,
+  ensureMetricTargetsSchema,
+  loadIndicatorTargets,
+  saveIndicatorTargets,
+  type MetricTargetInput,
+} from '@/lib/questionnaire-metric-targets';
 
 export const dynamic = 'force-dynamic';
 
@@ -40,6 +47,7 @@ export async function GET(_request: Request, context: { params: Promise<{ id: st
     }
 
     await ensureQuestionnaireObjectiveSchema();
+    await ensureMetricTargetsSchema();
     const catalog = await fetchDepartmentsWithAmbassador(true);
     await syncIndicatorDepartmentGroups(indicatorId, catalog);
 
@@ -76,12 +84,16 @@ export async function GET(_request: Request, context: { params: Promise<{ id: st
     }) as { financial_year: string }[];
 
     const assignedGroups = await getIndicatorAssignedGroups(indicatorId);
+    const targets = await loadIndicatorTargets(indicatorId);
 
     return NextResponse.json({
       ...ind,
       id: indicatorId,
       is_locked: Boolean(ind.is_locked),
-      metrics: metrics.map((m) => ({ ...m, id: Number(m.id) })),
+      metrics: attachTargetsToMetrics(
+        metrics.map((m) => ({ ...m, id: Number(m.id) })),
+        targets,
+      ),
       departments: departments.map((d) => ({ id: Number(d.id), name: d.name })),
       financial_years: financialYears.map((f) => normalizeFinancialYear(f.financial_year)),
       assigned_groups: assignedGroups,
@@ -102,7 +114,12 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
     const outcomeId = Number(body.outcome_id);
     const departmentIds: number[] = Array.isArray(body.department_ids) ? body.department_ids.map(Number).filter((n: number) => Number.isFinite(n) && n > 0) : [];
     const financialYears: string[] = Array.isArray(body.financial_years) ? body.financial_years.filter((s: unknown) => typeof s === 'string' && (s as string).trim()) : [];
-    const metrics: { id?: number; metric_text: string; unit_of_measure: string }[] = Array.isArray(body.metrics) ? body.metrics : [];
+    const metrics: {
+      id?: number;
+      metric_text: string;
+      unit_of_measure: string;
+      targets?: { financial_year: string; target_value?: string | null }[];
+    }[] = Array.isArray(body.metrics) ? body.metrics : [];
 
     if (!indicatorText) return NextResponse.json({ message: 'indicator_text is required' }, { status: 400 });
     if (!outcomeId) return NextResponse.json({ message: 'outcome_id is required' }, { status: 400 });
@@ -110,6 +127,8 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
     if (financialYears.length === 0) return NextResponse.json({ message: 'At least one financial year is required' }, { status: 400 });
     const validMetrics = metrics.filter((m) => typeof m.metric_text === 'string' && m.metric_text.trim());
     if (validMetrics.length === 0) return NextResponse.json({ message: 'At least one metric is required' }, { status: 400 });
+
+    await ensureMetricTargetsSchema();
 
     await query({ query: 'UPDATE q_indicators SET outcome_id=?, indicator_text=? WHERE id=?', values: [outcomeId, indicatorText, id] });
 
@@ -138,15 +157,30 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
       }
     }
     // Update or insert metrics
+    const targetEntries: MetricTargetInput[] = [];
     for (let i = 0; i < validMetrics.length; i++) {
       const m = validMetrics[i];
       const uom = m.unit_of_measure || 'numeric';
+      let metricId: number;
       if (m.id && existingIds.has(m.id)) {
+        metricId = m.id;
         await query({ query: 'UPDATE q_metrics SET metric_text=?, unit_of_measure=?, sort_order=? WHERE id=?', values: [m.metric_text.trim(), uom, i, m.id] });
       } else {
-        await query({ query: 'INSERT INTO q_metrics (indicator_id, metric_text, unit_of_measure, sort_order) VALUES (?, ?, ?, ?)', values: [id, m.metric_text.trim(), uom, i] });
+        const insertResult = await query({
+          query: 'INSERT INTO q_metrics (indicator_id, metric_text, unit_of_measure, sort_order) VALUES (?, ?, ?, ?)',
+          values: [id, m.metric_text.trim(), uom, i],
+        }) as { insertId: number };
+        metricId = insertResult.insertId;
+      }
+      for (const t of m.targets ?? []) {
+        targetEntries.push({
+          metric_id: metricId,
+          financial_year: t.financial_year,
+          target_value: t.target_value,
+        });
       }
     }
+    await saveIndicatorTargets(Number(id), financialYears, targetEntries);
 
     const catalog = await fetchDepartmentsWithAmbassador(true);
     await refreshIndicatorAssignedGroupFlags(Number(id), departmentIds, catalog);
@@ -173,6 +207,7 @@ export async function DELETE(request: Request, context: { params: Promise<{ id: 
     }
     // Delete responses first, then metrics, then junctions, then indicator
     await query({ query: 'DELETE FROM q_responses WHERE indicator_id=?', values: [id] });
+    await query({ query: 'DELETE FROM q_metric_fy_targets WHERE indicator_id=?', values: [id] });
     await query({ query: 'DELETE FROM q_metrics WHERE indicator_id=?', values: [id] });
     await query({ query: 'DELETE FROM q_indicator_departments WHERE indicator_id=?', values: [id] });
     await query({ query: 'DELETE FROM q_indicator_fys WHERE indicator_id=?', values: [id] });

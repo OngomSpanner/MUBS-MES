@@ -2,8 +2,11 @@ import { query } from '@/lib/db';
 
 export type NotificationEventType =
   | 'indicator_submitted'
+  | 'indicator_submit_confirmed'
   | 'indicator_approved'
-  | 'indicator_returned';
+  | 'indicator_approved_admin'
+  | 'indicator_returned'
+  | 'indicator_reminder';
 
 export type NotificationChannel = 'in_app' | 'email';
 export type NotificationDeliveryStatus = 'sent' | 'failed' | 'skipped';
@@ -24,6 +27,9 @@ export type IndicatorNotificationPayload = {
   notificationType: 'info' | 'success' | 'warning' | 'danger';
   actionUrl: string;
   emailSubject?: string;
+  indicatorCount?: number;
+  auto?: boolean;
+  approvedIndicators?: { indicatorText: string; departmentName: string }[];
 };
 
 export type NotificationDeliveryAdminRow = {
@@ -238,6 +244,8 @@ export function eventTypeLabel(eventType: NotificationEventType): string {
       return 'Indicator approved';
     case 'indicator_returned':
       return 'Indicator returned';
+    case 'indicator_reminder':
+      return 'Reporting reminder';
     default:
       return eventType;
   }

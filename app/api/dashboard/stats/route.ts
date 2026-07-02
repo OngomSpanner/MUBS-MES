@@ -16,6 +16,7 @@ import {
   summarizeResultsFramework,
   type ResultsFrameworkDbRow,
 } from '@/lib/results-framework-query';
+import { getAmbassadorReportsSummary } from '@/lib/admin/ambassador-reports-aggregate';
 
 export async function GET() {
   try {
@@ -146,6 +147,7 @@ export async function GET() {
       values: [fyKey],
     })) as ResultsFrameworkDbRow[];
     const rfSummary = summarizeResultsFramework(mapResultsFrameworkRows(rfRows, fyKey));
+    const ambassadorReporting = await getAmbassadorReportsSummary();
 
     return NextResponse.json({
       stats: {
@@ -171,6 +173,13 @@ export async function GET() {
         rfAchievement: rfSummary.achievement,
         rfOverachievement: rfSummary.overachievement,
         rfNarrativesMissing: rfSummary.narrativesMissing,
+        ambassadorAssignments: ambassadorReporting.totals.assignments,
+        ambassadorNotStarted: ambassadorReporting.totals.notStarted,
+        ambassadorInProgress: ambassadorReporting.totals.inProgress,
+        ambassadorAwaitingHod: ambassadorReporting.totals.awaitingReview,
+        ambassadorApproved: ambassadorReporting.totals.approved,
+        ambassadorFillRatePct: ambassadorReporting.totals.fillRatePct,
+        ambassadorHodPendingDays: ambassadorReporting.totals.avgHodPendingDays,
       },
       enrollment,
       rfSummary,

@@ -3,6 +3,11 @@ import { query } from '@/lib/db';
 import { requireAmbassador } from '@/lib/ambassador/context';
 import { ensureHodReviewWorkflowSchema } from '@/lib/hod-review-workflow';
 import { ensureQuestionnaireObjectiveSchema } from '@/lib/questionnaire-schema';
+import {
+  attachTargetsToMetrics,
+  ensureMetricTargetsSchema,
+  loadIndicatorTargets,
+} from '@/lib/questionnaire-metric-targets';
 
 export const dynamic = 'force-dynamic';
 
@@ -14,6 +19,7 @@ export async function GET(request: Request) {
 
   await ensureHodReviewWorkflowSchema();
   await ensureQuestionnaireObjectiveSchema();
+  await ensureMetricTargetsSchema();
 
   const url = new URL(request.url);
   const fyFilter = url.searchParams.get('fy') || 'all';
@@ -70,6 +76,11 @@ export async function GET(request: Request) {
     submissionRows.map((s) => [s.indicator_id, s])
   );
 
+  const targetsByIndicator = new Map<number, Awaited<ReturnType<typeof loadIndicatorTargets>>>();
+  for (const indicatorId of indicatorIds) {
+    targetsByIndicator.set(indicatorId, await loadIndicatorTargets(indicatorId));
+  }
+
   const metricsMap = new Map<number, any[]>();
   for (const m of metrics) {
     if (!metricsMap.has(m.indicator_id)) metricsMap.set(m.indicator_id, []);
@@ -110,7 +121,7 @@ export async function GET(request: Request) {
       return {
         ...ind,
         is_locked: Boolean(ind.is_locked),
-        metrics: indMetrics,
+        metrics: attachTargetsToMetrics(indMetrics, targetsByIndicator.get(ind.id) ?? []),
         financial_years: indFys,
         status,
         filled,

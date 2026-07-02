@@ -4,7 +4,12 @@ import { verifyToken } from '@/lib/auth';
 import { getVisibleDepartmentIds, inPlaceholders } from '@/lib/department-head';
 import { query } from '@/lib/db';
 import { ensureHodReviewWorkflowSchema } from '@/lib/hod-review-workflow';
-import { notifyAmbassadorOfIndicatorReview } from '@/lib/questionnaire-submission-notifications';
+import { ensureMetricCommentsSchema } from '@/lib/questionnaire-metric-comments';
+import {
+  ensureMetricTargetsSchema,
+  loadIndicatorTargets,
+} from '@/lib/questionnaire-metric-targets';
+import { notifyAmbassadorOfIndicatorReview, notifyAdminsOfIndicatorApprovals } from '@/lib/questionnaire-submission-notifications';
 
 export const dynamic = 'force-dynamic';
 
@@ -26,6 +31,8 @@ export async function GET(request: Request) {
     const auth = await authReviewer();
     if ('error' in auth) return auth.error;
     await ensureHodReviewWorkflowSchema();
+    await ensureMetricCommentsSchema();
+    await ensureMetricTargetsSchema();
 
     const url = new URL(request.url);
     const indicatorId = Number(url.searchParams.get('indicatorId'));
@@ -54,6 +61,14 @@ export async function GET(request: Request) {
         values: [indicatorId, departmentId],
       })) as { metric_id: number; financial_year: string; value: string | null }[];
 
+      const metricComments = (await query({
+        query: `SELECT metric_id, comment FROM q_metric_comments
+                WHERE indicator_id = ? AND department_id = ?`,
+        values: [indicatorId, departmentId],
+      })) as { metric_id: number; comment: string | null }[];
+
+      const targets = await loadIndicatorTargets(indicatorId);
+
       const submission = (await query({
         query: `SELECT qis.hod_review_status, qis.hod_review_comment, qis.hod_reviewed_at,
                        ru.full_name AS reviewed_by_name
@@ -72,6 +87,8 @@ export async function GET(request: Request) {
         metrics,
         financial_years: financialYears.map((r) => r.financial_year),
         responses,
+        metric_comments: metricComments,
+        targets,
         hod_review_status: submission[0]?.hod_review_status ?? null,
         hod_review_comment: submission[0]?.hod_review_comment ?? null,
         hod_reviewed_at: submission[0]?.hod_reviewed_at ?? null,
@@ -135,6 +152,8 @@ export async function PATCH(request: Request) {
     const auth = await authReviewer();
     if ('error' in auth) return auth.error;
     await ensureHodReviewWorkflowSchema();
+    await ensureMetricCommentsSchema();
+    await ensureMetricTargetsSchema();
 
     const body = await request.json();
     const indicatorId = Number(body.indicatorId);
@@ -178,6 +197,12 @@ export async function PATCH(request: Request) {
         reviewerUserId: auth.userId,
         action: action as 'approve' | 'return',
         comment: comment || null,
+      });
+    }
+    if (action === 'approve') {
+      void notifyAdminsOfIndicatorApprovals({
+        items: [{ indicatorId, departmentId }],
+        reviewerUserId: auth.userId,
       });
     }
 

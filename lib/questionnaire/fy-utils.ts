@@ -50,3 +50,11 @@ export function normalizeFinancialYear(fy: string): string {
   }
   return s;
 }
+
+/** Short FY display label, e.g. 2024/2025 → 2024/25 */
+export function fyShortLabel(fy: string): string {
+  const normalized = normalizeFinancialYear(fy);
+  const m = normalized.match(/^(\d{4})\/(\d{4})$/);
+  if (!m) return normalized;
+  return `${m[1]}/${m[2].slice(-2)}`;
+}
