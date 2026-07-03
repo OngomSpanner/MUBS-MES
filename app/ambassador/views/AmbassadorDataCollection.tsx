@@ -5,16 +5,16 @@ import { Modal, Button, Form, Badge, Spinner } from 'react-bootstrap';
 import axios from 'axios';
 import StatCard from '@/components/StatCard';
 import { uomLabel, validateMetricValue, uomPlaceholder } from '@/lib/questionnaire/uom';
-import { normalizeFinancialYear, fyShortLabel } from '@/lib/questionnaire/fy-utils';
+import { fyShortLabel } from '@/lib/questionnaire/fy-utils';
 import { METRIC_ENTRY_TABLE, uomTableLabel } from '@/lib/questionnaire/metric-entry-table-layout';
 import { HOD_REVIEW_STATUS_LABELS, HOD_UNIT_HEAD_LABEL, type HodReviewStatus } from '@/lib/hod-review-workflow-constants';
+import { IndicatorFyTargetGroup, type IndicatorTarget } from '@/components/Questionnaire/IndicatorTargetUI';
 
 type Metric = {
   id: number;
   metric_text: string;
   unit_of_measure: string;
   sort_order: number;
-  targets?: { financial_year: string; target_value: string | null }[];
 };
 type Indicator = {
   id: number;
@@ -23,6 +23,7 @@ type Indicator = {
   outcome_type: string;
   outcome_label: string;
   metrics: Metric[];
+  targets?: IndicatorTarget[];
   financial_years: string[];
   status: 'not-started' | 'partial' | 'complete';
   filled: number;
@@ -52,13 +53,6 @@ const FILTER_TABS: { key: IndicatorFilter; label: string }[] = [
   { key: 'completed', label: 'Completed' },
   { key: 'needs-revision', label: 'Needs revision' },
 ];
-
-function metricTargetValue(metric: Metric, fy: string): string | null {
-  const normalized = normalizeFinancialYear(fy);
-  const row = metric.targets?.find((t) => normalizeFinancialYear(t.financial_year) === normalized);
-  const v = row?.target_value;
-  return v != null && String(v).trim() !== '' ? String(v) : null;
-}
 
 function isSubmissionReadOnly(ind: Indicator): boolean {
   return ind.is_locked || ind.hod_review_status === 'submitted' || ind.hod_review_status === 'approved';
@@ -729,11 +723,12 @@ export default function AmbassadorDataCollection() {
                 </Modal.Title>
               </Modal.Header>
               <Modal.Body>
-                <div className="mb-3 small text-muted d-flex gap-2 flex-wrap align-items-center">
+                <div className="mb-3 small d-flex flex-wrap gap-1 align-items-center">
                   <Badge bg="light" className="text-dark border">{entryIndicator.department_name}</Badge>
-                  {entryIndicator.financial_years.map((fy) => (
-                    <Badge key={fy} bg="primary" style={{ background: 'var(--mubs-blue)' }}>{fy}</Badge>
-                  ))}
+                  <IndicatorFyTargetGroup
+                    financialYears={entryIndicator.financial_years}
+                    targets={entryIndicator.targets}
+                  />
                   {entryIndicator.hod_review_status && entryIndicator.hod_review_status !== 'draft' ? (
                     <Badge
                       bg={entryIndicator.hod_review_status === 'approved' ? 'success' : 'warning'}
@@ -779,8 +774,7 @@ export default function AmbassadorDataCollection() {
                 )}
 
                 <p className="small text-muted mb-2">
-                  <span className="fw-semibold text-dark">Target</span> columns show goals set by management.
-                  Enter your office&apos;s <span className="fw-semibold text-dark">actual</span> figures in the Actual columns.
+                  Indicator targets are shown above for each financial year. Enter your office&apos;s figures in the table below.
                 </p>
 
                 <div className="table-responsive">
@@ -788,34 +782,24 @@ export default function AmbassadorDataCollection() {
                     <colgroup>
                       <col />
                       <col style={METRIC_ENTRY_TABLE.col.unit} />
-                      {entryIndicator.financial_years.flatMap((fy) => ([
-                        <col key={`${fy}-target`} style={METRIC_ENTRY_TABLE.col.target} />,
-                        <col key={`${fy}-actual`} style={METRIC_ENTRY_TABLE.col.actual} />,
-                      ]))}
+                      {entryIndicator.financial_years.map((fy) => (
+                        <col key={`${fy}-actual`} style={METRIC_ENTRY_TABLE.col.actual} />
+                      ))}
                       <col style={METRIC_ENTRY_TABLE.col.comment} />
                     </colgroup>
                     <thead className="table-dark">
                       <tr>
                         <th style={METRIC_ENTRY_TABLE.th.metric}>Performance Metric</th>
                         <th className="text-center" style={METRIC_ENTRY_TABLE.th.unit}>UNIT</th>
-                        {entryIndicator.financial_years.flatMap((fy) => ([
-                          <th
-                            key={`${fy}-target`}
-                            className="text-center"
-                            style={{ ...METRIC_ENTRY_TABLE.th.fy, ...METRIC_ENTRY_TABLE.th.target }}
-                          >
-                            {fyShortLabel(fy)}
-                            <div className="fw-normal opacity-75" style={METRIC_ENTRY_TABLE.th.fySub}>Target</div>
-                          </th>,
+                        {entryIndicator.financial_years.map((fy) => (
                           <th
                             key={`${fy}-actual`}
                             className="text-center"
                             style={{ ...METRIC_ENTRY_TABLE.th.fy, ...METRIC_ENTRY_TABLE.th.actual }}
                           >
                             {fyShortLabel(fy)}
-                            <div className="fw-normal opacity-75" style={METRIC_ENTRY_TABLE.th.fySub}>Actual</div>
-                          </th>,
-                        ]))}
+                          </th>
+                        ))}
                         <th style={METRIC_ENTRY_TABLE.th.comment}>
                           Comment <span className="fw-normal opacity-75">(optional)</span>
                         </th>
@@ -833,21 +817,13 @@ export default function AmbassadorDataCollection() {
                               {uomTableLabel(m.unit_of_measure)}
                             </Badge>
                           </td>
-                          {entryIndicator.financial_years.flatMap((fy) => {
+                          {entryIndicator.financial_years.map((fy) => {
                             const key = `${m.id}_${fy}`;
                             const val = responses[key] ?? '';
                             const err = validationErrors[key];
                             const isMissing = missingFields.has(key);
                             const displayVal = val.trim() || null;
-                            const targetVal = metricTargetValue(m, fy);
-                            return [
-                              <td key={`${fy}-target`} style={METRIC_ENTRY_TABLE.td.target}>
-                                {targetVal ? (
-                                  <span className="fw-semibold text-secondary">{targetVal}</span>
-                                ) : (
-                                  <span className="text-muted" style={{ fontStyle: 'italic' }}>—</span>
-                                )}
-                              </td>,
+                            return (
                               <td
                                 key={`${fy}-actual`}
                                 style={{
@@ -885,8 +861,8 @@ export default function AmbassadorDataCollection() {
                                     )}
                                   </>
                                 )}
-                              </td>,
-                            ];
+                              </td>
+                            );
                           })}
                           <td style={METRIC_ENTRY_TABLE.td.comment}>
                             {readOnly ? (

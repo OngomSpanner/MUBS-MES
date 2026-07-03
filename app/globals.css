@@ -1073,6 +1073,62 @@ body {
   margin: 0.75rem auto;
 }
 
+.modal-indicator-targets.modal-dialog {
+  max-width: min(36rem, calc(100vw - 1.5rem));
+  margin: 0.75rem auto;
+}
+
+/* Compact FY + target badges (display) */
+.indicator-fy-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.15rem;
+  padding: 0.18rem 0.45rem;
+  border-radius: 4px;
+  font-size: 0.62rem;
+  font-weight: 600;
+  line-height: 1.2;
+  background: var(--mubs-blue);
+  color: #fff;
+  white-space: nowrap;
+}
+
+.indicator-fy-badge--static {
+  flex-shrink: 0;
+  min-width: 5.5rem;
+  justify-content: center;
+}
+
+.indicator-fy-badge__target {
+  font-weight: 600;
+}
+
+.indicator-fy-badge__target-label {
+  color: var(--mubs-yellow, #ffcd00);
+  font-weight: 700;
+}
+
+/* Compact target inputs (edit) */
+.indicator-target-inputs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1rem;
+}
+
+.indicator-target-inputs__row {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex: 1 1 12rem;
+  max-width: 16rem;
+}
+
+.indicator-target-inputs__row .form-control {
+  font-size: 0.8rem;
+  min-width: 0;
+}
+
+
 /* Modals: stat-card style (all modals match stat card) */
 .modal-content {
   background: #fff;

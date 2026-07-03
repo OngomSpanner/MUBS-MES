@@ -6,6 +6,7 @@ import { Badge, Button, Form, Modal, Spinner } from 'react-bootstrap';
 import { normalizeFinancialYear, fyShortLabel } from '@/lib/questionnaire/fy-utils';
 import { METRIC_ENTRY_TABLE, uomTableLabel } from '@/lib/questionnaire/metric-entry-table-layout';
 import { HOD_REVIEW_STATUS_LABELS, HOD_UNIT_HEAD_LABEL, type HodReviewStatus } from '@/lib/hod-review-workflow-constants';
+import { IndicatorFyTargetGroup, type IndicatorTarget } from '@/components/Questionnaire/IndicatorTargetUI';
 
 type Submission = {
   indicator_id: number;
@@ -38,7 +39,7 @@ type SubmissionDetail = {
   financial_years: string[];
   responses: { metric_id: number; financial_year: string; value: string | null }[];
   metric_comments?: { metric_id: number; comment: string | null }[];
-  targets?: { metric_id: number; financial_year: string; target_value: string | null }[];
+  targets?: IndicatorTarget[];
   hod_review_status: HodReviewStatus | null;
   hod_review_comment: string | null;
   hod_reviewed_at: string | null;
@@ -98,19 +99,6 @@ function responseValue(
   return v != null && String(v).trim() !== '' ? String(v) : null;
 }
 
-function metricTargetValue(
-  targets: SubmissionDetail['targets'],
-  metricId: number,
-  fy: string,
-): string | null {
-  const normalized = normalizeFinancialYear(fy);
-  const row = targets?.find(
-    (t) => t.metric_id === metricId && normalizeFinancialYear(t.financial_year) === normalized,
-  );
-  const v = row?.target_value;
-  return v != null && String(v).trim() !== '' ? String(v) : null;
-}
-
 function metricCommentValue(
   comments: SubmissionDetail['metric_comments'],
   metricId: number,
@@ -131,34 +119,24 @@ function SubmissionDataTable({ detail }: { detail: SubmissionDetail }) {
         <colgroup>
           <col />
           <col style={METRIC_ENTRY_TABLE.col.unit} />
-          {detail.financial_years.flatMap((fy) => ([
-            <col key={`${fy}-target`} style={METRIC_ENTRY_TABLE.col.target} />,
-            <col key={`${fy}-actual`} style={METRIC_ENTRY_TABLE.col.actual} />,
-          ]))}
+          {detail.financial_years.map((fy) => (
+            <col key={`${fy}-actual`} style={METRIC_ENTRY_TABLE.col.actual} />
+          ))}
           <col style={METRIC_ENTRY_TABLE.col.comment} />
         </colgroup>
         <thead className="table-dark">
           <tr>
             <th style={METRIC_ENTRY_TABLE.th.metric}>Performance Metric</th>
             <th className="text-center" style={METRIC_ENTRY_TABLE.th.unit}>UNIT</th>
-            {detail.financial_years.flatMap((fy) => ([
-              <th
-                key={`${fy}-target`}
-                className="text-center"
-                style={{ ...METRIC_ENTRY_TABLE.th.fy, ...METRIC_ENTRY_TABLE.th.target }}
-              >
-                {fyShortLabel(fy)}
-                <div className="fw-normal opacity-75" style={METRIC_ENTRY_TABLE.th.fySub}>Target</div>
-              </th>,
+            {detail.financial_years.map((fy) => (
               <th
                 key={`${fy}-actual`}
                 className="text-center"
                 style={{ ...METRIC_ENTRY_TABLE.th.fy, ...METRIC_ENTRY_TABLE.th.actual }}
               >
                 {fyShortLabel(fy)}
-                <div className="fw-normal opacity-75" style={METRIC_ENTRY_TABLE.th.fySub}>Actual</div>
-              </th>,
-            ]))}
+              </th>
+            ))}
             <th style={METRIC_ENTRY_TABLE.th.comment}>Comment</th>
           </tr>
         </thead>
@@ -174,17 +152,9 @@ function SubmissionDataTable({ detail }: { detail: SubmissionDetail }) {
                   {uomTableLabel(m.unit_of_measure)}
                 </Badge>
               </td>
-              {detail.financial_years.flatMap((fy) => {
-                const target = metricTargetValue(detail.targets, m.id, fy);
+              {detail.financial_years.map((fy) => {
                 const val = responseValue(detail.responses, m.id, fy);
-                return [
-                  <td key={`${fy}-target`} style={METRIC_ENTRY_TABLE.td.target}>
-                    {target ? (
-                      <span className="fw-semibold text-secondary">{target}</span>
-                    ) : (
-                      <span className="text-muted" style={{ fontStyle: 'italic' }}>—</span>
-                    )}
-                  </td>,
+                return (
                   <td
                     key={`${fy}-actual`}
                     className={`${val ? 'fw-semibold' : 'text-muted'}`}
@@ -197,8 +167,8 @@ function SubmissionDataTable({ detail }: { detail: SubmissionDetail }) {
                     }}
                   >
                     {val ?? '—'}
-                  </td>,
-                ];
+                  </td>
+                );
               })}
               <td
                 className={metricCommentValue(detail.metric_comments, m.id) ? '' : 'text-muted'}
@@ -344,6 +314,8 @@ export default function HodQuestionnaireSubmissionsTab() {
         metrics: res.data.metrics ?? [],
         financial_years: res.data.financial_years ?? [],
         responses: res.data.responses ?? [],
+        metric_comments: res.data.metric_comments ?? [],
+        targets: res.data.targets ?? [],
         hod_review_status: res.data.hod_review_status ?? submission.hod_review_status,
         hod_review_comment: res.data.hod_review_comment ?? null,
         hod_reviewed_at: res.data.hod_reviewed_at ?? null,
@@ -666,6 +638,15 @@ export default function HodQuestionnaireSubmissionsTab() {
               <div className="text-muted fw-bold text-uppercase mb-2" style={{ fontSize: '0.65rem', letterSpacing: '0.04em' }}>
                 Submitted data
               </div>
+
+              {detail && detail.financial_years.length > 0 ? (
+                <div className="mb-2 d-flex flex-wrap gap-1">
+                  <IndicatorFyTargetGroup
+                    financialYears={detail.financial_years}
+                    targets={detail.targets}
+                  />
+                </div>
+              ) : null}
 
               {detailLoading ? (
                 <div className="text-center py-4">

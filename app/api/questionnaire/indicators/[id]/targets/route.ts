@@ -5,10 +5,10 @@ import { query } from '@/lib/db';
 import { canManageStrategicStandards } from '@/lib/role-routing';
 import { normalizeFinancialYear } from '@/lib/questionnaire/fy-utils';
 import {
-  ensureMetricTargetsSchema,
+  ensureIndicatorTargetsSchema,
   loadIndicatorTargets,
   saveIndicatorTargets,
-  type MetricTargetInput,
+  type IndicatorTargetInput,
 } from '@/lib/questionnaire-metric-targets';
 
 export const dynamic = 'force-dynamic';
@@ -71,9 +71,9 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
       return NextResponse.json({ message: 'Invalid indicator id' }, { status: 400 });
     }
 
-    await ensureMetricTargetsSchema();
+    await ensureIndicatorTargetsSchema();
     const body = await request.json();
-    const entries: MetricTargetInput[] = Array.isArray(body.targets) ? body.targets : [];
+    const entries: IndicatorTargetInput[] = Array.isArray(body.targets) ? body.targets : [];
 
     const financialYears = (await query({
       query: 'SELECT financial_year FROM q_indicator_fys WHERE indicator_id = ?',

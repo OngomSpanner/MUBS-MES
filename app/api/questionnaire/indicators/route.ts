@@ -11,11 +11,10 @@ import {
   syncIndicatorDepartmentGroups,
 } from '@/lib/questionnaire/sync-indicator-groups';
 import {
-  attachTargetsToMetrics,
-  ensureMetricTargetsSchema,
+  ensureIndicatorTargetsSchema,
   loadIndicatorTargets,
   saveIndicatorTargets,
-  type MetricTargetInput,
+  type IndicatorTargetInput,
 } from '@/lib/questionnaire-metric-targets';
 
 export const dynamic = 'force-dynamic';
@@ -37,7 +36,7 @@ export async function GET() {
     if (!verifyToken(token)) return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
 
     await ensureQuestionnaireObjectiveSchema();
-    await ensureMetricTargetsSchema();
+    await ensureIndicatorTargetsSchema();
     const catalog = await fetchDepartmentsWithAmbassador(true);
     const indicatorRows = await query({
       query: `SELECT i.id, i.outcome_id, i.indicator_text, i.is_locked, i.created_at,
@@ -101,7 +100,8 @@ export async function GET() {
         ...ind,
         id,
         is_locked: Boolean(ind.is_locked),
-        metrics: attachTargetsToMetrics(rawMetrics, targetsByIndicator.get(id) ?? []),
+        metrics: rawMetrics,
+        targets: targetsByIndicator.get(id) ?? [],
         departments: deptsMap.get(id) ?? [],
         financial_years: fysMap.get(id) ?? [],
       };
@@ -122,11 +122,8 @@ export async function POST(request: Request) {
     const indicatorText = typeof body.indicator_text === 'string' ? body.indicator_text.trim() : '';
     const departmentIds: number[] = Array.isArray(body.department_ids) ? body.department_ids.map(Number).filter((n: number) => Number.isFinite(n) && n > 0) : [];
     const financialYears: string[] = Array.isArray(body.financial_years) ? body.financial_years.filter((s: unknown) => typeof s === 'string' && (s as string).trim()) : [];
-    const metrics: {
-      metric_text: string;
-      unit_of_measure: string;
-      targets?: { financial_year: string; target_value?: string | null }[];
-    }[] = Array.isArray(body.metrics) ? body.metrics : [];
+    const metrics: { metric_text: string; unit_of_measure: string }[] = Array.isArray(body.metrics) ? body.metrics : [];
+    const indicatorTargets: IndicatorTargetInput[] = Array.isArray(body.targets) ? body.targets : [];
 
     if (!outcomeId) return NextResponse.json({ message: 'outcome_id is required' }, { status: 400 });
     if (!indicatorText) return NextResponse.json({ message: 'indicator_text is required' }, { status: 400 });
@@ -147,25 +144,16 @@ export async function POST(request: Request) {
     for (const fy of financialYears) {
       await query({ query: 'INSERT IGNORE INTO q_indicator_fys (indicator_id, financial_year) VALUES (?, ?)', values: [indicatorId, fy] });
     }
-    await ensureMetricTargetsSchema();
-    const targetEntries: MetricTargetInput[] = [];
+    await ensureIndicatorTargetsSchema();
     for (let i = 0; i < validMetrics.length; i++) {
       const uom = validMetrics[i].unit_of_measure || 'numeric';
-      const insertResult = await query({
+      await query({
         query: 'INSERT INTO q_metrics (indicator_id, metric_text, unit_of_measure, sort_order) VALUES (?, ?, ?, ?)',
         values: [indicatorId, validMetrics[i].metric_text.trim(), uom, i],
-      }) as { insertId: number };
-      const metricId = insertResult.insertId;
-      for (const t of validMetrics[i].targets ?? []) {
-        targetEntries.push({
-          metric_id: metricId,
-          financial_year: t.financial_year,
-          target_value: t.target_value,
-        });
-      }
+      });
     }
-    if (targetEntries.length > 0) {
-      await saveIndicatorTargets(indicatorId, financialYears, targetEntries);
+    if (indicatorTargets.length > 0) {
+      await saveIndicatorTargets(indicatorId, financialYears, indicatorTargets);
     }
 
     const catalog = await fetchDepartmentsWithAmbassador(true);

@@ -4,8 +4,7 @@ import { requireAmbassador } from '@/lib/ambassador/context';
 import { ensureHodReviewWorkflowSchema } from '@/lib/hod-review-workflow';
 import { ensureQuestionnaireObjectiveSchema } from '@/lib/questionnaire-schema';
 import {
-  attachTargetsToMetrics,
-  ensureMetricTargetsSchema,
+  ensureIndicatorTargetsSchema,
   loadIndicatorTargets,
 } from '@/lib/questionnaire-metric-targets';
 
@@ -19,7 +18,7 @@ export async function GET(request: Request) {
 
   await ensureHodReviewWorkflowSchema();
   await ensureQuestionnaireObjectiveSchema();
-  await ensureMetricTargetsSchema();
+  await ensureIndicatorTargetsSchema();
 
   const url = new URL(request.url);
   const fyFilter = url.searchParams.get('fy') || 'all';
@@ -121,7 +120,8 @@ export async function GET(request: Request) {
       return {
         ...ind,
         is_locked: Boolean(ind.is_locked),
-        metrics: attachTargetsToMetrics(indMetrics, targetsByIndicator.get(ind.id) ?? []),
+        metrics: indMetrics,
+        targets: targetsByIndicator.get(ind.id) ?? [],
         financial_years: indFys,
         status,
         filled,

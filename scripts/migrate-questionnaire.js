@@ -78,6 +78,14 @@ async function migrate() {
       KEY idx_qmc_indicator_dept (indicator_id, department_id)
     )`,
 
+    `CREATE TABLE IF NOT EXISTS q_indicator_fy_targets (
+      indicator_id INT NOT NULL,
+      financial_year VARCHAR(20) NOT NULL,
+      target_value TEXT NULL,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      PRIMARY KEY (indicator_id, financial_year)
+    )`,
+
     `CREATE TABLE IF NOT EXISTS q_metric_fy_targets (
       metric_id INT NOT NULL,
       financial_year VARCHAR(20) NOT NULL,

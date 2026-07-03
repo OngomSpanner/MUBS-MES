@@ -10,7 +10,7 @@ import { HOD_UNIT_HEAD_LABEL } from '@/lib/hod-review-workflow-constants';
 import { notifyHodsOfIndicatorSubmission } from '@/lib/questionnaire-submission-notifications';
 import { ensureMetricCommentsSchema } from '@/lib/questionnaire-metric-comments';
 import {
-  ensureMetricTargetsSchema,
+  ensureIndicatorTargetsSchema,
   loadIndicatorTargets,
 } from '@/lib/questionnaire-metric-targets';
 
@@ -58,7 +58,7 @@ export async function GET(request: Request) {
   if ('error' in auth) return auth.error;
 
   await ensureMetricCommentsSchema();
-  await ensureMetricTargetsSchema();
+  await ensureIndicatorTargetsSchema();
 
   const url = new URL(request.url);
   const indicatorId = url.searchParams.get('indicator_id');

@@ -6,7 +6,7 @@ import { query } from '@/lib/db';
 import { ensureHodReviewWorkflowSchema } from '@/lib/hod-review-workflow';
 import { ensureMetricCommentsSchema } from '@/lib/questionnaire-metric-comments';
 import {
-  ensureMetricTargetsSchema,
+  ensureIndicatorTargetsSchema,
   loadIndicatorTargets,
 } from '@/lib/questionnaire-metric-targets';
 import { notifyAmbassadorOfIndicatorReview, notifyAdminsOfIndicatorApprovals } from '@/lib/questionnaire-submission-notifications';
@@ -32,7 +32,7 @@ export async function GET(request: Request) {
     if ('error' in auth) return auth.error;
     await ensureHodReviewWorkflowSchema();
     await ensureMetricCommentsSchema();
-    await ensureMetricTargetsSchema();
+    await ensureIndicatorTargetsSchema();
 
     const url = new URL(request.url);
     const indicatorId = Number(url.searchParams.get('indicatorId'));
@@ -153,7 +153,7 @@ export async function PATCH(request: Request) {
     if ('error' in auth) return auth.error;
     await ensureHodReviewWorkflowSchema();
     await ensureMetricCommentsSchema();
-    await ensureMetricTargetsSchema();
+    await ensureIndicatorTargetsSchema();
 
     const body = await request.json();
     const indicatorId = Number(body.indicatorId);
