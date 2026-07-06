@@ -1,7 +1,14 @@
-import { query } from '@/lib/db';
+import {
+  appWeekday,
+  autoReminderBatchRanToday,
+  markAutoReminderBatchComplete,
+  tryAcquireAutoReminderBatch,
+} from '@/lib/ambassador-reminder-run-log';
 import { sendAmbassadorReportReminders, type ReminderAudience } from '@/lib/ambassador-report-reminders';
 
 const AUTO_AUDIENCES: ReminderAudience[] = ['not_started', 'in_progress', 'ready_to_submit'];
+
+let running = false;
 
 function isAutoRemindersEnabled(): boolean {
   const v = String(process.env.AMBASSADOR_AUTO_REMINDERS_ENABLED || 'true').toLowerCase();
@@ -18,18 +25,6 @@ function hodAgingThresholdDays(): number {
   return Number.isFinite(raw) && raw >= 1 ? raw : 7;
 }
 
-async function autoRemindersRanToday(): Promise<boolean> {
-  const rows = (await query({
-    query: `
-      SELECT COUNT(*) AS c FROM notification_deliveries
-      WHERE event_type = 'indicator_reminder'
-        AND payload_json LIKE '%"auto":true%'
-        AND DATE(sent_at) = CURDATE()
-    `,
-  })) as { c: number }[];
-  return Number(rows[0]?.c ?? 0) > 0;
-}
-
 export type AutoReminderRunResult = {
   ran: boolean;
   reason?: string;
@@ -42,25 +37,44 @@ export async function tryRunAmbassadorAutoReminders(force = false): Promise<Auto
     return { ran: false, reason: 'Auto reminders disabled (AMBASSADOR_AUTO_REMINDERS_ENABLED)' };
   }
 
-  const now = new Date();
-  if (!force && now.getDay() !== configuredWeekday()) {
+  if (running) {
+    return { ran: false, reason: 'Auto reminders already running' };
+  }
+
+  if (!force && appWeekday() !== configuredWeekday()) {
     return { ran: false, reason: `Not reminder weekday (configured: ${configuredWeekday()})` };
   }
 
-  if (!force && (await autoRemindersRanToday())) {
+  if (!force && (await autoReminderBatchRanToday())) {
     return { ran: false, reason: 'Auto reminders already sent today' };
   }
 
-  const results: Awaited<ReturnType<typeof sendAmbassadorReportReminders>>[] = [];
-
-  for (const audience of AUTO_AUDIENCES) {
-    results.push(await sendAmbassadorReportReminders(audience, { auto: true }));
+  if (!force) {
+    const acquired = await tryAcquireAutoReminderBatch();
+    if (!acquired) {
+      return { ran: false, reason: 'Auto reminders already sent today' };
+    }
   }
 
-  const hodMinDays = hodAgingThresholdDays();
-  results.push(await sendAmbassadorReportReminders('hod_pending', { auto: true, hodMinDays }));
+  running = true;
+  try {
+    const results: Awaited<ReturnType<typeof sendAmbassadorReportReminders>>[] = [];
 
-  return { ran: true, results };
+    for (const audience of AUTO_AUDIENCES) {
+      results.push(await sendAmbassadorReportReminders(audience, { auto: true }));
+    }
+
+    const hodMinDays = hodAgingThresholdDays();
+    results.push(await sendAmbassadorReportReminders('hod_pending', { auto: true, hodMinDays }));
+
+    if (!force) {
+      await markAutoReminderBatchComplete();
+    }
+
+    return { ran: true, results };
+  } finally {
+    running = false;
+  }
 }
 
 export function triggerAmbassadorAutoRemindersInBackground(force = false): void {
