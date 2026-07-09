@@ -102,15 +102,37 @@ export default function ReportsView() {
             if (dateTo) params.append('to', dateTo);
 
             const { data } = await axios.get(`/api/reports?${params.toString()}`);
-            const rows: DepartmentSummary[] = (data.data as any[]).map(r => ({
-                department: r.department,
+            const rawRows: DepartmentSummary[] = (data.data as any[]).map(r => ({
+                department: String(r.department || '').trim(),
                 total: Number(r.total_activities),
                 completed: Number(r.completed),
                 inProgress: Number(r.in_progress),
                 delayed: Number(r.delayed_cnt),
                 progress: Number(r.avg_progress),
                 score: getScore(Number(r.avg_progress))
-            }));
+            })).filter((r) => r.department);
+
+            // Defensive: some report queries can return duplicate department rows.
+            // Merge by department name so each unit appears once.
+            const merged = new Map<string, DepartmentSummary>();
+            for (const r of rawRows) {
+                const key = r.department.toLowerCase();
+                const existing = merged.get(key);
+                if (!existing) {
+                    merged.set(key, { ...r });
+                    continue;
+                }
+                const total = (existing.total || 0) + (r.total || 0);
+                const completed = (existing.completed || 0) + (r.completed || 0);
+                const inProgress = (existing.inProgress || 0) + (r.inProgress || 0);
+                const delayed = (existing.delayed || 0) + (r.delayed || 0);
+                const progress = total > 0
+                    ? Math.round(((completed + inProgress) / total) * 100)
+                    : Math.max(existing.progress || 0, r.progress || 0);
+                merged.set(key, { ...existing, total, completed, inProgress, delayed, progress, score: getScore(progress) });
+            }
+
+            const rows = Array.from(merged.values()).sort((a, b) => a.department.localeCompare(b.department));
             setUnitSummaries(rows);
         } catch (err) {
             console.error('activity-summary error', err);

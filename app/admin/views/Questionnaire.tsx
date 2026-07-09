@@ -19,6 +19,13 @@ import { CORE_OBJECTIVES_2025_2030, coreObjectiveNumber, coreObjectiveShortTitle
 import { summarizeIndicatorDepartments } from '@/lib/summarize-indicator-departments';
 import { expandAmbassadorGroupSelection } from '@/lib/expand-ambassador-group-selection';
 import type { AmbassadorDepartmentGroup } from '@/lib/department-ambassador-groups';
+import { MUBS_CAMPUS_PRESETS, parseBulkSubMetricLines } from '@/lib/questionnaire/metric-tree';
+import {
+  buildMetricDisplayRows,
+  canAutoSumTotal,
+  subMetricLetter,
+  sumSubMetricValues,
+} from '@/lib/questionnaire/metric-tree';
 
 // ────────────────────────────────────────────────────────────
 // Types
@@ -30,12 +37,29 @@ type Outcome = {
   strategic_objective: string | null;
   indicator_count: number;
 };
-type MetricFormRow = { id?: number; metric_text: string; unit_of_measure: string };
+type MetricFormRow = {
+  id?: number;
+  client_id: string;
+  parent_metric_id?: number | null;
+  parent_client_id?: string | null;
+  metric_text: string;
+  unit_of_measure: string;
+  aggregation?: string | null;
+  is_total?: boolean;
+};
 type Indicator = {
   id: number; outcome_id: number; indicator_text: string; is_locked: boolean;
   outcome_type: string; outcome_label: string; outcome_strategic_objective: string | null;
   created_at: string;
-  metrics: { id: number; metric_text: string; unit_of_measure: string; sort_order: number }[];
+  metrics: {
+    id: number;
+    metric_text: string;
+    unit_of_measure: string;
+    parent_metric_id?: number | null;
+    aggregation?: string | null;
+    is_total?: boolean | number;
+    sort_order: number;
+  }[];
   targets?: IndicatorTarget[];
   departments: { id: number; name: string }[];
   financial_years: string[];
@@ -55,7 +79,15 @@ type IndicatorResponse = {
 const AVAILABLE_FYS = getAvailableFinancialYears();
 
 function emptyMetricRow(): MetricFormRow {
-  return { metric_text: '', unit_of_measure: 'numeric' };
+  return {
+    client_id: `tmp-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+    parent_metric_id: null,
+    parent_client_id: null,
+    metric_text: '',
+    unit_of_measure: 'numeric',
+    aggregation: null,
+    is_total: false,
+  };
 }
 
 function targetsByFyFromIndicator(targets: IndicatorTarget[] | undefined): Record<string, string> {
@@ -375,8 +407,51 @@ function TemplateModal({
   const [loadingDetail, setLoadingDetail] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+  const [bulkParentClientId, setBulkParentClientId] = useState<string | null>(null);
+  const [bulkText, setBulkText] = useState('');
+  const [bulkSource, setBulkSource] = useState<'programmes' | 'campuses' | 'faculties' | 'manual'>('programmes');
+  const [bulkLoading, setBulkLoading] = useState(false);
+  const [bulkSearch, setBulkSearch] = useState('');
+  const [bulkItems, setBulkItems] = useState<{ id: number; name: string; meta?: string }[]>([]);
+  const [bulkSelectedIds, setBulkSelectedIds] = useState<Set<number>>(new Set());
+  const [deptOverridePrompt, setDeptOverridePrompt] = useState<null | { items: { department_id: number; department_name: string; response_count: number }[] }>(null);
 
   const isEditing = Boolean(editingIndicator);
+
+  const loadBulkItems = useCallback(async (source: typeof bulkSource) => {
+    setBulkLoading(true);
+    try {
+      if (source === 'programmes') {
+        const res = await axios.get('/api/reference/programmes');
+        const items = (Array.isArray(res.data) ? res.data : []).map((r: any) => ({
+          id: Number(r.id),
+          name: String(r.name || '').trim(),
+          meta: String(r.level || '').trim(),
+        })).filter((r: any) => Number.isFinite(r.id) && r.id > 0 && r.name);
+        setBulkItems(items);
+      } else if (source === 'campuses') {
+        const res = await axios.get('/api/reference/campuses');
+        const items = (Array.isArray(res.data) ? res.data : []).map((r: any) => ({
+          id: Number(r.id),
+          name: String(r.name || '').trim(),
+        })).filter((r: any) => Number.isFinite(r.id) && r.id > 0 && r.name);
+        setBulkItems(items);
+      } else if (source === 'faculties') {
+        const res = await axios.get('/api/reference/faculties');
+        const items = (Array.isArray(res.data) ? res.data : []).map((r: any) => ({
+          id: Number(r.id),
+          name: String(r.name || '').trim(),
+        })).filter((r: any) => Number.isFinite(r.id) && r.id > 0 && r.name);
+        setBulkItems(items);
+      } else {
+        setBulkItems([]);
+      }
+    } catch {
+      setBulkItems([]);
+    } finally {
+      setBulkLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
     if (!show) return;
@@ -404,13 +479,22 @@ function TemplateModal({
         setDeptIds(expandedIds);
         setSelectedFYs([...ind.financial_years]);
         setTargetsByFy(targetsByFyFromIndicator(ind.targets));
-        setMetrics(ind.metrics.length > 0
-          ? ind.metrics.map((m) => ({
-            id: m.id,
-            metric_text: m.metric_text,
-            unit_of_measure: m.unit_of_measure,
-          }))
-          : [emptyMetricRow()]);
+        const rows: MetricFormRow[] =
+          ind.metrics.length > 0
+            ? ind.metrics
+              .filter((m) => !(m.is_total === true || m.is_total === 1))
+              .map((m) => ({
+              id: m.id,
+              client_id: `m-${m.id}`,
+              parent_metric_id: m.parent_metric_id != null ? Number(m.parent_metric_id) : null,
+              parent_client_id: m.parent_metric_id != null ? `m-${Number(m.parent_metric_id)}` : null,
+              metric_text: m.metric_text,
+              unit_of_measure: m.unit_of_measure,
+              aggregation: m.aggregation != null ? String(m.aggregation) : null,
+              is_total: m.is_total === true || m.is_total === 1,
+            }))
+            : [emptyMetricRow()];
+        setMetrics(rows);
 
         if (expandedIds.length !== editingIndicator.departments.length) {
           onDepartmentSync?.();
@@ -424,13 +508,22 @@ function TemplateModal({
         setDeptIds(expandAmbassadorGroupSelection(baseIds, allDepartments, editingIndicator.assigned_groups));
         setSelectedFYs([...editingIndicator.financial_years]);
         setTargetsByFy(targetsByFyFromIndicator(editingIndicator.targets));
-        setMetrics(editingIndicator.metrics.length > 0
-          ? editingIndicator.metrics.map((m) => ({
-            id: m.id,
-            metric_text: m.metric_text,
-            unit_of_measure: m.unit_of_measure,
-          }))
-          : [emptyMetricRow()]);
+        const rows: MetricFormRow[] =
+          editingIndicator.metrics.length > 0
+            ? editingIndicator.metrics
+              .filter((m) => !(m.is_total === true || m.is_total === 1))
+              .map((m) => ({
+              id: m.id,
+              client_id: `m-${m.id}`,
+              parent_metric_id: m.parent_metric_id != null ? Number(m.parent_metric_id) : null,
+              parent_client_id: m.parent_metric_id != null ? `m-${Number(m.parent_metric_id)}` : null,
+              metric_text: m.metric_text,
+              unit_of_measure: m.unit_of_measure,
+              aggregation: m.aggregation != null ? String(m.aggregation) : null,
+              is_total: m.is_total === true || m.is_total === 1,
+            }))
+            : [emptyMetricRow()];
+        setMetrics(rows);
       } finally {
         if (!cancelled) setLoadingDetail(false);
       }
@@ -440,13 +533,18 @@ function TemplateModal({
   }, [show, editingIndicator?.id, allDepartments, onDepartmentSync]);
 
   useEffect(() => {
-    if (!show || !isEditing || deptIds.length === 0 || allDepartments.length === 0) return;
-    setDeptIds((prev) => {
-      const expanded = expandAmbassadorGroupSelection(prev, allDepartments, subscribedGroups);
-      if (expanded.length === prev.length && expanded.every((id) => prev.includes(id))) return prev;
-      return expanded;
-    });
-  }, [show, isEditing, allDepartments, subscribedGroups]);
+    if (!bulkParentClientId) return;
+    // Default to programmes when opening.
+    setBulkSource('programmes');
+    setBulkSearch('');
+    setBulkSelectedIds(new Set());
+    setBulkText('');
+    void loadBulkItems('programmes');
+  }, [bulkParentClientId, loadBulkItems]);
+
+  // NOTE: previously we auto-expanded departments from group flags.
+  // This prevented admins from removing units (e.g. Outreach Centres) because the list re-expanded after saving.
+  // Now we leave the selection as-is and let the backend re-compute group flags.
 
   function resetForm() {
     setOutcomeId(''); setIndicatorText(''); setDeptIds([]); setSubscribedGroups([]);
@@ -467,17 +565,142 @@ function TemplateModal({
     });
 
   const addMetric = () => setMetrics((prev) => [...prev, emptyMetricRow()]);
-  const removeMetric = (i: number) => setMetrics((prev) => prev.filter((_, idx) => idx !== i));
-  const updateMetric = (i: number, field: keyof MetricFormRow, val: string) =>
-    setMetrics((prev) => prev.map((m, idx) => idx === i ? { ...m, [field]: val } : m));
+
+  function childrenOf(parentClientId: string, list: MetricFormRow[]): MetricFormRow[] {
+    return list.filter((m) => (m.parent_client_id ?? null) === parentClientId);
+  }
+
+  function isParentRow(row: MetricFormRow): boolean {
+    return !row.parent_client_id;
+  }
+
+  const addSubMetric = (parentClientId: string) => {
+    setMetrics((prev) => {
+      const next = [...prev];
+      const parentIdx = next.findIndex((m) => m.client_id === parentClientId);
+      if (parentIdx < 0) return prev;
+      const existingChildren = childrenOf(parentClientId, next);
+      const insertAt = parentIdx + 1 + existingChildren.length;
+      const child = emptyMetricRow();
+      child.parent_client_id = parentClientId;
+      child.parent_metric_id = next[parentIdx].id ?? null;
+      child.unit_of_measure = next[parentIdx].unit_of_measure;
+      next.splice(insertAt, 0, child);
+      return next;
+    });
+  };
+
+  const addBulkSubMetrics = (parentClientId: string, lines: string[]) => {
+    const names = parseBulkSubMetricLines(lines.join('\n'));
+    if (!names.length) return;
+    setMetrics((prev) => {
+      const next = [...prev];
+      const parentIdx = next.findIndex((m) => m.client_id === parentClientId);
+      if (parentIdx < 0) return prev;
+      const parent = next[parentIdx];
+      const existingChildren = childrenOf(parentClientId, next);
+      let insertAt = parentIdx + 1 + existingChildren.length;
+      for (const name of names) {
+        const child = emptyMetricRow();
+        child.parent_client_id = parentClientId;
+        child.parent_metric_id = parent.id ?? null;
+        child.unit_of_measure = parent.unit_of_measure;
+        child.metric_text = name;
+        next.splice(insertAt, 0, child);
+        insertAt += 1;
+      }
+      return next;
+    });
+  };
+
+  const removeMetric = (clientId: string) => {
+    setMetrics((prev) => {
+      const target = prev.find((m) => m.client_id === clientId);
+      if (!target) return prev;
+      // If removing a parent, remove its children too.
+      if (isParentRow(target)) {
+        return prev.filter((m) => m.client_id !== clientId && m.parent_client_id !== clientId);
+      }
+      return prev.filter((m) => m.client_id !== clientId);
+    });
+  };
+
+  const updateMetric = (clientId: string, field: keyof MetricFormRow, val: string) =>
+    setMetrics((prev) => {
+      const next = prev.map((m) => (m.client_id === clientId ? { ...m, [field]: val } : m));
+      const updated = next.find((m) => m.client_id === clientId);
+      if (!updated) return next;
+
+      // Keep children (including Total) UoM aligned to parent.
+      if (!updated.parent_client_id && field === 'unit_of_measure') {
+        for (let i = 0; i < next.length; i++) {
+          if (next[i].parent_client_id === updated.client_id) {
+            next[i] = { ...next[i], unit_of_measure: val };
+          }
+        }
+      }
+      return next;
+    });
   const updateIndicatorTarget = (fy: string, val: string) =>
     setTargetsByFy((prev) => ({ ...prev, [fy]: val }));
-  const moveMetric = (i: number, dir: -1 | 1) => {
-    const arr = [...metrics];
-    const target = i + dir;
-    if (target < 0 || target >= arr.length) return;
-    [arr[i], arr[target]] = [arr[target], arr[i]];
-    setMetrics(arr);
+
+  const moveMetric = (clientId: string, dir: -1 | 1) => {
+    setMetrics((prev) => {
+      const idx = prev.findIndex((m) => m.client_id === clientId);
+      if (idx < 0) return prev;
+      const row = prev[idx];
+      const next = [...prev];
+
+      // Parent move: move with its children as a block
+      if (isParentRow(row)) {
+        const block = [row, ...childrenOf(row.client_id, next)];
+        const start = idx;
+        const end = idx + block.length - 1;
+        const targetStart = dir === -1 ? start - 1 : end + 1;
+        if (dir === -1) {
+          if (start === 0) return prev;
+          // swap with the previous block start (find previous parent)
+          const prevParentIdx = (() => {
+            for (let i = start - 1; i >= 0; i--) if (isParentRow(next[i])) return i;
+            return -1;
+          })();
+          if (prevParentIdx < 0) return prev;
+          const prevBlock = [next[prevParentIdx], ...childrenOf(next[prevParentIdx].client_id, next)];
+          const before = next.slice(0, prevParentIdx);
+          const middle = next.slice(prevParentIdx + prevBlock.length, start);
+          const after = next.slice(end + 1);
+          return [...before, ...block, ...middle, ...prevBlock, ...after];
+        }
+        if (dir === 1) {
+          // swap with next block (next parent after this block)
+          const nextParentIdx = (() => {
+            for (let i = end + 1; i < next.length; i++) if (isParentRow(next[i])) return i;
+            return -1;
+          })();
+          if (nextParentIdx < 0) return prev;
+          const nextBlock = [next[nextParentIdx], ...childrenOf(next[nextParentIdx].client_id, next)];
+          const before = next.slice(0, start);
+          const middle = next.slice(end + 1, nextParentIdx);
+          const after = next.slice(nextParentIdx + nextBlock.length);
+          return [...before, ...nextBlock, ...middle, ...block, ...after];
+        }
+        return prev;
+      }
+
+      // Child move: only within same parent group
+      const parentId = row.parent_client_id;
+      if (!parentId) return prev;
+      const siblings = prev.filter((m) => m.parent_client_id === parentId);
+      const sIdx = siblings.findIndex((m) => m.client_id === clientId);
+      const sTarget = sIdx + dir;
+      if (sIdx < 0 || sTarget < 0 || sTarget >= siblings.length) return prev;
+      const a = siblings[sIdx];
+      const b = siblings[sTarget];
+      const aIdx = prev.findIndex((m) => m.client_id === a.client_id);
+      const bIdx = prev.findIndex((m) => m.client_id === b.client_id);
+      [next[aIdx], next[bIdx]] = [next[bIdx], next[aIdx]];
+      return next;
+    });
   };
 
   const handleSave = async () => {
@@ -486,31 +709,39 @@ function TemplateModal({
     if (!indicatorText.trim()) return setErr('Performance indicator text is required.');
     if (deptIds.length === 0) return setErr('Select at least one department.');
     if (selectedFYs.length === 0) return setErr('Select at least one financial year.');
-    const validMetrics = metrics.filter((m) => m.metric_text.trim());
+    const validMetrics = metrics
+      .filter((m) => m.metric_text.trim() && !m.is_total);
     if (validMetrics.length === 0) return setErr('Add at least one performance metric.');
 
     setSaving(true);
-    try {
+    const attemptSave = async (override_remove_departments: boolean) => {
       const payload = {
         outcome_id: Number(outcomeId),
         indicator_text: indicatorText.trim(),
         department_ids: deptIds,
         financial_years: selectedFYs,
+        override_remove_departments,
         targets: selectedFYs.map((fy) => ({
           financial_year: fy,
           target_value: (targetsByFy[fy] ?? '').trim() || null,
         })),
         metrics: validMetrics.map((m) => ({
           id: m.id,
+          client_id: m.client_id,
+          parent_metric_id: m.parent_metric_id ?? null,
+          parent_client_id: m.parent_client_id ?? null,
           metric_text: m.metric_text,
           unit_of_measure: m.unit_of_measure,
+          aggregation: m.aggregation ?? null,
+          is_total: Boolean(m.is_total),
         })),
       };
-      if (isEditing && editingIndicator) {
-        await axios.put(`/api/questionnaire/indicators/${editingIndicator.id}`, payload);
-      } else {
-        await axios.post('/api/questionnaire/indicators', payload);
-      }
+      if (isEditing && editingIndicator) return axios.put(`/api/questionnaire/indicators/${editingIndicator.id}`, payload);
+      return axios.post('/api/questionnaire/indicators', payload);
+    };
+
+    try {
+      await attemptSave(false);
       setSuccess(true);
       onSaved();
       if (!isEditing) {
@@ -518,11 +749,16 @@ function TemplateModal({
         setTimeout(() => setSuccess(false), 1500);
       }
     } catch (e: unknown) {
+      if (axios.isAxiosError(e) && e.response?.status === 409 && e.response?.data?.requires_confirmation) {
+        setDeptOverridePrompt({ items: e.response.data.removed_offices_with_data ?? [] });
+        return;
+      }
       setErr(axios.isAxiosError(e) ? e.response?.data?.message ?? 'Save failed' : 'Save failed');
     } finally { setSaving(false); }
   };
 
   return (
+    <>
     <Modal show={show} onHide={onHide} size="xl" scrollable centered className="modal-questionnaire-template">
       <Modal.Header closeButton className="py-2">
         <Modal.Title className="fs-6 fw-bold">
@@ -621,35 +857,127 @@ function TemplateModal({
             </Button>
           </div>
           <p className="text-muted small mb-2" style={{ fontSize: '0.78rem' }}>
-            List metrics in order and set the unit of measure for each. Targets are set per indicator above, not per metric.
+            Add sub-metrics under a parent metric for programmes, campuses, or other breakdowns. Use <strong>Bulk add</strong> to paste many names at once (one per line). Numeric/currency parents auto-sum sub-metrics in data entry.
           </p>
           <div className="d-flex flex-column gap-2">
-            {metrics.map((m, i) => (
-              <div key={i} className="border rounded-2 p-2 bg-light bg-opacity-50">
-                <div className="d-flex gap-2 align-items-start">
-                <div className="bg-white border rounded-circle text-center fw-bold flex-shrink-0" style={{ width: '24px', height: '24px', lineHeight: '22px', fontSize: '0.72rem', marginTop: '4px' }}>{i + 1}</div>
-                <Form.Control
-                  size="sm"
-                  as="textarea"
-                  rows={2}
-                  className="flex-grow-1"
-                  value={m.metric_text}
-                  onChange={(e) => updateMetric(i, 'metric_text', e.target.value)}
-                  placeholder="Metric description…"
-                />
-                <Form.Select size="sm" value={m.unit_of_measure} onChange={(e) => updateMetric(i, 'unit_of_measure', e.target.value)} style={{ width: '140px', flexShrink: 0 }}>
-                  {UOM_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-                </Form.Select>
-                <div className="d-flex flex-column gap-1 flex-shrink-0">
-                  <button type="button" className="btn btn-outline-secondary btn-sm p-0" style={{ width: '24px', height: '24px', lineHeight: '1' }} onClick={() => moveMetric(i, -1)} disabled={i === 0} title="Move up">▲</button>
-                  <button type="button" className="btn btn-outline-secondary btn-sm p-0" style={{ width: '24px', height: '24px', lineHeight: '1' }} onClick={() => moveMetric(i, 1)} disabled={i === metrics.length - 1} title="Move down">▼</button>
+            {metrics.map((m, i) => {
+              const isChild = Boolean(m.parent_client_id);
+              const isTotal = Boolean(m.is_total);
+              const parent = m.parent_client_id ? metrics.find((x) => x.client_id === m.parent_client_id) : null;
+
+              // Hide child rows if parent not present (safety)
+              if (isChild && !parent) return null;
+
+              return (
+                <div
+                  key={m.client_id}
+                  className="border rounded-2 p-2 bg-light bg-opacity-50"
+                  style={isChild ? { marginLeft: 26, borderLeft: '3px solid #cbd5e1' } : undefined}
+                >
+                  <div className="d-flex gap-2 align-items-start">
+                    <div
+                      className="bg-white border rounded-circle text-center fw-bold flex-shrink-0"
+                      style={{ width: '24px', height: '24px', lineHeight: '22px', fontSize: '0.72rem', marginTop: '4px' }}
+                      title={isChild ? 'Sub-metric' : 'Metric'}
+                    >
+                      {isChild ? '↳' : i + 1}
+                    </div>
+
+                    <Form.Control
+                      size="sm"
+                      as="textarea"
+                      rows={2}
+                      className="flex-grow-1"
+                      value={m.metric_text}
+                      onChange={(e) => updateMetric(m.client_id, 'metric_text', e.target.value)}
+                      placeholder={isChild ? 'Sub-metric… (e.g. Bachelor of Commerce)' : 'Metric description…'}
+                      disabled={isTotal}
+                    />
+
+                    <Form.Select
+                      size="sm"
+                      value={m.unit_of_measure}
+                      onChange={(e) => updateMetric(m.client_id, 'unit_of_measure', e.target.value)}
+                      style={{ width: '160px', flexShrink: 0 }}
+                      disabled={isTotal || isChild}
+                      title={isChild ? 'Sub-metric unit inherits from parent' : 'Unit of measure'}
+                    >
+                      {UOM_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+                    </Form.Select>
+
+                    <div className="d-flex flex-column gap-1 flex-shrink-0">
+                      <button
+                        type="button"
+                        className="btn btn-outline-secondary btn-sm p-0"
+                        style={{ width: '24px', height: '24px', lineHeight: '1' }}
+                        onClick={() => moveMetric(m.client_id, -1)}
+                        disabled={saving}
+                        title="Move up"
+                      >▲</button>
+                      <button
+                        type="button"
+                        className="btn btn-outline-secondary btn-sm p-0"
+                        style={{ width: '24px', height: '24px', lineHeight: '1' }}
+                        onClick={() => moveMetric(m.client_id, 1)}
+                        disabled={saving}
+                        title="Move down"
+                      >▼</button>
+                    </div>
+
+                    {!isChild && (
+                      <div className="d-flex flex-column gap-1 flex-shrink-0">
+                        <Button
+                          size="sm"
+                          variant="outline-primary"
+                          className="p-1"
+                          style={{ fontSize: '0.72rem' }}
+                          onClick={() => addSubMetric(m.client_id)}
+                          disabled={saving}
+                          title="Add one sub-metric"
+                        >
+                          + Sub
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline-secondary"
+                          className="p-1"
+                          style={{ fontSize: '0.72rem' }}
+                          onClick={() => {
+                            setBulkParentClientId(m.client_id);
+                            setBulkText('');
+                          }}
+                          disabled={saving}
+                          title="Bulk add programmes or campuses"
+                        >
+                          Bulk
+                        </Button>
+                      </div>
+                    )}
+
+                    {metrics.length > 1 && (
+                      <Button
+                        size="sm"
+                        variant="outline-danger"
+                        className="flex-shrink-0 p-1"
+                        style={{ width: '28px', height: '28px', lineHeight: '1' }}
+                        onClick={() => removeMetric(m.client_id)}
+                        title={isChild ? 'Remove sub-metric' : 'Remove metric (and its sub-metrics)'}
+                        disabled={saving}
+                      >
+                        ×
+                      </Button>
+                    )}
+                  </div>
+
+                  {isChild && (
+                    <div className="text-muted small mt-1" style={{ fontSize: '0.72rem' }}>
+                      Under: <span className="fw-semibold">{parent?.metric_text || '—'}</span>
+                      {isTotal ? <span className="ms-2 badge text-bg-warning">Auto total (sum)</span> : null}
+                    </div>
+                  )}
                 </div>
-                {metrics.length > 1 && (
-                  <Button size="sm" variant="outline-danger" className="flex-shrink-0 p-1" style={{ width: '28px', height: '28px', lineHeight: '1' }} onClick={() => removeMetric(i)} title="Remove">×</Button>
-                )}
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
         </div>
@@ -670,6 +998,278 @@ function TemplateModal({
         </Button>
       </Modal.Footer>
     </Modal>
+
+    <Modal
+      show={bulkParentClientId != null}
+      onHide={() => setBulkParentClientId(null)}
+      centered
+      size="lg"
+    >
+      <Modal.Header closeButton className="py-2">
+        <Modal.Title className="fs-6 fw-bold">Bulk add sub-metrics</Modal.Title>
+      </Modal.Header>
+      <Modal.Body>
+        <p className="small text-muted mb-2">
+          Add sub-metrics under{' '}
+          <span className="fw-semibold">
+            {metrics.find((m) => m.client_id === bulkParentClientId)?.metric_text || 'the selected metric'}
+          </span>.
+          You can pull from the system (programmes/campuses/faculties) or paste manually.
+        </p>
+
+        <div className="row g-2 align-items-end mb-2">
+          <div className="col-12 col-md-4">
+            <Form.Label className="small fw-bold mb-1">Source</Form.Label>
+            <Form.Select
+              size="sm"
+              value={bulkSource}
+              onChange={async (e) => {
+                const next = e.target.value as typeof bulkSource;
+                setBulkSource(next);
+                setBulkSearch('');
+                setBulkSelectedIds(new Set());
+                if (next !== 'manual') await loadBulkItems(next);
+              }}
+            >
+              <option value="programmes">Programmes</option>
+              <option value="campuses">Campuses</option>
+              <option value="faculties">Faculties / Schools</option>
+              <option value="manual">Manual paste</option>
+            </Form.Select>
+          </div>
+          {bulkSource !== 'manual' ? (
+            <div className="col-12 col-md-8">
+              <Form.Label className="small fw-bold mb-1">Search</Form.Label>
+              <Form.Control
+                size="sm"
+                value={bulkSearch}
+                onChange={(e) => setBulkSearch(e.target.value)}
+                placeholder="Type to filter…"
+              />
+            </div>
+          ) : null}
+        </div>
+
+        {bulkSource !== 'manual' ? (
+          <>
+            <div className="d-flex flex-wrap gap-2 mb-2">
+              <Button
+                size="sm"
+                variant="outline-secondary"
+                onClick={async () => {
+                  setBulkSearch('');
+                  setBulkSelectedIds(new Set());
+                  await loadBulkItems(bulkSource);
+                }}
+                disabled={bulkLoading}
+              >
+                {bulkLoading ? 'Loading…' : 'Reload'}
+              </Button>
+              {bulkSource === 'campuses' ? (
+                <Button
+                  size="sm"
+                  variant="outline-secondary"
+                  onClick={() => {
+                    setBulkSource('manual');
+                    setBulkText(MUBS_CAMPUS_PRESETS.join('\n'));
+                  }}
+                  disabled={bulkLoading}
+                >
+                  Use campus preset (manual)
+                </Button>
+              ) : null}
+            </div>
+
+            <div className="border rounded-2 p-2" style={{ maxHeight: 320, overflow: 'auto', background: '#f8fafc' }}>
+              {bulkLoading ? (
+                <div className="text-muted small">Loading…</div>
+              ) : (() => {
+                const q = bulkSearch.trim().toLowerCase();
+                const filtered = q
+                  ? bulkItems.filter((it) => it.name.toLowerCase().includes(q) || (it.meta || '').toLowerCase().includes(q))
+                  : bulkItems;
+                if (!filtered.length) return <div className="text-muted small">No results.</div>;
+                return (
+                  <div className="d-flex flex-column gap-1">
+                    <div className="d-flex gap-2 align-items-center mb-1">
+                      <Button
+                        size="sm"
+                        variant="outline-primary"
+                        onClick={() => setBulkSelectedIds(new Set(filtered.map((f) => f.id)))}
+                      >
+                        Select all (filtered)
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline-secondary"
+                        onClick={() => setBulkSelectedIds(new Set())}
+                      >
+                        Clear
+                      </Button>
+                      <span className="small text-muted">
+                        {bulkSelectedIds.size} selected
+                      </span>
+                    </div>
+                    {filtered.map((it) => (
+                      <label key={it.id} className="d-flex gap-2 align-items-start small">
+                        <input
+                          type="checkbox"
+                          checked={bulkSelectedIds.has(it.id)}
+                          onChange={() => {
+                            setBulkSelectedIds((prev) => {
+                              const next = new Set(prev);
+                              if (next.has(it.id)) next.delete(it.id);
+                              else next.add(it.id);
+                              return next;
+                            });
+                          }}
+                          className="mt-1"
+                        />
+                        <span>
+                          <span className="fw-semibold">{it.name}</span>
+                          {it.meta ? <span className="text-muted"> — {it.meta}</span> : null}
+                        </span>
+                      </label>
+                    ))}
+                  </div>
+                );
+              })()}
+            </div>
+          </>
+        ) : (
+          <>
+            <div className="d-flex flex-wrap gap-2 mb-2">
+              <Button
+                size="sm"
+                variant="outline-secondary"
+                onClick={() => setBulkText(MUBS_CAMPUS_PRESETS.join('\n'))}
+              >
+                Insert MUBS campuses
+              </Button>
+            </div>
+            <Form.Control
+              as="textarea"
+              rows={10}
+              value={bulkText}
+              onChange={(e) => setBulkText(e.target.value)}
+              placeholder={'Bachelor of Commerce\nBachelor of Business Administration\nMaster of Business Administration'}
+            />
+          </>
+        )}
+      </Modal.Body>
+      <Modal.Footer className="py-2">
+        <Button variant="outline-secondary" size="sm" onClick={() => setBulkParentClientId(null)}>
+          Cancel
+        </Button>
+        <Button
+          variant="primary"
+          size="sm"
+          style={{ background: 'var(--mubs-blue)', borderColor: 'var(--mubs-blue)' }}
+          disabled={
+            bulkSource === 'manual'
+              ? !parseBulkSubMetricLines(bulkText).length
+              : bulkSelectedIds.size === 0
+          }
+          onClick={() => {
+            if (!bulkParentClientId) return;
+            if (bulkSource === 'manual') {
+              addBulkSubMetrics(bulkParentClientId, [bulkText]);
+            } else {
+              const selected = bulkItems
+                .filter((it) => bulkSelectedIds.has(it.id))
+                .map((it) => it.name);
+              addBulkSubMetrics(bulkParentClientId, [selected.join('\n')]);
+            }
+            setBulkParentClientId(null);
+            setBulkText('');
+            setBulkSelectedIds(new Set());
+            setBulkSearch('');
+          }}
+        >
+          Add {bulkSource === 'manual' ? (parseBulkSubMetricLines(bulkText).length || '') : bulkSelectedIds.size} sub-metric
+          {(bulkSource === 'manual' ? parseBulkSubMetricLines(bulkText).length : bulkSelectedIds.size) === 1 ? '' : 's'}
+        </Button>
+      </Modal.Footer>
+    </Modal>
+
+    <Modal
+      show={!!deptOverridePrompt}
+      onHide={() => setDeptOverridePrompt(null)}
+      centered
+    >
+      <Modal.Header closeButton className="py-2">
+        <Modal.Title className="fs-6 fw-bold">Offices already submitted data</Modal.Title>
+      </Modal.Header>
+      <Modal.Body>
+        <p className="small text-muted mb-2">
+          You removed one or more offices that already captured data for this indicator. If you proceed, those offices will no longer appear as responsible for this indicator (their previously captured data will remain in the database, but will not be shown in normal entry/review flows).
+        </p>
+        <div className="border rounded-2 p-2" style={{ background: '#f8fafc' }}>
+          {(deptOverridePrompt?.items ?? []).length === 0 ? (
+            <div className="text-muted small">No details provided.</div>
+          ) : (
+            <ul className="mb-0 small">
+              {deptOverridePrompt?.items.map((it) => (
+                <li key={it.department_id}>
+                  <span className="fw-semibold">{it.department_name}</span>
+                  <span className="text-muted"> — {it.response_count} cell(s) filled</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </Modal.Body>
+      <Modal.Footer className="py-2">
+        <Button variant="outline-secondary" size="sm" onClick={() => setDeptOverridePrompt(null)}>
+          Cancel
+        </Button>
+        <Button
+          variant="danger"
+          size="sm"
+          onClick={async () => {
+            if (!editingIndicator) return;
+            setDeptOverridePrompt(null);
+            setSaving(true);
+            setErr(null);
+            try {
+              const payload = {
+                outcome_id: Number(outcomeId),
+                indicator_text: indicatorText.trim(),
+                department_ids: deptIds,
+                financial_years: selectedFYs,
+                override_remove_departments: true,
+                targets: selectedFYs.map((fy) => ({
+                  financial_year: fy,
+                  target_value: (targetsByFy[fy] ?? '').trim() || null,
+                })),
+                metrics: metrics
+                  .filter((m) => m.metric_text.trim() && !m.is_total)
+                  .map((m) => ({
+                    id: m.id,
+                    client_id: m.client_id,
+                    parent_metric_id: m.parent_metric_id ?? null,
+                    parent_client_id: m.parent_client_id ?? null,
+                    metric_text: m.metric_text,
+                    unit_of_measure: m.unit_of_measure,
+                    aggregation: m.aggregation ?? null,
+                    is_total: Boolean(m.is_total),
+                  })),
+              };
+              await axios.put(`/api/questionnaire/indicators/${editingIndicator.id}`, payload);
+              setSuccess(true);
+              onSaved();
+            } catch (e2: unknown) {
+              setErr(axios.isAxiosError(e2) ? e2.response?.data?.message ?? 'Save failed' : 'Save failed');
+            } finally {
+              setSaving(false);
+            }
+          }}
+        >
+          Override &amp; remove offices
+        </Button>
+      </Modal.Footer>
+    </Modal>
+    </>
   );
 }
 
@@ -1135,7 +1735,7 @@ function IndicatorsPanel({
                         ind.departments.map((dept) => {
                           const responses = responsesByIndicator[ind.id] ?? [];
                           const visibleFys = ind.financial_years;
-                          const visibleMetrics = ind.metrics;
+                          const visibleMetrics = ind.metrics.filter((m) => !(m.is_total === true || m.is_total === 1));
                           const hasAnyValue = visibleMetrics.some((m) =>
                             visibleFys.some((fy) => responseValue(responses, dept.id, m.id, fy) != null)
                           );
@@ -1165,24 +1765,79 @@ function IndicatorsPanel({
                                     </tr>
                                   </thead>
                                   <tbody>
-                                    {visibleMetrics.map((m, mi) => (
-                                      <tr key={m.id}>
-                                        <td className="text-center fw-bold" style={{ color: 'var(--mubs-gold, #C8922A)' }}>{mi + 1}</td>
-                                        <td>{m.metric_text}</td>
-                                        {visibleFys.map((fy) => {
-                                          const val = responseValue(responses, dept.id, m.id, fy);
-                                          return (
-                                            <td
-                                              key={`${fy}-actual`}
-                                              className={`text-center ${val ? 'fw-semibold' : 'text-muted'}`}
-                                              style={{ fontSize: '0.72rem', fontStyle: val ? 'normal' : 'italic' }}
-                                            >
-                                              {val ?? '—'}
-                                            </td>
-                                          );
-                                        })}
-                                      </tr>
-                                    ))}
+                                    {buildMetricDisplayRows(visibleMetrics as any).flatMap((row) => {
+                                      if (row.kind === 'standalone') {
+                                        const m: any = row.metric;
+                                        return [(
+                                          <tr key={`standalone-${m.id}`}>
+                                            <td className="text-center fw-bold" style={{ color: 'var(--mubs-gold, #C8922A)' }}>{row.index}</td>
+                                            <td>{m.metric_text}</td>
+                                            {visibleFys.map((fy) => {
+                                              const val = responseValue(responses, dept.id, m.id, fy);
+                                              return (
+                                                <td
+                                                  key={`${fy}-actual`}
+                                                  className={`text-center ${val ? 'fw-semibold' : 'text-muted'}`}
+                                                  style={{ fontSize: '0.72rem', fontStyle: val ? 'normal' : 'italic' }}
+                                                >
+                                                  {val ?? '—'}
+                                                </td>
+                                              );
+                                            })}
+                                          </tr>
+                                        )];
+                                      }
+
+                                      const parent: any = row.parent;
+                                      const children: any[] = row.children;
+                                      const showTotal = canAutoSumTotal(parent);
+                                      const parentRow = (
+                                        <tr key={`group-parent-${parent.id}`} className="table-light">
+                                          <td className="text-center fw-bold" style={{ color: 'var(--mubs-gold, #C8922A)' }}>{row.index}</td>
+                                          <td className="fw-semibold">{parent.metric_text}</td>
+                                          {visibleFys.map((fy) => {
+                                            const totalVal = showTotal
+                                              ? sumSubMetricValues(
+                                                children,
+                                                fy,
+                                                (metricId, year) => responseValue(responses, dept.id, metricId, year),
+                                              )
+                                              : '';
+                                            const display = totalVal.trim() || null;
+                                            return (
+                                              <td
+                                                key={`${fy}-total`}
+                                                className={`text-center ${display ? 'fw-semibold' : 'text-muted'}`}
+                                                style={{ fontSize: '0.72rem', fontStyle: display ? 'normal' : 'italic', background: '#f8fafc' }}
+                                              >
+                                                {showTotal ? (display ?? '—') : '—'}
+                                              </td>
+                                            );
+                                          })}
+                                        </tr>
+                                      );
+
+                                      const childRows = children.map((m: any, idx: number) => (
+                                        <tr key={`sub-${m.id}`}>
+                                          <td className="text-center text-muted fw-bold" style={{ fontSize: '0.7rem' }}>{subMetricLetter(idx)}</td>
+                                          <td style={{ paddingLeft: 18 }}>{m.metric_text}</td>
+                                          {visibleFys.map((fy) => {
+                                            const val = responseValue(responses, dept.id, m.id, fy);
+                                            return (
+                                              <td
+                                                key={`${fy}-actual`}
+                                                className={`text-center ${val ? 'fw-semibold' : 'text-muted'}`}
+                                                style={{ fontSize: '0.72rem', fontStyle: val ? 'normal' : 'italic' }}
+                                              >
+                                                {val ?? '—'}
+                                              </td>
+                                            );
+                                          })}
+                                        </tr>
+                                      ));
+
+                                      return [parentRow, ...childRows];
+                                    })}
                                   </tbody>
                                 </table>
                               </div>

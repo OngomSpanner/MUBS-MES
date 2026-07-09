@@ -9,11 +9,21 @@ import { fyShortLabel } from '@/lib/questionnaire/fy-utils';
 import { METRIC_ENTRY_TABLE, uomTableLabel } from '@/lib/questionnaire/metric-entry-table-layout';
 import { HOD_REVIEW_STATUS_LABELS, HOD_UNIT_HEAD_LABEL, type HodReviewStatus } from '@/lib/hod-review-workflow-constants';
 import { IndicatorFyTargetGroup, type IndicatorTarget } from '@/components/Questionnaire/IndicatorTargetUI';
+import {
+  buildMetricDisplayRows,
+  canAutoSumTotal,
+  inputMetricsForIndicator,
+  subMetricLetter,
+  sumSubMetricValues,
+} from '@/lib/questionnaire/metric-tree';
 
 type Metric = {
   id: number;
   metric_text: string;
   unit_of_measure: string;
+  parent_metric_id?: number | null;
+  aggregation?: string | null;
+  is_total?: boolean | number;
   sort_order: number;
 };
 type Indicator = {
@@ -77,10 +87,11 @@ function matchesFilter(ind: Indicator, filter: IndicatorFilter): boolean {
 }
 
 function computeEntryStatus(ind: Indicator, responses: ResponseMap): Indicator['status'] {
-  const total = ind.metrics.length * ind.financial_years.length;
+  const inputs = inputMetricsForIndicator(ind.metrics);
+  const total = inputs.length * ind.financial_years.length;
   if (total === 0) return 'not-started';
   let filled = 0;
-  for (const m of ind.metrics) {
+  for (const m of inputs) {
     for (const fy of ind.financial_years) {
       if ((responses[`${m.id}_${fy}`] ?? '').trim()) filled += 1;
     }
@@ -96,7 +107,7 @@ function computeMissingCellKeys(
   validationErrors: Record<string, string>,
 ): string[] {
   const missing: string[] = [];
-  for (const m of ind.metrics) {
+  for (const m of inputMetricsForIndicator(ind.metrics)) {
     for (const fy of ind.financial_years) {
       const key = `${m.id}_${fy}`;
       const val = (responses[key] ?? '').trim();
@@ -108,7 +119,7 @@ function computeMissingCellKeys(
 
 function snapshotForIndicator(ind: Indicator, map: ResponseMap): ResponseMap {
   const snap: ResponseMap = {};
-  for (const m of ind.metrics) {
+  for (const m of inputMetricsForIndicator(ind.metrics)) {
     for (const fy of ind.financial_years) {
       const key = `${m.id}_${fy}`;
       snap[key] = map[key] ?? '';
@@ -119,14 +130,14 @@ function snapshotForIndicator(ind: Indicator, map: ResponseMap): ResponseMap {
 
 function snapshotCommentsForIndicator(ind: Indicator, map: CommentMap): CommentMap {
   const snap: CommentMap = {};
-  for (const m of ind.metrics) {
+  for (const m of inputMetricsForIndicator(ind.metrics)) {
     snap[String(m.id)] = map[String(m.id)] ?? '';
   }
   return snap;
 }
 
 function commentsMatch(ind: Indicator, current: CommentMap, baseline: CommentMap): boolean {
-  for (const m of ind.metrics) {
+  for (const m of inputMetricsForIndicator(ind.metrics)) {
     const key = String(m.id);
     if ((current[key] ?? '') !== (baseline[key] ?? '')) return false;
   }
@@ -134,16 +145,17 @@ function commentsMatch(ind: Indicator, current: CommentMap, baseline: CommentMap
 }
 
 function buildMetricCommentsPayload(ind: Indicator, comments: CommentMap) {
-  return ind.metrics.map((m) => ({
+  return inputMetricsForIndicator(ind.metrics).map((m) => ({
     metric_id: m.id,
     comment: (comments[String(m.id)] ?? '').trim() || null,
   }));
 }
 
 function patchIndicatorFromResponses(ind: Indicator, map: ResponseMap): Indicator {
-  const total = ind.metrics.length * ind.financial_years.length;
+  const inputs = inputMetricsForIndicator(ind.metrics);
+  const total = inputs.length * ind.financial_years.length;
   let filled = 0;
-  for (const m of ind.metrics) {
+  for (const m of inputs) {
     for (const fy of ind.financial_years) {
       if ((map[`${m.id}_${fy}`] ?? '').trim()) filled += 1;
     }
@@ -154,7 +166,7 @@ function patchIndicatorFromResponses(ind: Indicator, map: ResponseMap): Indicato
 }
 
 function responsesMatch(ind: Indicator, current: ResponseMap, baseline: ResponseMap): boolean {
-  for (const m of ind.metrics) {
+  for (const m of inputMetricsForIndicator(ind.metrics)) {
     for (const fy of ind.financial_years) {
       const key = `${m.id}_${fy}`;
       if ((current[key] ?? '') !== (baseline[key] ?? '')) return false;
@@ -178,6 +190,18 @@ function IndicatorCard({
 }) {
   const sc = STATUS_CONFIG[ind.status];
   const readOnly = isSubmissionReadOnly(ind);
+  const uomBadges = (() => {
+    const inputs = inputMetricsForIndicator(ind.metrics);
+    const counts = new Map<string, { label: string; count: number }>();
+    for (const m of inputs) {
+      const key = String(m.unit_of_measure || 'numeric');
+      const item = counts.get(key) ?? { label: uomLabel(key), count: 0 };
+      item.count += 1;
+      counts.set(key, item);
+    }
+    const list = Array.from(counts.values()).sort((a, b) => b.count - a.count);
+    return list;
+  })();
 
   return (
     <div
@@ -207,9 +231,16 @@ function IndicatorCard({
           {ind.financial_years.map((fy) => (
             <Badge key={fy} bg="primary" style={{ fontSize: '0.62rem', background: 'var(--mubs-blue)' }}>{fy}</Badge>
           ))}
-          {ind.metrics.map((m) => (
-            <Badge key={m.id} bg="light" className="text-dark border" style={{ fontSize: '0.6rem' }}>{uomLabel(m.unit_of_measure)}</Badge>
+          {uomBadges.slice(0, 4).map((u) => (
+            <Badge key={u.label} bg="light" className="text-dark border" style={{ fontSize: '0.6rem' }}>
+              {u.label}{u.count > 1 ? ` × ${u.count}` : ''}
+            </Badge>
           ))}
+          {uomBadges.length > 4 ? (
+            <Badge bg="light" className="text-dark border" style={{ fontSize: '0.6rem' }}>
+              +{uomBadges.length - 4} more
+            </Badge>
+          ) : null}
         </div>
         <div className="text-muted" style={{ fontSize: '0.75rem' }}>
           {ind.metrics.length} metric{ind.metrics.length !== 1 ? 's' : ''} · {ind.filled}/{ind.total} cells filled
@@ -399,7 +430,7 @@ export default function AmbassadorDataCollection() {
         setSaveOk(false);
       }
       try {
-        const entries = entryIndicator.metrics.flatMap((m) =>
+        const entries = inputMetricsForIndicator(entryIndicator.metrics).flatMap((m) =>
           entryIndicator.financial_years.map((fy) => ({
             metric_id: m.id,
             financial_year: fy,
@@ -498,7 +529,7 @@ export default function AmbassadorDataCollection() {
     setSaveErr(null);
     setSaveOk(false);
     try {
-      const entries = entryIndicator.metrics.flatMap((m) =>
+      const entries = inputMetricsForIndicator(entryIndicator.metrics).flatMap((m) =>
         entryIndicator.financial_years.map((fy) => ({
           metric_id: m.id,
           financial_year: fy,
@@ -806,86 +837,236 @@ export default function AmbassadorDataCollection() {
                       </tr>
                     </thead>
                     <tbody>
-                      {entryIndicator.metrics.map((m, mi) => (
-                        <tr key={m.id}>
-                          <td className="align-middle">
-                            <span className="fw-semibold me-2" style={{ color: 'var(--mubs-gold, #C8922A)' }}>{mi + 1}.</span>
-                            {m.metric_text}
-                          </td>
-                          <td style={METRIC_ENTRY_TABLE.td.unit}>
-                            <Badge bg="light" className="text-dark border" style={METRIC_ENTRY_TABLE.td.badge}>
-                              {uomTableLabel(m.unit_of_measure)}
-                            </Badge>
-                          </td>
-                          {entryIndicator.financial_years.map((fy) => {
-                            const key = `${m.id}_${fy}`;
-                            const val = responses[key] ?? '';
-                            const err = validationErrors[key];
-                            const isMissing = missingFields.has(key);
-                            const displayVal = val.trim() || null;
-                            return (
-                              <td
-                                key={`${fy}-actual`}
-                                style={{
-                                  ...METRIC_ENTRY_TABLE.td.actual,
-                                  ...(isMissing ? { background: '#fff5f5' } : {}),
-                                }}
-                              >
+                      {buildMetricDisplayRows(entryIndicator.metrics).flatMap((row) => {
+                        const getVal = (metricId: number, fy: string) => responses[`${metricId}_${fy}`] ?? '';
+
+                        if (row.kind === 'standalone') {
+                          const m = row.metric;
+                          return [(
+                            <tr key={`standalone-${m.id}`}>
+                              <td className="align-middle">
+                                <span className="fw-semibold me-2" style={{ color: 'var(--mubs-gold, #C8922A)' }}>
+                                  {row.index}.
+                                </span>
+                                {m.metric_text}
+                              </td>
+                              <td style={METRIC_ENTRY_TABLE.td.unit}>
+                                <Badge bg="light" className="text-dark border" style={METRIC_ENTRY_TABLE.td.badge}>
+                                  {uomTableLabel(m.unit_of_measure)}
+                                </Badge>
+                              </td>
+                              {entryIndicator.financial_years.map((fy) => {
+                                const key = `${m.id}_${fy}`;
+                                const val = responses[key] ?? '';
+                                const err = validationErrors[key];
+                                const isMissing = missingFields.has(key);
+                                const displayVal = val.trim() || null;
+                                return (
+                                  <td
+                                    key={`${fy}-actual`}
+                                    style={{
+                                      ...METRIC_ENTRY_TABLE.td.actual,
+                                      ...(isMissing ? { background: '#fff5f5' } : {}),
+                                    }}
+                                  >
+                                    {readOnly ? (
+                                      <span
+                                        className={`d-block text-center ${displayVal ? 'fw-semibold' : 'text-muted'}`}
+                                        style={{ fontSize: '0.78rem', fontStyle: displayVal ? 'normal' : 'italic', wordBreak: 'break-word' }}
+                                      >
+                                        {displayVal ?? '—'}
+                                      </span>
+                                    ) : (
+                                      <>
+                                        <Form.Control
+                                          size="sm"
+                                          value={val}
+                                          onChange={(e) => setValue(m.id, fy, e.target.value)}
+                                          placeholder={uomPlaceholder(m.unit_of_measure)}
+                                          isInvalid={!!err || isMissing}
+                                          aria-label={`Actual value for ${m.metric_text}, ${fyShortLabel(fy)}`}
+                                          style={{
+                                            ...METRIC_ENTRY_TABLE.td.input,
+                                            borderColor: isMissing ? '#dc3545' : undefined,
+                                            boxShadow: isMissing ? '0 0 0 0.15rem rgba(220,53,69,.2)' : undefined,
+                                          }}
+                                          as={m.unit_of_measure === 'text' || m.unit_of_measure === 'list' ? 'textarea' : 'input'}
+                                          {...(m.unit_of_measure === 'text' || m.unit_of_measure === 'list' ? { rows: 2 } : {})}
+                                        />
+                                        {err && <div className="text-danger" style={{ fontSize: '0.65rem' }}>{err}</div>}
+                                        {isMissing && !err && (
+                                          <div className="text-danger" style={{ fontSize: '0.65rem' }}>Required</div>
+                                        )}
+                                      </>
+                                    )}
+                                  </td>
+                                );
+                              })}
+                              <td style={METRIC_ENTRY_TABLE.td.comment}>
                                 {readOnly ? (
                                   <span
-                                    className={`d-block text-center ${displayVal ? 'fw-semibold' : 'text-muted'}`}
-                                    style={{ fontSize: '0.78rem', fontStyle: displayVal ? 'normal' : 'italic', wordBreak: 'break-word' }}
+                                    className={`d-block ${(metricComments[String(m.id)] ?? '').trim() ? '' : 'text-muted'}`}
+                                    style={{ fontSize: '0.78rem', fontStyle: (metricComments[String(m.id)] ?? '').trim() ? 'normal' : 'italic', wordBreak: 'break-word' }}
                                   >
-                                    {displayVal ?? '—'}
+                                    {(metricComments[String(m.id)] ?? '').trim() || '—'}
                                   </span>
                                 ) : (
-                                  <>
-                                    <Form.Control
-                                      size="sm"
-                                      value={val}
-                                      onChange={(e) => setValue(m.id, fy, e.target.value)}
-                                      placeholder={uomPlaceholder(m.unit_of_measure)}
-                                      isInvalid={!!err || isMissing}
-                                      aria-label={`Actual value for ${m.metric_text}, ${fyShortLabel(fy)}`}
-                                      style={{
-                                        ...METRIC_ENTRY_TABLE.td.input,
-                                        borderColor: isMissing ? '#dc3545' : undefined,
-                                        boxShadow: isMissing ? '0 0 0 0.15rem rgba(220,53,69,.2)' : undefined,
-                                      }}
-                                      as={m.unit_of_measure === 'text' || m.unit_of_measure === 'list' ? 'textarea' : 'input'}
-                                      {...(m.unit_of_measure === 'text' || m.unit_of_measure === 'list' ? { rows: 2 } : {})}
-                                    />
-                                    {err && <div className="text-danger" style={{ fontSize: '0.65rem' }}>{err}</div>}
-                                    {isMissing && !err && (
-                                      <div className="text-danger" style={{ fontSize: '0.65rem' }}>Required</div>
-                                    )}
-                                  </>
+                                  <Form.Control
+                                    as="textarea"
+                                    rows={2}
+                                    size="sm"
+                                    value={metricComments[String(m.id)] ?? ''}
+                                    onChange={(e) => setComment(m.id, e.target.value)}
+                                    placeholder="Note…"
+                                    style={METRIC_ENTRY_TABLE.td.input}
+                                  />
                                 )}
                               </td>
-                            );
-                          })}
-                          <td style={METRIC_ENTRY_TABLE.td.comment}>
-                            {readOnly ? (
-                              <span
-                                className={`d-block ${(metricComments[String(m.id)] ?? '').trim() ? '' : 'text-muted'}`}
-                                style={{ fontSize: '0.78rem', fontStyle: (metricComments[String(m.id)] ?? '').trim() ? 'normal' : 'italic', wordBreak: 'break-word' }}
-                              >
-                                {(metricComments[String(m.id)] ?? '').trim() || '—'}
+                            </tr>
+                          )];
+                        }
+
+                        const { parent, children, index } = row;
+                        const showAutoTotal = canAutoSumTotal(parent);
+                        const parentRows = [(
+                          <tr key={`group-parent-${parent.id}`} className="table-light">
+                            <td className="align-middle">
+                              <span className="fw-semibold me-2" style={{ color: 'var(--mubs-gold, #C8922A)' }}>
+                                {index}.
                               </span>
-                            ) : (
-                              <Form.Control
-                                as="textarea"
-                                rows={2}
-                                size="sm"
-                                value={metricComments[String(m.id)] ?? ''}
-                                onChange={(e) => setComment(m.id, e.target.value)}
-                                placeholder="Note…"
-                                style={METRIC_ENTRY_TABLE.td.input}
-                              />
-                            )}
-                          </td>
-                        </tr>
-                      ))}
+                              <span className="fw-semibold">{parent.metric_text}</span>
+                            </td>
+                            <td style={METRIC_ENTRY_TABLE.td.unit}>
+                              <Badge bg="light" className="text-dark border" style={METRIC_ENTRY_TABLE.td.badge}>
+                                {uomTableLabel(parent.unit_of_measure)}
+                              </Badge>
+                            </td>
+                            {entryIndicator.financial_years.map((fy) => {
+                              const totalVal = showAutoTotal
+                                ? sumSubMetricValues(children, fy, (metricId, year) => getVal(metricId, year))
+                                : '';
+                              const totalDisplay = totalVal.trim() || null;
+                              return (
+                                <td
+                                  key={`${fy}-total`}
+                                  style={{ ...METRIC_ENTRY_TABLE.td.actual, background: '#f8fafc' }}
+                                >
+                                  {showAutoTotal ? (
+                                    <div className="text-center">
+                                      <div
+                                        className={`${totalDisplay ? 'fw-semibold' : 'text-muted'}`}
+                                        style={{ fontSize: '0.78rem', fontStyle: totalDisplay ? 'normal' : 'italic', wordBreak: 'break-word' }}
+                                      >
+                                        {totalDisplay ?? '—'}
+                                      </div>
+                                      <Badge bg="warning" className="text-dark border mt-1" style={{ fontSize: '0.58rem' }}>
+                                        Auto total
+                                      </Badge>
+                                    </div>
+                                  ) : (
+                                    <span className="d-block text-center text-muted" style={{ fontSize: '0.78rem', fontStyle: 'italic' }}>
+                                      —
+                                    </span>
+                                  )}
+                                </td>
+                              );
+                            })}
+                            <td style={METRIC_ENTRY_TABLE.td.comment}>
+                              <span className="text-muted d-block text-center" style={{ fontSize: '0.78rem', fontStyle: 'italic' }}>
+                                —
+                              </span>
+                            </td>
+                          </tr>
+                        )];
+
+                        const childRows = children.map((m, childIdx) => (
+                          <tr key={`sub-${m.id}`}>
+                            <td className="align-middle">
+                              <span
+                                className="fw-semibold me-2 text-muted"
+                                style={{ paddingLeft: 28, display: 'inline-block', minWidth: 42 }}
+                              >
+                                {subMetricLetter(childIdx)}.
+                              </span>
+                              <span style={{ paddingLeft: 4 }}>{m.metric_text}</span>
+                            </td>
+                            <td style={METRIC_ENTRY_TABLE.td.unit}>
+                              <Badge bg="light" className="text-dark border" style={METRIC_ENTRY_TABLE.td.badge}>
+                                {uomTableLabel(m.unit_of_measure)}
+                              </Badge>
+                            </td>
+                            {entryIndicator.financial_years.map((fy) => {
+                              const key = `${m.id}_${fy}`;
+                              const val = responses[key] ?? '';
+                              const err = validationErrors[key];
+                              const isMissing = missingFields.has(key);
+                              const displayVal = val.trim() || null;
+                              return (
+                                <td
+                                  key={`${fy}-actual`}
+                                  style={{
+                                    ...METRIC_ENTRY_TABLE.td.actual,
+                                    ...(isMissing ? { background: '#fff5f5' } : {}),
+                                  }}
+                                >
+                                  {readOnly ? (
+                                    <span
+                                      className={`d-block text-center ${displayVal ? 'fw-semibold' : 'text-muted'}`}
+                                      style={{ fontSize: '0.78rem', fontStyle: displayVal ? 'normal' : 'italic', wordBreak: 'break-word' }}
+                                    >
+                                      {displayVal ?? '—'}
+                                    </span>
+                                  ) : (
+                                    <>
+                                      <Form.Control
+                                        size="sm"
+                                        value={val}
+                                        onChange={(e) => setValue(m.id, fy, e.target.value)}
+                                        placeholder={uomPlaceholder(m.unit_of_measure)}
+                                        isInvalid={!!err || isMissing}
+                                        aria-label={`Actual value for ${m.metric_text}, ${fyShortLabel(fy)}`}
+                                        style={{
+                                          ...METRIC_ENTRY_TABLE.td.input,
+                                          borderColor: isMissing ? '#dc3545' : undefined,
+                                          boxShadow: isMissing ? '0 0 0 0.15rem rgba(220,53,69,.2)' : undefined,
+                                        }}
+                                        as={m.unit_of_measure === 'text' || m.unit_of_measure === 'list' ? 'textarea' : 'input'}
+                                        {...(m.unit_of_measure === 'text' || m.unit_of_measure === 'list' ? { rows: 2 } : {})}
+                                      />
+                                      {err && <div className="text-danger" style={{ fontSize: '0.65rem' }}>{err}</div>}
+                                      {isMissing && !err && (
+                                        <div className="text-danger" style={{ fontSize: '0.65rem' }}>Required</div>
+                                      )}
+                                    </>
+                                  )}
+                                </td>
+                              );
+                            })}
+                            <td style={METRIC_ENTRY_TABLE.td.comment}>
+                              {readOnly ? (
+                                <span
+                                  className={`d-block ${(metricComments[String(m.id)] ?? '').trim() ? '' : 'text-muted'}`}
+                                  style={{ fontSize: '0.78rem', fontStyle: (metricComments[String(m.id)] ?? '').trim() ? 'normal' : 'italic', wordBreak: 'break-word' }}
+                                >
+                                  {(metricComments[String(m.id)] ?? '').trim() || '—'}
+                                </span>
+                              ) : (
+                                <Form.Control
+                                  as="textarea"
+                                  rows={2}
+                                  size="sm"
+                                  value={metricComments[String(m.id)] ?? ''}
+                                  onChange={(e) => setComment(m.id, e.target.value)}
+                                  placeholder="Note…"
+                                  style={METRIC_ENTRY_TABLE.td.input}
+                                />
+                              )}
+                            </td>
+                          </tr>
+                        ));
+
+                        return [...parentRows, ...childRows];
+                      })}
                     </tbody>
                   </table>
                 </div>

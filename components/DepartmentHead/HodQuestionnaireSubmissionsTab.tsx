@@ -7,6 +7,12 @@ import { normalizeFinancialYear, fyShortLabel } from '@/lib/questionnaire/fy-uti
 import { METRIC_ENTRY_TABLE, uomTableLabel } from '@/lib/questionnaire/metric-entry-table-layout';
 import { HOD_REVIEW_STATUS_LABELS, HOD_UNIT_HEAD_LABEL, type HodReviewStatus } from '@/lib/hod-review-workflow-constants';
 import { IndicatorFyTargetGroup, type IndicatorTarget } from '@/components/Questionnaire/IndicatorTargetUI';
+import {
+  buildMetricDisplayRows,
+  canAutoSumTotal,
+  subMetricLetter,
+  sumSubMetricValues,
+} from '@/lib/questionnaire/metric-tree';
 
 type Submission = {
   indicator_id: number;
@@ -32,7 +38,15 @@ const FILTER_TABS: { key: SubmissionFilter; label: string }[] = [
   { key: 'needs-revision', label: 'Needs revision' },
 ];
 
-type Metric = { id: number; metric_text: string; unit_of_measure: string; sort_order: number };
+type Metric = {
+  id: number;
+  metric_text: string;
+  unit_of_measure: string;
+  parent_metric_id?: number | null;
+  aggregation?: string | null;
+  is_total?: boolean | number;
+  sort_order: number;
+};
 
 type SubmissionDetail = {
   metrics: Metric[];
@@ -113,6 +127,8 @@ function SubmissionDataTable({ detail }: { detail: SubmissionDetail }) {
     return <div className="alert alert-warning py-2 small mb-0">No metric data submitted yet.</div>;
   }
 
+  const getVal = (metricId: number, fy: string) => responseValue(detail.responses, metricId, fy);
+
   return (
     <div className="table-responsive">
       <table className="table table-bordered table-sm mb-0" style={METRIC_ENTRY_TABLE.table}>
@@ -141,48 +157,151 @@ function SubmissionDataTable({ detail }: { detail: SubmissionDetail }) {
           </tr>
         </thead>
         <tbody>
-          {detail.metrics.map((m, mi) => (
-            <tr key={m.id}>
-              <td className="align-middle">
-                <span className="fw-semibold me-2" style={{ color: 'var(--mubs-gold, #C8922A)' }}>{mi + 1}.</span>
-                {m.metric_text}
-              </td>
-              <td style={METRIC_ENTRY_TABLE.td.unit}>
-                <Badge bg="light" className="text-dark border" style={METRIC_ENTRY_TABLE.td.badge}>
-                  {uomTableLabel(m.unit_of_measure)}
-                </Badge>
-              </td>
-              {detail.financial_years.map((fy) => {
-                const val = responseValue(detail.responses, m.id, fy);
-                return (
+          {buildMetricDisplayRows(detail.metrics).flatMap((row) => {
+            if (row.kind === 'standalone') {
+              const m = row.metric;
+              return [(
+                <tr key={`standalone-${m.id}`}>
+                  <td className="align-middle">
+                    <span className="fw-semibold me-2" style={{ color: 'var(--mubs-gold, #C8922A)' }}>{row.index}.</span>
+                    {m.metric_text}
+                  </td>
+                  <td style={METRIC_ENTRY_TABLE.td.unit}>
+                    <Badge bg="light" className="text-dark border" style={METRIC_ENTRY_TABLE.td.badge}>
+                      {uomTableLabel(m.unit_of_measure)}
+                    </Badge>
+                  </td>
+                  {detail.financial_years.map((fy) => {
+                    const val = getVal(m.id, fy);
+                    return (
+                      <td
+                        key={`${fy}-actual`}
+                        className={`${val ? 'fw-semibold' : 'text-muted'}`}
+                        style={{
+                          ...METRIC_ENTRY_TABLE.td.actual,
+                          fontSize: '0.78rem',
+                          fontStyle: val ? 'normal' : 'italic',
+                          textAlign: 'center',
+                          wordBreak: 'break-word',
+                        }}
+                      >
+                        {val ?? '—'}
+                      </td>
+                    );
+                  })}
                   <td
-                    key={`${fy}-actual`}
-                    className={`${val ? 'fw-semibold' : 'text-muted'}`}
+                    className={metricCommentValue(detail.metric_comments, m.id) ? '' : 'text-muted'}
                     style={{
-                      ...METRIC_ENTRY_TABLE.td.actual,
+                      ...METRIC_ENTRY_TABLE.td.comment,
                       fontSize: '0.78rem',
-                      fontStyle: val ? 'normal' : 'italic',
-                      textAlign: 'center',
+                      fontStyle: metricCommentValue(detail.metric_comments, m.id) ? 'normal' : 'italic',
                       wordBreak: 'break-word',
                     }}
                   >
-                    {val ?? '—'}
+                    {metricCommentValue(detail.metric_comments, m.id) ?? '—'}
                   </td>
-                );
-              })}
-              <td
-                className={metricCommentValue(detail.metric_comments, m.id) ? '' : 'text-muted'}
-                style={{
-                  ...METRIC_ENTRY_TABLE.td.comment,
-                  fontSize: '0.78rem',
-                  fontStyle: metricCommentValue(detail.metric_comments, m.id) ? 'normal' : 'italic',
-                  wordBreak: 'break-word',
-                }}
-              >
-                {metricCommentValue(detail.metric_comments, m.id) ?? '—'}
-              </td>
-            </tr>
-          ))}
+                </tr>
+              )];
+            }
+
+            const { parent, children, index } = row;
+            const showAutoTotal = canAutoSumTotal(parent);
+            const parentRow = (
+              <tr key={`group-parent-${parent.id}`} className="table-light">
+                <td className="align-middle">
+                  <span className="fw-semibold me-2" style={{ color: 'var(--mubs-gold, #C8922A)' }}>{index}.</span>
+                  <span className="fw-semibold">{parent.metric_text}</span>
+                </td>
+                <td style={METRIC_ENTRY_TABLE.td.unit}>
+                  <Badge bg="light" className="text-dark border" style={METRIC_ENTRY_TABLE.td.badge}>
+                    {uomTableLabel(parent.unit_of_measure)}
+                  </Badge>
+                </td>
+                {detail.financial_years.map((fy) => {
+                  const totalVal = showAutoTotal
+                    ? sumSubMetricValues(children, fy, (metricId, year) => getVal(metricId, year))
+                    : '';
+                  const display = totalVal.trim() || null;
+                  return (
+                    <td
+                      key={`${fy}-total`}
+                      className={`${display ? 'fw-semibold' : 'text-muted'}`}
+                      style={{
+                        ...METRIC_ENTRY_TABLE.td.actual,
+                        fontSize: '0.78rem',
+                        fontStyle: display ? 'normal' : 'italic',
+                        textAlign: 'center',
+                        wordBreak: 'break-word',
+                        background: '#f8fafc',
+                      }}
+                    >
+                      {showAutoTotal ? (
+                        <div>
+                          <div>{display ?? '—'}</div>
+                          <Badge bg="warning" className="text-dark border mt-1" style={{ fontSize: '0.58rem' }}>
+                            Auto total
+                          </Badge>
+                        </div>
+                      ) : '—'}
+                    </td>
+                  );
+                })}
+                <td className="text-muted" style={{ ...METRIC_ENTRY_TABLE.td.comment, fontSize: '0.78rem', fontStyle: 'italic' }}>
+                  —
+                </td>
+              </tr>
+            );
+
+            const childRows = children.map((m, childIdx) => (
+              <tr key={`sub-${m.id}`}>
+                <td className="align-middle">
+                  <span
+                    className="fw-semibold me-2 text-muted"
+                    style={{ paddingLeft: 28, display: 'inline-block', minWidth: 42 }}
+                  >
+                    {subMetricLetter(childIdx)}.
+                  </span>
+                  <span style={{ paddingLeft: 4 }}>{m.metric_text}</span>
+                </td>
+                <td style={METRIC_ENTRY_TABLE.td.unit}>
+                  <Badge bg="light" className="text-dark border" style={METRIC_ENTRY_TABLE.td.badge}>
+                    {uomTableLabel(m.unit_of_measure)}
+                  </Badge>
+                </td>
+                {detail.financial_years.map((fy) => {
+                  const val = getVal(m.id, fy);
+                  return (
+                    <td
+                      key={`${fy}-actual`}
+                      className={`${val ? 'fw-semibold' : 'text-muted'}`}
+                      style={{
+                        ...METRIC_ENTRY_TABLE.td.actual,
+                        fontSize: '0.78rem',
+                        fontStyle: val ? 'normal' : 'italic',
+                        textAlign: 'center',
+                        wordBreak: 'break-word',
+                      }}
+                    >
+                      {val ?? '—'}
+                    </td>
+                  );
+                })}
+                <td
+                  className={metricCommentValue(detail.metric_comments, m.id) ? '' : 'text-muted'}
+                  style={{
+                    ...METRIC_ENTRY_TABLE.td.comment,
+                    fontSize: '0.78rem',
+                    fontStyle: metricCommentValue(detail.metric_comments, m.id) ? 'normal' : 'italic',
+                    wordBreak: 'break-word',
+                  }}
+                >
+                  {metricCommentValue(detail.metric_comments, m.id) ?? '—'}
+                </td>
+              </tr>
+            ));
+
+            return [parentRow, ...childRows];
+          })}
         </tbody>
       </table>
     </div>

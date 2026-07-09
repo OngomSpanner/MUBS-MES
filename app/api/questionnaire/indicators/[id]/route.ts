@@ -4,7 +4,7 @@ import { cookies } from 'next/headers';
 import { verifyToken } from '@/lib/auth';
 import { canManageStrategicStandards } from '@/lib/role-routing';
 import { normalizeFinancialYear } from '@/lib/questionnaire/fy-utils';
-import { ensureQuestionnaireObjectiveSchema } from '@/lib/questionnaire-schema';
+import { ensureQuestionnaireObjectiveSchema, ensureQuestionnaireSubMetricsSchema } from '@/lib/questionnaire-schema';
 import { fetchDepartmentsWithAmbassador } from '@/lib/departments-with-ambassador';
 import {
   getIndicatorAssignedGroups,
@@ -17,6 +17,7 @@ import {
   saveIndicatorTargets,
   type IndicatorTargetInput,
 } from '@/lib/questionnaire-metric-targets';
+import { saveIndicatorMetrics } from '@/lib/questionnaire/save-indicator-metrics';
 
 export const dynamic = 'force-dynamic';
 
@@ -46,6 +47,7 @@ export async function GET(_request: Request, context: { params: Promise<{ id: st
     }
 
     await ensureQuestionnaireObjectiveSchema();
+    await ensureQuestionnaireSubMetricsSchema();
     await ensureIndicatorTargetsSchema();
     const catalog = await fetchDepartmentsWithAmbassador(true);
     await syncIndicatorDepartmentGroups(indicatorId, catalog);
@@ -64,7 +66,12 @@ export async function GET(_request: Request, context: { params: Promise<{ id: st
     const ind = rows[0];
 
     const metrics = await query({
-      query: 'SELECT id, metric_text, unit_of_measure, sort_order FROM q_metrics WHERE indicator_id = ? ORDER BY sort_order',
+      query: `
+        SELECT id, metric_text, unit_of_measure, parent_metric_id, aggregation, is_total, sort_order
+        FROM q_metrics
+        WHERE indicator_id = ?
+        ORDER BY sort_order
+      `,
       values: [indicatorId],
     }) as any[];
 
@@ -106,12 +113,22 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
     if (!await requireAdmin()) return NextResponse.json({ message: 'Forbidden' }, { status: 403 });
     const { id } = await context.params;
     const body = await request.json();
+    const overrideRemoveDepartments = body.override_remove_departments === true || body.override_remove_departments === 1;
 
     const indicatorText = typeof body.indicator_text === 'string' ? body.indicator_text.trim() : '';
     const outcomeId = Number(body.outcome_id);
     const departmentIds: number[] = Array.isArray(body.department_ids) ? body.department_ids.map(Number).filter((n: number) => Number.isFinite(n) && n > 0) : [];
     const financialYears: string[] = Array.isArray(body.financial_years) ? body.financial_years.filter((s: unknown) => typeof s === 'string' && (s as string).trim()) : [];
-    const metrics: { id?: number; metric_text: string; unit_of_measure: string }[] = Array.isArray(body.metrics) ? body.metrics : [];
+    const metrics: {
+      id?: number;
+      client_id?: string;
+      parent_metric_id?: number | null;
+      parent_client_id?: string | null;
+      metric_text: string;
+      unit_of_measure: string;
+      aggregation?: string | null;
+      is_total?: boolean | number;
+    }[] = Array.isArray(body.metrics) ? body.metrics : [];
     const indicatorTargets: IndicatorTargetInput[] = Array.isArray(body.targets) ? body.targets : [];
 
     if (!indicatorText) return NextResponse.json({ message: 'indicator_text is required' }, { status: 400 });
@@ -126,6 +143,45 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
     await query({ query: 'UPDATE q_indicators SET outcome_id=?, indicator_text=? WHERE id=?', values: [outcomeId, indicatorText, id] });
 
     // Replace departments and FYs (does not affect existing responses)
+    const existingDeptRows = (await query({
+      query: 'SELECT department_id FROM q_indicator_departments WHERE indicator_id=?',
+      values: [id],
+    })) as { department_id: number }[];
+    const existingDeptIds = existingDeptRows.map((r) => Number(r.department_id)).filter((n) => Number.isFinite(n) && n > 0);
+    const existingSet = new Set(existingDeptIds);
+    const incomingSet = new Set(departmentIds);
+    const removedDeptIds = existingDeptIds.filter((d) => existingSet.has(d) && !incomingSet.has(d));
+
+    if (removedDeptIds.length > 0 && !overrideRemoveDepartments) {
+      const removedPlaceholders = removedDeptIds.map(() => '?').join(',');
+      const rows = (await query({
+        query: `
+          SELECT r.department_id, COUNT(*) AS cnt,
+                 COALESCE(NULLIF(TRIM(d.external_name), ''), d.name) AS department_name
+          FROM q_responses r
+          JOIN departments d ON d.id = r.department_id
+          WHERE r.indicator_id = ?
+            AND r.department_id IN (${removedPlaceholders})
+            AND r.value IS NOT NULL AND TRIM(r.value) <> ''
+          GROUP BY r.department_id, department_name
+        `,
+        values: [id, ...removedDeptIds],
+      })) as { department_id: number; cnt: number; department_name: string }[];
+
+      const blocking = rows.filter((r) => Number(r.cnt) > 0);
+      if (blocking.length > 0) {
+        return NextResponse.json({
+          message: 'Some removed offices already submitted data for this indicator.',
+          requires_confirmation: true,
+          removed_offices_with_data: blocking.map((r) => ({
+            department_id: Number(r.department_id),
+            department_name: String(r.department_name || '').trim(),
+            response_count: Number(r.cnt),
+          })),
+        }, { status: 409 });
+      }
+    }
+
     await query({ query: 'DELETE FROM q_indicator_departments WHERE indicator_id=?', values: [id] });
     for (const deptId of departmentIds) {
       await query({ query: 'INSERT IGNORE INTO q_indicator_departments (indicator_id, department_id) VALUES (?, ?)', values: [id, deptId] });
@@ -136,32 +192,8 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
     }
 
     // Update metrics: keep existing by id, add new, delete removed
-    const existingMetrics = await query({ query: 'SELECT id FROM q_metrics WHERE indicator_id=?', values: [id] }) as any[];
-    const existingIds = new Set(existingMetrics.map((m: any) => m.id));
-    const incomingIds = new Set(validMetrics.filter((m) => m.id).map((m) => m.id!));
-    // Delete metrics not in the incoming list (only if no responses)
-    for (const existing of existingMetrics) {
-      if (!incomingIds.has(existing.id)) {
-        const respCount = await query({ query: 'SELECT COUNT(*) as cnt FROM q_responses WHERE metric_id=?', values: [existing.id] }) as any[];
-        if (respCount[0].cnt === 0) {
-          await query({ query: 'DELETE FROM q_metrics WHERE id=?', values: [existing.id] });
-        }
-        // if has responses, leave the metric (orphaned from editing but data preserved)
-      }
-    }
-    // Update or insert metrics
-    for (let i = 0; i < validMetrics.length; i++) {
-      const m = validMetrics[i];
-      const uom = m.unit_of_measure || 'numeric';
-      if (m.id && existingIds.has(m.id)) {
-        await query({ query: 'UPDATE q_metrics SET metric_text=?, unit_of_measure=?, sort_order=? WHERE id=?', values: [m.metric_text.trim(), uom, i, m.id] });
-      } else {
-        await query({
-          query: 'INSERT INTO q_metrics (indicator_id, metric_text, unit_of_measure, sort_order) VALUES (?, ?, ?, ?)',
-          values: [id, m.metric_text.trim(), uom, i],
-        });
-      }
-    }
+    await saveIndicatorMetrics(Number(id), validMetrics);
+
     await saveIndicatorTargets(Number(id), financialYears, indicatorTargets);
 
     const catalog = await fetchDepartmentsWithAmbassador(true);

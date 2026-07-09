@@ -9,6 +9,15 @@ async function migrate() {
     database: process.env.DB_NAME || 'mubs_super_admin',
   });
 
+  async function columnExists(table, column) {
+    const [rows] = await connection.execute(
+      `SELECT COUNT(*) AS c FROM information_schema.COLUMNS
+       WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = ?`,
+      [table, column]
+    );
+    return (rows?.[0]?.c ?? 0) > 0;
+  }
+
   const tables = [
     `CREATE TABLE IF NOT EXISTS q_outcomes (
       id INT AUTO_INCREMENT PRIMARY KEY,
@@ -48,9 +57,13 @@ async function migrate() {
       indicator_id INT NOT NULL,
       metric_text TEXT NOT NULL,
       unit_of_measure ENUM('numeric','ratio','percentage','currency','text','list') NOT NULL DEFAULT 'numeric',
+      parent_metric_id INT NULL,
+      aggregation VARCHAR(32) NULL,
+      is_total TINYINT(1) NOT NULL DEFAULT 0,
       sort_order INT NOT NULL DEFAULT 0,
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-      FOREIGN KEY (indicator_id) REFERENCES q_indicators(id) ON DELETE CASCADE
+      FOREIGN KEY (indicator_id) REFERENCES q_indicators(id) ON DELETE CASCADE,
+      FOREIGN KEY (parent_metric_id) REFERENCES q_metrics(id) ON DELETE SET NULL
     )`,
 
     `CREATE TABLE IF NOT EXISTS q_responses (
@@ -111,6 +124,41 @@ async function migrate() {
         }
       }
     }
+
+    // q_metrics: sub-metrics support (parent/aggregation/is_total)
+    if (!(await columnExists('q_metrics', 'parent_metric_id'))) {
+      await connection.execute(`ALTER TABLE q_metrics ADD COLUMN parent_metric_id INT NULL AFTER unit_of_measure`);
+      console.log('  added q_metrics.parent_metric_id');
+    } else {
+      console.log('  skip (exists): q_metrics.parent_metric_id');
+    }
+    if (!(await columnExists('q_metrics', 'aggregation'))) {
+      await connection.execute(`ALTER TABLE q_metrics ADD COLUMN aggregation VARCHAR(32) NULL AFTER parent_metric_id`);
+      console.log('  added q_metrics.aggregation');
+    } else {
+      console.log('  skip (exists): q_metrics.aggregation');
+    }
+    if (!(await columnExists('q_metrics', 'is_total'))) {
+      await connection.execute(`ALTER TABLE q_metrics ADD COLUMN is_total TINYINT(1) NOT NULL DEFAULT 0 AFTER aggregation`);
+      console.log('  added q_metrics.is_total');
+    } else {
+      console.log('  skip (exists): q_metrics.is_total');
+    }
+    try {
+      await connection.execute(`ALTER TABLE q_metrics ADD KEY idx_q_metrics_parent (parent_metric_id)`);
+      console.log('  added index idx_q_metrics_parent');
+    } catch (e) {
+      if (e.code !== 'ER_DUP_KEYNAME') throw e;
+      console.log('  skip (exists): idx_q_metrics_parent');
+    }
+    try {
+      await connection.execute(`ALTER TABLE q_metrics ADD KEY idx_q_metrics_indicator_sort (indicator_id, sort_order)`);
+      console.log('  added index idx_q_metrics_indicator_sort');
+    } catch (e) {
+      if (e.code !== 'ER_DUP_KEYNAME') throw e;
+      console.log('  skip (exists): idx_q_metrics_indicator_sort');
+    }
+
     try {
       const [cols] = await connection.execute(
         `SELECT COUNT(*) AS c FROM information_schema.COLUMNS

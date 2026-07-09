@@ -2,11 +2,12 @@ import { NextResponse } from 'next/server';
 import { query } from '@/lib/db';
 import { requireAmbassador } from '@/lib/ambassador/context';
 import { ensureHodReviewWorkflowSchema } from '@/lib/hod-review-workflow';
-import { ensureQuestionnaireObjectiveSchema } from '@/lib/questionnaire-schema';
+import { ensureQuestionnaireObjectiveSchema, ensureQuestionnaireSubMetricsSchema } from '@/lib/questionnaire-schema';
 import {
   ensureIndicatorTargetsSchema,
   loadIndicatorTargets,
 } from '@/lib/questionnaire-metric-targets';
+import { inputMetricsForIndicator } from '@/lib/questionnaire/metric-tree';
 
 export const dynamic = 'force-dynamic';
 
@@ -18,6 +19,7 @@ export async function GET(request: Request) {
 
   await ensureHodReviewWorkflowSchema();
   await ensureQuestionnaireObjectiveSchema();
+  await ensureQuestionnaireSubMetricsSchema();
   await ensureIndicatorTargetsSchema();
 
   const url = new URL(request.url);
@@ -40,7 +42,8 @@ export async function GET(request: Request) {
   const indicatorIds = indicators.map((i: any) => i.id);
   const inClause = indicatorIds.map(() => '?').join(',');
 
-  let metricsQuery = `SELECT id, indicator_id, metric_text, unit_of_measure, sort_order
+  let metricsQuery = `SELECT id, indicator_id, metric_text, unit_of_measure,
+                             parent_metric_id, aggregation, is_total, sort_order
                       FROM q_metrics WHERE indicator_id IN (${inClause})`;
   const metricsValues: any[] = [...indicatorIds];
   if (uomFilter !== 'all') {
@@ -105,8 +108,9 @@ export async function GET(request: Request) {
       if (uomFilter !== 'all' && indMetrics.length === 0) return null;
       if (fyFilter !== 'all' && indFys.length === 0) return null;
 
-      const total = indMetrics.length * indFys.length;
-      const filled = indMetrics.reduce((acc: number, m: any) =>
+      const inputMetrics = inputMetricsForIndicator(indMetrics);
+      const total = inputMetrics.length * indFys.length;
+      const filled = inputMetrics.reduce((acc: number, m: any) =>
         acc + indFys.filter((fy: string) => {
           const v = responseMap.get(`${m.id}_${fy}`)?.value;
           return v != null && String(v).trim() !== '';

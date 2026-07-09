@@ -5,6 +5,7 @@ import { getVisibleDepartmentIds, inPlaceholders } from '@/lib/department-head';
 import { query } from '@/lib/db';
 import { ensureHodReviewWorkflowSchema } from '@/lib/hod-review-workflow';
 import { ensureMetricCommentsSchema } from '@/lib/questionnaire-metric-comments';
+import { ensureQuestionnaireSubMetricsSchema } from '@/lib/questionnaire-schema';
 import {
   ensureIndicatorTargetsSchema,
   loadIndicatorTargets,
@@ -32,6 +33,7 @@ export async function GET(request: Request) {
     if ('error' in auth) return auth.error;
     await ensureHodReviewWorkflowSchema();
     await ensureMetricCommentsSchema();
+    await ensureQuestionnaireSubMetricsSchema();
     await ensureIndicatorTargetsSchema();
 
     const url = new URL(request.url);
@@ -44,10 +46,18 @@ export async function GET(request: Request) {
       }
 
       const metrics = (await query({
-        query: `SELECT id, metric_text, unit_of_measure, sort_order
+        query: `SELECT id, metric_text, unit_of_measure, parent_metric_id, aggregation, is_total, sort_order
                 FROM q_metrics WHERE indicator_id = ? ORDER BY sort_order`,
         values: [indicatorId],
-      })) as { id: number; metric_text: string; unit_of_measure: string; sort_order: number }[];
+      })) as {
+        id: number;
+        metric_text: string;
+        unit_of_measure: string;
+        parent_metric_id: number | null;
+        aggregation: string | null;
+        is_total: number | null;
+        sort_order: number;
+      }[];
 
       const financialYears = (await query({
         query: 'SELECT financial_year FROM q_indicator_fys WHERE indicator_id = ? ORDER BY financial_year',

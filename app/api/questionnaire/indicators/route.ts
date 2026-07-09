@@ -4,7 +4,7 @@ import { cookies } from 'next/headers';
 import { verifyToken } from '@/lib/auth';
 import { canManageStrategicStandards } from '@/lib/role-routing';
 import { normalizeFinancialYear } from '@/lib/questionnaire/fy-utils';
-import { ensureQuestionnaireObjectiveSchema } from '@/lib/questionnaire-schema';
+import { ensureQuestionnaireObjectiveSchema, ensureQuestionnaireSubMetricsSchema } from '@/lib/questionnaire-schema';
 import { fetchDepartmentsWithAmbassador } from '@/lib/departments-with-ambassador';
 import {
   refreshIndicatorAssignedGroupFlags,
@@ -16,6 +16,7 @@ import {
   saveIndicatorTargets,
   type IndicatorTargetInput,
 } from '@/lib/questionnaire-metric-targets';
+import { saveIndicatorMetrics } from '@/lib/questionnaire/save-indicator-metrics';
 
 export const dynamic = 'force-dynamic';
 
@@ -36,6 +37,7 @@ export async function GET() {
     if (!verifyToken(token)) return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
 
     await ensureQuestionnaireObjectiveSchema();
+    await ensureQuestionnaireSubMetricsSchema();
     await ensureIndicatorTargetsSchema();
     const catalog = await fetchDepartmentsWithAmbassador(true);
     const indicatorRows = await query({
@@ -54,7 +56,11 @@ export async function GET() {
     const indicators = indicatorRows;
 
     const metrics = await query({
-      query: 'SELECT id, indicator_id, metric_text, unit_of_measure, sort_order FROM q_metrics ORDER BY indicator_id, sort_order',
+      query: `
+        SELECT id, indicator_id, metric_text, unit_of_measure, parent_metric_id, aggregation, is_total, sort_order
+        FROM q_metrics
+        ORDER BY indicator_id, sort_order
+      `,
     }) as any[];
 
     const depts = await query({
@@ -122,7 +128,16 @@ export async function POST(request: Request) {
     const indicatorText = typeof body.indicator_text === 'string' ? body.indicator_text.trim() : '';
     const departmentIds: number[] = Array.isArray(body.department_ids) ? body.department_ids.map(Number).filter((n: number) => Number.isFinite(n) && n > 0) : [];
     const financialYears: string[] = Array.isArray(body.financial_years) ? body.financial_years.filter((s: unknown) => typeof s === 'string' && (s as string).trim()) : [];
-    const metrics: { metric_text: string; unit_of_measure: string }[] = Array.isArray(body.metrics) ? body.metrics : [];
+    const metrics: {
+      id?: number;
+      client_id?: string;
+      parent_metric_id?: number | null;
+      parent_client_id?: string | null;
+      metric_text: string;
+      unit_of_measure: string;
+      aggregation?: string | null;
+      is_total?: boolean | number;
+    }[] = Array.isArray(body.metrics) ? body.metrics : [];
     const indicatorTargets: IndicatorTargetInput[] = Array.isArray(body.targets) ? body.targets : [];
 
     if (!outcomeId) return NextResponse.json({ message: 'outcome_id is required' }, { status: 400 });
@@ -145,13 +160,7 @@ export async function POST(request: Request) {
       await query({ query: 'INSERT IGNORE INTO q_indicator_fys (indicator_id, financial_year) VALUES (?, ?)', values: [indicatorId, fy] });
     }
     await ensureIndicatorTargetsSchema();
-    for (let i = 0; i < validMetrics.length; i++) {
-      const uom = validMetrics[i].unit_of_measure || 'numeric';
-      await query({
-        query: 'INSERT INTO q_metrics (indicator_id, metric_text, unit_of_measure, sort_order) VALUES (?, ?, ?, ?)',
-        values: [indicatorId, validMetrics[i].metric_text.trim(), uom, i],
-      });
-    }
+    await saveIndicatorMetrics(indicatorId, validMetrics);
     if (indicatorTargets.length > 0) {
       await saveIndicatorTargets(indicatorId, financialYears, indicatorTargets);
     }
