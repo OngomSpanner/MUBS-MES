@@ -50,7 +50,7 @@ function LayoutContent({ children, sidebarOpen, setSidebarOpen }: any) {
       }
     }
     if (key === 'strategic' && pathname.startsWith('/admin')) {
-      return 'Standard and Activities';
+      return 'Service Delivery Standards';
     }
     const pageTitles: { [key: string]: string } = {
       'dashboard': 'Dashboard Overview',

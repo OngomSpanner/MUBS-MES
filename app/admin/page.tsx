@@ -1,4 +1,5 @@
 import StrategicView from './views/Strategic';
+import SdsStandardsAdminView from './views/SdsStandards';
 import UsersView from './views/Users';
 import ReportsView from './views/Reports';
 import AmbassadorReportsView from './views/AmbassadorReports';
@@ -21,7 +22,11 @@ export default async function AdminDashboard({ searchParams }: AdminPageProps) {
   switch (pg) {
     case 'tracking':
       redirect('/admin?pg=reports');
+    case 'sds':
+    case 'service-delivery-standards':
     case 'strategic':
+      return <SdsStandardsAdminView />;
+    case 'legacy-strategic-activities':
       return <StrategicView />;
     case 'users':
       return <UsersView />;

@@ -1,0 +1,841 @@
+output_id,standard_code,sequence,activity_name,duration_text
+MUBS/P1/OBJ1/TLSS/SR/S001-O1,MUBS/P1/OBJ1/TLSS/SR/S001,1,Needs Assessment,2 months
+MUBS/P1/OBJ1/TLSS/SR/S001-O1,MUBS/P1/OBJ1/TLSS/SR/S001,2,Concept development,1 month
+MUBS/P1/OBJ1/TLSS/SR/S001-O1,MUBS/P1/OBJ1/TLSS/SR/S001,3,Approval,1 month
+MUBS/P1/OBJ1/TLSS/SR/S001-O1,MUBS/P1/OBJ1/TLSS/SR/S001,4,Programme/courses Development/Review,4 months
+MUBS/P1/OBJ1/TLSS/SR/S001-O1,MUBS/P1/OBJ1/TLSS/SR/S001,5,Approval by Academic Board,1 month
+MUBS/P1/OBJ1/TLSS/SR/S001-O1,MUBS/P1/OBJ1/TLSS/SR/S001,6,Verification and Validation by QAD,1 month
+MUBS/P1/OBJ1/TLSS/SR/S001-O1,MUBS/P1/OBJ1/TLSS/SR/S001,7,Submission to Mak/NCHE,2 months
+MUBS/P1/OBJ1/TLSS /SR/S002-O2,MUBS/P1/OBJ1/TLSS /SR/S002,1,Approved intake figures,Before Advert
+MUBS/P1/OBJ1/TLSS /SR/S002-O2,MUBS/P1/OBJ1/TLSS /SR/S002,2,Advertisement Preparation and Approval,1 week
+MUBS/P1/OBJ1/TLSS /SR/S002-O2,MUBS/P1/OBJ1/TLSS /SR/S002,3,Receipt of Applications,as advertised
+MUBS/P1/OBJ1/TLSS /SR/S002-O2,MUBS/P1/OBJ1/TLSS /SR/S002,4,Verification of Applications,3 weeks
+MUBS/P1/OBJ1/TLSS /SR/S002-O2,MUBS/P1/OBJ1/TLSS /SR/S002,5,"Pre-entry Tests/Interviews, where applicable",as scheduled
+MUBS/P1/OBJ1/TLSS /SR/S002-O2,MUBS/P1/OBJ1/TLSS /SR/S002,6,Admissions Board Recommendation and Academic Board/Senate Approval,4 weeks
+MUBS/P1/OBJ1/TLSS /SR/S002-O2,MUBS/P1/OBJ1/TLSS /SR/S002,7,Release of Admission Lists,3 working days
+MUBS/P1/OBJ1/TLSS /SR/S002-O2,MUBS/P1/OBJ1/TLSS /SR/S002,8,Issuance of Admission Letters,1 week
+MUBS/P1/OBJ1/TLSS /SR/S002-O2,MUBS/P1/OBJ1/TLSS /SR/S002,9,Change of programme,Apply within 2 weeks of reporting
+MUBS/P1/OBJ1/TLSS /SR/S002-O3,MUBS/P1/OBJ1/TLSS /SR/S002,1,Collection of Course Offerings and staff Availability,2 weeks
+MUBS/P1/OBJ1/TLSS /SR/S002-O3,MUBS/P1/OBJ1/TLSS /SR/S002,2,Data Entry and Clash-Free Scheduling,1 Week
+MUBS/P1/OBJ1/TLSS /SR/S002-O3,MUBS/P1/OBJ1/TLSS /SR/S002,3,Consultation with Deans/HODs,1 week
+MUBS/P1/OBJ1/TLSS /SR/S002-O3,MUBS/P1/OBJ1/TLSS /SR/S002,4,Preparation for Teaching Timetable Meetings,2 Weeks
+MUBS/P1/OBJ1/TLSS /SR/S002-O3,MUBS/P1/OBJ1/TLSS /SR/S002,5,Final Approval and Publication of Timetables,1 Week
+MUBS/P1/OBJ1/TLSS /SR/S002-O3,MUBS/P1/OBJ1/TLSS /SR/S002,6,Teaching Timetable Published,2 weeks before semester
+MUBS/P1/OBJ1/TLSS /SR/S002-O3,MUBS/P1/OBJ1/TLSS /SR/S002,7,Coursework Timetable Published,1 week before coursework period
+MUBS/P1/OBJ1/TLSS /SR/S002-O3,MUBS/P1/OBJ1/TLSS /SR/S002,8,Examination Timetable Published,2 weeks before examination period
+MUBS/P1/OBJ1/TLSS /SR/S002-O4,MUBS/P1/OBJ1/TLSS /SR/S002,1,Draft and Approve Orientation Programme,2 weeks before reporting
+MUBS/P1/OBJ1/TLSS /SR/S002-O4,MUBS/P1/OBJ1/TLSS /SR/S002,2,Publish and Communicate Orientation Schedule,1 week before reporting
+MUBS/P1/OBJ1/TLSS /SR/S002-O4,MUBS/P1/OBJ1/TLSS /SR/S002,3,General Welcome Assembly,Day 1
+MUBS/P1/OBJ1/TLSS /SR/S002-O4,MUBS/P1/OBJ1/TLSS /SR/S002,4,Faculty/Departmental Briefings and Campus Tours,Days 2–3
+MUBS/P1/OBJ1/TLSS /SR/S002-O4,MUBS/P1/OBJ1/TLSS /SR/S002,5,"Health, Security, Library, ICT, and Student Support Inductions",Days 4–5
+MUBS/P1/OBJ1/TLSS /SR/S002-O4,MUBS/P1/OBJ1/TLSS /SR/S002,6,Post-Orientation Feedback Survey,within 3 days after completion
+MUBS/P1/OBJ1/TLSS /SR/S002-O5,MUBS/P1/OBJ1/TLSS /SR/S002,1,Upload Biodata for New Entrants,1 week
+MUBS/P1/OBJ1/TLSS /SR/S002-O5,MUBS/P1/OBJ1/TLSS /SR/S002,2,Verify Biodata and Academic Documents,4 weeks
+MUBS/P1/OBJ1/TLSS /SR/S002-O5,MUBS/P1/OBJ1/TLSS /SR/S002,3,Activate Registration Portal for Continuing Students,1 week after release of results
+MUBS/P1/OBJ1/TLSS /SR/S002-O5,MUBS/P1/OBJ1/TLSS /SR/S002,4,Course Selection and Approval of Electives/Options,where applicable
+MUBS/P1/OBJ1/TLSS /SR/S002-O5,MUBS/P1/OBJ1/TLSS /SR/S002,5,"Process Withdrawal, Reinstatement, Stay-Put, and Other Academic Status Cases",throughout the semester
+MUBS/P1/OBJ1/TLSS /SR/S002-O5,MUBS/P1/OBJ1/TLSS /SR/S002,6,Issue Registration Permits,immediately upon completion
+MUBS/P1/OBJ1/TLSS /SR/S002-O5,MUBS/P1/OBJ1/TLSS /SR/S002,7,Requisition new identity cards,1 week
+MUBS/P1/OBJ1/TLSS /SR/S002-O5,MUBS/P1/OBJ1/TLSS /SR/S002,8,Compilation of disaggregated Statistical data and report,Within two weeks
+MUBS/P1/OBJ1/TLSS /SR/S002-O6,MUBS/P1/OBJ1/TLSS /SR/S002,1,Approved Formative Assessment timetable,4 Weeks before commencement
+MUBS/P1/OBJ1/TLSS /SR/S002-O6,MUBS/P1/OBJ1/TLSS /SR/S002,2,Approved course outline,1 week of the semester
+MUBS/P1/OBJ1/TLSS /SR/S002-O6,MUBS/P1/OBJ1/TLSS /SR/S002,3,submission of draft question to HOD by Internal Examiner,4 weeks
+MUBS/P1/OBJ1/TLSS /SR/S002-O6,MUBS/P1/OBJ1/TLSS /SR/S002,4,Verification of adherence of the approved guidelines,1 week before commencement of exams
+MUBS/P1/OBJ1/TLSS /SR/S002-O6,MUBS/P1/OBJ1/TLSS /SR/S002,5,Approved moderation submission form,2 days
+MUBS/P1/OBJ1/TLSS /SR/S002-O6,MUBS/P1/OBJ1/TLSS /SR/S002,6,Submission to the production Unit,Immediate
+MUBS/P1/OBJ1/TLSS /SR/S002-O7,MUBS/P1/OBJ1/TLSS /SR/S002,1,Receive Approved Moderated Formative Assessment Question Papers,2 Weeks before commencement
+MUBS/P1/OBJ1/TLSS /SR/S002-O7,MUBS/P1/OBJ1/TLSS /SR/S002,2,Verification and custody,2 days
+MUBS/P1/OBJ1/TLSS /SR/S002-O7,MUBS/P1/OBJ1/TLSS /SR/S002,3,Printing and Quality checks,Case by case
+MUBS/P1/OBJ1/TLSS /SR/S002-O7,MUBS/P1/OBJ1/TLSS /SR/S002,4,"Verification, Packaging and Labelling",immediately after printing
+MUBS/P1/OBJ1/TLSS /SR/S002-O7,MUBS/P1/OBJ1/TLSS /SR/S002,5,Issuing Printed Formative Assessment Question Papers to Internal examiners,As per schedule
+MUBS/P1/OBJ1/TLSS /SR/S002-O7,MUBS/P1/OBJ1/TLSS /SR/S002,6,Reports,1 Week after examination period
+MUBS/P1/OBJ1/TLSS /SR/S002-O8,MUBS/P1/OBJ1/TLSS /SR/S002,1,Verification,Instant
+MUBS/P1/OBJ1/TLSS /SR/S002-O8,MUBS/P1/OBJ1/TLSS /SR/S002,2,Issuance of formative assessment question papers and materials to internal examiners/campus chiefs,at least 3 days before commencement for campuses & main campus as per schedule
+MUBS/P1/OBJ1/TLSS /SR/S002-O8,MUBS/P1/OBJ1/TLSS /SR/S002,3,designated examination venue,immediate
+MUBS/P1/OBJ1/TLSS /SR/S002-O9,MUBS/P1/OBJ1/TLSS /SR/S002,1,Confirm sitting arrangement,as per schedule
+MUBS/P1/OBJ1/TLSS /SR/S002-O9,MUBS/P1/OBJ1/TLSS /SR/S002,2,Pick Printed Question Papers and materials from internal examiners,Not more than 30 minutes before the start of the exam
+MUBS/P1/OBJ1/TLSS /SR/S002-O9,MUBS/P1/OBJ1/TLSS /SR/S002,3,distribute question papers and assessment materials,Before examination scheduled time
+MUBS/P1/OBJ1/TLSS /SR/S002-O9,MUBS/P1/OBJ1/TLSS /SR/S002,4,commencement of the examination,On time
+MUBS/P1/OBJ1/TLSS /SR/S002-O9,MUBS/P1/OBJ1/TLSS /SR/S002,5,Recording attendance,Immediately
+MUBS/P1/OBJ1/TLSS /SR/S002-O9,MUBS/P1/OBJ1/TLSS /SR/S002,6,Oversight role,as per examination time
+MUBS/P1/OBJ1/TLSS /SR/S002-O9,MUBS/P1/OBJ1/TLSS /SR/S002,7,collection and tallying answer scripts,End of the examination
+MUBS/P1/OBJ1/TLSS /SR/S002-O9,MUBS/P1/OBJ1/TLSS /SR/S002,8,"Submit answer scripts, invigilation reports, examinations Malpractices where applicable and attendance sheets to authorized staff and Unit (Instant) For other formative assessment modes that are not sit-in, other approved processes shall apply",
+MUBS/P1/OBJ1/TLSS /SR/S002-O10,MUBS/P1/OBJ1/TLSS /SR/S002,1,Approved examination timetable,4 Weeks before commencement
+MUBS/P1/OBJ1/TLSS /SR/S002-O10,MUBS/P1/OBJ1/TLSS /SR/S002,2,Approved course outline,1 week of the semester
+MUBS/P1/OBJ1/TLSS /SR/S002-O10,MUBS/P1/OBJ1/TLSS /SR/S002,3,submission of draft question to HOD by Internal Examiner,4 weeks
+MUBS/P1/OBJ1/TLSS /SR/S002-O10,MUBS/P1/OBJ1/TLSS /SR/S002,4,Verification of adherence of the approved guidelines,3 weeks before commencement of exams
+MUBS/P1/OBJ1/TLSS /SR/S002-O10,MUBS/P1/OBJ1/TLSS /SR/S002,5,Approved moderation submission form,2 days
+MUBS/P1/OBJ1/TLSS /SR/S002-O10,MUBS/P1/OBJ1/TLSS /SR/S002,6,Submission to the production Unit,Immediate
+MUBS/P1/OBJ1/TLSS /SR/S002-O11,MUBS/P1/OBJ1/TLSS /SR/S002,1,Receive Approved Moderated Question Papers,2 Weeks before commencement
+MUBS/P1/OBJ1/TLSS /SR/S002-O11,MUBS/P1/OBJ1/TLSS /SR/S002,2,Verification and custody,2 days
+MUBS/P1/OBJ1/TLSS /SR/S002-O11,MUBS/P1/OBJ1/TLSS /SR/S002,3,Printing and Quality checks,Case by case
+MUBS/P1/OBJ1/TLSS /SR/S002-O11,MUBS/P1/OBJ1/TLSS /SR/S002,4,"Verification, Packaging and Labelling",immediately after printing
+MUBS/P1/OBJ1/TLSS /SR/S002-O11,MUBS/P1/OBJ1/TLSS /SR/S002,5,Issuing Printed Question Papers to Internal examiners,As per schedule
+MUBS/P1/OBJ1/TLSS /SR/S002-O11,MUBS/P1/OBJ1/TLSS /SR/S002,6,Reports,1 Week after examination period
+MUBS/P1/OBJ1/TLSS /SR/S002-O12,MUBS/P1/OBJ1/TLSS /SR/S002,1,Verification,Instant
+MUBS/P1/OBJ1/TLSS /SR/S002-O12,MUBS/P1/OBJ1/TLSS /SR/S002,2,Issuance of examination question papers and materials to internal examiners/campus chiefs,at least 3 days for campuses before commencement & main campus as per schedule
+MUBS/P1/OBJ1/TLSS /SR/S002-O12,MUBS/P1/OBJ1/TLSS /SR/S002,3,designated examination venue,immediate
+MUBS/P1/OBJ1/TLSS /SR/S002-O13,MUBS/P1/OBJ1/TLSS /SR/S002,1,Confirm sitting arrangement,as per schedule
+MUBS/P1/OBJ1/TLSS /SR/S002-O13,MUBS/P1/OBJ1/TLSS /SR/S002,2,Pick Printed Question Papers and materials from internal examiners,Not more than 30 minutes before the start of the exam
+MUBS/P1/OBJ1/TLSS /SR/S002-O13,MUBS/P1/OBJ1/TLSS /SR/S002,3,distribute question papers and examination papers,Before examination scheduled time
+MUBS/P1/OBJ1/TLSS /SR/S002-O13,MUBS/P1/OBJ1/TLSS /SR/S002,4,commencement of the examination,On time
+MUBS/P1/OBJ1/TLSS /SR/S002-O13,MUBS/P1/OBJ1/TLSS /SR/S002,5,Recording attendance,After 30 minutes from commencement
+MUBS/P1/OBJ1/TLSS /SR/S002-O13,MUBS/P1/OBJ1/TLSS /SR/S002,6,Oversight role,as per examination time
+MUBS/P1/OBJ1/TLSS /SR/S002-O13,MUBS/P1/OBJ1/TLSS /SR/S002,7,collection and tallying answer scripts,End of the examination
+MUBS/P1/OBJ1/TLSS /SR/S002-O13,MUBS/P1/OBJ1/TLSS /SR/S002,8,"Submit answer scripts, invigilation reports, examinations Malpractices where applicable and attendance sheets to authorized staff and Unit",Instant
+MUBS/P1/OBJ1/TLSS /SR/S002-O14,MUBS/P1/OBJ1/TLSS /SR/S002,1,"Prepare for Markers (receive, batch, serialise answer scripts) during the examination period",
+MUBS/P1/OBJ1/TLSS /SR/S002-O14,MUBS/P1/OBJ1/TLSS /SR/S002,2,"Receive list of appointed markers and marking load from departments, after completion of assessments",
+MUBS/P1/OBJ1/TLSS /SR/S002-O14,MUBS/P1/OBJ1/TLSS /SR/S002,3,Receive markers with pre-tested and approved marking guides before marking begins,
+MUBS/P1/OBJ1/TLSS /SR/S002-O14,MUBS/P1/OBJ1/TLSS /SR/S002,4,Coordinate the marking process,"issuing, recording, reconciling and returning answer scripts"
+MUBS/P1/OBJ1/TLSS /SR/S002-O14,MUBS/P1/OBJ1/TLSS /SR/S002,5,Submit status reports to Academic HoDs weekly,
+MUBS/P1/OBJ1/TLSS /SR/S002-O14,MUBS/P1/OBJ1/TLSS /SR/S002,6,Proceed to checking,
+MUBS/P1/OBJ1/TLSS /SR/S002-O15,MUBS/P1/OBJ1/TLSS /SR/S002,1,Receives results from internal examiner,Within 3 weeks
+MUBS/P1/OBJ1/TLSS /SR/S002-O15,MUBS/P1/OBJ1/TLSS /SR/S002,2,submit to QAD for checking,Within 3 weeks
+MUBS/P1/OBJ1/TLSS /SR/S002-O15,MUBS/P1/OBJ1/TLSS /SR/S002,3,Approval of results Faculty Examiners’ Board,2 weeks
+MUBS/P1/OBJ1/TLSS /SR/S002-O15,MUBS/P1/OBJ1/TLSS /SR/S002,4,Submit results to Faculties where programmes are housed,2 Working Days
+MUBS/P1/OBJ1/TLSS /SR/S002-O15,MUBS/P1/OBJ1/TLSS /SR/S002,5,Hold Faculty Board,Within 2 weeks
+MUBS/P1/OBJ1/TLSS /SR/S002-O15,MUBS/P1/OBJ1/TLSS /SR/S002,6,Provisionals release of results,2 Working Days
+MUBS/P1/OBJ1/TLSS /SR/S002-O15,MUBS/P1/OBJ1/TLSS /SR/S002,7,Results compliant and feedback,Routine
+MUBS/P1/OBJ1/TLSS /SR/S002-O15,MUBS/P1/OBJ1/TLSS /SR/S002,8,Proceed to Academic Board for Approval/Recommendations,2 weeks
+MUBS/P1/OBJ1/TLSS /SR/S002-O15,MUBS/P1/OBJ1/TLSS /SR/S002,9,Uploading and Publishing of results,2 working days
+MUBS/P1/OBJ1/TLSS /SR/S002-O16,MUBS/P1/OBJ1/TLSS /SR/S002,1,Receive appointed checkers,Immediately after marking
+MUBS/P1/OBJ1/TLSS /SR/S002-O16,MUBS/P1/OBJ1/TLSS /SR/S002,2,Induct checkers,1 day
+MUBS/P1/OBJ1/TLSS /SR/S002-O16,MUBS/P1/OBJ1/TLSS /SR/S002,3,Assign workload,Continuous
+MUBS/P1/OBJ1/TLSS /SR/S002-O16,MUBS/P1/OBJ1/TLSS /SR/S002,4,coordinate checking process,Continuous
+MUBS/P1/OBJ1/TLSS /SR/S002-O16,MUBS/P1/OBJ1/TLSS /SR/S002,5,Compile Checkers’ Comments,daily
+MUBS/P1/OBJ1/TLSS /SR/S002-O16,MUBS/P1/OBJ1/TLSS /SR/S002,6,Prepare Reports,within 3 weeks
+MUBS/P1/OBJ1/TLSS /SR/S002-O16,MUBS/P1/OBJ1/TLSS /SR/S002,7,"Submit Reports to Deans, HODs, and Internal Examiners",Within 3 weeks
+MUBS/P1/OBJ1/TLSS /SR/S002-O16,MUBS/P1/OBJ1/TLSS /SR/S002,8,Receipt of Corrected Results Mark sheets,Immediate
+MUBS/P1/OBJ1/TLSS /SR/S002-O16,MUBS/P1/OBJ1/TLSS /SR/S002,9,Verify and Confirm Corrections,Immediate
+MUBS/P1/OBJ1/TLSS /SR/S002-O16,MUBS/P1/OBJ1/TLSS /SR/S002,10,Submit examination report to Management,1 weeks
+MUBS/P1/OBJ1/TLSS /SR/S002-O17,MUBS/P1/OBJ1/TLSS /SR/S002,1,Invitation of EE by HODs,6 months before commencement of Academic Year
+MUBS/P1/OBJ1/TLSS /SR/S002-O17,MUBS/P1/OBJ1/TLSS /SR/S002,2,Confirmation availability by EE,Beginning of Semester
+MUBS/P1/OBJ1/TLSS /SR/S002-O17,MUBS/P1/OBJ1/TLSS /SR/S002,3,Requests and approval of logistical requirements,Within 4 Weeks
+MUBS/P1/OBJ1/TLSS /SR/S002-O17,MUBS/P1/OBJ1/TLSS /SR/S002,4,Examining,1-2 Weeks
+MUBS/P1/OBJ1/TLSS /SR/S002-O17,MUBS/P1/OBJ1/TLSS /SR/S002,5,Meeting Faculty staff,End of examining period
+MUBS/P1/OBJ1/TLSS /SR/S002-O17,MUBS/P1/OBJ1/TLSS /SR/S002,6,Submission of Reports,Immediate
+MUBS/P1/OBJ1/TLSS /SR/S002-O18,MUBS/P1/OBJ1/TLSS /SR/S002,1,Stock taking,4 Weeks
+MUBS/P1/OBJ1/TLSS /SR/S002-O18,MUBS/P1/OBJ1/TLSS /SR/S002,2,Monitor and Manage Storage Conditions,continuous
+MUBS/P1/OBJ1/TLSS /SR/S002-O18,MUBS/P1/OBJ1/TLSS /SR/S002,3,Conduct Verification and Audit of Stored Scripts,Once a year
+MUBS/P1/OBJ1/TLSS /SR/S002-O18,MUBS/P1/OBJ1/TLSS /SR/S002,4,Identify Scripts Due for Disposal,Once a year
+MUBS/P1/OBJ1/TLSS /SR/S002-O18,MUBS/P1/OBJ1/TLSS /SR/S002,5,Report to Management,2 Weeks
+MUBS/P1/OBJ1/TLSS /SR/S002-O19,MUBS/P1/OBJ1/TLSS /SR/S002,1,Request for document,Open
+MUBS/P1/OBJ1/TLSS /SR/S002-O19,MUBS/P1/OBJ1/TLSS /SR/S002,2,Verification,Within a Week
+MUBS/P1/OBJ1/TLSS /SR/S002-O19,MUBS/P1/OBJ1/TLSS /SR/S002,3,Approval,1 Week
+MUBS/P1/OBJ1/TLSS /SR/S002-O19,MUBS/P1/OBJ1/TLSS /SR/S002,4,Issuance,Immediate after Approval
+MUBS/P1/OBJ1/TLSS /SR/S002-O19,MUBS/P1/OBJ1/TLSS /SR/S002,5,Reports,Monthly
+MUBS/P1/OBJ1/TLSS /SR/S002-O20,MUBS/P1/OBJ1/TLSS /SR/S002,1,Disseminate Academic Board–Approved Lists,8 weeks before ceremony
+MUBS/P1/OBJ1/TLSS /SR/S002-O20,MUBS/P1/OBJ1/TLSS /SR/S002,2,"Issue Notices, Invitations, and Instructions",from 6 weeks before ceremony
+MUBS/P1/OBJ1/TLSS /SR/S002-O20,MUBS/P1/OBJ1/TLSS /SR/S002,3,"Coordinate Venue, Seating, Security, and Gown Distribution",6 weeks before ceremony
+MUBS/P1/OBJ1/TLSS /SR/S002-O20,MUBS/P1/OBJ1/TLSS /SR/S002,4,"Conduct Graduation Ceremony (Academic Procession, Speeches, and Award of Degrees)",Graduation Day
+MUBS/P1/OBJ1/TLSS /SR/S002-O20,MUBS/P1/OBJ1/TLSS /SR/S002,5,Post evaluation report,1 week after graduation
+MUBS/P1/OBJ1/TLSS /SR/S002-O21,MUBS/P1/OBJ1/TLSS /SR/S002,1,Approved Annual Academic Board/Sub-Committee Meeting Schedule,As per schedule
+MUBS/P1/OBJ1/TLSS /SR/S002-O21,MUBS/P1/OBJ1/TLSS /SR/S002,2,Call for Agenda Items,6 weeks before meeting
+MUBS/P1/OBJ1/TLSS /SR/S002-O21,MUBS/P1/OBJ1/TLSS /SR/S002,3,Set Agenda,4 weeks before meeting
+MUBS/P1/OBJ1/TLSS /SR/S002-O21,MUBS/P1/OBJ1/TLSS /SR/S002,4,Compile and Review Board Papers,2 weeks before meeting
+MUBS/P1/OBJ1/TLSS /SR/S002-O21,MUBS/P1/OBJ1/TLSS /SR/S002,5,Verify Submissions,"policy, financial, completeness"
+MUBS/P1/OBJ1/TLSS /SR/S002-O21,MUBS/P1/OBJ1/TLSS /SR/S002,6,Distribute Board Pack,14 days before meeting
+MUBS/P1/OBJ1/TLSS /SR/S002-O21,MUBS/P1/OBJ1/TLSS /SR/S002,7,Conduct Board Meeting with Secretariat Support,
+MUBS/P1/OBJ1/TLSS /SR/S002-O21,MUBS/P1/OBJ1/TLSS /SR/S002,8,Prepare Minutes and Track Actions,
+MUBS/P1/OBJ1/TLSS /SR/S002-O21,MUBS/P1/OBJ1/TLSS /SR/S002,9,Circulate Draft Minutes,within 14 working days
+MUBS/P1/OBJ1/TLSS /SR/S002-O21,MUBS/P1/OBJ1/TLSS /SR/S002,10,Resolution Tracking,As per time frame
+MUBS/P1/OBJ1/TLSS /SR/S002-O22,MUBS/P1/OBJ1/TLSS /SR/S002,1,Request Semester Results from Academic Departments,2 weeks after Academic Board
+MUBS/P1/OBJ1/TLSS /SR/S002-O22,MUBS/P1/OBJ1/TLSS /SR/S002,2,Receive Departmental Responses,1 week
+MUBS/P1/OBJ1/TLSS /SR/S002-O22,MUBS/P1/OBJ1/TLSS /SR/S002,3,Compile Faculty and Programme Performance Analyses,4 weeks
+MUBS/P1/OBJ1/TLSS /SR/S002-O22,MUBS/P1/OBJ1/TLSS /SR/S002,4,Prepare Consolidated Student Performance Report with disaggregated data,1 Week
+MUBS/P1/OBJ1/TLSS /SR/S002-O22,MUBS/P1/OBJ1/TLSS /SR/S002,5,Submit Report to the Principal,1 day
+MUBS/P1/OBJ1/TLSS/F&Ds/S001-O24,MUBS/P1/OBJ1/TLSS/F&Ds/S001,1,"Departmental sourcing, verification and recommendations of IE &EE to Faculty Board",6 months before beginning of AY
+MUBS/P1/OBJ1/TLSS/F&Ds/S001-O24,MUBS/P1/OBJ1/TLSS/F&Ds/S001,2,Faculty Board recommendations of IE & EE to AB,4 weeks
+MUBS/P1/OBJ1/TLSS/F&Ds/S001-O24,MUBS/P1/OBJ1/TLSS/F&Ds/S001,3,Appointments of IE & EE),Within 4 weeks
+MUBS/P1/OBJ1/TLSS/F&Ds/S001-O24,MUBS/P1/OBJ1/TLSS/F&Ds/S001,4,Report to management,Immediate
+MUBS/P1/OBJ1/TLSS/F&Ds/S001-O25,MUBS/P1/OBJ1/TLSS/F&Ds/S001,1,Appointed Internal Examiner,4 weeks before commencement of semester
+MUBS/P1/OBJ1/TLSS/F&Ds/S001-O25,MUBS/P1/OBJ1/TLSS/F&Ds/S001,2,Develop/Update Course Outline,Before beginning of semester
+MUBS/P1/OBJ1/TLSS/F&Ds/S001-O25,MUBS/P1/OBJ1/TLSS/F&Ds/S001,3,Lecture instruction and delivery,As per the teaching timetable
+MUBS/P1/OBJ1/TLSS/F&Ds/S001-O25,MUBS/P1/OBJ1/TLSS/F&Ds/S001,4,Recording of attendance,Per lecture
+MUBS/P1/OBJ1/TLSS/F&Ds/S001-O25,MUBS/P1/OBJ1/TLSS/F&Ds/S001,5,Uploading materials,Per lecture
+MUBS/P1/OBJ1/TLSS/F&Ds/S001-O25,MUBS/P1/OBJ1/TLSS/F&Ds/S001,6,"Monitoring, Evaluation and Feedback",Weekly
+MUBS/P1/OBJ1/TLSS/F&Ds/S001-O25,MUBS/P1/OBJ1/TLSS/F&Ds/S001,7,Report to HOD,As necessary
+MUBS/P1/OBJ1/TLSS/F&Ds/S001-O27,MUBS/P1/OBJ1/TLSS/F&Ds/S001,1,Study Teaching Timetable,1 day
+MUBS/P1/OBJ1/TLSS/F&Ds/S001-O27,MUBS/P1/OBJ1/TLSS/F&Ds/S001,2,Prepare SECAT Forms,Weeks 8–9
+MUBS/P1/OBJ1/TLSS/F&Ds/S001-O27,MUBS/P1/OBJ1/TLSS/F&Ds/S001,3,Departmental Verification,3 days
+MUBS/P1/OBJ1/TLSS/F&Ds/S001-O27,MUBS/P1/OBJ1/TLSS/F&Ds/S001,4,Form Retrieval for Updates,1 day
+MUBS/P1/OBJ1/TLSS/F&Ds/S001-O27,MUBS/P1/OBJ1/TLSS/F&Ds/S001,5,Print Final Forms,2 days
+MUBS/P1/OBJ1/TLSS/F&Ds/S001-O27,MUBS/P1/OBJ1/TLSS/F&Ds/S001,6,SECAT Briefing Meeting,1 day
+MUBS/P1/OBJ1/TLSS/F&Ds/S001-O27,MUBS/P1/OBJ1/TLSS/F&Ds/S001,7,Distribute & Collect Forms,Weeks 10–12
+MUBS/P1/OBJ1/TLSS/F&Ds/S001-O27,MUBS/P1/OBJ1/TLSS/F&Ds/S001,8,Data Capture,4 weeks
+MUBS/P1/OBJ1/TLSS/F&Ds/S001-O27,MUBS/P1/OBJ1/TLSS/F&Ds/S001,9,Analyse & Compile Report,Week 1 next semester
+MUBS/P1/OBJ1/TLSS/F&Ds/S001-O27,MUBS/P1/OBJ1/TLSS/F&Ds/S001,10,Submit Report to Principal,Week 2 next semester
+MUBS/P1/OBJ1/TLSS/F&Ds/S002-O28,MUBS/P1/OBJ1/TLSS/F&Ds/S002,1,Submission of FA acceptance letters by Students to FA coordinators,Before end of semester two every Academic Year
+MUBS/P1/OBJ1/TLSS/F&Ds/S002-O28,MUBS/P1/OBJ1/TLSS/F&Ds/S002,2,Effective Allocation of Academic Supervisors to students,8 Weeks before commencement
+MUBS/P1/OBJ1/TLSS/F&Ds/S002-O28,MUBS/P1/OBJ1/TLSS/F&Ds/S002,3,Submission of Allocation lists and Facilitation for Approval,8 Weeks before commencement
+MUBS/P1/OBJ1/TLSS/F&Ds/S002-O28,MUBS/P1/OBJ1/TLSS/F&Ds/S002,4,Receipt of Facilitation and FA Materials,4 Weeks
+MUBS/P1/OBJ1/TLSS/F&Ds/S002-O28,MUBS/P1/OBJ1/TLSS/F&Ds/S002,5,Supervision,As per schedule
+MUBS/P1/OBJ1/TLSS/F&Ds/S002-O28,MUBS/P1/OBJ1/TLSS/F&Ds/S002,6,"Monitoring, Evaluation and Feedback",4 Weeks
+MUBS/P1/OBJ1/TLSS/F&Ds/S002-O28,MUBS/P1/OBJ1/TLSS/F&Ds/S002,7,Submission of FA Reports,2 Weeks
+MUBS/P1/OBJ1/TLSS/FGSR/S001-O29,MUBS/P1/OBJ1/TLSS/FGSR/S001,1,Concept development,Before end of semester two of year one
+MUBS/P1/OBJ1/TLSS/FGSR/S001-O29,MUBS/P1/OBJ1/TLSS/FGSR/S001,2,Supervisor Allocation,On approval of Concept Dev’t
+MUBS/P1/OBJ1/TLSS/FGSR/S001-O29,MUBS/P1/OBJ1/TLSS/FGSR/S001,3,Proposal Development and supervision,8 Weeks
+MUBS/P1/OBJ1/TLSS/FGSR/S001-O29,MUBS/P1/OBJ1/TLSS/FGSR/S001,4,Plagiarism/REC compliance,4 Weeks
+MUBS/P1/OBJ1/TLSS/FGSR/S001-O29,MUBS/P1/OBJ1/TLSS/FGSR/S001,5,Proposal Review & Feedback,3 Weeks
+MUBS/P1/OBJ1/TLSS/FGSR/S001-O29,MUBS/P1/OBJ1/TLSS/FGSR/S001,6,Submission of Corrected Proposal,1 Week
+MUBS/P1/OBJ1/TLSS/FGSR/S001-O29,MUBS/P1/OBJ1/TLSS/FGSR/S001,7,Data Collection and Analysis,4 Weeks
+MUBS/P1/OBJ1/TLSS/FGSR/S001-O29,MUBS/P1/OBJ1/TLSS/FGSR/S001,8,Dissertation/Thesis/Project writing,4 Weeks
+MUBS/P1/OBJ1/TLSS/FGSR/S001-O29,MUBS/P1/OBJ1/TLSS/FGSR/S001,9,Plagiarism Check,1 Day
+MUBS/P1/OBJ1/TLSS/FGSR/S001-O29,MUBS/P1/OBJ1/TLSS/FGSR/S001,10,Submission for examination and Feedback,8 Weeks
+MUBS/P1/OBJ1/TLSS/FGSR/S001-O29,MUBS/P1/OBJ1/TLSS/FGSR/S001,11,Oral Examination (Viva Voce/Public Defence),2 Weeks after receipt of feedback
+MUBS/P1/OBJ1/TLSS/FGSR/S001-O29,MUBS/P1/OBJ1/TLSS/FGSR/S001,12,Recommendations,1 Weeks
+MUBS/P1/OBJ1/TLSS/FGSR/S001-O29,MUBS/P1/OBJ1/TLSS/FGSR/S001,13,Submit Corrected Dissertation/Thesis/Project,1 Week
+MUBS/P1/OBJ1/TLSS/SR/S003-O30,MUBS/P1/OBJ1/TLSS/SR/S003,1,Internal (students already admitted (Continuous) and External,As schedule
+MUBS/P1/OBJ1/TLSS/SR/S003-O30,MUBS/P1/OBJ1/TLSS/SR/S003,2,Identify Target Schools,End of Term I
+MUBS/P1/OBJ1/TLSS/SR/S003-O30,MUBS/P1/OBJ1/TLSS/SR/S003,3,Engage School Administrations and Secure Dates,1 month
+MUBS/P1/OBJ1/TLSS/SR/S003-O30,MUBS/P1/OBJ1/TLSS/SR/S003,4,Develop Customized Presentations,2 Weeks
+MUBS/P1/OBJ1/TLSS/SR/S003-O30,MUBS/P1/OBJ1/TLSS/SR/S003,5,"Deploy Career Facilitators, Faculty Representatives, and Student Ambassadors",2 Weeks
+MUBS/P1/OBJ1/TLSS/SR/S003-O30,MUBS/P1/OBJ1/TLSS/SR/S003,6,Conduct Career Guidance Sessions and Fairs,2 Working Days
+MUBS/P1/OBJ1/TLSS/SR/S003-O30,MUBS/P1/OBJ1/TLSS/SR/S003,8,Feedback and Follow Up,Within 2 Weeks
+MUBS/P1/OBJ1/TLSS/SR/S003-O30,MUBS/P1/OBJ1/TLSS/SR/S003,9,Compile and Submit Annual Impact Report,1 week
+MUBS/P1/OBJ1/TLSS/SR/S003-O31,MUBS/P1/OBJ1/TLSS/SR/S003,1,Mapping potential partners,Monthly
+MUBS/P1/OBJ1/TLSS/SR/S003-O31,MUBS/P1/OBJ1/TLSS/SR/S003,2,Initial outreach & introduction,Within 7 days of identification
+MUBS/P1/OBJ1/TLSS/SR/S003-O31,MUBS/P1/OBJ1/TLSS/SR/S003,3,Needs assessment meeting,Within 14 days
+MUBS/P1/OBJ1/TLSS/SR/S003-O31,MUBS/P1/OBJ1/TLSS/SR/S003,4,Drafting partnership proposal,Within 21 days
+MUBS/P1/OBJ1/TLSS/SR/S003-O31,MUBS/P1/OBJ1/TLSS/SR/S003,5,Internal review & approval,Within 25 days
+MUBS/P1/OBJ1/TLSS/SR/S003-O31,MUBS/P1/OBJ1/TLSS/SR/S003,6,Signing MoU/ Agreement,Within 30 days
+MUBS/P1/OBJ1/TLSS/SR/S003-O31,MUBS/P1/OBJ1/TLSS/SR/S003,7,Onboarding employer into partnership database,Within 3 days after signing
+MUBS/P1/OBJ1/TLSS/SR/S003-O31,MUBS/P1/OBJ1/TLSS/SR/S003,8,Implementation of partnership activities,Continuous
+MUBS/P1/OBJ1/TLSS/SR/S003-O31,MUBS/P1/OBJ1/TLSS/SR/S003,9,Annual partnership review & renewal,Every December
+MUBS/P1/OBJ1/TLSS/SR/S003-O32,MUBS/P1/OBJ1/TLSS/SR/S003,1,"Obtain Information from the Office of the School Registrar and Mak about Postgraduate, Undergraduate programmes and the Certificate and Diploma programmes in 1-2 days",
+MUBS/P1/OBJ1/TLSS/SR/S003-O32,MUBS/P1/OBJ1/TLSS/SR/S003,2,Initiate form 5 requests to Principal to run an advert for these Programmes.,3-4 days
+MUBS/P1/OBJ1/TLSS/SR/S003-O32,MUBS/P1/OBJ1/TLSS/SR/S003,3,"Send Artwork for design to the chosen Print Media; 1 day,",
+MUBS/P1/OBJ1/TLSS/SR/S003-O32,MUBS/P1/OBJ1/TLSS/SR/S003,4,"Print Media sends back artwork for approval by PRO; 1 day,",
+MUBS/P1/OBJ1/TLSS/SR/S003-O32,MUBS/P1/OBJ1/TLSS/SR/S003,5,Artwork studied by PRO and approval 2 days,
+MUBS/P1/OBJ1/TLSS/SR/S003-O32,MUBS/P1/OBJ1/TLSS/SR/S003,6,Artwork runs in the Print and Digital Media,1 day
+MUBS/P1/OBJ1/TLSS/SR/S003-O32,MUBS/P1/OBJ1/TLSS/SR/S003,7,Performance report by PRO sent to PDU. 1day,
+MUBS/P2/OBJ1/IDDT/S&P/S001-O33,MUBS/P2/OBJ1/IDDT/S&P/S001,1,Issue Planning Guidelines,1 day
+MUBS/P2/OBJ1/IDDT/S&P/S001-O33,MUBS/P2/OBJ1/IDDT/S&P/S001,2,Receive and Consolidate Unit Plans and Budgets,2 weeks
+MUBS/P2/OBJ1/IDDT/S&P/S001-O33,MUBS/P2/OBJ1/IDDT/S&P/S001,3,Conduct Stakeholder Consultations,1 week
+MUBS/P2/OBJ1/IDDT/S&P/S001-O33,MUBS/P2/OBJ1/IDDT/S&P/S001,4,Align Strategic Priorities with Budget Resources,1 week
+MUBS/P2/OBJ1/IDDT/S&P/S001-O33,MUBS/P2/OBJ1/IDDT/S&P/S001,5,Compile and Review Consolidated Plans and Performance Reports,1 week
+MUBS/P2/OBJ1/IDDT/S&P/S001-O33,MUBS/P2/OBJ1/IDDT/S&P/S001,6,Present to Management,
+MUBS/P2/OBJ1/IDDT/S&P/S001-O33,MUBS/P2/OBJ1/IDDT/S&P/S001,7,Incorporate Feedback and Revise Documents,2 days
+MUBS/P2/OBJ1/IDDT/S&P/S001-O33,MUBS/P2/OBJ1/IDDT/S&P/S001,8,Submit Budget for Approval by Management and Council,1 week
+MUBS/P2/OBJ1/IDDT/S&P/S001-O33,MUBS/P2/OBJ1/IDDT/S&P/S001,9,Communicate Approved Targets for Implementation,2 days
+MUBS/P2/OBJ1/IDDT/S&P/S001-O34,MUBS/P2/OBJ1/IDDT/S&P/S001,1,Identify Strategic Project Priorities and Targets,1 week
+MUBS/P2/OBJ1/IDDT/S&P/S001-O34,MUBS/P2/OBJ1/IDDT/S&P/S001,2,Develop Concept Notes,within 2 months
+MUBS/P2/OBJ1/IDDT/S&P/S001-O34,MUBS/P2/OBJ1/IDDT/S&P/S001,3,Submit Concept Notes to Development Committee,1 day
+MUBS/P2/OBJ1/IDDT/S&P/S001-O34,MUBS/P2/OBJ1/IDDT/S&P/S001,4,"Refine and Submit to NPA, MoFPED, and Other Relevant Authorities",up to 1 month
+MUBS/P2/OBJ1/IDDT/S&P/S001-O34,MUBS/P2/OBJ1/IDDT/S&P/S001,5,Conduct Feasibility Studies,3 months
+MUBS/P2/OBJ1/IDDT/S&P/S001-O34,MUBS/P2/OBJ1/IDDT/S&P/S001,6,Submit Feasibility Reports for Approval,1 week
+MUBS/P2/OBJ1/IDDT/S&P/S001-O34,MUBS/P2/OBJ1/IDDT/S&P/S001,7,Submit Implementation Plans to Development Committee,1 week
+MUBS/P2/OBJ1/IDDT/S&P/S001-O34,MUBS/P2/OBJ1/IDDT/S&P/S001,8,Coordinate Development of Technical Designs and Specifications,6 months
+MUBS/P2/OBJ1/IDDT/S&P/S001-O34,MUBS/P2/OBJ1/IDDT/S&P/S001,9,Submit Progress Reports to Management,1 week
+MUBS/P2/OBJ1/IDDT/S&P/S001-O34,MUBS/P2/OBJ1/IDDT/S&P/S001,10,Support Transition to Project Implementation,as per workplan
+MUBS/P2/OBJ1/IDDT/S&P/S001-O35,MUBS/P2/OBJ1/IDDT/S&P/S001,1,Draft and seek approval for Strategic Planning Roadmap and Budget,1 week
+MUBS/P2/OBJ1/IDDT/S&P/S001-O35,MUBS/P2/OBJ1/IDDT/S&P/S001,2,Conduct Institutional Performance Review and SWOT Analysis,1 month
+MUBS/P2/OBJ1/IDDT/S&P/S001-O35,MUBS/P2/OBJ1/IDDT/S&P/S001,3,Hold Stakeholder Consultations and Validation Workshops,2 weeks
+MUBS/P2/OBJ1/IDDT/S&P/S001-O35,MUBS/P2/OBJ1/IDDT/S&P/S001,4,"Define Strategic Pillars, Objectives, and KPIs",3 weeks
+MUBS/P2/OBJ1/IDDT/S&P/S001-O35,MUBS/P2/OBJ1/IDDT/S&P/S001,5,Develop Strategic Plan Framework and Results Matrix,2 weeks
+MUBS/P2/OBJ1/IDDT/S&P/S001-O35,MUBS/P2/OBJ1/IDDT/S&P/S001,6,Align Costing with Resources,1 week
+MUBS/P2/OBJ1/IDDT/S&P/S001-O35,MUBS/P2/OBJ1/IDDT/S&P/S001,7,Prepare Draft Strategic Plan,
+MUBS/P2/OBJ1/IDDT/S&P/S001-O35,MUBS/P2/OBJ1/IDDT/S&P/S001,8,Validate with Management and NPA,1 week
+MUBS/P2/OBJ1/IDDT/S&P/S001-O35,MUBS/P2/OBJ1/IDDT/S&P/S001,9,Revise and Finalize the Plan,2 weeks
+MUBS/P2/OBJ1/IDDT/S&P/S001-O35,MUBS/P2/OBJ1/IDDT/S&P/S001,10,Submit to Council for Approval,1 week
+MUBS/P2/OBJ1/IDDT/S&P/S001-O35,MUBS/P2/OBJ1/IDDT/S&P/S001,11,Publish and Launch the Strategic Plan,1 week
+MUBS/P2/OBJ1/IDDT/S&P/S001-O35,MUBS/P2/OBJ1/IDDT/S&P/S001,12,Communicate Implementation Targets and Responsibilities,1 week
+MUBS/P2/OBJ2/IDDT/E&W/S001-O36,MUBS/P2/OBJ2/IDDT/E&W/S001,1,Draft workplans for submission to development committee,
+MUBS/P2/OBJ2/IDDT/E&W/S001-O36,MUBS/P2/OBJ2/IDDT/E&W/S001,2,Constitute teams to draft designs,
+MUBS/P2/OBJ2/IDDT/E&W/S001-O36,MUBS/P2/OBJ2/IDDT/E&W/S001,3,Conduct technical review and compliance verification,
+MUBS/P2/OBJ2/IDDT/E&W/S001-O36,MUBS/P2/OBJ2/IDDT/E&W/S001,4,Submit designs to management for approval,
+MUBS/P2/OBJ2/IDDT/E&W/S001-O36,MUBS/P2/OBJ2/IDDT/E&W/S001,5,Obtain regulatory clearance and approvals,
+MUBS/P2/OBJ2/IDDT/E&W/S001-O36,MUBS/P2/OBJ2/IDDT/E&W/S001,6,Submit to management for implementation,procurement
+MUBS/P2/OBJ2/IDDT/E&W/S001-O36,MUBS/P2/OBJ2/IDDT/E&W/S001,7,construction project management and quality control,
+MUBS/P2/OBJ2/IDDT/E&W/S001-O36,MUBS/P2/OBJ2/IDDT/E&W/S001,8,Report to management,
+MUBS/P2/OBJ2/IDDT/E&W/S001-O37,MUBS/P2/OBJ2/IDDT/E&W/S001,1,Draft and Submit Maintenance Plans and Budget to Development Committee for Approval,before beginning of financial year
+MUBS/P2/OBJ2/IDDT/E&W/S001-O37,MUBS/P2/OBJ2/IDDT/E&W/S001,2,Maintenance and Repair requests,1 Week
+MUBS/P2/OBJ2/IDDT/E&W/S001-O37,MUBS/P2/OBJ2/IDDT/E&W/S001,3,Implement as per workplan,
+MUBS/P2/OBJ2/IDDT/E&W/S001-O37,MUBS/P2/OBJ2/IDDT/E&W/S001,4,Routine inspections,weekly
+MUBS/P2/OBJ2/IDDT/E&W/S001-O37,MUBS/P2/OBJ2/IDDT/E&W/S001,5,Fault logging,instant
+MUBS/P2/OBJ2/IDDT/E&W/S001-O37,MUBS/P2/OBJ2/IDDT/E&W/S001,6,Submit reports to Management,Weekly
+MUBS/P2/OBJ2/IDDT/E&W/S001-O38,MUBS/P2/OBJ2/IDDT/E&W/S001,1,Conduct monthly Monitoring using an appropriate tool,
+MUBS/P2/OBJ2/IDDT/E&W/S001-O38,MUBS/P2/OBJ2/IDDT/E&W/S001,2,Routine Data Collection and Checks,
+MUBS/P2/OBJ2/IDDT/E&W/S001-O38,MUBS/P2/OBJ2/IDDT/E&W/S001,3,Compile monthly Report,
+MUBS/P2/OBJ2/IDDT/E&W/S001-O38,MUBS/P2/OBJ2/IDDT/E&W/S001,4,Submit Report to Principal,monthly
+MUBS/P2/OBJ2/IDDT/E&W/S001-O39,MUBS/P2/OBJ2/IDDT/E&W/S001,1,"Conduct Accessibility Audit, map, develop costed workplans",Once every strategic planning period
+MUBS/P2/OBJ2/IDDT/E&W/S001-O39,MUBS/P2/OBJ2/IDDT/E&W/S001,2,Obtain Development Committee Budget Approval,Every beginning of FY
+MUBS/P2/OBJ2/IDDT/E&W/S001-O39,MUBS/P2/OBJ2/IDDT/E&W/S001,3,Secure Procurement and Administrative Approvals,
+MUBS/P2/OBJ2/IDDT/E&W/S001-O39,MUBS/P2/OBJ2/IDDT/E&W/S001,4,Implement Accessibility Modifications,
+MUBS/P2/OBJ2/IDDT/E&W/S001-O39,MUBS/P2/OBJ2/IDDT/E&W/S001,5,Monitor and Supervise Works,
+MUBS/P2/OBJ2/IDDT/E&W/S001-O39,MUBS/P2/OBJ2/IDDT/E&W/S001,6,Conduct User Validation Audit with Special Needs Department,
+MUBS/P2/OBJ2/IDDT/E&W/S001-O39,MUBS/P2/OBJ2/IDDT/E&W/S001,7,Undertake Final Adjustments,
+MUBS/P2/OBJ2/IDDT/E&W/S001-O39,MUBS/P2/OBJ2/IDDT/E&W/S001,8,Approve and Sign Off Completed Works,
+MUBS/P2/OBJ2/IDDT/E&W/S001-O39,MUBS/P2/OBJ2/IDDT/E&W/S001,9,Submit Final Compliance Report to Management,
+MUBS/P2/OBJ2/IDDT/E&W/S001-O40,MUBS/P2/OBJ2/IDDT/E&W/S001,1,Conduct Daily Utility Infrastructure Inspections,
+MUBS/P2/OBJ2/IDDT/E&W/S001-O40,MUBS/P2/OBJ2/IDDT/E&W/S001,2,Identify and Report Faults,
+MUBS/P2/OBJ2/IDDT/E&W/S001-O40,MUBS/P2/OBJ2/IDDT/E&W/S001,3,Coordinate with Utility Service Providers,
+MUBS/P2/OBJ2/IDDT/E&W/S001-O40,MUBS/P2/OBJ2/IDDT/E&W/S001,4,Manage Generator and Solar Backup Systems,
+MUBS/P2/OBJ2/IDDT/E&W/S001-O40,MUBS/P2/OBJ2/IDDT/E&W/S001,5,Undertake Preventive Maintenance,
+MUBS/P2/OBJ2/IDDT/E&W/S001-O40,MUBS/P2/OBJ2/IDDT/E&W/S001,6,Conduct Weekly Meter Readings and Consumption Monitoring,
+MUBS/P2/OBJ2/IDDT/E&W/S001-O40,MUBS/P2/OBJ2/IDDT/E&W/S001,7,Perform Leak Detection and Efficiency Assessments,
+MUBS/P2/OBJ2/IDDT/E&W/S001-O40,MUBS/P2/OBJ2/IDDT/E&W/S001,8,Analyse Consumption Trends,
+MUBS/P2/OBJ2/IDDT/E&W/S001-O40,MUBS/P2/OBJ2/IDDT/E&W/S001,9,Verify and Reconcile Utility Invoices,
+MUBS/P2/OBJ2/IDDT/E&W/S001-O40,MUBS/P2/OBJ2/IDDT/E&W/S001,10,Process Approved Utility Payments,
+MUBS/P2/OBJ2/IDDT/E&W/S001-O40,MUBS/P2/OBJ2/IDDT/E&W/S001,11,Prepare Monthly Utility Performance Reports,
+MUBS/P2/OBJ2/IDDT/E&W/S001-O40,MUBS/P2/OBJ2/IDDT/E&W/S001,12,Submit Reports and Recommendations to Management,
+MUBS/P2/OBJ2/IDDT/E&W/S001-O41,MUBS/P2/OBJ2/IDDT/E&W/S001,1,Conduct Environmental Needs Assessment,1 week
+MUBS/P2/OBJ2/IDDT/E&W/S001-O41,MUBS/P2/OBJ2/IDDT/E&W/S001,2,Compliance Risk Analysis,1 week
+MUBS/P2/OBJ2/IDDT/E&W/S001-O41,MUBS/P2/OBJ2/IDDT/E&W/S001,3,Identify Environmental Risks and Sustainability Priorities,1 week
+MUBS/P2/OBJ2/IDDT/E&W/S001-O41,MUBS/P2/OBJ2/IDDT/E&W/S001,4,Develop Sustainability Work Plan,1 week
+MUBS/P2/OBJ2/IDDT/E&W/S001-O41,MUBS/P2/OBJ2/IDDT/E&W/S001,5,Submit to Management for Approval,1 day
+MUBS/P2/OBJ2/IDDT/E&W/S001-O41,MUBS/P2/OBJ2/IDDT/E&W/S001,6,Develop and Disseminate Environmental Guidelines,as per workplan
+MUBS/P2/OBJ2/IDDT/E&W/S001-O41,MUBS/P2/OBJ2/IDDT/E&W/S001,7,Implement Sustainability and Pollution Prevention Initiatives,as per schedule
+MUBS/P2/OBJ2/IDDT/E&W/S001-O41,MUBS/P2/OBJ2/IDDT/E&W/S001,8,Monitor Implementation,
+MUBS/P2/OBJ2/IDDT/E&W/S001-O41,MUBS/P2/OBJ2/IDDT/E&W/S001,9,Prepare and submit Environmental Compliance Reports to Management,
+MUBS/P2/OBJ2/IDDT/E&W/S001-O41,MUBS/P2/OBJ2/IDDT/E&W/S001,10,Promote Continuous Environmental Improvement,
+MUBS/P2/OBJ2/IDDT/E&W/S001-O42,MUBS/P2/OBJ2/IDDT/E&W/S001,1,Develop Environmental Protection workplan,
+MUBS/P2/OBJ2/IDDT/E&W/S001-O42,MUBS/P2/OBJ2/IDDT/E&W/S001,2,Issue Environmental Protection standards,
+MUBS/P2/OBJ2/IDDT/E&W/S001-O42,MUBS/P2/OBJ2/IDDT/E&W/S001,3,Sensitize User Units,
+MUBS/P2/OBJ2/IDDT/E&W/S001-O42,MUBS/P2/OBJ2/IDDT/E&W/S001,4,Support Implementation of Waste Segregation and Environmental Practices,
+MUBS/P2/OBJ2/IDDT/E&W/S001-O42,MUBS/P2/OBJ2/IDDT/E&W/S001,5,Monitor Waste Collection and Disposal,
+MUBS/P2/OBJ2/IDDT/E&W/S001-O42,MUBS/P2/OBJ2/IDDT/E&W/S001,6,Inspect Campus Cleanliness and Green Spaces,
+MUBS/P2/OBJ2/IDDT/E&W/S001-O42,MUBS/P2/OBJ2/IDDT/E&W/S001,7,Prevent Illegal Waste Burning,
+MUBS/P2/OBJ2/IDDT/E&W/S001-O42,MUBS/P2/OBJ2/IDDT/E&W/S001,8,Identify Environmental Management Gaps,
+MUBS/P2/OBJ2/IDDT/E&W/S001-O42,MUBS/P2/OBJ2/IDDT/E&W/S001,9,Develop Maintenance Cost Framework,
+MUBS/P2/OBJ2/IDDT/E&W/S001-O42,MUBS/P2/OBJ2/IDDT/E&W/S001,10,Obtain Management Approval,
+MUBS/P2/OBJ2/IDDT/E&W/S001-O42,MUBS/P2/OBJ2/IDDT/E&W/S001,11,Implement Environmental Improvement Actions,
+MUBS/P2/OBJ2/IDDT/E&W/S001-O42,MUBS/P2/OBJ2/IDDT/E&W/S001,12,Evaluate Compliance and Performance,
+MUBS/P2/OBJ2/IDDT/E&W/S001-O42,MUBS/P2/OBJ2/IDDT/E&W/S001,13,Submit Reports and Recommendations for Continuous Improvement,
+MUBS/P2/OBJ2/IDDT/E&W/S001-O43,MUBS/P2/OBJ2/IDDT/E&W/S001,1,Identify Capacity-Building Needs and Objectives,
+MUBS/P2/OBJ2/IDDT/E&W/S001-O43,MUBS/P2/OBJ2/IDDT/E&W/S001,2,Define Target Groups,
+MUBS/P2/OBJ2/IDDT/E&W/S001-O43,MUBS/P2/OBJ2/IDDT/E&W/S001,3,Develop Environmental Training Programmes,
+MUBS/P2/OBJ2/IDDT/E&W/S001-O43,MUBS/P2/OBJ2/IDDT/E&W/S001,4,Source Technical Training Materials,
+MUBS/P2/OBJ2/IDDT/E&W/S001-O43,MUBS/P2/OBJ2/IDDT/E&W/S001,5,Customize Content to Institutional Needs,
+MUBS/P2/OBJ2/IDDT/E&W/S001-O43,MUBS/P2/OBJ2/IDDT/E&W/S001,6,Develop Work Plan and Budget,
+MUBS/P2/OBJ2/IDDT/E&W/S001-O43,MUBS/P2/OBJ2/IDDT/E&W/S001,7,Allocate Logistics and Training Facilities,
+MUBS/P2/OBJ2/IDDT/E&W/S001-O43,MUBS/P2/OBJ2/IDDT/E&W/S001,8,Obtain Approval,
+MUBS/P2/OBJ2/IDDT/E&W/S001-O43,MUBS/P2/OBJ2/IDDT/E&W/S001,9,Conduct Training and Awareness Sessions,
+MUBS/P2/OBJ2/IDDT/E&W/S001-O43,MUBS/P2/OBJ2/IDDT/E&W/S001,10,Assess Learning and Collect Feedback,
+MUBS/P2/OBJ2/IDDT/E&W/S001-O43,MUBS/P2/OBJ2/IDDT/E&W/S001,11,Prepare Training Reports,
+MUBS/P2/OBJ2/IDDT/E&W/S001-O43,MUBS/P2/OBJ2/IDDT/E&W/S001,12,Monitor Application of Knowledge,
+MUBS/P2/OBJ2/IDDT/E&W/S001-O43,MUBS/P2/OBJ2/IDDT/E&W/S001,13,Submit Reports to Management,
+MUBS/P2/OBJ2/IDDT/E&W/S001-O44,MUBS/P2/OBJ2/IDDT/E&W/S001,1,Open and closing of classrooms/lecture halls for daily Use,
+MUBS/P2/OBJ2/IDDT/E&W/S001-O44,MUBS/P2/OBJ2/IDDT/E&W/S001,2,Conduct daily Risk Assessment and Safety Inspection,
+MUBS/P2/OBJ2/IDDT/E&W/S001-O44,MUBS/P2/OBJ2/IDDT/E&W/S001,3,Report Hazards and Obstructions and recommend the Implementation of Corrective Actions,daily
+MUBS/P2/OBJ2/IDDT/E&W/S001-O44,MUBS/P2/OBJ2/IDDT/E&W/S001,4,Monitor Facilities and Learning Environment Throughout the Day and follow up with relevant offices,
+MUBS/P2/OBJ2/IDDT/E&W/S001-O44,MUBS/P2/OBJ2/IDDT/E&W/S001,5,Prepare and submit Inspection and Maintenance Reports to management,one month
+MUBS/P2/OBJ1/IDDT/MIS/S001-O46,MUBS/P2/OBJ1/IDDT/MIS/S001,1,ICT Infrastructure and network Needs Assessment,2 weeks
+MUBS/P2/OBJ1/IDDT/MIS/S001-O46,MUBS/P2/OBJ1/IDDT/MIS/S001,2,ICT Infrastructure and Network Planning and Budget,1week
+MUBS/P2/OBJ1/IDDT/MIS/S001-O46,MUBS/P2/OBJ1/IDDT/MIS/S001,3,Submit Assessment and Work Plan to Management for approval,
+MUBS/P2/OBJ1/IDDT/MIS/S001-O46,MUBS/P2/OBJ1/IDDT/MIS/S001,4,Implement ICT Infrastructure and Network Activities,
+MUBS/P2/OBJ1/IDDT/MIS/S001-O46,MUBS/P2/OBJ1/IDDT/MIS/S001,5,Monitor Performance & Resolve Issues,Daily
+MUBS/P2/OBJ1/IDDT/MIS/S001-O46,MUBS/P2/OBJ1/IDDT/MIS/S001,6,Submit Reports to Management,Weekly
+MUBS/P2/OBJ1/IDDT/MIS/S001-O47,MUBS/P2/OBJ1/IDDT/MIS/S001,1,Needs Assessment,1 month
+MUBS/P2/OBJ1/IDDT/MIS/S001-O47,MUBS/P2/OBJ1/IDDT/MIS/S001,2,Database planning and Design,As per approved workplan
+MUBS/P2/OBJ1/IDDT/MIS/S001-O47,MUBS/P2/OBJ1/IDDT/MIS/S001,3,Database Development,As per approved workplan
+MUBS/P2/OBJ1/IDDT/MIS/S001-O47,MUBS/P2/OBJ1/IDDT/MIS/S001,4,Testing and Validation,1 month
+MUBS/P2/OBJ1/IDDT/MIS/S001-O47,MUBS/P2/OBJ1/IDDT/MIS/S001,5,Approval and Deployment,2 weeks
+MUBS/P2/OBJ1/IDDT/MIS/S001-O47,MUBS/P2/OBJ1/IDDT/MIS/S001,6,Update,where applicable
+MUBS/P2/OBJ1/IDDT/MIS/S001-O47,MUBS/P2/OBJ1/IDDT/MIS/S001,7,Monitor Database Performance,2 weeks
+MUBS/P2/OBJ1/IDDT/MIS/S001-O47,MUBS/P2/OBJ1/IDDT/MIS/S001,8,Submit Reports to Management,Within 1 Week
+MUBS/P2/OBJ1/IDDT/MIS/S001-O48,MUBS/P2/OBJ1/IDDT/MIS/S001,1,Receive User Request,Immediate
+MUBS/P2/OBJ1/IDDT/MIS/S001-O48,MUBS/P2/OBJ1/IDDT/MIS/S001,2,Log Ticket,Instant
+MUBS/P2/OBJ1/IDDT/MIS/S001-O48,MUBS/P2/OBJ1/IDDT/MIS/S001,3,Categorize and Assign,Immediate
+MUBS/P2/OBJ1/IDDT/MIS/S001-O48,MUBS/P2/OBJ1/IDDT/MIS/S001,4,Diagnose Issue,Within 30 Minutes
+MUBS/P2/OBJ1/IDDT/MIS/S001-O48,MUBS/P2/OBJ1/IDDT/MIS/S001,5,Provide Support,Immediate
+MUBS/P2/OBJ1/IDDT/MIS/S001-O48,MUBS/P2/OBJ1/IDDT/MIS/S001,6,Resolve and Restore Service,Within 1 hour
+MUBS/P2/OBJ1/IDDT/MIS/S001-O48,MUBS/P2/OBJ1/IDDT/MIS/S001,7,Escalate Complex Issues,Within 1 hour
+MUBS/P2/OBJ1/IDDT/MIS/S001-O48,MUBS/P2/OBJ1/IDDT/MIS/S001,8,Confirm User Satisfaction,Immediate
+MUBS/P2/OBJ1/IDDT/MIS/S001-O48,MUBS/P2/OBJ1/IDDT/MIS/S001,9,Close Ticket,Within 1 Hour
+MUBS/P2/OBJ1/IDDT/MIS/S001-O48,MUBS/P2/OBJ1/IDDT/MIS/S001,10,Prepare Performance Reports,Weekly
+MUBS/P2/OBJ1/IDDT/MIS/S001-O49,MUBS/P2/OBJ1/IDDT/MIS/S001,1,System Monitoring,Continuously
+MUBS/P2/OBJ1/IDDT/MIS/S001-O49,MUBS/P2/OBJ1/IDDT/MIS/S001,2,Conducting maintenance (preventive/predictive/corrective),as scheduled/required/instant
+MUBS/P2/OBJ1/IDDT/MIS/S001-O49,MUBS/P2/OBJ1/IDDT/MIS/S001,3,Implement Maintenance Activities,as per the request
+MUBS/P2/OBJ1/IDDT/MIS/S001-O49,MUBS/P2/OBJ1/IDDT/MIS/S001,4,Test and Verify functionality,Immediate
+MUBS/P2/OBJ1/IDDT/MIS/S001-O49,MUBS/P2/OBJ1/IDDT/MIS/S001,5,Submit Maintenance Reports to Management,Monthly
+MUBS/P2/OBJ1/IDDT/MIS/S001-O50,MUBS/P2/OBJ1/IDDT/MIS/S001,1,Monitor Systems,24/7
+MUBS/P2/OBJ1/IDDT/MIS/S001-O50,MUBS/P2/OBJ1/IDDT/MIS/S001,2,Detect Threats,Immediate
+MUBS/P2/OBJ1/IDDT/MIS/S001-O50,MUBS/P2/OBJ1/IDDT/MIS/S001,3,Log Incident,30 mins
+MUBS/P2/OBJ1/IDDT/MIS/S001-O50,MUBS/P2/OBJ1/IDDT/MIS/S001,4,Contain Threat,1 hr
+MUBS/P2/OBJ1/IDDT/MIS/S001-O50,MUBS/P2/OBJ1/IDDT/MIS/S001,5,Isolate Systems,1–2 hrs
+MUBS/P2/OBJ1/IDDT/MIS/S001-O50,MUBS/P2/OBJ1/IDDT/MIS/S001,6,Investigate,24–72 hrs
+MUBS/P2/OBJ1/IDDT/MIS/S001-O50,MUBS/P2/OBJ1/IDDT/MIS/S001,7,Recover Systems,1–3 days
+MUBS/P2/OBJ1/IDDT/MIS/S001-O50,MUBS/P2/OBJ1/IDDT/MIS/S001,8,Restore Services,1 day
+MUBS/P2/OBJ1/IDDT/MIS/S001-O50,MUBS/P2/OBJ1/IDDT/MIS/S001,9,Notify Stakeholders,24 hrs
+MUBS/P2/OBJ1/IDDT/MIS/S001-O50,MUBS/P2/OBJ1/IDDT/MIS/S001,10,Document Incident,1 day
+MUBS/P2/OBJ1/IDDT/MIS/S001-O50,MUBS/P2/OBJ1/IDDT/MIS/S001,11,Post-Incident Review,3–5 days
+MUBS/P2/OBJ1/IDDT/MIS/S001-O50,MUBS/P2/OBJ1/IDDT/MIS/S001,12,Implement Improvements,1–2 weeks
+MUBS/P2/OBJ1/IDDT/MIS/S001-O50,MUBS/P2/OBJ1/IDDT/MIS/S001,13,Conduct Security Audits,Periodic
+MUBS/P2/OBJ1/IDDT/MIS/S001-O51,MUBS/P2/OBJ1/IDDT/MIS/S001,1,Receive physical items at Stores,
+MUBS/P2/OBJ1/IDDT/MIS/S001-O51,MUBS/P2/OBJ1/IDDT/MIS/S001,2,"Reconcile items against delivery notes, purchase orders, and specs",
+MUBS/P2/OBJ1/IDDT/MIS/S001-O51,MUBS/P2/OBJ1/IDDT/MIS/S001,3,Route specialized assets to technical units (ICT/Estates/Audit etc.) for testing,
+MUBS/P2/OBJ1/IDDT/MIS/S001-O51,MUBS/P2/OBJ1/IDDT/MIS/S001,4,Issue and sign a Technical Acceptance Certificate,
+MUBS/P2/OBJ1/IDDT/MIS/S001-O51,MUBS/P2/OBJ1/IDDT/MIS/S001,5,Retain records in Stores files,
+MUBS/P2/OBJ1/IDDT/MIS/S001-O52,MUBS/P2/OBJ1/IDDT/MIS/S001,1,"Secure physical storage with controlled access, keys, and cards",
+MUBS/P2/OBJ1/IDDT/MIS/S001-O52,MUBS/P2/OBJ1/IDDT/MIS/S001,2,Process asset requisitions using approved documentation,
+MUBS/P2/OBJ1/IDDT/MIS/S001-O52,MUBS/P2/OBJ1/IDDT/MIS/S001,3,Log internal movements/transfers across units,
+MUBS/P2/OBJ1/IDDT/MIS/S001-O52,MUBS/P2/OBJ1/IDDT/MIS/S001,4,Execute periodic physical stock takes,
+MUBS/P2/OBJ1/IDDT/MIS/S001-O52,MUBS/P2/OBJ1/IDDT/MIS/S001,5,Escalate stock variances to the Bursar for investigation,
+MUBS/P2/OBJ1/IDDT/MIS/S001-O53,MUBS/P2/OBJ1/IDDT/MIS/S001,1,Generate unique institutional identifiers per asset classification,Immediate
+MUBS/P2/OBJ1/IDDT/MIS/S001-O53,MUBS/P2/OBJ1/IDDT/MIS/S001,2,Print/program durable physical tags,or alternative markers
+MUBS/P2/OBJ1/IDDT/MIS/S001-O53,MUBS/P2/OBJ1/IDDT/MIS/S001,3,Prioritize portable and high-risk controlled assets,
+MUBS/P2/OBJ1/IDDT/MIS/S001-O53,MUBS/P2/OBJ1/IDDT/MIS/S001,4,Physical attachment of tags to the item surface,
+MUBS/P2/OBJ1/IDDT/MIS/S001-O53,MUBS/P2/OBJ1/IDDT/MIS/S001,5,Synchronize tag numbers with the central digital sub-registers,
+MUBS/P2/OBJ1/IDDT/MIS/S001-O54,MUBS/P2/OBJ1/IDDT/MIS/S001,1,Conduct physical asset counts across units and campuses,
+MUBS/P4/OBJ2/EISG/SR/S004-O55,MUBS/P4/OBJ2/EISG/SR/S004,1,Draft the public scholarship call/advert and submit it for management approval,3 days
+MUBS/P4/OBJ2/EISG/SR/S004-O55,MUBS/P4/OBJ2/EISG/SR/S004,2,Receive and compile digital and physical applications,As stipulated in the advert window
+MUBS/P4/OBJ2/EISG/SR/S004-O55,MUBS/P4/OBJ2/EISG/SR/S004,3,"Execute background verification of transcripts, certificates, and socioeconomic statuses",1-week post-deadline
+MUBS/P4/OBJ2/EISG/SR/S004-O55,MUBS/P4/OBJ2/EISG/SR/S004,4,Filter and recommend eligible applicants to the Scholarship Admissions Sub-Committee or the Sports Committee for shortlisting,2 weeks
+MUBS/P4/OBJ2/EISG/SR/S004-O55,MUBS/P4/OBJ2/EISG/SR/S004,5,Issue formal interview invitations to shortlisted candidates,1-day post-shortlist approval
+MUBS/P4/OBJ2/EISG/SR/S004-O55,MUBS/P4/OBJ2/EISG/SR/S004,6,"Compile interview folders, rubrics, and room allocations for the panel panels",3 days
+MUBS/P4/OBJ2/EISG/SR/S004-O55,MUBS/P4/OBJ2/EISG/SR/S004,7,"Conduct panel interviews and transcribe minutes for submission through the Academic Board, Top Management, and School Council routing chain",3 weeks
+MUBS/P4/OBJ2/EISG/SR/S004-O55,MUBS/P4/OBJ2/EISG/SR/S004,8,Receive verified beneficiary lists from external sponsors,By Week 6 of the semester
+MUBS/P4/OBJ2/EISG/SR/S004-O55,MUBS/P4/OBJ2/EISG/SR/S004,9,"Generate, communicate, and issue official award letters to beneficiaries",1-week post-approval
+MUBS/P4/OBJ2/EISG/DOS/S001-O56,MUBS/P4/OBJ2/EISG/DOS/S001,1,Compile student financial files and supporting vouchers,3 weeks
+MUBS/P4/OBJ2/EISG/DOS/S001-O56,MUBS/P4/OBJ2/EISG/DOS/S001,2,Verify documents against primary registrar registers,1 week
+MUBS/P4/OBJ2/EISG/DOS/S001-O56,MUBS/P4/OBJ2/EISG/DOS/S001,3,Submit verified payroll schedules to Management for approval,1 week
+MUBS/P4/OBJ2/EISG/DOS/S001-O56,MUBS/P4/OBJ2/EISG/DOS/S001,4,Upload and authorize the approved master list within the payment interface,1 week
+MUBS/P4/OBJ2/EISG/DOS/S001-O56,MUBS/P4/OBJ2/EISG/DOS/S001,5,Disburse direct payments to verified student bank accounts,
+MUBS/P4/OBJ2/EISG/DOS/S001-O56,MUBS/P4/OBJ2/EISG/DOS/S001,6,Broadcast transaction notifications to recipients via corporate email/portals,
+MUBS/P4/OBJ2/EISG/DOS/S001-O56,MUBS/P4/OBJ2/EISG/DOS/S001,7,Compile and submit a comprehensive close-out report to Top Management,
+MUBS/P4/OBJ2/EISG/DOS/S001-O57,MUBS/P4/OBJ2/EISG/DOS/S001,1,GRCs Institute the Students' Electoral Commission,21 days from the beginning of semester 2
+MUBS/P4/OBJ2/EISG/DOS/S001-O57,MUBS/P4/OBJ2/EISG/DOS/S001,2,The electoral commission makes a budget and workplan for the guild elections,two weeks
+MUBS/P4/OBJ2/EISG/DOS/S001-O57,MUBS/P4/OBJ2/EISG/DOS/S001,3,Interested registered students pay nomination fees,2 weeks
+MUBS/P4/OBJ2/EISG/DOS/S001-O57,MUBS/P4/OBJ2/EISG/DOS/S001,4,Nominations held.,1 day
+MUBS/P4/OBJ2/EISG/DOS/S001-O57,MUBS/P4/OBJ2/EISG/DOS/S001,5,Successfully nominated students’ campaign for guild president position in a 1 Month),
+MUBS/P4/OBJ2/EISG/DOS/S001-O57,MUBS/P4/OBJ2/EISG/DOS/S001,6,Elections of the Guild president held,
+MUBS/P4/OBJ2/EISG/DOS/S001-O57,MUBS/P4/OBJ2/EISG/DOS/S001,7,Waiting period for any petition in 3 days,
+MUBS/P4/OBJ2/EISG/DOS/S001-O57,MUBS/P4/OBJ2/EISG/DOS/S001,8,Guild president elects his cabinet members,3weeks
+MUBS/P4/OBJ2/EISG/DOS/S001-O57,MUBS/P4/OBJ2/EISG/DOS/S001,9,Guild and cabinet swearing in by the guild legal advisor,1 day
+MUBS/P4/OBJ2/EISG/DOS/S001-O58,MUBS/P4/OBJ2/EISG/DOS/S001,1,Review performance of the previous sports program with stakeholders,1 month
+MUBS/P4/OBJ2/EISG/DOS/S001-O58,MUBS/P4/OBJ2/EISG/DOS/S001,2,Recommend the sports almanac and programs through the Sports Committee,1 Month
+MUBS/P4/OBJ2/EISG/DOS/S001-O58,MUBS/P4/OBJ2/EISG/DOS/S001,3,Scout and sensitize newly admitted students,One Semester
+MUBS/P4/OBJ2/EISG/DOS/S001-O58,MUBS/P4/OBJ2/EISG/DOS/S001,4,Receive expressions of interest from students to join the sports program,One Semester
+MUBS/P4/OBJ2/EISG/DOS/S001-O58,MUBS/P4/OBJ2/EISG/DOS/S001,5,Schedule training for sports coaches,1 Week
+MUBS/P4/OBJ2/EISG/DOS/S001-O58,MUBS/P4/OBJ2/EISG/DOS/S001,6,Conduct trials and selections,1 Month
+MUBS/P4/OBJ2/EISG/DOS/S001-O58,MUBS/P4/OBJ2/EISG/DOS/S001,7,Conduct scheduled team trainings,2 Months
+MUBS/P4/OBJ2/EISG/DOS/S001-O58,MUBS/P4/OBJ2/EISG/DOS/S001,8,Receive expressions of interest to compete at national level,1 Month
+MUBS/P4/OBJ2/EISG/DOS/S001-O58,MUBS/P4/OBJ2/EISG/DOS/S001,9,Register teams and athletes for competitions,1 week
+MUBS/P4/OBJ2/EISG/DOS/S001-O58,MUBS/P4/OBJ2/EISG/DOS/S001,10,Participate in competitions,2 weeks
+MUBS/P4/OBJ2/EISG/DOS/S001-O58,MUBS/P4/OBJ2/EISG/DOS/S001,11,Report sports performance to management,1 week
+MUBS/P4/OBJ2/EISG/DOS/S001-O59,MUBS/P4/OBJ2/EISG/DOS/S001,1,Compile the required documents,3 weeks
+MUBS/P4/OBJ2/EISG/DOS/S001-O59,MUBS/P4/OBJ2/EISG/DOS/S001,2,Verify the received documents,1 week
+MUBS/P4/OBJ2/EISG/DOS/S001-O59,MUBS/P4/OBJ2/EISG/DOS/S001,3,Submit verified documents to management for approval,1 week
+MUBS/P4/OBJ2/EISG/DOS/S001-O59,MUBS/P4/OBJ2/EISG/DOS/S001,4,Upload and approve the approved list for payment on the system,1 week
+MUBS/P4/OBJ2/EISG/DOS/S001-O59,MUBS/P4/OBJ2/EISG/DOS/S001,5,Process payments to student beneficiary accounts,within 2 working days
+MUBS/P4/OBJ2/EISG/DOS/S001-O59,MUBS/P4/OBJ2/EISG/DOS/S001,6,Communicate payment information to recipients via email or student platforms,1 day
+MUBS/P4/OBJ2/EISG/DOS/S001-O59,MUBS/P4/OBJ2/EISG/DOS/S001,7,Prepare and submit a report to management,2 weeks
+MUBS/P4/OBJ2/EISG/HS/S001-O60,MUBS/P4/OBJ2/EISG/HS/S001,1,Conduct triage and initial assessment in 10 minutes,
+MUBS/P4/OBJ2/EISG/HS/S001-O60,MUBS/P4/OBJ2/EISG/HS/S001,2,Provide doctor’s consultation in 15 minutes,
+MUBS/P4/OBJ2/EISG/HS/S001-O60,MUBS/P4/OBJ2/EISG/HS/S001,3,Carry out laboratory tests and/or scans in 20 minutes,
+MUBS/P4/OBJ2/EISG/HS/S001-O60,MUBS/P4/OBJ2/EISG/HS/S001,4,Complete diagnosis and initiate treatment plan in10 minutes,
+MUBS/P4/OBJ2/EISG/HS/S001-O60,MUBS/P4/OBJ2/EISG/HS/S001,5,Recommend counselling or make a referral as required,
+MUBS/P4/OBJ2/EISG/HS/S001-O60,MUBS/P4/OBJ2/EISG/HS/S001,6,Provide nursing care and support as required,
+MUBS/P4/OBJ2/EISG/HS/S001-O60,MUBS/P4/OBJ2/EISG/HS/S001,7,Formulate clinical referral notes for tertiary medical facilities when required,
+MUBS/P4/OBJ2/EISG/HS/S001-O60,MUBS/P4/OBJ2/EISG/HS/S001,8,Dispense prescribed medication at the pharmacy 5 minutes,
+MUBS/P4/OBJ2/EISG/HS/S001-O61,MUBS/P4/OBJ2/EISG/HS/S001,1,"Receive case intakes through self-referral, medical clinician routing, or administrative welfare directives",
+MUBS/P4/OBJ2/EISG/HS/S001-O61,MUBS/P4/OBJ2/EISG/HS/S001,2,Conduct a preliminary intake screening to assess psychological risk and distress levels,
+MUBS/P4/OBJ2/EISG/HS/S001-O61,MUBS/P4/OBJ2/EISG/HS/S001,3,Schedule a structured therapeutic cycle matching the client's profiling data,
+MUBS/P4/OBJ2/EISG/HS/S001-O61,MUBS/P4/OBJ2/EISG/HS/S001,4,Execute the primary counselling session,Same-day launch for all acute or high-risk presentations
+MUBS/P4/OBJ2/EISG/HS/S001-O61,MUBS/P4/OBJ2/EISG/HS/S001,5,Maintain collaborative multidisciplinary follow-ups between counselors and medical officers,
+MUBS/P4/OBJ2/EISG/HS/S001-O61,MUBS/P4/OBJ2/EISG/HS/S001,6,Administer post-session electronic client feedback instruments,
+MUBS/P4/OBJ2/EISG/HS/S001-O61,MUBS/P4/OBJ2/EISG/HS/S001,7,Submit secure performance metrics to Top Management,Immediate escalation for emergencies; consolidated monthly reports for routine checkups
+MUBS/P4/OBJ2/EISG/HS/ S002-O62,MUBS/P4/OBJ2/EISG/HS/ S002,1,Staff Registration,As required
+MUBS/P4/OBJ2/EISG/HS/ S002-O62,MUBS/P4/OBJ2/EISG/HS/ S002,2,Access medical services at the Health Services Centre or designated government referral centers,Case by case
+MUBS/P4/OBJ2/EISG/HS/ S002-O62,MUBS/P4/OBJ2/EISG/HS/ S002,3,"Medical claims and invoice listings are audited, verified, and processed for payment routing",2 weeks
+MUBS/P4/OBJ2/EISG/HS/ S002-O62,MUBS/P4/OBJ2/EISG/HS/ S002,4,Approval,1 week
+MUBS/P4/OBJ2/EISG/HS/ S002-O62,MUBS/P4/OBJ2/EISG/HS/ S002,5,Payment Refund,Within 2 weeks after approval
+MUBS/P4/OBJ2/EISG/HS/ S002-O63,MUBS/P4/OBJ2/EISG/HS/ S002,1,Injured employee or supervisor reports the workplace hazard incident to HR,immediately
+MUBS/P4/OBJ2/EISG/HS/ S002-O63,MUBS/P4/OBJ2/EISG/HS/ S002,2,HR conducts a structural review and liaises directly with the insurance provider/labor officer,
+MUBS/P4/OBJ2/EISG/HS/ S002-O63,MUBS/P4/OBJ2/EISG/HS/ S002,3,Coordinate formal clinical assessments to define permanent impairment percentages,
+MUBS/P4/OBJ2/EISG/HS/ S002-O63,MUBS/P4/OBJ2/EISG/HS/ S002,4,Formulate compensation files and process payouts through internal finance boards. Time Target: Incident reported within 48 hours of occurrence; insurance claims filed within 14 days; compensation payouts dispatched within 30 days of fund release,
+MUBS/P4/OBJ2/EISG/HS/ S002-O64,MUBS/P4/OBJ2/EISG/HS/ S002,1,Self-referral or departmental referral,
+MUBS/P4/OBJ2/EISG/HS/ S002-O64,MUBS/P4/OBJ2/EISG/HS/ S002,2,Intake at counselling unit,
+MUBS/P4/OBJ2/EISG/HS/ S002-O64,MUBS/P4/OBJ2/EISG/HS/ S002,3,confidential sessions conducted Time Target: Routine therapy bookings assigned within 48 hours; urgent emotional crisis interventions launched within 2 hours,
+MUBS/P4/OBJ2/EISG/HS/ S002-O65,MUBS/P4/OBJ2/EISG/HS/ S002,1,Family notifies HR,
+MUBS/P4/OBJ2/EISG/HS/ S002-O65,MUBS/P4/OBJ2/EISG/HS/ S002,2,Submits required documents,"death certificate, beneficiary IDs, etc."
+MUBS/P4/OBJ2/EISG/HS/ S002-O65,MUBS/P4/OBJ2/EISG/HS/ S002,3,HR verifies,
+MUBS/P4/OBJ2/EISG/HS/ S002-O65,MUBS/P4/OBJ2/EISG/HS/ S002,4,HR processes death benefits as a ''one -off '' payment as per policy,
+MUBS/P4/OBJ2/EISG/HS/ S002-O66,MUBS/P4/OBJ2/EISG/HS/ S002,1,Staff notifies HR of wedding,2 weeks
+MUBS/P4/OBJ2/EISG/HS/ S002-O66,MUBS/P4/OBJ2/EISG/HS/ S002,2,HR verifies eligibility,1 week
+MUBS/P4/OBJ2/EISG/HS/ S002-O66,MUBS/P4/OBJ2/EISG/HS/ S002,3,HR processes wedding gift/transport facilitation as per welfare budget allocation (Within 2 week). Time Target: Application checked and payment cleared inside a 14-day window prior to the scheduled event date,
+MUBS/P4/OBJ2/EISG/HS/ S002-O67,MUBS/P4/OBJ2/EISG/HS/ S002,1,Receive application with relevant attachments,1 week after semester has started
+MUBS/P4/OBJ2/EISG/HS/ S002-O67,MUBS/P4/OBJ2/EISG/HS/ S002,2,"Verification, generate list of applicants",1 week
+MUBS/P4/OBJ2/EISG/HS/ S002-O67,MUBS/P4/OBJ2/EISG/HS/ S002,3,Present to Management for approval,1 day
+MUBS/P4/OBJ2/EISG/HS/ S002-O67,MUBS/P4/OBJ2/EISG/HS/ S002,4,Feedback to successful applicants,2 weeks
+MUBS/P4/OBJ2/EISG/HS/ S002-O68,MUBS/P4/OBJ2/EISG/HS/ S002,1,HR calculates employee/employer contributions,Immediate
+MUBS/P4/OBJ2/EISG/HS/ S002-O68,MUBS/P4/OBJ2/EISG/HS/ S002,2,Bursar remits to MURBS (Defined Contribution Scheme) & NSSF,Monthly
+MUBS/P4/OBJ2/EISG/HS/ S002-O68,MUBS/P4/OBJ2/EISG/HS/ S002,3,Staff receive annual statements,Instant
+MUBS/P4/OBJ2/EISG/HS/ S002-O68,MUBS/P4/OBJ2/EISG/HS/ S002,4,Benefits processed at retirement per scheme rules,As per payment guidelines
+MUBS/P4/OBJ2/EISG/SO/S001-O69,MUBS/P4/OBJ2/EISG/SO/S001,1,mapping of deployable areas to ascertain the actual of security guards.,immediate
+MUBS/P4/OBJ2/EISG/SO/S001-O69,MUBS/P4/OBJ2/EISG/SO/S001,2,mobilize the required number of security guards,immediate
+MUBS/P4/OBJ2/EISG/SO/S001-O69,MUBS/P4/OBJ2/EISG/SO/S001,3,Give guidelines for the activity,after mobilization
+MUBS/P4/OBJ2/EISG/SO/S001-O69,MUBS/P4/OBJ2/EISG/SO/S001,4,Supervise the activity,as per schedule
+MUBS/P4/OBJ2/EISG/SO/S001-O69,MUBS/P4/OBJ2/EISG/SO/S001,5,Receive reports from the guards,
+MUBS/P4/OBJ2/EISG/SO/S001-O69,MUBS/P4/OBJ2/EISG/SO/S001,6,Debrief to security guards,at the end of the activity
+MUBS/P4/OBJ2/EISG/SO/S001-O70,MUBS/P4/OBJ2/EISG/SO/S001,1,Receive emergency call or alarm and record incident details,
+MUBS/P4/OBJ2/EISG/SO/S001-O70,MUBS/P4/OBJ2/EISG/SO/S001,2,Triage incident by threat severity level,
+MUBS/P4/OBJ2/EISG/SO/S001-O70,MUBS/P4/OBJ2/EISG/SO/S001,3,Locate closest unit and dispatch within 2 minutes,
+MUBS/P4/OBJ2/EISG/SO/S001-O70,MUBS/P4/OBJ2/EISG/SO/S001,4,Units arrive on scene within 5 minutes and secure perimeter,
+MUBS/P4/OBJ2/EISG/SO/S001-O70,MUBS/P4/OBJ2/EISG/SO/S001,5,"Mitigate threat, apply first aid, and log incident resolution",
+MUBS/P4/OBJ2/EISG/SO/S001-O71,MUBS/P4/OBJ2/EISG/SO/S001,1,Receive found item and inspect for immediate hazards or ID,
+MUBS/P4/OBJ2/EISG/SO/S001-O71,MUBS/P4/OBJ2/EISG/SO/S001,2,Record item specifications and location found into database,
+MUBS/P4/OBJ2/EISG/SO/S001-O71,MUBS/P4/OBJ2/EISG/SO/S001,3,Place high-value property in sealed tamper bags inside the safe,
+MUBS/P4/OBJ2/EISG/SO/S001-O71,MUBS/P4/OBJ2/EISG/SO/S001,4,Match claimant details against item attributes to verify ownership,
+MUBS/P4/OBJ2/EISG/SO/S001-O71,MUBS/P4/OBJ2/EISG/SO/S001,5,Execute digital sign-off and release item to owner,
+MUBS/P4/OBJ2/EISG/SO/S001-O72,MUBS/P4/OBJ2/EISG/SO/S001,1,Inspect Fire Safety Equipment and Infrastructure,
+MUBS/P4/OBJ2/EISG/SO/S001-O72,MUBS/P4/OBJ2/EISG/SO/S001,2,Check Emergency Exits and Escape Routes Daily,
+MUBS/P4/OBJ2/EISG/SO/S001-O72,MUBS/P4/OBJ2/EISG/SO/S001,3,Identify and Report Fire Safety Risks,
+MUBS/P4/OBJ2/EISG/SO/S001-O72,MUBS/P4/OBJ2/EISG/SO/S001,4,Conduct Hazard and Risk Assessments,
+MUBS/P4/OBJ2/EISG/SO/S001-O72,MUBS/P4/OBJ2/EISG/SO/S001,5,Coordinate Servicing and Refilling of Fire Equipment,
+MUBS/P4/OBJ2/EISG/SO/S001-O72,MUBS/P4/OBJ2/EISG/SO/S001,6,"Test Fire Alarms, Smoke Detectors, and Emergency Lighting Systems",
+MUBS/P4/OBJ2/EISG/SO/S001-O72,MUBS/P4/OBJ2/EISG/SO/S001,7,Implement Corrective Actions,
+MUBS/P4/OBJ2/EISG/SO/S001-O72,MUBS/P4/OBJ2/EISG/SO/S001,8,Conduct Emergency Evacuation Drills,
+MUBS/P4/OBJ2/EISG/SO/S001-O72,MUBS/P4/OBJ2/EISG/SO/S001,9,Evaluate Emergency Preparedness Performance,
+MUBS/P4/OBJ2/EISG/SO/S001-O72,MUBS/P4/OBJ2/EISG/SO/S001,10,Document Safety Findings,
+MUBS/P4/OBJ2/EISG/SO/S001-O72,MUBS/P4/OBJ2/EISG/SO/S001,11,Compile Quarterly Fire Readiness Reports,
+MUBS/P4/OBJ2/EISG/SO/S001-O72,MUBS/P4/OBJ2/EISG/SO/S001,12,Submit Reports and Recommendations to Management,
+MUBS/P4/OBJ2/EISG/DRLC/S001-O73,MUBS/P4/OBJ2/EISG/DRLC/S001,1,Conduct needs assessments to identify awareness gaps and plan interventions,Annually
+MUBS/P4/OBJ2/EISG/DRLC/S001-O73,MUBS/P4/OBJ2/EISG/DRLC/S001,2,Identify and engage key stakeholders,1 month
+MUBS/P4/OBJ2/EISG/DRLC/S001-O73,MUBS/P4/OBJ2/EISG/DRLC/S001,3,"Develop tailored, inclusive content",1 month
+MUBS/P4/OBJ2/EISG/DRLC/S001-O73,MUBS/P4/OBJ2/EISG/DRLC/S001,4,Mobilize required resources,2 months
+MUBS/P4/OBJ2/EISG/DRLC/S001-O73,MUBS/P4/OBJ2/EISG/DRLC/S001,5,Implement awareness activities,1 week
+MUBS/P4/OBJ2/EISG/DRLC/S001-O73,MUBS/P4/OBJ2/EISG/DRLC/S001,6,"Conduct monitoring, evaluation, and submit reports to management",1 week
+MUBS/P3/OBJ3/R&I/HS/S003-O74,MUBS/P3/OBJ3/R&I/HS/S003,1,Develop the campaign programme for the semester within 1 week,
+MUBS/P3/OBJ3/R&I/HS/S003-O74,MUBS/P3/OBJ3/R&I/HS/S003,2,Identify and confirm facilitators from the industry within 2 weeks,
+MUBS/P3/OBJ3/R&I/HS/S003-O74,MUBS/P3/OBJ3/R&I/HS/S003,3,Schedule dates for the campaign activities within 1 week,
+MUBS/P3/OBJ3/R&I/HS/S003-O74,MUBS/P3/OBJ3/R&I/HS/S003,4,Submit the programme to management for approval within 1 week,
+MUBS/P3/OBJ3/R&I/HS/S003-O74,MUBS/P3/OBJ3/R&I/HS/S003,5,Initiate request for funds to support the campaign activities within 1 day,
+MUBS/P3/OBJ3/R&I/HS/S003-O74,MUBS/P3/OBJ3/R&I/HS/S003,6,Create awareness about the upcoming campaign within 1 week,
+MUBS/P3/OBJ3/R&I/HS/S003-O74,MUBS/P3/OBJ3/R&I/HS/S003,7,Implement all planned campaign activities within 1 week,
+MUBS/P3/OBJ3/R&I/HS/S003-O74,MUBS/P3/OBJ3/R&I/HS/S003,8,"Ensure accessibility of campaign information through flyers, email, social media, and the website and is a continuous exercise",
+MUBS/P3/OBJ3/R&I/HS/S003-O74,MUBS/P3/OBJ3/R&I/HS/S003,9,the same process can be followed (or handled case by case) for other health outbreaks,
+MUBS/P6/OBJ3/PCI/SL/S001-O77,MUBS/P6/OBJ3/PCI/SL/S001,1,"Receive files containing dissertations, Thesis, datasets and faculty publications from the faculties",
+MUBS/P6/OBJ3/PCI/SL/S001-O77,MUBS/P6/OBJ3/PCI/SL/S001,2,Verify for standard format,
+MUBS/P6/OBJ3/PCI/SL/S001-O77,MUBS/P6/OBJ3/PCI/SL/S001,3,Conduct plagiarism checks and compliance with research and Ethics policy,
+MUBS/P6/OBJ3/PCI/SL/S001-O77,MUBS/P6/OBJ3/PCI/SL/S001,4,Extract the information and save Meta data entry in the system,
+MUBS/P6/OBJ3/PCI/SL/S001-O77,MUBS/P6/OBJ3/PCI/SL/S001,5,Upload the document,
+MUBS/P6/OBJ3/PCI/SL/S001-O77,MUBS/P6/OBJ3/PCI/SL/S001,6,Review of workflow to confirm to the meta data standard,
+MUBS/P6/OBJ3/PCI/SL/S001-O77,MUBS/P6/OBJ3/PCI/SL/S001,7,Approval and then the work is archived onto the repository,
+MUBS/P6/OBJ3/PCI/SL/S001-O78,MUBS/P6/OBJ3/PCI/SL/S001,1,"Conduct user needs assessment with faculties, depts, & students",4 weeks
+MUBS/P6/OBJ3/PCI/SL/S001-O78,MUBS/P6/OBJ3/PCI/SL/S001,2,"Compile, evaluate & select resources in collaboration with faculties and depts within 2 weeks",
+MUBS/P6/OBJ3/PCI/SL/S001-O78,MUBS/P6/OBJ3/PCI/SL/S001,3,Submit list of procurable resources for approvals and procurement,1 week
+MUBS/P6/OBJ3/PCI/SL/S001-O78,MUBS/P6/OBJ3/PCI/SL/S001,4,Process resources upon receipt,3 weeks
+MUBS/P6/OBJ3/PCI/SL/S001-O78,MUBS/P6/OBJ3/PCI/SL/S001,5,Communicate to relevant offices about new arrivals,within 1 week
+MUBS/P6/OBJ3/PCI/SL/S001-O78,MUBS/P6/OBJ3/PCI/SL/S001,6,Sensitise community about the existing services,3weeks at the beginning of the academic year and library week
+MUBS/P6/OBJ3/PCI/SL/S001-O78,MUBS/P6/OBJ3/PCI/SL/S001,7,Provide access to resources,continuous
+MUBS/P6/OBJ3/PCI/SL/S001-O78,MUBS/P6/OBJ3/PCI/SL/S001,8,Confirm registration of users,5 minutes and continuous
+MUBS/P6/OBJ3/PCI/SL/S001-O78,MUBS/P6/OBJ3/PCI/SL/S001,9,Charge & discharge resources,5 minutes
+MUBS/P6/OBJ3/PCI/SL/S001-O78,MUBS/P6/OBJ3/PCI/SL/S001,10,Renewal and return of physical resources,2 working days for reserve and 7 days for open section
+MUBS/P6/OBJ3/PCI/SL/S001-O78,MUBS/P6/OBJ3/PCI/SL/S001,11,Enforce Penalties and fines for defaulters,instant on deadline
+MUBS/P6/OBJ3/PCI/FGSR/S002-O79,MUBS/P6/OBJ3/PCI/FGSR/S002,1,Share funding calls via intranet and email,
+MUBS/P6/OBJ3/PCI/FGSR/S002-O79,MUBS/P6/OBJ3/PCI/FGSR/S002,2,Provide technical proposal support,
+MUBS/P6/OBJ3/PCI/FGSR/S002-O79,MUBS/P6/OBJ3/PCI/FGSR/S002,3,Conduct comprehensive budget review,
+MUBS/P6/OBJ3/PCI/FGSR/S002-O79,MUBS/P6/OBJ3/PCI/FGSR/S002,4,Submit final proposal package,
+MUBS/P6/OBJ3/PCI/FGSR/S002-O80,MUBS/P6/OBJ3/PCI/FGSR/S002,1,Receive and register applications,
+MUBS/P6/OBJ3/PCI/FGSR/S002-O80,MUBS/P6/OBJ3/PCI/FGSR/S002,2,Administrative screening,
+MUBS/P6/OBJ3/PCI/FGSR/S002-O80,MUBS/P6/OBJ3/PCI/FGSR/S002,3,Distribute protocols to reviewers,
+MUBS/P6/OBJ3/PCI/FGSR/S002-O80,MUBS/P6/OBJ3/PCI/FGSR/S002,4,Convene IRB meetings,
+MUBS/P6/OBJ3/PCI/FGSR/S002-O80,MUBS/P6/OBJ3/PCI/FGSR/S002,5,Issue decisions and certificates,
+MUBS/P6/OBJ3/PCI/PRO/S001-O81,MUBS/P6/OBJ3/PCI/PRO/S001,1,Receive information to communicate from the user unit,Day 0
+MUBS/P6/OBJ3/PCI/PRO/S001-O81,MUBS/P6/OBJ3/PCI/PRO/S001,2,Conduct daily information verification and factual audit,Day 0–1
+MUBS/P6/OBJ3/PCI/PRO/S001-O81,MUBS/P6/OBJ3/PCI/PRO/S001,3,"Select target-appropriate communication channels e.g., corporate email, print newspapers, or social media",Day 1–2
+MUBS/P6/OBJ3/PCI/PRO/S001-O81,MUBS/P6/OBJ3/PCI/PRO/S001,4,Execute actual communication and message dissemination,Day 1–3
+MUBS/P6/OBJ3/PCI/PRO/S001-O81,MUBS/P6/OBJ3/PCI/PRO/S001,5,Capture and log stakeholder feedback as per the designated communication terms,
+MUBS/P6/OBJ3/PCI/PRO/S001-O82,MUBS/P6/OBJ3/PCI/PRO/S001,1,Extract programme data from the Office of the School Registrar Makerere (for postgraduate/undergraduate) and MUBS Registrar (for diplomas/certificates),1–2 days
+MUBS/P6/OBJ3/PCI/PRO/S001-O82,MUBS/P6/OBJ3/PCI/PRO/S001,2,Submit comprehensive marketing request to the Principal for executive approval,3–4 days
+MUBS/P6/OBJ3/PCI/PRO/S001-O82,MUBS/P6/OBJ3/PCI/PRO/S001,3,Transmit designed artwork to selected print and digital media vendors,1 day
+MUBS/P6/OBJ3/PCI/PRO/S001-O82,MUBS/P6/OBJ3/PCI/PRO/S001,4,Review proofing artwork sent back by print media houses to the PRO,1 day
+MUBS/P6/OBJ3/PCI/PRO/S001-O82,MUBS/P6/OBJ3/PCI/PRO/S001,5,"Study, audit, and issue final PRO approval for the artwork",2 days
+MUBS/P6/OBJ3/PCI/PRO/S001-O82,MUBS/P6/OBJ3/PCI/PRO/S001,6,Run finalized artwork across selected print and digital media channels,1 day
+MUBS/P6/OBJ3/PCI/PRO/S001-O82,MUBS/P6/OBJ3/PCI/PRO/S001,7,Compile and submit the final service performance report to the PDU,1 day
+MUBS/P6/OBJ3/PCI/PRO/S001-O83,MUBS/P6/OBJ3/PCI/PRO/S001,1,"Identify, log, and classify the operational or reputational crisis",Minute 0
+MUBS/P6/OBJ3/PCI/PRO/S001-O83,MUBS/P6/OBJ3/PCI/PRO/S001,2,Convene the core Institutional Crisis Response Team,Within 30 minutes
+MUBS/P6/OBJ3/PCI/PRO/S001-O83,MUBS/P6/OBJ3/PCI/PRO/S001,3,Draft an official factual holding statement,Within 1 hour
+MUBS/P6/OBJ3/PCI/PRO/S001-O83,MUBS/P6/OBJ3/PCI/PRO/S001,4,Secure executive approval from Management / Principal,Within 2 hours
+MUBS/P6/OBJ3/PCI/PRO/S001-O83,MUBS/P6/OBJ3/PCI/PRO/S001,5,Disseminate statement to media houses and targeted stakeholder groups,Within 2–3 hours
+MUBS/P6/OBJ3/PCI/PRO/S001-O83,MUBS/P6/OBJ3/PCI/PRO/S001,6,Issue daily verified updates until full resolution of the crisis,
+MUBS/P6/OBJ3/PCI/PRO/S001-O83,MUBS/P6/OBJ3/PCI/PRO/S001,7,Compile and submit a comprehensive final crisis evaluation report to Management,Within 7 days
+MUBS/P6/OBJ3/PCI/PRO/S001-O84,MUBS/P6/OBJ3/PCI/PRO/S001,1,Develop comprehensive digital content calendars reflecting institutional milestones,Monthly
+MUBS/P6/OBJ3/PCI/PRO/S001-O84,MUBS/P6/OBJ3/PCI/PRO/S001,2,"Execute daily content creation, formatting, and platform posting",
+MUBS/P6/OBJ3/PCI/PRO/S001-O84,MUBS/P6/OBJ3/PCI/PRO/S001,3,"Conduct hourly monitoring of comments, tags, and brand mentions",
+MUBS/P6/OBJ3/PCI/PRO/S001-O84,MUBS/P6/OBJ3/PCI/PRO/S001,4,Resolve public queries and direct messages,Within 2 hours during working hours
+MUBS/P6/OBJ3/PCI/PRO/S001-O84,MUBS/P6/OBJ3/PCI/PRO/S001,5,Compile and review weekly analytics reports for internal optimization,
+MUBS/P6/OBJ3/PCI/PRO/S001-O84,MUBS/P6/OBJ3/PCI/PRO/S001,6,Submit a formalized monthly digital performance and engagement report to management,
+MUBS/P6/OBJ3/PCI/PRO/S001-O85,MUBS/P6/OBJ3/PCI/PRO/S001,1,Receive full event concepts and logistical details from user units,2–4 weeks prior
+MUBS/P6/OBJ3/PCI/PRO/S001-O85,MUBS/P6/OBJ3/PCI/PRO/S001,2,Design and finalize a tailored event communication and publicity plan,Within 3 days
+MUBS/P6/OBJ3/PCI/PRO/S001-O85,MUBS/P6/OBJ3/PCI/PRO/S001,3,Launch the official publicity rollout across selected media,2 weeks before the event
+MUBS/P6/OBJ3/PCI/PRO/S001-O85,MUBS/P6/OBJ3/PCI/PRO/S001,4,Deploy PR teams for live multimedia coverage and press management,Event Day
+MUBS/P6/OBJ3/PCI/PRO/S001-O85,MUBS/P6/OBJ3/PCI/PRO/S001,5,"Compile, review, and submit the final post-event publicity report to management",Within 5 days
+MUBS/P6/OBJ3/PCI/PRO/S001-O86,MUBS/P6/OBJ3/PCI/PRO/S001,1,Conduct comprehensive stakeholder mapping exercises to identify priority partners,Quarterly
+MUBS/P6/OBJ3/PCI/PRO/S001-O86,MUBS/P6/OBJ3/PCI/PRO/S001,2,Formulate a detailed institutional stakeholder engagement plan,Quarterly
+MUBS/P6/OBJ3/PCI/PRO/S001-O86,MUBS/P6/OBJ3/PCI/PRO/S001,3,"Draft, dispatch, and coordinate official invitations and logistics",2 weeks before engagement
+MUBS/P6/OBJ3/PCI/PRO/S001-O86,MUBS/P6/OBJ3/PCI/PRO/S001,4,"Execute the stakeholder engagement session, forum, or dialogue",On scheduled date
+MUBS/P6/OBJ3/PCI/PRO/S001-O86,MUBS/P6/OBJ3/PCI/PRO/S001,5,"Collect, aggregate, and analyze participant feedback data",Within 3 days post-event
+MUBS/P6/OBJ3/PCI/PRO/S001-O86,MUBS/P6/OBJ3/PCI/PRO/S001,6,Submit the consolidated quarterly stakeholder outreach report to Management,
+MUBS/P6/OBJ3/PCI/PRO/S001-O87,MUBS/P6/OBJ3/PCI/PRO/S001,1,Engage directly with departments and units to capture upcoming milestones,Continuous over 1 month
+MUBS/P6/OBJ3/PCI/PRO/S001-O87,MUBS/P6/OBJ3/PCI/PRO/S001,2,Develop and structurally map out the master cross-platform content calendar,1 week prior to month-start
+MUBS/P6/OBJ3/PCI/PRO/S001-O87,MUBS/P6/OBJ3/PCI/PRO/S001,3,Retrieve raw event data and background assets from organizing units,1 month prior to event
+MUBS/P6/OBJ3/PCI/PRO/S001-O87,MUBS/P6/OBJ3/PCI/PRO/S001,4,"Design and produce approved digital promotional materials, fliers, and graphics",Within 2 days of asset receipt
+MUBS/P6/OBJ3/PCI/PRO/S001-O87,MUBS/P6/OBJ3/PCI/PRO/S001,5,"Design, caption, and schedule live event day digital content blocks",Event Day
+MUBS/P6/OBJ3/PCI/PRO/S001-O87,MUBS/P6/OBJ3/PCI/PRO/S001,6,Enforce strict real-time content moderation and spam filtering,Event Day
+MUBS/P6/OBJ3/PCI/PRO/S001-O87,MUBS/P6/OBJ3/PCI/PRO/S001,7,Conduct user validation checks to ensure information accuracy,Event Day
+MUBS/P6/OBJ3/PCI/PRO/S001-O87,MUBS/P6/OBJ3/PCI/PRO/S001,8,Publish validated real-time content streams directly across platforms on the event day,
+MUBS/P6/OBJ3/PCI/PRO/S001-O88,MUBS/P6/OBJ3/PCI/PRO/S001,1,"Receive raw communication texts, announcements, or policies from the requesting User Department/Unit",Daily
+MUBS/P6/OBJ3/PCI/PRO/S001-O88,MUBS/P6/OBJ3/PCI/PRO/S001,2,"Verify information authenticity, checking against primary source records",1–3 days
+MUBS/P6/OBJ3/PCI/PRO/S001-O88,MUBS/P6/OBJ3/PCI/PRO/S001,3,"Analyze and select the best distribution channel matrices, including corporate email, digital portal news, or social extensions",1–3 days
+MUBS/P6/OBJ3/PCI/PRO/S001-O88,MUBS/P6/OBJ3/PCI/PRO/S001,4,"Format, code, and execute the actual communication and web publishing sequence",1–3 days
+MUBS/P6/OBJ3/PCI/PRO/S001-O88,MUBS/P6/OBJ3/PCI/PRO/S001,5,"Track, capture, and archive user feedback as dictated by the specific communication terms and portal logs",
+MUBS/P6/OBJ3/PCI/OCs/S001-O89,MUBS/P6/OBJ3/PCI/OCs/S001,1,Design promotional materials,1 week
+MUBS/P6/OBJ3/PCI/OCs/S001-O89,MUBS/P6/OBJ3/PCI/OCs/S001,2,Awareness creation,1 month
+MUBS/P6/OBJ3/PCI/OCs/S001-O89,MUBS/P6/OBJ3/PCI/OCs/S001,3,Application review (2 weeks) or MoU signing,
+MUBS/P6/OBJ3/PCI/OCs/S001-O89,MUBS/P6/OBJ3/PCI/OCs/S001,4,Communication to applicants,1 day
+MUBS/P6/OBJ3/PCI/OCs/S001-O89,MUBS/P6/OBJ3/PCI/OCs/S001,5,Payment collection,continuous
+MUBS/P6/OBJ3/PCI/OCs/S001-O89,MUBS/P6/OBJ3/PCI/OCs/S001,6,Orientation,1 day
+MUBS/P6/OBJ3/PCI/OCs/S001-O89,MUBS/P6/OBJ3/PCI/OCs/S001,7,Training,2-6weeks
+MUBS/P6/OBJ3/PCI/OCs/S001-O89,MUBS/P6/OBJ3/PCI/OCs/S001,8,Progressive assessments,continuous
+MUBS/P6/OBJ3/PCI/OCs/S001-O89,MUBS/P6/OBJ3/PCI/OCs/S001,9,Certification,1 day
+MUBS/P6/OBJ3/PCI/OCs/S001-O90,MUBS/P6/OBJ3/PCI/OCs/S001,1,Call for applications,1 week
+MUBS/P6/OBJ3/PCI/OCs/S001-O90,MUBS/P6/OBJ3/PCI/OCs/S001,2,Training,1 weeks
+MUBS/P6/OBJ3/PCI/OCs/S001-O90,MUBS/P6/OBJ3/PCI/OCs/S001,3,Mentorship,1 week
+MUBS/P6/OBJ3/PCI/OCs/S001-O90,MUBS/P6/OBJ3/PCI/OCs/S001,4,Graduation,1 day
+MUBS/P6/OBJ3/PCI/OCs/S001-O91,MUBS/P6/OBJ3/PCI/OCs/S001,1,Needs assessment,1 Month
+MUBS/P6/OBJ3/PCI/OCs/S001-O91,MUBS/P6/OBJ3/PCI/OCs/S001,2,receive EOI,2 weeks
+MUBS/P6/OBJ3/PCI/OCs/S001-O91,MUBS/P6/OBJ3/PCI/OCs/S001,3,Conduct Training,1 week
+MUBS/P6/OBJ3/PCI/OCs/S001-O91,MUBS/P6/OBJ3/PCI/OCs/S001,4,conduct assessments,1 week
+MUBS/P6/OBJ3/PCI/OCs/S001-O91,MUBS/P6/OBJ3/PCI/OCs/S001,5,Submit reports to Management,1 day
+MUBS/P6/OBJ3/PCI/OCs/S001-O92,MUBS/P6/OBJ3/PCI/OCs/S001,1,Preincubation,2 months
+MUBS/P6/OBJ3/PCI/OCs/S001-O92,MUBS/P6/OBJ3/PCI/OCs/S001,2,Growth stage,as per schedule
+MUBS/P6/OBJ3/PCI/OCs/S001-O92,MUBS/P6/OBJ3/PCI/OCs/S001,3,Acceleration of financing as per schedule,
+MUBS/P6/OBJ3/PCI/OCs/S001-O92,MUBS/P6/OBJ3/PCI/OCs/S001,4,graduation as per schedule,
+MUBS/P6/OBJ3/PCI/OCs/S001-O93,MUBS/P6/OBJ3/PCI/OCs/S001,1,Sourcing (3 months) Concept development,1 month
+MUBS/P6/OBJ3/PCI/OCs/S001-O93,MUBS/P6/OBJ3/PCI/OCs/S001,2,Engagement with stakeholders,3 months
+MUBS/P6/OBJ3/PCI/OCs/S001-O93,MUBS/P6/OBJ3/PCI/OCs/S001,3,MoU signing,3 months
+MUBS/P6/OBJ3/PCI/OCs/S001-O93,MUBS/P6/OBJ3/PCI/OCs/S001,4,Placement of interns,1 months
+MUBS/P6/OBJ3/PCI/OCs/S001-O93,MUBS/P6/OBJ3/PCI/OCs/S001,5,Monitoring of performance,continuous
+MUBS/P6/OBJ3/PCI/OCs/S001-O93,MUBS/P6/OBJ3/PCI/OCs/S001,6,Submission of reports to management,monthly
+MUBS/P6/OBJ3/PCI/DoS/S002-O94,MUBS/P6/OBJ3/PCI/DoS/S002,1,Compile information on admitted international students within 3 working days of receiving admission lists,
+MUBS/P6/OBJ3/PCI/DoS/S002-O94,MUBS/P6/OBJ3/PCI/DoS/S002,2,Review and verify beneficiary documentation for immigration support within 2 working days,
+MUBS/P6/OBJ3/PCI/DoS/S002-O94,MUBS/P6/OBJ3/PCI/DoS/S002,3,Coordinate visa and immigration support with the relevant government offices,
+MUBS/P6/OBJ3/PCI/DoS/S002-O94,MUBS/P6/OBJ3/PCI/DoS/S002,4,"Facilitate accommodation arrangements and other essential pre-arrival requirements, where applicable, within 1 week",
+MUBS/P6/OBJ3/PCI/DoS/S002-O94,MUBS/P6/OBJ3/PCI/DoS/S002,5,Coordinate arrival logistics with relevant School offices and provide reception and transition support upon arrival,
+MUBS/P6/OBJ3/PCI/DoS/S002-O94,MUBS/P6/OBJ3/PCI/DoS/S002,6,Verify original travel and immigration documents upon arrival,
+MUBS/P6/OBJ3/PCI/DoS/S002-O94,MUBS/P6/OBJ3/PCI/DoS/S002,7,Coordinate issuance of MUBS identification cards and other institutional documentation within 2 working days of registration,
+MUBS/P6/OBJ3/PCI/DoS/S002-O94,MUBS/P6/OBJ3/PCI/DoS/S002,8,"Conduct orientation on MUBS policies, academic systems, student support services, and campus life within 4 working days of arrival",
+MUBS/P6/OBJ3/PCI/DoS/S002-O94,MUBS/P6/OBJ3/PCI/DoS/S002,9,"Monitor students throughout the transition period and promptly identify and refer academic, financial, immigration, welfare, or psychosocial concerns to the appropriate support units",
+MUBS/P6/OBJ3/PCI/DoS/S002-O94,MUBS/P6/OBJ3/PCI/DoS/S002,10,Transition students into the standard MUBS student support systems and submit periodic onboarding reports to Management,
+MUBS/P5/OBJ4/HCG/S&P/S001-O95,MUBS/P5/OBJ4/HCG/S&P/S001,1,Draft and secure Council approval for the formulation roadmap and budget,
+MUBS/P5/OBJ4/HCG/S&P/S001-O95,MUBS/P5/OBJ4/HCG/S&P/S001,2,Conduct baseline performance reviews and comprehensive institutional SWOT/PESTLE environmental scans,
+MUBS/P5/OBJ4/HCG/S&P/S001-O95,MUBS/P5/OBJ4/HCG/S&P/S001,3,Administer stakeholder consultation workshops across all MUBS constituencies,
+MUBS/P5/OBJ4/HCG/S&P/S001-O95,MUBS/P5/OBJ4/HCG/S&P/S001,4,"Draft core strategic pillars, institutional objectives, and macro–Key Performance Indicators",KPIs
+MUBS/P5/OBJ4/HCG/S&P/S001-O95,MUBS/P5/OBJ4/HCG/S&P/S001,5,Align the strategic plan costing matrix with macro-economic realities and institutional budget ceilings,
+MUBS/P5/OBJ4/HCG/S&P/S001-O95,MUBS/P5/OBJ4/HCG/S&P/S001,6,"Validate the draft plan with Top Management, Council, and external certification authorities",NPA
+MUBS/P5/OBJ4/HCG/S&P/S001-O95,MUBS/P5/OBJ4/HCG/S&P/S001,7,"Publish, distribute, and officially launch the approved Strategic Plan",
+MUBS/P5/OBJ4/HCG/S&P/S001-O96,MUBS/P5/OBJ4/HCG/S&P/S001,1,Issue planning guideline by September every year in 1 week,
+MUBS/P5/OBJ4/HCG/S&P/S001-O96,MUBS/P5/OBJ4/HCG/S&P/S001,2,Consolidate the workplan; 10 working days,
+MUBS/P5/OBJ4/HCG/S&P/S001-O96,MUBS/P5/OBJ4/HCG/S&P/S001,3,Review & submit to Bursar in October,
+MUBS/P5/OBJ4/HCG/S&P/S001-O96,MUBS/P5/OBJ4/HCG/S&P/S001,4,"Upon approval, extract procurement plan & submit to PDU in 3 days",
+MUBS/P5/OBJ4/HCG/S&P/S001-O96,MUBS/P5/OBJ4/HCG/S&P/S001,5,Initiate procurement as per workplan by beginning of FY,
+MUBS/P5/OBJ4/HCG/S&P/S001-O96,MUBS/P5/OBJ4/HCG/S&P/S001,6,"Acquire specification, market survey report in 4 weeks",
+MUBS/P5/OBJ4/HCG/S&P/S001-O96,MUBS/P5/OBJ4/HCG/S&P/S001,7,Submit for approval to management in 1 week,
+MUBS/P5/OBJ4/HCG/S&P/S001-O96,MUBS/P5/OBJ4/HCG/S&P/S001,8,Report to Development committee and management,
+MUBS/P5/OBJ4/HCG/S&P/S001-O97,MUBS/P5/OBJ4/HCG/S&P/S001,1,Assess the active institutional results framework,
+MUBS/P5/OBJ4/HCG/S&P/S001-O97,MUBS/P5/OBJ4/HCG/S&P/S001,2,Formulate the comprehensive annual M&E operational workplan at the start of the Financial Year,1 week
+MUBS/P5/OBJ4/HCG/S&P/S001-O97,MUBS/P5/OBJ4/HCG/S&P/S001,3,Field data collection teams to retrieve performance logs from all academic and administrative cost-centres in one month,
+MUBS/P5/OBJ4/HCG/S&P/S001-O97,MUBS/P5/OBJ4/HCG/S&P/S001,4,Verify submitted performance claims directly against primary source results frameworks in 1 week,
+MUBS/P5/OBJ4/HCG/S&P/S001-O97,MUBS/P5/OBJ4/HCG/S&P/S001,5,Conduct quantitative and qualitative trend analysis on quarterly milestones in 2 weeks,
+MUBS/P5/OBJ4/HCG/S&P/S001-O97,MUBS/P5/OBJ4/HCG/S&P/S001,6,Draft cumulative performance evaluation dashboards in 2 weeks,
+MUBS/P5/OBJ4/HCG/S&P/S001-O97,MUBS/P5/OBJ4/HCG/S&P/S001,7,Submit verified evaluation reports to Top Management and the Development Committee quarterly,
+MUBS/P5/OBJ4/HCG/S&P/S001-O98,MUBS/P5/OBJ4/HCG/S&P/S001,1,Design Data Collection Tools,
+MUBS/P5/OBJ4/HCG/S&P/S001-O98,MUBS/P5/OBJ4/HCG/S&P/S001,2,Issue Data Collection Requests,
+MUBS/P5/OBJ4/HCG/S&P/S001-O98,MUBS/P5/OBJ4/HCG/S&P/S001,3,Receive and Compile Data,
+MUBS/P5/OBJ4/HCG/S&P/S001-O98,MUBS/P5/OBJ4/HCG/S&P/S001,4,"Clean, Code, and Capture Data",
+MUBS/P5/OBJ4/HCG/S&P/S001-O98,MUBS/P5/OBJ4/HCG/S&P/S001,5,Validate and Verify Data,
+MUBS/P5/OBJ4/HCG/S&P/S001-O98,MUBS/P5/OBJ4/HCG/S&P/S001,6,Analyse Institutional Trends and Indicators,
+MUBS/P5/OBJ4/HCG/S&P/S001-O98,MUBS/P5/OBJ4/HCG/S&P/S001,7,"Prepare Tables, Graphs, and Visualizations",
+MUBS/P5/OBJ4/HCG/S&P/S001-O98,MUBS/P5/OBJ4/HCG/S&P/S001,8,Draft Statistical Abstract and Fact Book,
+MUBS/P5/OBJ4/HCG/S&P/S001-O98,MUBS/P5/OBJ4/HCG/S&P/S001,9,Present Draft for Management Review,
+MUBS/P5/OBJ4/HCG/S&P/S001-O98,MUBS/P5/OBJ4/HCG/S&P/S001,10,Incorporate Feedback and Finalize,
+MUBS/P5/OBJ4/HCG/S&P/S001-O98,MUBS/P5/OBJ4/HCG/S&P/S001,11,Publish and Disseminate the Fact Book,
+MUBS/P5/OBJ4/HCG/S&P/S001-O98,MUBS/P5/OBJ4/HCG/S&P/S001,12,Archive Data and Records,
+MUBS/P5/OBJ4/HCG/PDU/S001-O99,MUBS/P5/OBJ4/HCG/PDU/S001,1,Receive user department procurement plans explicitly aligned to localized activity budgets,By May
+MUBS/P5/OBJ4/HCG/PDU/S001-O99,MUBS/P5/OBJ4/HCG/PDU/S001,2,"Clean, code, and consolidate independent unit plans into the master institutional APP framework",15–25 June
+MUBS/P5/OBJ4/HCG/PDU/S001-O99,MUBS/P5/OBJ4/HCG/PDU/S001,3,Execute cross-validation exercises with the School Bursar/Finance Department,25–28 June
+MUBS/P5/OBJ4/HCG/PDU/S001-O99,MUBS/P5/OBJ4/HCG/PDU/S001,4,Submit the consolidated PP for approval to Top Management and PPDA,By 30 June
+MUBS/P5/OBJ4/HCG/PDU/S001-O100,MUBS/P5/OBJ4/HCG/PDU/S001,1,Receive official procurement requisition (Form 5) from the user unit,Day 0
+MUBS/P5/OBJ4/HCG/PDU/S001-O100,MUBS/P5/OBJ4/HCG/PDU/S001,2,Verify funds availability and asset specifications,Days 1–2
+MUBS/P5/OBJ4/HCG/PDU/S001-O100,MUBS/P5/OBJ4/HCG/PDU/S001,3,"Draft complete, unambiguous bidding/solicitation documents as per PPDA guidelines and deadlines",
+MUBS/P5/OBJ4/HCG/PDU/S001-O100,MUBS/P5/OBJ4/HCG/PDU/S001,4,Report to management at the end of the process,
+MUBS/P5/OBJ4/HCG/PDU/S001-O101,MUBS/P5/OBJ4/HCG/PDU/S001,1,As per PPDA guidelines,
+MUBS/P5/OBJ4/HCG/PDU/S001-O102,MUBS/P5/OBJ4/HCG/PDU/S001,1,As per PPDA guidelines and deadlines,
+MUBS/P5/OBJ4/HCG/PDU/S001-O103,MUBS/P5/OBJ4/HCG/PDU/S001,1,"Gather raw store delivery notes, user feedback logs, and quality rejection sheets",Quarter 4
+MUBS/P5/OBJ4/HCG/PDU/S001-O103,MUBS/P5/OBJ4/HCG/PDU/S001,2,"Execute structured evaluation scoring based on timelines, quality, and responsiveness",Within 2 weeks
+MUBS/P5/OBJ4/HCG/PDU/S001-O103,MUBS/P5/OBJ4/HCG/PDU/S001,3,Compile and submit the final annual Supplier Performance Evaluation,
+MUBS/P5/OBJ4/HCG/PDU/S001-O103,MUBS/P5/OBJ4/HCG/PDU/S001,4,Report to Top Management,By 15 December
+MUBS/P5/OBJ4/HCG/PDU/S001-O104,MUBS/P5/OBJ4/HCG/PDU/S001,1,"Board of Survey identifies and logs obsolete, unserviceable, or redundant assets",Day 0
+MUBS/P5/OBJ4/HCG/PDU/S001-O104,MUBS/P5/OBJ4/HCG/PDU/S001,2,Conduct independent professional asset valuation and reserve pricing,Days 1–7
+MUBS/P5/OBJ4/HCG/PDU/S001-O104,MUBS/P5/OBJ4/HCG/PDU/S001,3,Formulate a comprehensive asset disposal plan,Days 7–14
+MUBS/P5/OBJ4/HCG/PDU/S001-O104,MUBS/P5/OBJ4/HCG/PDU/S001,4,Present the disposal plan to the Contracts Committee for formal execution approval,Days 14–21
+MUBS/P5/OBJ4/HCG/PDU/S001-O104,MUBS/P5/OBJ4/HCG/PDU/S001,5,"Run open public disposal processes, including public auctions or selective bidding",Days 21–60
+MUBS/P5/OBJ4/HCG/PDU/S001-O104,MUBS/P5/OBJ4/HCG/PDU/S001,6,Compile and route the final close-out disposal report to the relevant Offices,Day 60
+MUBS/P5/OBJ4/HCG/PDU/S001-O105,MUBS/P5/OBJ4/HCG/PDU/S001,1,"Receive closed procurement transaction files from active case officers. -Audit file for mandatory contents (requisitions, bids, evaluation logs, minutes). -Index and assign unique tracking codes to the file (Same day). -Transport and deposit files into secure archives (Within 48 hours).Retrieve and log out requested archival files to authorized officers",Within 1 working day
+MUBS/P5/OBJ4/HCG/SB/S001-O106,MUBS/P5/OBJ4/HCG/SB/S001,1,Verify student registers,Day 0
+MUBS/P5/OBJ4/HCG/SB/S001-O106,MUBS/P5/OBJ4/HCG/SB/S001,2,Generate invoice generated,Day 1
+MUBS/P5/OBJ4/HCG/SB/S001-O106,MUBS/P5/OBJ4/HCG/SB/S001,3,Record payment received,Any day
+MUBS/P5/OBJ4/HCG/SB/S001-O106,MUBS/P5/OBJ4/HCG/SB/S001,4,Issue receipt issued,Within 24 hrs
+MUBS/P5/OBJ4/HCG/SB/S001-O107,MUBS/P5/OBJ4/HCG/SB/S001,1,Draft and Issue budget call circular,March
+MUBS/P5/OBJ4/HCG/SB/S001-O107,MUBS/P5/OBJ4/HCG/SB/S001,2,Guide units on submission requirements,
+MUBS/P5/OBJ4/HCG/SB/S001-O107,MUBS/P5/OBJ4/HCG/SB/S001,3,Compile unit submissions,By 15 April
+MUBS/P5/OBJ4/HCG/SB/S001-O107,MUBS/P5/OBJ4/HCG/SB/S001,4,Align consolidated budget with MUBS priorities,15–25 April
+MUBS/P5/OBJ4/HCG/SB/S001-O107,MUBS/P5/OBJ4/HCG/SB/S001,5,Submit final budget,By 30 April
+MUBS/P5/OBJ4/HCG/SB/S001-O107,MUBS/P5/OBJ4/HCG/SB/S001,6,Track execution against approved allocations,throughout the financial year
+MUBS/P5/OBJ4/HCG/SB/S001-O108,MUBS/P5/OBJ4/HCG/SB/S001,1,Data collection,1–3rd
+MUBS/P5/OBJ4/HCG/SB/S001-O108,MUBS/P5/OBJ4/HCG/SB/S001,2,Verify accuracy and compliance with reporting standards,
+MUBS/P5/OBJ4/HCG/SB/S001-O108,MUBS/P5/OBJ4/HCG/SB/S001,3,Prepare monthly financial report,3–4th
+MUBS/P5/OBJ4/HCG/SB/S001-O108,MUBS/P5/OBJ4/HCG/SB/S001,4,Submit report to management,By 5th
+MUBS/P5/OBJ4/HCG/SB/S001-O108,MUBS/P5/OBJ4/HCG/SB/S001,5,Archive reports for audit and compliance purposes,
+MUBS/P5/OBJ4/HCG/SB/S001-O110,MUBS/P5/OBJ4/HCG/SB/S001,1,Log in and acknowledge audit query,Day 0
+MUBS/P5/OBJ4/HCG/SB/S001-O110,MUBS/P5/OBJ4/HCG/SB/S001,2,Gather relevant files and evidence,
+MUBS/P5/OBJ4/HCG/SB/S001-O110,MUBS/P5/OBJ4/HCG/SB/S001,3,Conduct investigations and analysis,Day 4-7
+MUBS/P5/OBJ4/HCG/SB/S001-O110,MUBS/P5/OBJ4/HCG/SB/S001,4,Investigation,Day 1–7
+MUBS/P5/OBJ4/HCG/SB/S001-O110,MUBS/P5/OBJ4/HCG/SB/S001,5,Submit official response,Day 7–14
+MUBS/P5/OBJ4/HCG/SB/S001-O110,MUBS/P5/OBJ4/HCG/SB/S001,6,Track resolution status and update compliance records,
+MUBS/P5/OBJ4/HCG/SB/S001-O111,MUBS/P5/OBJ4/HCG/SB/S001,1,Collect payments daily,Daily
+MUBS/P5/OBJ4/HCG/SB/S001-O111,MUBS/P5/OBJ4/HCG/SB/S001,2,Record transactions immediately in the systems,End of day
+MUBS/P5/OBJ4/HCG/SB/S001-O111,MUBS/P5/OBJ4/HCG/SB/S001,3,Prepare weekly revenue summary,
+MUBS/P5/OBJ4/HCG/SB/S001-O111,MUBS/P5/OBJ4/HCG/SB/S001,4,Submit monthly accountability reports,
+MUBS/P5/OBJ4/HCG/SB/S001-O111,MUBS/P5/OBJ4/HCG/SB/S001,5,Maintain 100% traceability funds,
+MUBS/P5/OBJ4/HCG/HRD/S001-O112,MUBS/P5/OBJ4/HCG/HRD/S001,1,"HR Directorate (HRD) interfaces with the new hire, collects primary biodata, and issues critical HR files",Within 5 working days of contract acceptance
+MUBS/P5/OBJ4/HCG/HRD/S001-O112,MUBS/P5/OBJ4/HCG/HRD/S001,2,Notify the respective Head of Department (HOD) of the new hire's reporting date,Within 5 working days
+MUBS/P5/OBJ4/HCG/HRD/S001-O112,MUBS/P5/OBJ4/HCG/HRD/S001,3,"Formal introduction to the HOD, department team, and assignment of role expectations/academic workflows",Within 5 working days
+MUBS/P5/OBJ4/HCG/HRD/S001-O112,MUBS/P5/OBJ4/HCG/HRD/S001,4,HOD submits written confirmation of the employee's Assumption of Duty to HRD,Within 5 working days
+MUBS/P5/OBJ4/HCG/HRD/S001-O112,MUBS/P5/OBJ4/HCG/HRD/S001,5,"Set up official corporate email, build the HRMS portal profile, and capture banking/tax data for payroll entry",Within 5 working days
+MUBS/P5/OBJ4/HCG/HRD/S001-O112,MUBS/P5/OBJ4/HCG/HRD/S001,6,"HOD assesses role clarity, institutional cultural fit, and early training needs",Within 3 months
+MUBS/P5/OBJ4/HCG/HRD/S001-O112,MUBS/P5/OBJ4/HCG/HRD/S001,7,Conduct initial probation performance review and deliver feedback to the hire,Within 3 months
+MUBS/P5/OBJ4/HCG/HRD/S001-O112,MUBS/P5/OBJ4/HCG/HRD/S001,8,Submit a consolidated onboarding cycle report to Top Management,Within 3 months post-cycle
+MUBS/P5/OBJ4/HCG/HRD/S001-O113,MUBS/P5/OBJ4/HCG/HRD/S001,1,"Newly appointed Dean of Faculty, Campus, and Head of Department approval hierarchies set on the HR portal",Within 5 working days
+MUBS/P5/OBJ4/HCG/HRD/S001-O113,MUBS/P5/OBJ4/HCG/HRD/S001,2,Remuneration adjustments on the Allowances payroll made,Within 1 month
+MUBS/P5/OBJ4/HCG/HRD/S001-O113,MUBS/P5/OBJ4/HCG/HRD/S001,3,"HRD organises orientation sessions for the newly appointed Deans of Faculties, Campus Chiefs and Heads of Departments and issues them a copy of the HR Manual",Within 2 months after acceptance
+MUBS/P5/OBJ4/HCG/HRD/S001-O113,MUBS/P5/OBJ4/HCG/HRD/S001,4,"Deans of Faculties, Campus Chiefs and Heads of Departments assessed and given feedback on performance on set targets",Within 1 year
+MUBS/P5/OBJ4/HCG/HRD/S001-O113,MUBS/P5/OBJ4/HCG/HRD/S001,5,Report to Management on the onboarding process Within 3 months after process),
+MUBS/P5/OBJ4/HCG/HRD/S001-O114,MUBS/P5/OBJ4/HCG/HRD/S001,1,Set performance targets in 3 months,
+MUBS/P5/OBJ4/HCG/HRD/S001-O114,MUBS/P5/OBJ4/HCG/HRD/S001,2,Performance implementation and monitoring in 1 year,
+MUBS/P5/OBJ4/HCG/HRD/S001-O114,MUBS/P5/OBJ4/HCG/HRD/S001,3,Performance appraisal in 1 month,
+MUBS/P5/OBJ4/HCG/HRD/S001-O114,MUBS/P5/OBJ4/HCG/HRD/S001,4,Presentation of performance outcome recommendations to Top Management for 2 weeks,
+MUBS/P5/OBJ4/HCG/HRD/S001-O114,MUBS/P5/OBJ4/HCG/HRD/S001,5,Presentation of Management’s recommendations on the consolidated performance appraisal exercise in 2 weeks,
+MUBS/P5/OBJ4/HCG/HRD/S001-O114,MUBS/P5/OBJ4/HCG/HRD/S001,6,"Performance improvement, rewards and sanctions",
+MUBS/P5/OBJ4/HCG/HRD/S001-O115,MUBS/P5/OBJ4/HCG/HRD/S001,1,Unit Heads and staff agree on definitive performance targets at the start of the appraisal cycle,Within the first 3 months
+MUBS/P5/OBJ4/HCG/HRD/S001-O115,MUBS/P5/OBJ4/HCG/HRD/S001,2,Execute daily work monitoring and maintain ongoing performance evidence logs,Over a 1-year window
+MUBS/P5/OBJ4/HCG/HRD/S001-O115,MUBS/P5/OBJ4/HCG/HRD/S001,3,"Conduct formal year-end appraisal assessments, scoring against the signed target agreements",Completed within 1 month
+MUBS/P5/OBJ4/HCG/HRD/S001-O115,MUBS/P5/OBJ4/HCG/HRD/S001,4,Compile and present performance outcome files to Top Management for initial consideration,Within 2 weeks
+MUBS/P5/OBJ4/HCG/HRD/S001-O115,MUBS/P5/OBJ4/HCG/HRD/S001,5,Present management's consolidated recommendations and appraisal insights to Council,Within 2 weeks
+MUBS/P5/OBJ4/HCG/HRD/S001-O115,MUBS/P5/OBJ4/HCG/HRD/S001,6,"Apply approved recommendations, including performance rewards, development tracking, or PIP sanctions",
+MUBS/P5/OBJ4/HCG/HRD/S001-O116,MUBS/P5/OBJ4/HCG/HRD/S001,1,Staff submit leave application,
+MUBS/P5/OBJ4/HCG/HRD/S001-O116,MUBS/P5/OBJ4/HCG/HRD/S001,2,Supervisor recommends,
+MUBS/P5/OBJ4/HCG/HRD/S001-O116,MUBS/P5/OBJ4/HCG/HRD/S001,3,HR verifies against policy & balances,
+MUBS/P5/OBJ4/HCG/HRD/S001-O116,MUBS/P5/OBJ4/HCG/HRD/S001,4,Approval issued Leave recorded on the HRMS porta,
+MUBS/P5/OBJ4/HCG/HRD/S001-O117,MUBS/P5/OBJ4/HCG/HRD/S001,1,Conduct a Training Needs Assessment -12 months,
+MUBS/P5/OBJ4/HCG/HRD/S001-O117,MUBS/P5/OBJ4/HCG/HRD/S001,2,Compile Departmental Plans and plan for delivery,6 months
+MUBS/P5/OBJ4/HCG/HRD/S001-O117,MUBS/P5/OBJ4/HCG/HRD/S001,3,Receive applications from staff for long and short-term trainings),As and when admissions to study programmes are received
+MUBS/P5/OBJ4/HCG/HRD/S001-O117,MUBS/P5/OBJ4/HCG/HRD/S001,4,Table applications at the STADeC Committee in 4 weeks after assessment,
+MUBS/P5/OBJ4/HCG/HRD/S001-O117,MUBS/P5/OBJ4/HCG/HRD/S001,5,Present STADeC recommendations to the Top Management Committee 36 weeks,
+MUBS/P5/OBJ4/HCG/HRD/S001-O117,MUBS/P5/OBJ4/HCG/HRD/S001,6,Communicate Management resolutions on staff requests-1 week after Committee meeting,
+MUBS/P5/OBJ4/HCG/HRD/S001-O117,MUBS/P5/OBJ4/HCG/HRD/S001,7,Receive progress reports from staff,6 months
+MUBS/P5/OBJ4/HCG/HRD/S001-O117,MUBS/P5/OBJ4/HCG/HRD/S001,8,Present consolidated Study Progress report to Management for consideration,12 months
+MUBS/P5/OBJ4/HCG/HRD/S001-O117,MUBS/P5/OBJ4/HCG/HRD/S001,9,Carry out monitoring and Evaluation,6 months
+MUBS/P5/OBJ4/HCG/HRD/S001-O117,MUBS/P5/OBJ4/HCG/HRD/S001,10,Carry out short term trainings according to Departmental plans in 36 weeks,
+MUBS/P5/OBJ4/HCG/HRD/S001-O118,MUBS/P5/OBJ4/HCG/HRD/S001,1,Identification of the need by user department in line with establishment,2 weeks
+MUBS/P5/OBJ4/HCG/HRD/S001-O118,MUBS/P5/OBJ4/HCG/HRD/S001,2,Applications considered at Department (at Staff Selections and Promotions Committee) and Faculty level (at Faculty Staff Selection and Promotions Committee,1 month
+MUBS/P5/OBJ4/HCG/HRD/S001-O118,MUBS/P5/OBJ4/HCG/HRD/S001,3,Verification,1 week
+MUBS/P5/OBJ4/HCG/HRD/S001-O118,MUBS/P5/OBJ4/HCG/HRD/S001,4,Submit to appointments and Promotions Committee for senior lecturer and lecturer level,1 month
+MUBS/P5/OBJ4/HCG/HRD/S001-O118,MUBS/P5/OBJ4/HCG/HRD/S001,5,Submit to Top Management Committee consideration,1 month
+MUBS/P5/OBJ4/HCG/HRD/S001-O118,MUBS/P5/OBJ4/HCG/HRD/S001,6,Submit to Appointments Board decision,1 month
+MUBS/P5/OBJ4/HCG/HRD/S001-O118,MUBS/P5/OBJ4/HCG/HRD/S001,7,Communicate Appointments Board decision to beneficiaries within 1 week),
+MUBS/P5/OBJ4/HCG/HRD/S001-O119,MUBS/P5/OBJ4/HCG/HRD/S001,1,Identification of promotion needs by user departments in line with approved establishment,2 weeks
+MUBS/P5/OBJ4/HCG/HRD/S001-O119,MUBS/P5/OBJ4/HCG/HRD/S001,2,Submission and consolidation of applications for Senior Administrative positions at departmental/faculty/campus level,1 month
+MUBS/P5/OBJ4/HCG/HRD/S001-O119,MUBS/P5/OBJ4/HCG/HRD/S001,3,Consideration of other promotions through Annual Staff Performance Evaluation Exercise,1 month
+MUBS/P5/OBJ4/HCG/HRD/S001-O119,MUBS/P5/OBJ4/HCG/HRD/S001,4,Promotions to Deputy Chief positions considered by Management and Appointments Board,2 months
+MUBS/P5/OBJ4/HCG/HRD/S001-O119,MUBS/P5/OBJ4/HCG/HRD/S001,5,Verification by Principal and Human Resource Directorate,1 week
+MUBS/P5/OBJ4/HCG/HRD/S001-O119,MUBS/P5/OBJ4/HCG/HRD/S001,6,Review by Interviewing Committee,1 month
+MUBS/P5/OBJ4/HCG/HRD/S001-O119,MUBS/P5/OBJ4/HCG/HRD/S001,7,Consideration by Top Management Committee,1 month
+MUBS/P5/OBJ4/HCG/HRD/S001-O119,MUBS/P5/OBJ4/HCG/HRD/S001,8,Approval by Appointments Board,1 month
+MUBS/P5/OBJ4/HCG/HRD/S001-O119,MUBS/P5/OBJ4/HCG/HRD/S001,9,Communication of outcomes by Human Resource Directorate,1 week
+MUBS/P5/OBJ4/HCG/IA/S001-O120,MUBS/P5/OBJ4/HCG/IA/S001,1,Draft the risk-based annual audit workplan aligned to the approved MUBS strategic plan and budget,Within 4 weeks
+MUBS/P5/OBJ4/HCG/IA/S001-O120,MUBS/P5/OBJ4/HCG/IA/S001,2,Forward the annual workplan to the Audit and Risk Management Committee of Council,2 weeks prior to meeting
+MUBS/P5/OBJ4/HCG/IA/S001-O120,MUBS/P5/OBJ4/HCG/IA/S001,3,"Submit the approved Annual Workplan to the Internal Auditor General, copying the Accounting Officer",By April
+MUBS/P5/OBJ4/HCG/IA/S001-O120,MUBS/P5/OBJ4/HCG/IA/S001,4,"Plan quarterly engagements defining scope (Financial, compliance, value for money, operational, environmental, performance) and allocate field auditors",3 days
+MUBS/P5/OBJ4/HCG/IA/S001-O120,MUBS/P5/OBJ4/HCG/IA/S001,5,Issue formal information requests to target auditees,1 day
+MUBS/P5/OBJ4/HCG/IA/S001-O120,MUBS/P5/OBJ4/HCG/IA/S001,6,Schedule and conduct operational entry meetings with auditees,Within 2 weeks
+MUBS/P5/OBJ4/HCG/IA/S001-O120,MUBS/P5/OBJ4/HCG/IA/S001,7,"Gather, extract, and compile financial and administrative records",
+MUBS/P5/OBJ4/HCG/IA/S001-O120,MUBS/P5/OBJ4/HCG/IA/S001,8,Conduct comprehensive field testing and compile formal audit findings,
+MUBS/P5/OBJ4/HCG/IA/S001-O120,MUBS/P5/OBJ4/HCG/IA/S001,9,Submit draft reports with remedial recommendations to Management for management responses,By the 10th day of the subsequent month post-quarter
+MUBS/P5/OBJ4/HCG/IA/S001-O120,MUBS/P5/OBJ4/HCG/IA/S001,10,Aggregate management responses into the final report and present to Council,Within 15 days
+MUBS/P5/OBJ4/HCG/IA/S001-O120,MUBS/P5/OBJ4/HCG/IA/S001,11,"Disseminate approved Quarterly Audit Reports to the Internal Auditor General, Ministry of Education, and MoFPED",Within 30 days post-quarter
+MUBS/P5/OBJ4/HCG/IA/S001-O120,MUBS/P5/OBJ4/HCG/IA/S001,12,Compile and submit the Annual Consolidated Internal Audit Report to the Internal Auditor General,Within 30 days post-FY
+MUBS/P5/OBJ4/HCG/IA/S001-O120,MUBS/P5/OBJ4/HCG/IA/S001,13,Conduct quarterly audit follow-ups to verify implementation status of past recommendations and update Council,
+MUBS/P5/OBJ4/HCG/IA/S001-O120,MUBS/P5/OBJ4/HCG/IA/S001,14,Coordinate end-of-year exit parameters with the Auditor General/External Auditors,
+MUBS/P5/OBJ4/HCG/DLA/S001-O121,MUBS/P5/OBJ4/HCG/DLA/S001,1,Request submitted,Day 0
+MUBS/P5/OBJ4/HCG/DLA/S001-O121,MUBS/P5/OBJ4/HCG/DLA/S001,2,Acknowledgement,Day 1
+MUBS/P5/OBJ4/HCG/DLA/S001-O121,MUBS/P5/OBJ4/HCG/DLA/S001,3,Registration & assignment,Day 1
+MUBS/P5/OBJ4/HCG/DLA/S001-O121,MUBS/P5/OBJ4/HCG/DLA/S001,4,Preliminary review,Day 1–2
+MUBS/P5/OBJ4/HCG/DLA/S001-O121,MUBS/P5/OBJ4/HCG/DLA/S001,5,Legal analysis & compliance check,Day 2–4
+MUBS/P5/OBJ4/HCG/DLA/S001-O121,MUBS/P5/OBJ4/HCG/DLA/S001,6,Consultations,Day 3–4
+MUBS/P5/OBJ4/HCG/DLA/S001-O121,MUBS/P5/OBJ4/HCG/DLA/S001,7,Final vetted contract issued,Day 5
+MUBS/P5/OBJ4/HCG/DLA/S001-O121,MUBS/P5/OBJ4/HCG/DLA/S001,8,Archiving,Within 24 hrs
+MUBS/P5/OBJ4/HCG/DLA/S001-O121,MUBS/P5/OBJ4/HCG/DLA/S001,9,Monthly report to Management,By 5th
+MUBS/P5/OBJ4/HCG/DLA/S001-O122,MUBS/P5/OBJ4/HCG/DLA/S001,1,Request submitted,Day 0
+MUBS/P5/OBJ4/HCG/DLA/S001-O122,MUBS/P5/OBJ4/HCG/DLA/S001,2,Acknowledgement,Day 1
+MUBS/P5/OBJ4/HCG/DLA/S001-O122,MUBS/P5/OBJ4/HCG/DLA/S001,3,Registration & assignment,Day 1
+MUBS/P5/OBJ4/HCG/DLA/S001-O122,MUBS/P5/OBJ4/HCG/DLA/S001,4,Legal research & analysis,Day 1–3
+MUBS/P5/OBJ4/HCG/DLA/S001-O122,MUBS/P5/OBJ4/HCG/DLA/S001,5,Consultations,Day 2–3
+MUBS/P5/OBJ4/HCG/DLA/S001-O122,MUBS/P5/OBJ4/HCG/DLA/S001,6,Opinion drafted & issued,Day 3–5
+MUBS/P5/OBJ4/HCG/DLA/S001-O122,MUBS/P5/OBJ4/HCG/DLA/S001,7,Archiving,24 hrs
+MUBS/P5/OBJ4/HCG/DLA/S001-O122,MUBS/P5/OBJ4/HCG/DLA/S001,8,Monthly report,By 5th
+MUBS/P5/OBJ4/HCG/DLA/S001-O123,MUBS/P5/OBJ4/HCG/DLA/S001,1,Receipt of summons/claim,Day 0
+MUBS/P5/OBJ4/HCG/DLA/S001-O123,MUBS/P5/OBJ4/HCG/DLA/S001,2,Registration,Day 0–1
+MUBS/P5/OBJ4/HCG/DLA/S001-O123,MUBS/P5/OBJ4/HCG/DLA/S001,3,Case assessment,Day 1–3
+MUBS/P5/OBJ4/HCG/DLA/S001-O123,MUBS/P5/OBJ4/HCG/DLA/S001,4,Consultations,Day 2–4
+MUBS/P5/OBJ4/HCG/DLA/S001-O123,MUBS/P5/OBJ4/HCG/DLA/S001,5,Drafting pleadings,Day 3–7
+MUBS/P5/OBJ4/HCG/DLA/S001-O123,MUBS/P5/OBJ4/HCG/DLA/S001,6,Filing,As per court rules
+MUBS/P5/OBJ4/HCG/DLA/S001-O123,MUBS/P5/OBJ4/HCG/DLA/S001,7,Court appearances,Ongoing
+MUBS/P5/OBJ4/HCG/DLA/S001-O123,MUBS/P5/OBJ4/HCG/DLA/S001,8,Quarterly case status reports,
+MUBS/P5/OBJ4/HCG/DLA/S001-O124,MUBS/P5/OBJ4/HCG/DLA/S001,1,Submission of draft policy,Day 0
+MUBS/P5/OBJ4/HCG/DLA/S001-O124,MUBS/P5/OBJ4/HCG/DLA/S001,2,Acknowledgement,Day 1
+MUBS/P5/OBJ4/HCG/DLA/S001-O124,MUBS/P5/OBJ4/HCG/DLA/S001,3,Registration,Day 1
+MUBS/P5/OBJ4/HCG/DLA/S001-O124,MUBS/P5/OBJ4/HCG/DLA/S001,4,Compliance audit,Day 1–5
+MUBS/P5/OBJ4/HCG/DLA/S001-O124,MUBS/P5/OBJ4/HCG/DLA/S001,5,Consultations,Day 3–6
+MUBS/P5/OBJ4/HCG/DLA/S001-O124,MUBS/P5/OBJ4/HCG/DLA/S001,6,Compliance report,Day 6–9
+MUBS/P5/OBJ4/HCG/DLA/S001-O124,MUBS/P5/OBJ4/HCG/DLA/S001,7,Final reviewed policy issued,Day 10
+MUBS/P5/OBJ4/HCG/DLA/S001-O124,MUBS/P5/OBJ4/HCG/DLA/S001,8,Archiving,24 hrs
+MUBS/P5/OBJ4/HCG/DLA/S001-O124,MUBS/P5/OBJ4/HCG/DLA/S001,9,Monthly reporting,
+MUBS/P5/OBJ4/HCG/DLA/S001-O125,MUBS/P5/OBJ4/HCG/DLA/S001,1,Meeting schedule received,
+MUBS/P5/OBJ4/HCG/DLA/S001-O125,MUBS/P5/OBJ4/HCG/DLA/S001,2,Preparation of legal briefs,Prior to meeting
+MUBS/P5/OBJ4/HCG/DLA/S001-O125,MUBS/P5/OBJ4/HCG/DLA/S001,3,Attendance & advisory support,During meeting
+MUBS/P5/OBJ4/HCG/DLA/S001-O125,MUBS/P5/OBJ4/HCG/DLA/S001,4,Validation of minutes,Within 3 days
+MUBS/P5/OBJ4/HCG/DLA/S001-O125,MUBS/P5/OBJ4/HCG/DLA/S001,5,Monthly governance report,
+MUBS/P5/OBJ4/HCG/DLA/S001-O126,MUBS/P5/OBJ4/HCG/DLA/S001,1,Complaint submitted,Day 0
+MUBS/P5/OBJ4/HCG/DLA/S001-O126,MUBS/P5/OBJ4/HCG/DLA/S001,2,Acknowledgement,Day 1
+MUBS/P5/OBJ4/HCG/DLA/S001-O126,MUBS/P5/OBJ4/HCG/DLA/S001,3,Registration,Day 1
+MUBS/P5/OBJ4/HCG/DLA/S001-O126,MUBS/P5/OBJ4/HCG/DLA/S001,4,Preliminary investigation,Day 1–5
+MUBS/P5/OBJ4/HCG/DLA/S001-O126,MUBS/P5/OBJ4/HCG/DLA/S001,5,Hearing,Day 6–10
+MUBS/P5/OBJ4/HCG/DLA/S001-O126,MUBS/P5/OBJ4/HCG/DLA/S001,6,Decision & recommendations,Day 10–12
+MUBS/P5/OBJ4/HCG/DLA/S001-O126,MUBS/P5/OBJ4/HCG/DLA/S001,7,Communication of outcome,Day 12–14
+MUBS/P5/OBJ4/HCG/DLA/S001-O126,MUBS/P5/OBJ4/HCG/DLA/S001,8,Archiving (24 hrs) - Monthly reporting,
+MUBS/P5/OBJ4/HCG/DLA/S001-O127,MUBS/P5/OBJ4/HCG/DLA/S001,1,Training calendar developed,Start of semester
+MUBS/P5/OBJ4/HCG/DLA/S001-O127,MUBS/P5/OBJ4/HCG/DLA/S001,2,Content preparation,2 weeks before
+MUBS/P5/OBJ4/HCG/DLA/S001-O127,MUBS/P5/OBJ4/HCG/DLA/S001,3,Training delivery,Mid-semester
+MUBS/P5/OBJ4/HCG/DLA/S001-O127,MUBS/P5/OBJ4/HCG/DLA/S001,4,Feedback collection,Same day
+MUBS/P5/OBJ4/HCG/DLA/S001-O127,MUBS/P5/OBJ4/HCG/DLA/S001,5,Training report,Within 1 week
+MUBS/P5/OBJ4/HCG/DLA/S001-O128,MUBS/P5/OBJ4/HCG/DLA/S001,1,Receipt of final document - Indexing & classification,Same day
+MUBS/P5/OBJ4/HCG/DLA/S001-O128,MUBS/P5/OBJ4/HCG/DLA/S001,2,Secure storage,Within 24 hrs
+MUBS/P5/OBJ4/HCG/DLA/S001-O128,MUBS/P5/OBJ4/HCG/DLA/S001,3,Retrieval upon request,Within 1 day
+MUBS/P5/OBJ4/HCG/DLA/S001-O128,MUBS/P5/OBJ4/HCG/DLA/S001,4,Monthly archive status report,
+MUBS/P5/OBJ4/HCG/SS/ S001-O129,MUBS/P5/OBJ4/HCG/SS/ S001,1,"Develop, secure approval for, and publish the Annual Governance Meetings Almanac",At start of FY
+MUBS/P5/OBJ4/HCG/SS/ S001-O129,MUBS/P5/OBJ4/HCG/SS/ S001,2,"Source, screen, and compile strategic business papers and executive briefs from institutional cost-centres",Ongoing over 3 months
+MUBS/P5/OBJ4/HCG/SS/ S001-O129,MUBS/P5/OBJ4/HCG/SS/ S001,3,"Edit, index, and securely distribute official meeting notices and comprehensive board packs to members",Exactly 7 calendar days prior to the meeting
+MUBS/P5/OBJ4/HCG/SS/ S001-O129,MUBS/P5/OBJ4/HCG/SS/ S001,4,Provide legal and procedural guidance during boardroom sessions and maintain live minutes logs,
+MUBS/P5/OBJ4/HCG/SS/ S001-O129,MUBS/P5/OBJ4/HCG/SS/ S001,5,"Formulate, polish, and circulate the first draft of meeting minutes to members for feedback",Within 7 calendar days post-meeting
+MUBS/P5/OBJ4/HCG/SS/ S001-O129,MUBS/P5/OBJ4/HCG/SS/ S001,6,Capture and integrate amendments or corrections submitted by members,Within 5 working days of minutes receipt
+MUBS/P5/OBJ4/HCG/SS/ S001-O129,MUBS/P5/OBJ4/HCG/SS/ S001,7,Archive signed master minutes into the central institutional registry,
+MUBS/P5/OBJ4/HCG/SS/ S001-O130,MUBS/P5/OBJ4/HCG/SS/ S001,1,Extract and format individual binding resolutions from the raw confirmed minutes of Council sessions,Within 24 hours of meeting closure
+MUBS/P5/OBJ4/HCG/SS/ S001-O130,MUBS/P5/OBJ4/HCG/SS/ S001,2,Issue formal Action Directives signed by the Chairperson/Secretary to the Principal to activate executive implementation,Within 1 working day
+MUBS/P5/OBJ4/HCG/SS/ S001-O130,MUBS/P5/OBJ4/HCG/SS/ S001,3,Deploy tracking matrices to monitor ongoing operational execution across user units,
+MUBS/P5/OBJ4/HCG/SS/ S001-O130,MUBS/P5/OBJ4/HCG/SS/ S001,4,Collect documentary evidence and field-test compliance claims submitted by Management,
+MUBS/P5/OBJ4/HCG/SS/ S001-O130,MUBS/P5/OBJ4/HCG/SS/ S001,5,"Aggregate findings to compile a comprehensive, data-backed Council Resolutions Action Report tracking implementation milestones",
+MUBS/P5/OBJ4/HCG/SS/ S001-O130,MUBS/P5/OBJ4/HCG/SS/ S001,6,Present the Action Report to the Main Council at its subsequent statutory session to highlight progress and performance gaps,

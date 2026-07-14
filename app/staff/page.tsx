@@ -9,6 +9,7 @@ import StaffUpdates from './views/StaffUpdates';
 import StaffSubmissions from './views/StaffSubmissions';
 import StaffProcessTasks from './views/StaffProcessTasks';
 import StaffAcademicTeaching from './views/StaffAcademicTeaching';
+import StaffSdsView from './views/StaffSds';
 
 function StaffAcademicTeachingGate() {
     const router = useRouter();
@@ -44,6 +45,8 @@ function StaffContent() {
     switch (pg) {
         case 'dashboard':
             return <StaffDashboard />;
+        case 'sds':
+            return <StaffSdsView />;
         case 'tasks':
             return <StaffTasks />;
         case 'deadlines':

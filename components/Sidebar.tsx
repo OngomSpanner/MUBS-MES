@@ -54,7 +54,7 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen, onLogoutClick }: 
 
   const adminMenuItems: MenuItem[] = [
     { key: 'dashboard', href: '/admin?pg=dashboard', icon: 'dashboard', label: 'Dashboard' },
-    { key: 'strategic', href: '/admin?pg=strategic', icon: 'track_changes', label: 'Standard and Activities' },
+    { key: 'sds', href: '/admin?pg=sds', icon: 'verified', label: 'Service Delivery Standards' },
     { key: 'questionnaire', href: '/admin?pg=questionnaire', icon: 'help_outline', label: 'Questionnaire' },
     { key: 'ambassador-reports', href: '/admin?pg=ambassador-reports', icon: 'monitoring', label: 'Ambassador Reports' },
     { key: 'reports', href: '/admin?pg=reports', icon: 'bar_chart', label: 'Reports & Monitoring' },
@@ -64,6 +64,7 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen, onLogoutClick }: 
 
   const departmentHeadMenuItems: MenuItem[] = [
     { key: 'dashboard', href: '/department-head?pg=dashboard', icon: 'dashboard', label: 'Dashboard', featureKey: HOD_MENU_FEATURE_KEYS.dashboard },
+    { key: 'sds', href: '/department-head?pg=sds', icon: 'verified', label: 'Service Delivery Standards', featureKey: HOD_MENU_FEATURE_KEYS.sds },
     { key: 'activities', href: '/department-head?pg=activities', icon: 'track_changes', label: 'Strategic Activities', featureKey: HOD_MENU_FEATURE_KEYS.activities },
     { key: 'departmental-activities', href: '/department-head?pg=departmental-activities', icon: 'apartment', label: 'Departmental Activities', featureKey: HOD_MENU_FEATURE_KEYS['departmental-activities'] },
     { key: 'tasks', href: '/department-head?pg=tasks', icon: 'checklist', label: 'Processes', featureKey: HOD_MENU_FEATURE_KEYS.tasks },
@@ -100,6 +101,7 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen, onLogoutClick }: 
 
   const staffMenuItems = [
     { key: 'dashboard', href: '/staff?pg=dashboard', icon: 'dashboard', label: 'Dashboard' },
+    { key: 'sds', href: '/staff?pg=sds', icon: 'verified', label: 'My SDS Activities' },
     { key: 'tasks', href: '/staff?pg=tasks', icon: 'checklist', label: 'Tasks' },
     { key: 'notifications', href: '/staff?pg=notifications', icon: 'notifications_active', label: 'Notifications & Deadlines' },
     { key: 'submissions', href: '/staff?pg=submissions', icon: 'history', label: 'Submissions & Feedback' },
