@@ -36,7 +36,7 @@ Supply one of the following:
 Example:
 
 ```text
-GET {m-e-production-base-url}/api/sds/hrm/appraisal-assignments?hrmsStaffId=123
+GET https://mubsme.mubs.ac.ug/api/sds/hrm/appraisal-assignments?hrmsStaffId=12345
 ```
 
 ## Response contract
