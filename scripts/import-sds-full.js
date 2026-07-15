@@ -14,6 +14,10 @@
 const fs = require('fs');
 const path = require('path');
 const mysql = require('mysql2/promise');
+// Production deployments keep DB settings in .env. Load it first; dotenv
+// preserves existing values, so .env.local only fills settings absent from
+// .env and remains a compatible local-development fallback.
+require('dotenv').config({ path: path.join(process.cwd(), '.env') });
 require('dotenv').config({ path: path.join(process.cwd(), '.env.local') });
 
 const { ensureSchema, parseCsv, normalizeCode, parseCode, durationToDays, matchDept, OWNER_HINTS } = (() => {
