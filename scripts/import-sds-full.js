@@ -5,7 +5,11 @@
  *  2) data/sds_standards_from_pdf.json (titles, purpose, pathway, matrix blocks)
  *
  * Usage:
- *   node scripts/import-sds-full.js
+ *   node scripts/import-sds-full.js [standards-json] [activities-csv]
+ *
+ * The optional standards JSON is the authoritative matrix source. Activities
+ * remain sourced from the CSV, and missing activity lists are safely derived
+ * from arrow-separated process steps without replacing existing activities.
  */
 const fs = require('fs');
 const path = require('path');
@@ -100,9 +104,67 @@ const { ensureSchema, parseCsv, normalizeCode, parseCode, durationToDays, matchD
     SO: ['SECURITY SECTION'],
     QAD: ['QUALITY ASSURANCE'],
   };
+  // These names deliberately target the primary service-unit records in the
+  // MUBS departments table. Owner labels in SDS documents vary considerably
+  // (Office of…, Directorate…, and abbreviations), including one record whose
+  // code says MIS but whose owner label is School Bursar.
+  const OWNER_LABEL_TO_DEPT = {
+    'OFFICE OF THE SCHOOL REGISTRAR': 'SCHOOL REGISTRAR S OFFICE',
+    'FACULTY OF GRADUATE STUDIES AND RESEARCH FGSR': 'FACULTY OF GRADUATE STUDIES AND RESEARCH FGSR',
+    'FACULTY OF GRADUATE STUDIES AND RESEARCH': 'FACULTY OF GRADUATE STUDIES AND RESEARCH FGSR',
+    'STRATEGY PROJECTS UNIT': 'STRATEGY PROJECTS',
+    'ESTATES WORKS UNIT': 'ESTATES AND WORKS',
+    'MANAGEMENT INFORMATION SYSTEMS UNIT MIS UNIT': 'MANAGEMENT OF INFORMATION SYSTEM MIS',
+    'OFFICE OF THE SCHOOL BURSAR': 'SCHOOL BURSAR S OFFICE',
+    'DEAN OF STUDENTS OFFICE': 'DEAN OF STUDENTS OFFICE',
+    'DEAN OF STUDENTS': 'DEAN OF STUDENTS OFFICE',
+    'HEALTH SERVICES CENTRE': 'HEALTH SERVICES CENTRE',
+    'HUMAN RESOURCE DIRECTORATE': 'HUMAN RESOURCE DIRECTORATE',
+    'SECURITY SECTION': 'SECURITY SECTION',
+    'DISABILITY RESOURCE AND LEARNING CENTRE DRLC': 'DISABILITY AND RESOURCE LEARNING CENTRE',
+    'QUALITY ASSURANCE DIRECTORATE QAD': 'DIRECTORATE OF QUALITY ASSURANCE',
+    'SCHOOL LIBRARY': 'SCHOOL LIBRARIAN S OFFICE',
+    'DIRECTORATE OF LEGAL AFFAIRS': 'DIRECTORATE OF LEGAL AFFAIRS',
+    'INTERNAL AUDIT DIRECTORATE': 'INTERNAL AUDIT DIRECTORATE',
+    'PROCUREMENT AND DISPOSAL UNIT PDU': 'PROCUREMENT AND DISPOSAL UNIT',
+    'PUBLIC RELATIONS OFFICE PRO': 'PUBLIC RELATIONS PROMOTIONS OFFICE',
+    'OFFICE OF THE SCHOOL SECRETARY': 'SCHOOL SECRETARY S OFFICE',
+    // There is no Outreach Centres department. This is the closest existing
+    // operational owner for the Industry Partnership standard.
+    'OUTREACH CENTRES': 'CAREER AND SKILLS DEVELOPMENT CENTRE',
+  };
+  const OWNER_CODE_TO_DEPT = {
+    SR: 'SCHOOL REGISTRAR S OFFICE',
+    FGSR: 'FACULTY OF GRADUATE STUDIES AND RESEARCH FGSR',
+    MIS: 'MANAGEMENT OF INFORMATION SYSTEM MIS',
+    'S&P': 'STRATEGY PROJECTS',
+    'E&W': 'ESTATES AND WORKS',
+    HS: 'HEALTH SERVICES CENTRE',
+    DOS: 'DEAN OF STUDENTS OFFICE',
+    DoS: 'DEAN OF STUDENTS OFFICE',
+    DRLC: 'DISABILITY AND RESOURCE LEARNING CENTRE',
+    DLA: 'DIRECTORATE OF LEGAL AFFAIRS',
+    HRD: 'HUMAN RESOURCE DIRECTORATE',
+    IA: 'INTERNAL AUDIT DIRECTORATE',
+    PDU: 'PROCUREMENT AND DISPOSAL UNIT',
+    SB: 'SCHOOL BURSAR S OFFICE',
+    SS: 'SCHOOL SECRETARY S OFFICE',
+    OCs: 'CAREER AND SKILLS DEVELOPMENT CENTRE',
+    PRO: 'PUBLIC RELATIONS PROMOTIONS OFFICE',
+    SL: 'SCHOOL LIBRARIAN S OFFICE',
+    SO: 'SECURITY SECTION',
+    QAD: 'DIRECTORATE OF QUALITY ASSURANCE',
+  };
   function matchDept(ownerAbbrev, ownerLabel, departments) {
     const pick = (hits) => [...hits].sort((a, b) => a.id - b.id)[0] || null;
     const labelNorm = normName(ownerLabel || '');
+    // Use explicit source-label mappings before the code. This fixes the
+    // known MIS-coded School Bursar record and makes aliases deterministic.
+    const mappedName = OWNER_LABEL_TO_DEPT[labelNorm] || OWNER_CODE_TO_DEPT[ownerAbbrev];
+    if (mappedName) {
+      const exactMapped = departments.filter((d) => normName(d.name) === mappedName);
+      if (exactMapped.length) return pick(exactMapped);
+    }
     if (labelNorm) {
       const exact = departments.filter((d) => normName(d.name) === labelNorm);
       if (exact.length) return pick(exact);
@@ -217,8 +279,8 @@ const { ensureSchema, parseCsv, normalizeCode, parseCode, durationToDays, matchD
 })();
 
 async function main() {
-  const csvPath = path.join(process.cwd(), 'data', 'sds_activities.csv');
-  const pdfJsonPath = path.join(process.cwd(), 'data', 'sds_standards_from_pdf.json');
+  const pdfJsonPath = path.resolve(process.argv[2] || path.join(process.cwd(), 'data', 'sds_standards_from_pdf.json'));
+  const csvPath = path.resolve(process.argv[3] || path.join(process.cwd(), 'data', 'sds_activities.csv'));
   if (!fs.existsSync(csvPath)) throw new Error('Missing ' + csvPath);
   if (!fs.existsSync(pdfJsonPath)) throw new Error('Missing ' + pdfJsonPath + ' — run scripts/parse-sds-pdf.py first');
 
@@ -465,6 +527,150 @@ async function main() {
       activitiesUpserted += 1;
     }
 
+    // A legacy CSV reused MIS output codes O51–O54 for the separate Bursar
+    // Stores & Asset Registry standard. Move the existing output/activity IDs
+    // once so their history stays intact and each standard shows its own
+    // authoritative matrix rows.
+    const legacyOutputRehomes = [{
+      fromCode: 'MUBS/P2/OBJ1/IDDT/MIS/S001',
+      toCode: 'MUBS/P2/OBJ1/IDDT/MIS/S001-DUPCHECK-D',
+      outputCodes: [
+        'MUBS/P2/OBJ1/IDDT/MIS/S001-O51',
+        'MUBS/P2/OBJ1/IDDT/MIS/S001-O52',
+        'MUBS/P2/OBJ1/IDDT/MIS/S001-O53',
+        'MUBS/P2/OBJ1/IDDT/MIS/S001-O54',
+      ],
+    }];
+    for (const rehome of legacyOutputRehomes) {
+      const targetId = stdIds.get(rehome.toCode);
+      if (!targetId) continue;
+      for (let index = 0; index < rehome.outputCodes.length; index++) {
+        await conn.query(
+          'UPDATE sds_outputs SET standard_id=?, sequence_no=? WHERE output_code=? AND standard_id=(SELECT id FROM sds_standards WHERE code=?)',
+          [targetId, index + 1, rehome.outputCodes[index], rehome.fromCode],
+        );
+      }
+    }
+
+    // 3) Make every matrix row importable even when the legacy activities CSV
+    // has no matching output. Existing output IDs are retained, which keeps
+    // assignments and indicator reports connected to the same catalog rows.
+    let matrixOutputsUpserted = 0;
+    let derivedActivitiesUpserted = 0;
+    let obsoleteGeneratedOutputsRemoved = 0;
+    const deriveProcessActivities = (processText) => {
+      const steps = String(processText || '')
+        .split(/\s*(?:→|->|►)\s*/)
+        .map((step) => step.trim().replace(/^[•\-–]\s*/, ''))
+        .filter(Boolean);
+      return steps.length > 1 ? steps : [];
+    };
+    for (const pdf of pdfStandards) {
+      const stdCode = normalizeCode(pdf.code || '');
+      const standardId = stdIds.get(stdCode);
+      const matrixRows = Array.isArray(pdf.matrix_rows) ? pdf.matrix_rows : [];
+      if (!standardId || !matrixRows.length) continue;
+      const [existingOutputs] = await conn.query(
+        'SELECT id, output_code, sequence_no FROM sds_outputs WHERE standard_id=? ORDER BY sequence_no, id',
+        [standardId],
+      );
+      const matchedOutputIds = new Set();
+      for (let index = 0; index < matrixRows.length; index++) {
+        const matrixRow = matrixRows[index] || {};
+        const sequenceNo = Number(matrixRow.sequence) || index + 1;
+        const existing = existingOutputs.find((row) => Number(row.sequence_no) === sequenceNo)
+          || existingOutputs[index]
+          || null;
+        const pis = Array.isArray(matrixRow.performance_indicators) ? matrixRow.performance_indicators : [];
+        const values = [
+          sequenceNo,
+          String(matrixRow.service_description || '').trim() || `Output ${sequenceNo}`,
+          JSON.stringify(pis),
+          matrixRow.quality_standard || null,
+          matrixRow.process_text || null,
+          matrixRow.coverage || null,
+          matrixRow.frequency || null,
+          matrixRow.target_beneficiary || null,
+          matrixRow.access_criteria || null,
+          matrixRow.methodology || null,
+          matrixRow.inputs || null,
+        ];
+        let outputId;
+        if (existing) {
+          outputId = Number(existing.id);
+          await conn.query(
+            `UPDATE sds_outputs SET sequence_no=?, service_description=?, performance_indicators_json=?,
+              quality_standard=?, process_text=COALESCE(?, process_text), coverage=COALESCE(?, coverage),
+              frequency=COALESCE(?, frequency), target_beneficiary=COALESCE(?, target_beneficiary),
+              access_criteria=COALESCE(?, access_criteria), methodology=COALESCE(?, methodology),
+              inputs=COALESCE(?, inputs) WHERE id=?`,
+            [...values, outputId],
+          );
+        } else {
+          const outputCode = `${stdCode}-M${sequenceNo}`;
+          const [ins] = await conn.query(
+            `INSERT INTO sds_outputs
+              (standard_id, output_code, sequence_no, service_description, performance_indicators_json,
+               quality_standard, process_text, coverage, frequency, target_beneficiary, access_criteria,
+               methodology, inputs)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            [standardId, outputCode, ...values],
+          );
+          outputId = Number(ins.insertId);
+          outputIds.set(outputCode, outputId);
+        }
+        matchedOutputIds.add(outputId);
+        matrixOutputsUpserted += 1;
+
+        // The supplied matrix has no activities array. Where the CSV also has
+        // none, derive assignable steps only from an explicit process flow.
+        // Do not alter non-empty outputs, protecting existing assignments.
+        const [activityCountRows] = await conn.query(
+          'SELECT COUNT(*) AS count FROM sds_activities WHERE output_id=?',
+          [outputId],
+        );
+        if (Number(activityCountRows[0]?.count || 0) === 0) {
+          const steps = deriveProcessActivities(matrixRow.process_text);
+          // An empty process field still has an explicit service deliverable;
+          // use that source text as one assignable activity rather than invent
+          // a workflow.
+          if (!steps.length && matrixRow.service_description) steps.push(String(matrixRow.service_description).trim());
+          for (let stepIndex = 0; stepIndex < steps.length; stepIndex++) {
+            const rawStep = steps[stepIndex];
+            const durationMatch = rawStep.match(/\(([^)]*(?:day|week|month)[^)]*)\)/i);
+            const durationText = durationMatch ? durationMatch[1].trim() : null;
+            const activityName = rawStep.replace(/\s*\([^)]*(?:day|week|month)[^)]*\)\s*/ig, ' ').trim();
+            if (!activityName) continue;
+            await conn.query(
+              `INSERT INTO sds_activities (output_id, sequence_no, activity_name, duration_text, duration_days)
+               VALUES (?, ?, ?, ?, ?)
+               ON DUPLICATE KEY UPDATE activity_name=VALUES(activity_name), duration_text=VALUES(duration_text),
+                 duration_days=VALUES(duration_days)`,
+              [outputId, stepIndex + 1, activityName, durationText, durationToDays(durationText)],
+            );
+            derivedActivitiesUpserted += 1;
+          }
+        }
+      }
+      // Remove only unreferenced, generated matrix placeholders left by a
+      // previous import. Never delete a legacy output or one with an
+      // assignment/report.
+      for (const existing of existingOutputs) {
+        if (matchedOutputIds.has(Number(existing.id)) || !String(existing.output_code).includes('-M')) continue;
+        const [refs] = await conn.query(
+          `SELECT
+            (SELECT COUNT(*) FROM sds_activity_assignments aa
+              JOIN sds_activities a ON a.id=aa.activity_id WHERE a.output_id=?) AS assignments,
+            (SELECT COUNT(*) FROM sds_indicator_reports WHERE output_id=?) AS reports`,
+          [existing.id, existing.id],
+        );
+        if (Number(refs[0]?.assignments || 0) || Number(refs[0]?.reports || 0)) continue;
+        await conn.query('DELETE FROM sds_activities WHERE output_id=?', [existing.id]);
+        await conn.query('DELETE FROM sds_outputs WHERE id=?', [existing.id]);
+        obsoleteGeneratedOutputsRemoved += 1;
+      }
+    }
+
     // Rebuild process_text + replace garbled PDF service descriptions with activity-based covers
     function isBadDesc(s) {
       const t = String(s || '').trim();
@@ -509,7 +715,11 @@ async function main() {
       standards: stdIds.size,
       outputs: outputIds.size,
       activitiesUpserted,
+      matrixOutputsUpserted,
+      derivedActivitiesUpserted,
+      obsoleteGeneratedOutputsRemoved,
       pdfStandards: pdfStandards.length,
+      sourceJson: pdfJsonPath,
     }, null, 2));
   } finally {
     await conn.end();
