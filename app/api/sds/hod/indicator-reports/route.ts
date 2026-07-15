@@ -4,6 +4,11 @@ import { verifyToken } from '@/lib/auth';
 import { getVisibleDepartmentIds } from '@/lib/department-head';
 import { query } from '@/lib/db';
 import { ensureSdsSchema } from '@/lib/sds/schema';
+import {
+  getAvailableFinancialYears,
+  getCurrentFinancialYear,
+  normalizeFinancialYear,
+} from '@/lib/questionnaire/fy-utils';
 
 export const dynamic = 'force-dynamic';
 
@@ -21,12 +26,29 @@ async function authHod() {
 }
 
 function currentPeriod() {
-  const now = new Date();
-  const y = now.getFullYear();
-  const m = now.getMonth() + 1;
-  // Academic-ish FY label Jul–Jun (aligns loosely with MUBS year)
-  if (m >= 7) return `FY${String(y).slice(2)}/${String(y + 1).slice(2)}`;
-  return `FY${String(y - 1).slice(2)}/${String(y).slice(2)}`;
+  return getCurrentFinancialYear();
+}
+
+function fiscalPeriods(): string[] {
+  const years = getAvailableFinancialYears();
+  const currentStart = Number(currentPeriod().slice(0, 4));
+  const next = `${currentStart + 1}/${currentStart + 2}`;
+  return years.includes(next) ? years : [...years, next];
+}
+
+function resolvePeriod(raw: string | null | undefined): string {
+  const s = String(raw || '').trim();
+  if (!s) return currentPeriod();
+  const short = s.match(/^FY\s*(\d{2})\s*\/\s*(\d{2})$/i);
+  if (short) {
+    const start = 2000 + Number(short[1]);
+    return `${start}/${start + 1}`;
+  }
+  return normalizeFinancialYear(s.replace(/^FY\s*/i, ''));
+}
+
+function isFiscalPeriod(period: string): boolean {
+  return fiscalPeriods().includes(period);
 }
 
 /** List indicator report catalog + existing self-reports for HOD. */
@@ -37,8 +59,28 @@ export async function GET(request: Request) {
     await ensureSdsSchema();
 
     const url = new URL(request.url);
-    const period = String(url.searchParams.get('period') || currentPeriod()).trim();
+    const period = resolvePeriod(url.searchParams.get('period'));
     const placeholders = auth.departmentIds.map(() => '?').join(',');
+    // Legacy report rows can contain a manually-entered period. They remain
+    // readable/selectable, but new values are limited to the FY dropdown.
+    const storedPeriods = (await query({
+      query: `
+        SELECT DISTINCT reporting_period
+        FROM sds_indicator_reports
+        WHERE department_id IN (${placeholders})
+      `,
+      values: auth.departmentIds,
+    })) as { reporting_period: string }[];
+    const legacyPeriods = storedPeriods
+      .map((row) => String(row.reporting_period || '').trim())
+      .filter((value) => value && !isFiscalPeriod(resolvePeriod(value)));
+    const requestedLegacy = legacyPeriods.includes(period);
+    if (!isFiscalPeriod(period) && !requestedLegacy) {
+      return NextResponse.json({ message: 'Choose a valid financial year.' }, { status: 400 });
+    }
+    const storedValuesForPeriod = storedPeriods
+      .map((row) => String(row.reporting_period || '').trim())
+      .filter((value) => requestedLegacy ? value === period : resolvePeriod(value) === period);
 
     const catalog = (await query({
       query: `
@@ -54,16 +96,18 @@ export async function GET(request: Request) {
       values: auth.departmentIds,
     })) as Record<string, unknown>[];
 
-    const reports = (await query({
-      query: `
-        SELECT r.*
-        FROM sds_indicator_reports r
-        WHERE r.department_id IN (${placeholders})
-          AND r.reporting_period = ?
-        ORDER BY r.updated_at DESC, r.id DESC
-      `,
-      values: [...auth.departmentIds, period],
-    })) as Record<string, unknown>[];
+    const reports = storedValuesForPeriod.length
+      ? (await query({
+        query: `
+          SELECT r.*
+          FROM sds_indicator_reports r
+          WHERE r.department_id IN (${placeholders})
+            AND r.reporting_period IN (${storedValuesForPeriod.map(() => '?').join(',')})
+          ORDER BY r.updated_at DESC, r.id DESC
+        `,
+        values: [...auth.departmentIds, ...storedValuesForPeriod],
+      })) as Record<string, unknown>[]
+      : [];
 
     const items = catalog.map((row) => {
       let indicators: string[] = [];
@@ -91,6 +135,7 @@ export async function GET(request: Request) {
 
     return NextResponse.json({
       period,
+      available_periods: [...fiscalPeriods(), ...legacyPeriods.filter((value) => !fiscalPeriods().includes(value))],
       catalog: items,
       reports: reports.map((r) => ({
         ...r,
@@ -123,7 +168,7 @@ export async function POST(request: Request) {
     const indicatorText = String(body.indicator_text || '').trim();
     const valueText = String(body.value_text || '').trim() || null;
     const comment = String(body.comment || '').trim() || null;
-    const period = String(body.reporting_period || currentPeriod()).trim();
+    const period = resolvePeriod(body.reporting_period);
     const departmentId = Number(body.department_id || auth.departmentIds[0]);
 
     if (!standardId || !indicatorText || !period) {
@@ -134,6 +179,19 @@ export async function POST(request: Request) {
     }
     if (!auth.departmentIds.includes(departmentId)) {
       return NextResponse.json({ message: 'Not authorized for department' }, { status: 403 });
+    }
+    if (!isFiscalPeriod(period)) {
+      const legacy = (await query({
+        query: `
+          SELECT 1 FROM sds_indicator_reports
+          WHERE department_id = ? AND reporting_period = ?
+          LIMIT 1
+        `,
+        values: [departmentId, period],
+      })) as { 1: number }[];
+      if (!legacy.length) {
+        return NextResponse.json({ message: 'Choose a valid financial year.' }, { status: 400 });
+      }
     }
 
     const owned = (await query({

@@ -33,6 +33,9 @@ export async function GET(request: Request) {
 
     if (mode === 'assignments') {
       const placeholders = auth.departmentIds.map(() => '?').join(',');
+      const activityId = Number(url.searchParams.get('activityId') || 0);
+      const activityFilter = activityId > 0 ? ' AND a.activity_id = ?' : '';
+      const values = activityId > 0 ? [...auth.departmentIds, activityId] : auth.departmentIds;
       const rows = (await query({
         query: `
           SELECT a.id AS assignment_id, a.activity_id, a.staff_user_id, a.target_date, a.notes, a.assigned_at, a.status,
@@ -47,9 +50,10 @@ export async function GET(request: Request) {
           LEFT JOIN users u ON u.id = a.staff_user_id
           WHERE a.status = 'active'
             AND a.department_id IN (${placeholders})
+            ${activityFilter}
           ORDER BY s.code ASC, o.sequence_no ASC, act.sequence_no ASC, u.full_name ASC
         `,
-        values: auth.departmentIds,
+        values,
       })) as Record<string, unknown>[];
       return NextResponse.json({ assignments: rows });
     }
@@ -97,14 +101,24 @@ export async function POST(request: Request) {
 
     const activities = (await query({
       query: `
-        SELECT act.id, act.duration_days, act.duration_text, s.owner_department_id
+        SELECT act.id, act.activity_name, act.duration_days, act.duration_text,
+               s.owner_department_id, s.code AS standard_code, s.title AS standard_title, s.pillar
         FROM sds_activities act
         JOIN sds_outputs o ON o.id = act.output_id
         JOIN sds_standards s ON s.id = o.standard_id
         WHERE act.id = ?
       `,
       values: [activityId],
-    })) as { id: number; duration_days: number | null; duration_text: string | null; owner_department_id: number | null }[];
+    })) as {
+      id: number;
+      activity_name: string;
+      duration_days: number | null;
+      duration_text: string | null;
+      owner_department_id: number | null;
+      standard_code: string;
+      standard_title: string;
+      pillar: string | null;
+    }[];
 
     if (!activities.length) return NextResponse.json({ message: 'Activity not found' }, { status: 404 });
     const activity = activities[0];
@@ -122,15 +136,23 @@ export async function POST(request: Request) {
     const deptPlaceholders = auth.departmentIds.map(() => '?').join(',');
     const staffRows = (await query({
       query: `
-        SELECT id, department_id FROM users
+        SELECT id, department_id, full_name, email FROM users
         WHERE id IN (${placeholders})
           AND department_id IN (${deptPlaceholders})
       `,
       values: [...staffIds, ...auth.departmentIds],
-    })) as { id: number; department_id: number }[];
+    })) as { id: number; department_id: number; full_name: string; email: string | null }[];
     if (staffRows.length !== staffIds.length) {
       return NextResponse.json({ message: 'One or more staff are not in your department' }, { status: 400 });
     }
+
+    const assignerRows = (await query({
+      query: 'SELECT full_name FROM users WHERE id = ? LIMIT 1',
+      values: [auth.userId],
+    })) as { full_name: string }[];
+    const assignedByName = String(assignerRows[0]?.full_name || 'Your Head of Unit').trim();
+
+    const { notifyStaffSdsAssignment } = await import('@/lib/sds/assignment-notify');
 
     let created = 0;
     for (const staff of staffRows) {
@@ -144,15 +166,30 @@ export async function POST(request: Request) {
       })) as { id: number }[];
       if (existing.length) continue;
 
-      await query({
+      const insertResult = (await query({
         query: `
           INSERT INTO sds_activity_assignments
             (activity_id, staff_user_id, assigned_by, department_id, target_date, notes, status)
           VALUES (?, ?, ?, ?, ?, ?, 'active')
         `,
         values: [activityId, staff.id, auth.userId, staff.department_id || ownerDept, targetDate, notes],
-      });
+      })) as { insertId?: number };
       created += 1;
+
+      const assignmentId = Number(insertResult.insertId || 0);
+      if (assignmentId > 0) {
+        void notifyStaffSdsAssignment({
+          staffUserId: staff.id,
+          assignmentId,
+          activityName: activity.activity_name,
+          standardTitle: activity.standard_title,
+          standardCode: activity.standard_code,
+          pillar: activity.pillar,
+          durationText: activity.duration_text,
+          targetDate,
+          assignedByName,
+        });
+      }
     }
 
     return NextResponse.json({
@@ -160,6 +197,7 @@ export async function POST(request: Request) {
       created,
       suggested_target_date: addDaysIso(new Date(), activity.duration_days),
       duration_text: activity.duration_text,
+      notified: created,
     });
   } catch (e) {
     console.error('sds hod POST', e);

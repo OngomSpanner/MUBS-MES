@@ -38,9 +38,39 @@ def normalize_code(raw: str) -> str:
 
 
 def clean_space(s: str) -> str:
-    s = re.sub(r"[ \t]+", " ", s or "")
+    s = s or ""
+    s = re.sub(r"=====PAGE\s*\d+=====", " ", s, flags=re.I)
+    s = re.sub(r"[ \t]+", " ", s)
     s = re.sub(r"\s*\n\s*", " ", s)
     return s.strip(" \n\t-–—")
+
+
+def scrub_pdf_noise(s: str) -> str:
+    """Remove extract artifacts and leaked Process/Coverage tails from quality-like text."""
+    s = clean_space(s)
+    if not s:
+        return s
+    # Hard stop before process/coverage/frequency if they leaked in
+    s = re.split(r"\bProcess\s*:", s, maxsplit=1, flags=re.I)[0]
+    s = re.split(r"\bCoverage\s*:", s, maxsplit=1, flags=re.I)[0]
+    s = re.split(r"\bFrequency\s*:", s, maxsplit=1, flags=re.I)[0]
+    # Stop before next-row PI markers that leak across page breaks
+    s = re.split(
+        r"\s+(?:\(?[ivxlc]+\)|[ivxlc]+\))\s+(?:No\.|Number|%|Aver\.?|Average)\b",
+        s,
+        maxsplit=1,
+        flags=re.I,
+    )[0]
+    # Beneficiary / access tails that sit between Quality and a delayed Process:
+    s = re.split(
+        r"\s+All\s+(?:staff|students|newly|prospective|continuing|enrolled)\b",
+        s,
+        maxsplit=1,
+        flags=re.I,
+    )[0]
+    s = re.split(r"\s+-(?:Published|Accredited|Staff list|Via )\b", s, maxsplit=1, flags=re.I)[0]
+    s = re.split(r"\s+Online and physical\b", s, maxsplit=1, flags=re.I)[0]
+    return clean_space(s)
 
 
 def parse_code_meta(code: str) -> dict:
@@ -109,32 +139,73 @@ def extract_labeled_blocks(block: str, label: str) -> list[str]:
 def extract_pis(text: str) -> list[str]:
     """Pull roman / lettered performance indicators from a blob."""
     items = re.findall(
-        r"(?:\(?[ivxlc]+\)|[ivxlc]+\)|\([a-z]\)|[a-z]\))\s*([^\n(]+?)(?=\s*(?:\(?[ivxlc]+\)|[ivxlc]+\)|\([a-z]\)|[a-z]\)|$))",
+        r"(?:\(?[ivxlc]+\)|[ivxlc]+\)|\([a-z]\)|[a-z]\))\s*([^\n(]+?)(?=\s*(?:\(?[ivxlc]+\)|[ivxlc]+\)|\([a-z]\)|[a-z]\)|Quality:|Process:|Coverage:|Frequency:|$))",
         text,
         re.I,
     )
     cleaned = []
     for x in items:
         t = clean_space(x)
-        t = re.sub(r"\s*Quality:.*$", "", t, flags=re.I).strip()
-        if len(t) >= 8 and not t.lower().startswith(("quality", "process", "coverage", "frequency")):
-            cleaned.append(t)
+        t = re.sub(r"\s*(?:Quality|Process|Coverage|Frequency)\s*:.*$", "", t, flags=re.I).strip()
+        t = re.sub(r"\s*https?://\S+", "", t).strip()
+        if len(t) >= 8 and not t.lower().startswith(("quality", "process", "coverage", "frequency", "adherence", "conformance")):
+            # Prefer KPI-looking phrases
+            if re.search(r"\b(No\.|Number|%|Aver|Rate|Reach)\b|increase|satisfact|enquir|application|programme|session|school|partner|employer|student", t, re.I):
+                cleaned.append(t)
+            elif len(t) <= 160:
+                cleaned.append(t)
     if cleaned:
-        return cleaned
-    # fallback: No. of / % of sentences
-    hits = re.findall(r"((?:No\.|Number|%|Aver\.?|Average)\s+of[^.]+)", text, re.I)
+        # de-dupe preserving order
+        seen = set()
+        out = []
+        for c in cleaned:
+            key = c.lower()
+            if key in seen:
+                continue
+            seen.add(key)
+            out.append(c)
+        return out
+    hits = re.findall(r"((?:No\.|Number|%|Aver\.?|Average|Rate)\s+[^.]+)", text, re.I)
     return [clean_space(h) for h in hits if len(clean_space(h)) >= 8]
+
+
+def split_description_and_pis(preamble: str) -> tuple[str, str]:
+    """
+    Find the output heading which owns the PI list.
+
+    PDF table columns often continue on the next page.  In that case the
+    previous row's trailing PIs can appear before the next output heading.
+    Selecting the last heading immediately followed by ``i)`` avoids attaching
+    those orphaned items to the following output.
+    """
+    heading = None
+    for match in re.finditer(r"(?m)^\s*([^\n]{6,240}?)\s*\n\s*((?:\(?i\)|i\))\s+)", preamble, re.I):
+        candidate = clean_space(match.group(1))
+        if (
+            candidate
+            and not re.search(r"^(?:Table|Quality|Process|Coverage|Frequency)\b", candidate, re.I)
+            and not re.match(r"^(?:\(?[ivxlc]+\)|[ivxlc]+\))\s+", candidate, re.I)
+        ):
+            heading = (candidate, match.start(2))
+
+    if heading:
+        desc, pi_start = heading
+        return desc, preamble[pi_start:]
+
+    first_pi = re.search(r"(?:\(?i\)|i\))\s+", preamble, flags=re.I)
+    if first_pi:
+        return scrub_pdf_noise(preamble[: first_pi.start()]), preamble[first_pi.start() :]
+    return scrub_pdf_noise(preamble), preamble
 
 
 def extract_matrix_rows(block: str) -> list[dict]:
     """
     Rebuild matrix rows from flattened PDF text.
-    Each row is anchored on a 'Quality:' label; preamble before it holds
-    service description + performance indicators.
+    Anchor on Quality: labels; preamble holds Output Service Description + PIs.
+    Also harvest PIs that PDF extract shoved between Quality and Process (page breaks).
     """
     table_idx = re.search(r"Table\s*3[:.]?\d*", block, re.I)
     section = block[table_idx.start() :] if table_idx else block
-    # Drop table header noise once
     section = re.sub(
         r"Table\s*3[:.]?\d*:?[^\n]*Output Service Description Performance Indicator[^\n]*",
         "\n",
@@ -143,7 +214,6 @@ def extract_matrix_rows(block: str) -> list[dict]:
         flags=re.I,
     )
 
-    # Split keeping delimiters via finditer on Quality:
     markers = list(re.finditer(r"\bQuality:\s*", section, flags=re.I))
     if not markers:
         return []
@@ -151,57 +221,105 @@ def extract_matrix_rows(block: str) -> list[dict]:
     rows: list[dict] = []
     for i, m in enumerate(markers):
         row_start = markers[i - 1].end() if i else 0
-        # For first row, skip leftover header fragments
         preamble = section[row_start : m.start()]
         rest = section[m.end() : markers[i + 1].start() if i + 1 < len(markers) else len(section)]
 
-        # Pull Process / Coverage / Frequency from rest
-        quality = take_field(rest, r"^", [r"Process:", r"Coverage:", r"Frequency:", r"$"])
-        # Better: text until Process:
         qm = re.match(r"(.*?)(?=\bProcess:|\bCoverage:|\bFrequency:|$)", rest, re.I | re.S)
-        quality_text = clean_space(qm.group(1) if qm else rest)
+        quality_text = scrub_pdf_noise(qm.group(1) if qm else rest) or None
+        # Drop PI fragments that leaked into quality text
+        if quality_text:
+            quality_text = re.split(
+                r"\s+(?:\(?[ivxlc]+\)|[ivxlc]+\))\s+(?:No\.|%|Aver|Rate)\b",
+                quality_text,
+                maxsplit=1,
+                flags=re.I,
+            )[0].strip() or None
 
-        process = take_field(rest, r"Process:", [r"Coverage:", r"Frequency:", r"Quality:", r"$"])
-        coverage = take_field(rest, r"Coverage:", [r"Frequency:", r"Process:", r"Quality:", r"$"])
-        frequency = take_field(rest, r"Frequency:", [r"Process:", r"Quality:", r"Coverage:", r"$"])
+        process = scrub_pdf_noise(
+            take_field(rest, r"Process:", [r"Coverage:", r"Frequency:", r"Quality:", r"$"]) or ""
+        ) or None
+        coverage = scrub_pdf_noise(
+            take_field(rest, r"Coverage:", [r"Frequency:", r"Process:", r"Quality:", r"$"]) or ""
+        ) or None
+        frequency = scrub_pdf_noise(
+            take_field(rest, r"Frequency:", [r"Process:", r"Quality:", r"Coverage:", r"$"]) or ""
+        ) or None
 
-        # After frequency, leftover is often beneficiary / access / methodology / inputs (noisy)
         after_freq = ""
-        fm = re.search(r"\bFrequency:\s*.*?(?=\n|$)", rest, re.I | re.S)
+        fm = re.search(r"\bFrequency:\s*", rest, re.I)
         if fm:
-            after_freq = clean_space(rest[fm.end() :])
-        # Cap after_freq to avoid swallowing next service description too much
-        after_freq = re.split(r"\bQuality:", after_freq, maxsplit=1, flags=re.I)[0]
+            after_freq = scrub_pdf_noise(rest[fm.end() :])
+            after_freq = re.split(r"\bQuality:", after_freq or "", maxsplit=1, flags=re.I)[0]
+            after_freq = scrub_pdf_noise(after_freq)
 
-        # Preamble: service description + PIs
-        pis = extract_pis(preamble)
-        # Remove PI markers from description
-        desc = preamble
-        desc = re.sub(
-            r"(?:\(?[ivxlc]+\)|[ivxlc]+\)|\([a-z]\)|[a-z]\))\s*[^\n(]+",
-            " ",
-            desc,
+        # Retain newlines here: they distinguish a new output title from PI
+        # fragments carried over from the preceding page/row.
+        desc, pi_blob = split_description_and_pis(preamble)
+
+        desc = re.sub(r"^(?:Coverage|Frequency)\s*:\s*", "", desc or "", flags=re.I)
+        desc = scrub_pdf_noise(desc)
+        # Prefer a short title-like description (first sentence / line)
+        if desc and len(desc) > 160:
+            # keep first clause before a long policy dump
+            cut = re.split(r"\s+https?://|\s+Adherence\b|\s+Conformance\b", desc, maxsplit=1, flags=re.I)[0]
+            if len(cut) >= 8:
+                desc = scrub_pdf_noise(cut)
+
+        if not desc or len(desc) < 6 or desc.startswith("Output row"):
+            # try last non-empty short line-ish chunk
+            chunks = [c.strip() for c in re.split(r"\s{2,}|\n", preamble) if c.strip()]
+            for c in reversed(chunks):
+                cc = scrub_pdf_noise(re.sub(r"(?:\(?[ivxlc]+\)|[ivxlc]+\))\s*.*$", "", c, flags=re.I))
+                if cc and 8 <= len(cc) <= 120 and not re.search(r"https?://", cc):
+                    desc = cc
+                    break
+            if not desc or len(desc) < 6:
+                desc = f"Output row {i + 1}"
+
+        # PIs from preamble + any shoved between Quality and Process (common across page breaks)
+        between = ""
+        pm = re.search(r"\bProcess\s*:", rest, re.I)
+        if pm:
+            between = rest[: pm.start()]
+        else:
+            between = qm.group(1) if qm else ""
+
+        pis = extract_pis(pi_blob) + extract_pis(between)
+        # Also catch trailing PI lines that appear after process but look like KPI continuations
+        # e.g. "...applications. iv) Reach and engagement..."
+        # Do not let PIs belonging to the next output leak backwards when its
+        # title/first PI was pushed to the following page.
+        late_text = re.split(
+            r"(?m)^\s*[^\n]{6,240}?\s*\n\s*(?:\(?i\)|i\))\s+",
+            rest,
+            maxsplit=1,
             flags=re.I,
-        )
-        desc = clean_space(desc)
-        # Strip lingering Frequency/Coverage tails from previous row
-        desc = re.sub(r"^(?:Coverage|Frequency)\s*:\s*", "", desc, flags=re.I)
-        desc = re.sub(r"^.*?Frequency:\s*[^.]*\.\s*", "", desc, flags=re.I)
-        desc = clean_space(desc)
-        # Drop very short / garbage descriptions
-        if len(desc) < 6:
-            desc = f"Output row {i + 1}"
+        )[0]
+        late = extract_pis(late_text)
+        for p in late:
+            if p not in pis and re.search(r"\b(Reach|engagement|marketing|enquir|application|satisfact)\b", p, re.I):
+                pis.append(p)
+
+        # de-dupe
+        seen = set()
+        uniq_pis = []
+        for p in pis:
+            k = p.lower()
+            if k in seen:
+                continue
+            seen.add(k)
+            uniq_pis.append(p)
 
         rows.append(
             {
                 "sequence": i + 1,
-                "service_description": desc[:800],
-                "performance_indicators": pis,
-                "quality_standard": quality_text or None,
+                "service_description": desc[:240],
+                "performance_indicators": uniq_pis,
+                "quality_standard": quality_text,
                 "process_text": process,
                 "coverage": coverage,
                 "frequency": frequency,
-                "target_beneficiary": after_freq[:500] or None,
+                "target_beneficiary": (after_freq[:500] if after_freq else None),
             }
         )
     return rows
@@ -215,6 +333,8 @@ CODE_RE = re.compile(
 
 def main() -> None:
     raw = EXTRACT.read_text(encoding="utf-8", errors="ignore")
+    # Drop page markers early so they never embed in field text
+    raw = re.sub(r"=====PAGE\s*\d+=====", "\n", raw, flags=re.I)
     start = raw.find("3.4 Detailed Service Delivery Standards Matrix")
     body = raw[start:] if start >= 0 else raw
 

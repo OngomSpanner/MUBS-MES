@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import axios from 'axios';
 import { Badge, Button, Form, Modal, Nav, Spinner, Tab } from 'react-bootstrap';
+import { ExpandableSdsText } from '@/components/LinkifyText';
 
 type SdsStandard = {
   id: number;
@@ -41,6 +42,15 @@ type SdsDetail = SdsStandard & {
 
 type StaffOption = { id: number; full_name: string; email?: string };
 
+type ActivityAssignment = {
+  assignment_id: number;
+  activity_id: number;
+  staff_user_id: number;
+  staff_name: string;
+  staff_email?: string | null;
+  target_date?: string | null;
+};
+
 type PiCatalogItem = {
   standard_id: number;
   standard_code: string;
@@ -62,6 +72,29 @@ type PiReport = {
   reporting_period: string;
 };
 
+type FlashTone = 'success' | 'info' | 'danger' | 'warning';
+
+function FlashAlert({
+  text,
+  tone,
+  onDismiss,
+  className = 'py-2 small',
+}: {
+  text: string;
+  tone: FlashTone;
+  onDismiss?: () => void;
+  className?: string;
+}) {
+  return (
+    <div className={`alert alert-${tone} ${className} d-flex align-items-center justify-content-between gap-2 mb-2`}>
+      <span>{text}</span>
+      {onDismiss ? (
+        <button type="button" className="btn-close" aria-label="Dismiss" onClick={onDismiss} />
+      ) : null}
+    </div>
+  );
+}
+
 export default function HodSdsView() {
   const [tab, setTab] = useState<'assign' | 'pi'>('assign');
   const [standards, setStandards] = useState<SdsStandard[]>([]);
@@ -75,14 +108,64 @@ export default function HodSdsView() {
   const [targetDate, setTargetDate] = useState('');
   const [assigning, setAssigning] = useState(false);
   const [assignMsg, setAssignMsg] = useState<string | null>(null);
+  const [assignMsgTone, setAssignMsgTone] = useState<FlashTone>('success');
+  const [piMsg, setPiMsg] = useState<string | null>(null);
+  const [piMsgTone, setPiMsgTone] = useState<FlashTone>('success');
+  const [modalFlash, setModalFlash] = useState<{ text: string; tone: FlashTone } | null>(null);
+  const [staffSearch, setStaffSearch] = useState('');
+  const [activityAssignments, setActivityAssignments] = useState<ActivityAssignment[]>([]);
+  const [viewAssignedActivity, setViewAssignedActivity] = useState<SdsActivity | null>(null);
+  const [assignedLoading, setAssignedLoading] = useState(false);
+  const [deassigningId, setDeassigningId] = useState<number | null>(null);
+  const [confirmDialog, setConfirmDialog] = useState<{
+    title: string;
+    body: string;
+    confirmLabel: string;
+    danger?: boolean;
+    run: () => Promise<void>;
+  } | null>(null);
+  const [confirmBusy, setConfirmBusy] = useState(false);
 
   const [piPeriod, setPiPeriod] = useState('');
+  const [piPeriods, setPiPeriods] = useState<string[]>([]);
   const [piCatalog, setPiCatalog] = useState<PiCatalogItem[]>([]);
   const [piReports, setPiReports] = useState<PiReport[]>([]);
   const [piLoading, setPiLoading] = useState(false);
-  const [piMsg, setPiMsg] = useState<string | null>(null);
   const [piDrafts, setPiDrafts] = useState<Record<string, { value: string; comment: string }>>({});
   const [piSavingKey, setPiSavingKey] = useState<string | null>(null);
+
+  const flashAssign = useCallback((text: string, tone: FlashTone = 'success') => {
+    setAssignMsg(text);
+    setAssignMsgTone(tone);
+  }, []);
+
+  const flashPi = useCallback((text: string, tone: FlashTone = 'success') => {
+    setPiMsg(text);
+    setPiMsgTone(tone);
+  }, []);
+
+  const flashModal = useCallback((text: string, tone: FlashTone = 'success') => {
+    setModalFlash({ text, tone });
+  }, []);
+
+  // Auto-dismiss success + info (keep errors until dismissed)
+  useEffect(() => {
+    if (!assignMsg || (assignMsgTone !== 'success' && assignMsgTone !== 'info')) return;
+    const t = window.setTimeout(() => setAssignMsg(null), 4000);
+    return () => window.clearTimeout(t);
+  }, [assignMsg, assignMsgTone]);
+
+  useEffect(() => {
+    if (!piMsg || (piMsgTone !== 'success' && piMsgTone !== 'info')) return;
+    const t = window.setTimeout(() => setPiMsg(null), 4000);
+    return () => window.clearTimeout(t);
+  }, [piMsg, piMsgTone]);
+
+  useEffect(() => {
+    if (!modalFlash || (modalFlash.tone !== 'success' && modalFlash.tone !== 'info')) return;
+    const t = window.setTimeout(() => setModalFlash(null), 3500);
+    return () => window.clearTimeout(t);
+  }, [modalFlash]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -99,11 +182,11 @@ export default function HodSdsView() {
 
   const loadPi = useCallback(async (period?: string) => {
     setPiLoading(true);
-    setPiMsg(null);
     try {
       const params = period ? `?period=${encodeURIComponent(period)}` : '';
       const res = await axios.get(`/api/sds/hod/indicator-reports${params}`);
       setPiPeriod(String(res.data?.period || ''));
+      setPiPeriods(Array.isArray(res.data?.available_periods) ? res.data.available_periods.map(String) : []);
       setPiCatalog(Array.isArray(res.data?.catalog) ? res.data.catalog : []);
       setPiReports(Array.isArray(res.data?.reports) ? res.data.reports : []);
       const drafts: Record<string, { value: string; comment: string }> = {};
@@ -113,11 +196,11 @@ export default function HodSdsView() {
       }
       setPiDrafts(drafts);
     } catch {
-      setPiMsg('Could not load PI reporting catalog');
+      flashPi('Could not load PI reporting catalog', 'danger');
     } finally {
       setPiLoading(false);
     }
-  }, []);
+  }, [flashPi]);
 
   useEffect(() => {
     void load();
@@ -135,7 +218,7 @@ export default function HodSdsView() {
 
   useEffect(() => {
     if (tab === 'pi') void loadPi(piPeriod || undefined);
-  }, [tab, loadPi]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [tab, loadPi]);
 
   const reportByKey = useMemo(() => {
     const map = new Map<string, PiReport>();
@@ -143,12 +226,58 @@ export default function HodSdsView() {
     return map;
   }, [piReports]);
 
+  const filteredStaff = useMemo(() => {
+    const q = staffSearch.trim().toLowerCase();
+    if (!q) return staff;
+    return staff.filter((s) =>
+      s.full_name.toLowerCase().includes(q) || (s.email || '').toLowerCase().includes(q),
+    );
+  }, [staff, staffSearch]);
+
+  const assignedCountByActivity = useMemo(() => {
+    const map = new Map<number, number>();
+    for (const a of activityAssignments) {
+      map.set(a.activity_id, (map.get(a.activity_id) || 0) + 1);
+    }
+    return map;
+  }, [activityAssignments]);
+
+  const loadAssignmentsForDetail = useCallback(async (standard?: SdsDetail | null) => {
+    if (!standard?.outputs?.length) {
+      setActivityAssignments([]);
+      return;
+    }
+    try {
+      const res = await axios.get('/api/sds/hod?mode=assignments');
+      const rows = (Array.isArray(res.data?.assignments) ? res.data.assignments : []) as ActivityAssignment[];
+      const activityIds = new Set(
+        standard.outputs.flatMap((o) => (o.activities || []).map((a) => a.id)),
+      );
+      setActivityAssignments(
+        rows
+          .filter((r) => activityIds.has(Number(r.activity_id)))
+          .map((r) => ({
+            assignment_id: Number(r.assignment_id),
+            activity_id: Number(r.activity_id),
+            staff_user_id: Number(r.staff_user_id),
+            staff_name: String(r.staff_name || 'Staff'),
+            staff_email: r.staff_email,
+            target_date: r.target_date,
+          })),
+      );
+    } catch {
+      setActivityAssignments([]);
+    }
+  }, []);
+
   const openDetail = async (id: number) => {
     setDetailLoading(true);
     setDetail(null);
     try {
       const res = await axios.get(`/api/sds/standards/${id}`);
-      setDetail(res.data as SdsDetail);
+      const data = res.data as SdsDetail;
+      setDetail(data);
+      await loadAssignmentsForDetail(data);
     } catch {
       setError('Failed to open standard');
     } finally {
@@ -166,27 +295,98 @@ export default function HodSdsView() {
   const openAssign = (activity: SdsActivity) => {
     setAssignActivity(activity);
     setSelectedStaffIds([]);
+    setStaffSearch('');
     setTargetDate(suggestDate(activity.duration_days));
-    setAssignMsg(null);
+    setModalFlash(null);
+  };
+
+  const openViewAssigned = async (activity: SdsActivity) => {
+    setViewAssignedActivity(activity);
+    setAssignedLoading(true);
+    setModalFlash(null);
+    try {
+      const res = await axios.get(`/api/sds/hod?mode=assignments&activityId=${activity.id}`);
+      const rows = (Array.isArray(res.data?.assignments) ? res.data.assignments : []) as ActivityAssignment[];
+      const mapped = rows.map((r) => ({
+        assignment_id: Number(r.assignment_id),
+        activity_id: Number(r.activity_id),
+        staff_user_id: Number(r.staff_user_id),
+        staff_name: String(r.staff_name || 'Staff'),
+        staff_email: r.staff_email,
+        target_date: r.target_date,
+      }));
+      setActivityAssignments((prev) => {
+        const others = prev.filter((a) => a.activity_id !== activity.id);
+        return [...others, ...mapped];
+      });
+      if (!mapped.length) {
+        flashModal('No staff assigned to this activity yet.', 'info');
+      }
+    } catch {
+      flashModal('Could not load assigned staff', 'danger');
+    } finally {
+      setAssignedLoading(false);
+    }
+  };
+
+  const deassignStaff = async (assignmentId: number, staffName: string) => {
+    setConfirmDialog({
+      title: 'Deassign staff',
+      body: `Remove ${staffName} from this activity?`,
+      confirmLabel: 'Deassign',
+      danger: true,
+      run: async () => {
+        setDeassigningId(assignmentId);
+        try {
+          await axios.patch('/api/sds/hod', { assignment_id: assignmentId, action: 'cancel' });
+          setActivityAssignments((prev) => prev.filter((a) => a.assignment_id !== assignmentId));
+          flashModal(`${staffName} deassigned.`, 'success');
+          flashAssign(`${staffName} deassigned.`, 'success');
+        } catch (e: unknown) {
+          const msg = axios.isAxiosError(e) ? e.response?.data?.message || 'Deassign failed' : 'Deassign failed';
+          flashModal(msg, 'danger');
+        } finally {
+          setDeassigningId(null);
+        }
+      },
+    });
   };
 
   const submitAssign = async () => {
     if (!assignActivity || !selectedStaffIds.length) return;
-    setAssigning(true);
-    setAssignMsg(null);
-    try {
-      const res = await axios.post('/api/sds/hod', {
-        activity_id: assignActivity.id,
-        staff_user_ids: selectedStaffIds,
-        target_date: targetDate || null,
-      });
-      setAssignMsg(`Assigned to ${res.data?.created ?? selectedStaffIds.length} staff member(s).`);
-      setAssignActivity(null);
-    } catch (e: unknown) {
-      setAssignMsg(axios.isAxiosError(e) ? e.response?.data?.message || 'Assign failed' : 'Assign failed');
-    } finally {
-      setAssigning(false);
-    }
+    const count = selectedStaffIds.length;
+    const activityName = assignActivity.activity_name;
+    const activityId = assignActivity.id;
+    const staffIds = [...selectedStaffIds];
+    const date = targetDate || null;
+    setConfirmDialog({
+      title: 'Confirm assignment',
+      body: `Assign ${count} staff member${count === 1 ? '' : 's'} to “${activityName}”?`,
+      confirmLabel: 'Assign',
+      run: async () => {
+        setAssigning(true);
+        setModalFlash(null);
+        try {
+          const res = await axios.post('/api/sds/hod', {
+            activity_id: activityId,
+            staff_user_ids: staffIds,
+            target_date: date,
+          });
+          const created = Number(res.data?.created ?? count);
+          const message = created > 0
+            ? `Assigned to ${created} staff member${created === 1 ? '' : 's'}.`
+            : 'No new assignments (staff may already be assigned).';
+          flashAssign(message, created > 0 ? 'success' : 'info');
+          setAssignActivity(null);
+          if (detail) await loadAssignmentsForDetail(detail);
+        } catch (e: unknown) {
+          const msg = axios.isAxiosError(e) ? e.response?.data?.message || 'Assign failed' : 'Assign failed';
+          flashModal(msg, 'danger');
+        } finally {
+          setAssigning(false);
+        }
+      },
+    });
   };
 
   const savePiRow = async (
@@ -196,11 +396,10 @@ export default function HodSdsView() {
     key: string,
   ) => {
     if (!indicatorText.trim()) {
-      setPiMsg('Enter an indicator description first');
+      flashPi('Enter an indicator description first', 'warning');
       return;
     }
     setPiSavingKey(key);
-    setPiMsg(null);
     try {
       await axios.post('/api/sds/hod/indicator-reports', {
         standard_id: item.standard_id,
@@ -210,10 +409,10 @@ export default function HodSdsView() {
         comment: draft.comment || null,
         reporting_period: piPeriod,
       });
-      setPiMsg('Saved (self-reported — no approval required).');
+      flashPi('Performance indicator saved.', 'success');
       await loadPi(piPeriod);
     } catch (e: unknown) {
-      setPiMsg(axios.isAxiosError(e) ? e.response?.data?.message || 'Save failed' : 'Save failed');
+      flashPi(axios.isAxiosError(e) ? e.response?.data?.message || 'Save failed' : 'Save failed', 'danger');
     } finally {
       setPiSavingKey(null);
     }
@@ -223,11 +422,17 @@ export default function HodSdsView() {
     <div className="container-fluid py-3">
       <h4 className="fw-bold mb-1" style={{ color: 'var(--mubs-blue)' }}>Service Delivery Standards</h4>
       <p className="text-muted small mb-3">
-        Assign Process Activities to staff (HRM appraisal pull). Report Performance Indicators yourself — heads of unit; no approval step.
+        Assign process activities to staff, and report performance indicators for your unit.
       </p>
-      {error && <div className="alert alert-danger py-2 small">{error}</div>}
-      {assignMsg && tab === 'assign' && <div className="alert alert-info py-2 small">{assignMsg}</div>}
-      {piMsg && tab === 'pi' && <div className="alert alert-info py-2 small">{piMsg}</div>}
+      {error && (
+        <FlashAlert text={error} tone="danger" onDismiss={() => setError(null)} className="py-2 small" />
+      )}
+      {assignMsg && tab === 'assign' && (
+        <FlashAlert text={assignMsg} tone={assignMsgTone} onDismiss={() => setAssignMsg(null)} className="py-2 small" />
+      )}
+      {piMsg && tab === 'pi' && (
+        <FlashAlert text={piMsg} tone={piMsgTone} onDismiss={() => setPiMsg(null)} className="py-2 small" />
+      )}
 
       <Tab.Container activeKey={tab} onSelect={(k) => setTab((k as 'assign' | 'pi') || 'assign')}>
         <Nav variant="tabs" className="mb-3">
@@ -273,20 +478,18 @@ export default function HodSdsView() {
             <div className="d-flex flex-wrap gap-2 align-items-end mb-3">
               <div>
                 <Form.Label className="small fw-bold mb-1">Reporting period</Form.Label>
-                <Form.Control
+                <Form.Select
                   size="sm"
                   value={piPeriod}
                   onChange={(e) => setPiPeriod(e.target.value)}
-                  placeholder="e.g. FY25/26"
                   style={{ minWidth: 140 }}
-                />
+                >
+                  {piPeriods.map((period) => <option key={period} value={period}>{period}</option>)}
+                </Form.Select>
               </div>
               <Button size="sm" variant="outline-primary" onClick={() => void loadPi(piPeriod)}>
                 Reload
               </Button>
-              <div className="small text-muted ms-auto">
-                Self-reported by HoU — counts as final when saved.
-              </div>
             </div>
 
             {piLoading ? (
@@ -421,22 +624,37 @@ export default function HodSdsView() {
                   )}
                   {o.quality_standard && (
                     <div className="small mt-2 p-2 rounded" style={{ background: '#f8fafc' }}>
-                      <span className="fw-semibold">Standard (quality):</span> {o.quality_standard}
+                      <ExpandableSdsText label="Standard (quality)" text={o.quality_standard} />
                     </div>
                   )}
                   <div className="mt-2">
                     <div className="small fw-bold mb-1">Assign Process Activities</div>
-                    {(o.activities || []).map((a) => (
+                    {(o.activities || []).map((a) => {
+                      const assignedN = assignedCountByActivity.get(a.id) || 0;
+                      return (
                       <div key={a.id} className="d-flex justify-content-between align-items-center gap-2 border-bottom py-2">
                         <div>
                           <span className="small fw-semibold">{a.sequence_no}. {a.activity_name}</span>
                           {a.duration_text ? <Badge bg="light" className="text-dark border ms-2">{a.duration_text}</Badge> : null}
+                          {assignedN > 0 ? (
+                            <Badge bg="info" className="ms-2">{assignedN} assigned</Badge>
+                          ) : null}
                         </div>
-                        <Button size="sm" variant="primary" style={{ background: 'var(--mubs-blue)', borderColor: 'var(--mubs-blue)' }} onClick={() => openAssign(a)}>
-                          Assign
-                        </Button>
+                        <div className="d-flex gap-1 flex-shrink-0">
+                          <Button
+                            size="sm"
+                            variant="outline-secondary"
+                            onClick={() => void openViewAssigned(a)}
+                          >
+                            View assigned
+                          </Button>
+                          <Button size="sm" variant="primary" style={{ background: 'var(--mubs-blue)', borderColor: 'var(--mubs-blue)' }} onClick={() => openAssign(a)}>
+                            Assign
+                          </Button>
+                        </div>
                       </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </div>
               ))}
@@ -450,12 +668,27 @@ export default function HodSdsView() {
           <Modal.Title className="fs-6 fw-bold">Assign activity</Modal.Title>
         </Modal.Header>
         <Modal.Body>
+          {modalFlash && assignActivity && (
+            <FlashAlert
+              text={modalFlash.text}
+              tone={modalFlash.tone}
+              onDismiss={() => setModalFlash(null)}
+            />
+          )}
           {assignActivity && (
             <>
               <div className="fw-semibold small mb-2">{assignActivity.activity_name}</div>
+              <Form.Label className="small fw-bold">Search staff</Form.Label>
+              <Form.Control
+                size="sm"
+                className="mb-2"
+                placeholder="Type a name or email…"
+                value={staffSearch}
+                onChange={(e) => setStaffSearch(e.target.value)}
+              />
               <Form.Label className="small fw-bold">Staff (select one or more)</Form.Label>
               <div className="border rounded-2 p-2 mb-2" style={{ maxHeight: 220, overflow: 'auto' }}>
-                {staff.map((s) => (
+                {filteredStaff.map((s) => (
                   <label key={s.id} className="d-flex gap-2 small mb-1">
                     <input
                       type="checkbox"
@@ -464,10 +697,16 @@ export default function HodSdsView() {
                         prev.includes(s.id) ? prev.filter((id) => id !== s.id) : [...prev, s.id]
                       )}
                     />
-                    <span>{s.full_name}</span>
+                    <span>
+                      {s.full_name}
+                      {s.email ? <span className="text-muted"> — {s.email}</span> : null}
+                    </span>
                   </label>
                 ))}
                 {!staff.length && <div className="text-muted small">No staff found in your department.</div>}
+                {!!staff.length && !filteredStaff.length && (
+                  <div className="text-muted small">No staff match “{staffSearch}”.</div>
+                )}
               </div>
               <Form.Label className="small fw-bold">Target date (suggested from duration, editable)</Form.Label>
               <Form.Control type="date" size="sm" value={targetDate} onChange={(e) => setTargetDate(e.target.value)} />
@@ -479,6 +718,118 @@ export default function HodSdsView() {
           <Button size="sm" variant="primary" disabled={assigning || !selectedStaffIds.length} onClick={() => void submitAssign()}
             style={{ background: 'var(--mubs-blue)', borderColor: 'var(--mubs-blue)' }}>
             {assigning ? 'Assigning…' : 'Assign'}
+          </Button>
+        </Modal.Footer>
+      </Modal>
+
+      <Modal show={!!viewAssignedActivity} onHide={() => setViewAssignedActivity(null)} centered>
+        <Modal.Header closeButton className="py-2">
+          <Modal.Title className="fs-6 fw-bold">Assigned staff</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          {modalFlash && viewAssignedActivity && (
+            <FlashAlert
+              text={modalFlash.text}
+              tone={modalFlash.tone}
+              onDismiss={() => setModalFlash(null)}
+            />
+          )}
+          {viewAssignedActivity && (
+            <>
+              <div className="fw-semibold small mb-2">{viewAssignedActivity.activity_name}</div>
+              {assignedLoading ? (
+                <div className="text-center py-3"><Spinner size="sm" /></div>
+              ) : (
+                <div className="d-flex flex-column gap-2">
+                  {activityAssignments
+                    .filter((a) => a.activity_id === viewAssignedActivity.id)
+                    .map((a) => (
+                      <div key={a.assignment_id} className="d-flex justify-content-between align-items-center border rounded-2 px-2 py-2">
+                        <div className="small">
+                          <div className="fw-semibold">{a.staff_name}</div>
+                          {a.staff_email ? <div className="text-muted" style={{ fontSize: '0.72rem' }}>{a.staff_email}</div> : null}
+                          {a.target_date ? <div className="text-muted" style={{ fontSize: '0.72rem' }}>Target: {String(a.target_date).slice(0, 10)}</div> : null}
+                        </div>
+                        <Button
+                          size="sm"
+                          variant="outline-danger"
+                          title="Deassign"
+                          disabled={deassigningId === a.assignment_id}
+                          onClick={() => void deassignStaff(a.assignment_id, a.staff_name)}
+                          style={{ lineHeight: 1, width: 32, height: 32, padding: 0 }}
+                        >
+                          {deassigningId === a.assignment_id ? '…' : '×'}
+                        </Button>
+                      </div>
+                    ))}
+                  {!activityAssignments.some((a) => a.activity_id === viewAssignedActivity.id) && (
+                    <div className="text-muted small py-2">No staff assigned to this activity yet.</div>
+                  )}
+                </div>
+              )}
+            </>
+          )}
+        </Modal.Body>
+        <Modal.Footer className="py-2">
+          <Button size="sm" variant="outline-secondary" onClick={() => setViewAssignedActivity(null)}>Close</Button>
+          <Button
+            size="sm"
+            variant="primary"
+            style={{ background: 'var(--mubs-blue)', borderColor: 'var(--mubs-blue)' }}
+            onClick={() => {
+              if (viewAssignedActivity) {
+                const act = viewAssignedActivity;
+                setViewAssignedActivity(null);
+                openAssign(act);
+              }
+            }}
+          >
+            Assign more
+          </Button>
+        </Modal.Footer>
+      </Modal>
+
+      <Modal
+        show={!!confirmDialog}
+        onHide={() => { if (!confirmBusy) setConfirmDialog(null); }}
+        centered
+        backdrop="static"
+        style={{ zIndex: 1080 }}
+      >
+        <Modal.Header closeButton={!confirmBusy} className="py-2">
+          <Modal.Title className="fs-6 fw-bold">{confirmDialog?.title || 'Confirm'}</Modal.Title>
+        </Modal.Header>
+        <Modal.Body className="small">
+          {confirmDialog?.body}
+        </Modal.Body>
+        <Modal.Footer className="py-2">
+          <Button
+            size="sm"
+            variant="outline-secondary"
+            disabled={confirmBusy}
+            onClick={() => setConfirmDialog(null)}
+          >
+            Cancel
+          </Button>
+          <Button
+            size="sm"
+            variant={confirmDialog?.danger ? 'danger' : 'primary'}
+            disabled={confirmBusy}
+            style={confirmDialog?.danger ? undefined : { background: 'var(--mubs-blue)', borderColor: 'var(--mubs-blue)' }}
+            onClick={() => {
+              if (!confirmDialog) return;
+              void (async () => {
+                setConfirmBusy(true);
+                try {
+                  await confirmDialog.run();
+                  setConfirmDialog(null);
+                } finally {
+                  setConfirmBusy(false);
+                }
+              })();
+            }}
+          >
+            {confirmBusy ? 'Please wait…' : (confirmDialog?.confirmLabel || 'Confirm')}
           </Button>
         </Modal.Footer>
       </Modal>

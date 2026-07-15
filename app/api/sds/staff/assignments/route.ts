@@ -3,6 +3,7 @@ import { cookies } from 'next/headers';
 import { verifyToken } from '@/lib/auth';
 import { query } from '@/lib/db';
 import { ensureSdsSchema } from '@/lib/sds/schema';
+import { deriveOutputCover } from '@/lib/sds/output-label';
 
 export const dynamic = 'force-dynamic';
 
@@ -21,8 +22,8 @@ export async function GET() {
       query: `
         SELECT a.id AS assignment_id, a.target_date, a.notes, a.assigned_at,
                act.id AS activity_id, act.activity_name, act.duration_text, act.sequence_no AS activity_sequence,
-               o.id AS output_id, o.output_code, o.service_description, o.process_text,
-               s.id AS standard_id, s.code AS standard_code, s.title AS standard_title, s.pathway,
+               o.id AS output_id, o.output_code, o.service_description, o.process_text, o.quality_standard,
+               s.id AS standard_id, s.code AS standard_code, s.title AS standard_title, s.pathway, s.pillar,
                assigner.full_name AS assigned_by_name
         FROM sds_activity_assignments a
         JOIN sds_activities act ON act.id = a.activity_id
@@ -35,7 +36,6 @@ export async function GET() {
       values: [decoded.userId],
     })) as Record<string, unknown>[];
 
-    // Enrich with co-assignees + full process chain activities
     const enriched = [];
     for (const row of rows) {
       const activityId = Number(row.activity_id);
@@ -49,7 +49,7 @@ export async function GET() {
           ORDER BY sequence_no ASC, id ASC
         `,
         values: [outputId],
-      })) as Record<string, unknown>[];
+      })) as { id: number; sequence_no: number; activity_name: string; duration_text: string | null }[];
 
       const coAssignees = (await query({
         query: `
@@ -62,10 +62,14 @@ export async function GET() {
         values: [activityId, decoded.userId],
       })) as { id: number; full_name: string }[];
 
+      const outputCover = deriveOutputCover(String(row.service_description || ''), chain);
+
       enriched.push({
         ...row,
         process_chain: chain,
         co_assignees: coAssignees,
+        output_cover: outputCover,
+        service_description: outputCover,
       });
     }
 

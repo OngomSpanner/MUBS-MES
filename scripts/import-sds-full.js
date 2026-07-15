@@ -318,7 +318,64 @@ async function main() {
       }
     }
 
-    // 2) Outputs + activities from CSV; attach matrix_rows / blocks by sequence order
+    // 2) Outputs + activities from CSV; attach matrix_rows by ORDINAL within each standard
+    //    (CSV output codes use global O30/O31/… — NOT a 1-based matrix index)
+    const outputCodesByStandard = new Map(); // stdCode -> ordered unique output codes
+    for (const row of activityRows) {
+      const stdCode = normalizeCode(row.standard_code || '');
+      const outputCode = normalizeCode(row.output_id || '');
+      if (!stdCode || !outputCode) continue;
+      if (!outputCodesByStandard.has(stdCode)) outputCodesByStandard.set(stdCode, []);
+      const list = outputCodesByStandard.get(stdCode);
+      if (!list.includes(outputCode)) list.push(outputCode);
+    }
+    const ordinalByOutputCode = new Map(); // outputCode -> 0-based ordinal within its standard
+    for (const [, codes] of outputCodesByStandard.entries()) {
+      codes.forEach((code, idx) => ordinalByOutputCode.set(code, idx));
+    }
+    const activityTextByOutputCode = new Map();
+    for (const row of activityRows) {
+      const outputCode = normalizeCode(row.output_id || '');
+      const activityName = String(row.activity_name || '').trim();
+      if (!outputCode || !activityName) continue;
+      activityTextByOutputCode.set(
+        outputCode,
+        `${activityTextByOutputCode.get(outputCode) || ''} ${activityName}`.trim(),
+      );
+    }
+    const titleTokens = (value) => new Set(
+      String(value || '').toLowerCase()
+        .replace(/[^a-z0-9]+/g, ' ')
+        .split(/\s+/)
+        .filter((token) => token.length >= 4 && !new Set([
+          'with', 'from', 'that', 'this', 'into', 'through', 'about', 'programme', 'programmes',
+          'service', 'process', 'report', 'mubs', 'output', 'their', 'within',
+        ]).has(token)),
+    );
+    const rowSimilarity = (activityText, matrixRow) => {
+      const activityTokens = titleTokens(activityText);
+      const rowTokens = titleTokens(`${matrixRow?.service_description || ''} ${matrixRow?.process_text || ''}`);
+      let shared = 0;
+      for (const token of activityTokens) if (rowTokens.has(token)) shared += 1;
+      return shared;
+    };
+    const matrixRowForOutput = (pdf, stdCode, outputCode, ordinal) => {
+      const rows = Array.isArray(pdf.matrix_rows) ? pdf.matrix_rows : [];
+      const ordinalRow = rows[ordinal] || null;
+      const standardOutputCount = (outputCodesByStandard.get(stdCode) || []).length;
+      // Ordinal is authoritative when the matrix and CSV have the same number
+      // of outputs. If they differ, activity/title similarity is safer than
+      // assigning a shifted matrix row to every subsequent CSV output.
+      if (rows.length === standardOutputCount || !rows.length) return ordinalRow;
+      const activityText = activityTextByOutputCode.get(outputCode) || '';
+      const ranked = rows
+        .map((row, index) => ({ row, index, score: rowSimilarity(activityText, row) }))
+        .sort((a, b) => b.score - a.score || a.index - b.index);
+      // A single shared generic word (for example "data" or "report") is
+      // not enough evidence to override position in a malformed matrix.
+      return ranked[0]?.score >= 2 ? ranked[0].row : ordinalRow;
+    };
+
     const outputIds = new Map();
     let activitiesUpserted = 0;
     for (const row of activityRows) {
@@ -332,16 +389,26 @@ async function main() {
 
       if (!outputIds.has(outputCode)) {
         const m = outputCode.match(/-O(\d+)$/i);
-        const outSeq = m ? Number(m[1]) : 1;
+        const codeNum = m ? Number(m[1]) : 1;
+        // Prefer ordinal among this standard's outputs; fall back to code number
+        const ordinal = ordinalByOutputCode.has(outputCode)
+          ? ordinalByOutputCode.get(outputCode)
+          : Math.max(0, codeNum - 1);
+        const sequenceNo = ordinal + 1;
         const pdf = pdfByCode.get(stdCode) || {};
-        const blockIdx = Math.max(0, outSeq - 1);
-        const matrixRow = Array.isArray(pdf.matrix_rows) ? pdf.matrix_rows[blockIdx] : null;
+        const matrixRow = matrixRowForOutput(pdf, stdCode, outputCode, ordinal);
         const fallbackOne = (arr) =>
-          (arr && arr[blockIdx])
-          || ((arr || []).length === 1 && outSeq === 1 ? arr[0] : null);
+          (arr && arr[ordinal])
+          || ((arr || []).length === 1 && ordinal === 0 ? arr[0] : null);
 
-        const serviceDescription = (matrixRow && matrixRow.service_description)
+        let serviceDescription = (matrixRow && matrixRow.service_description)
           || `Output ${outputCode}`;
+        // Prefer clean PDF titles; refuse quality/policy dumps
+        if (/https?:\/\//i.test(serviceDescription)
+          || /\b(adherence to|conformance to|compliance with)\b/i.test(serviceDescription)
+            && serviceDescription.length > 80) {
+          serviceDescription = `Output ${outputCode}`;
+        }
         const pis = (matrixRow && Array.isArray(matrixRow.performance_indicators)
           ? matrixRow.performance_indicators
           : []);
@@ -361,14 +428,14 @@ async function main() {
             `UPDATE sds_outputs SET standard_id=?, sequence_no=?,
               service_description=?,
               performance_indicators_json=?,
-              quality_standard=COALESCE(?, quality_standard),
+              quality_standard=?,
               process_text=COALESCE(?, process_text),
               coverage=COALESCE(?, coverage),
               frequency=COALESCE(?, frequency),
               target_beneficiary=COALESCE(?, target_beneficiary)
              WHERE output_code=?`,
             [
-              standardId, outSeq, serviceDescription, JSON.stringify(pis),
+              standardId, sequenceNo, serviceDescription, JSON.stringify(pis),
               quality, processText, coverage, frequency, beneficiary, outputCode,
             ],
           );
@@ -380,7 +447,7 @@ async function main() {
                quality_standard, process_text, coverage, frequency, target_beneficiary)
              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
             [
-              standardId, outputCode, outSeq, serviceDescription, JSON.stringify(pis),
+              standardId, outputCode, sequenceNo, serviceDescription, JSON.stringify(pis),
               quality, processText, coverage, frequency, beneficiary,
             ],
           );
@@ -398,7 +465,28 @@ async function main() {
       activitiesUpserted += 1;
     }
 
-    // Rebuild process_text from activities when missing
+    // Rebuild process_text + replace garbled PDF service descriptions with activity-based covers
+    function isBadDesc(s) {
+      const t = String(s || '').trim();
+      if (!t) return true;
+      if (/^Output\b/i.test(t)) return true;
+      if (/https?:\/\//i.test(t)) return true;
+      if (/\(\s*\d+\s*wee/i.test(t)) return true;
+      if (/\([A-Za-z]{2,8}\s*\(\d/i.test(t)) return true;
+      if (/\b(adherence to|conformance to|compliance with|quality assurance policy)\b/i.test(t) && t.length > 70) return true;
+      const open = (t.match(/\(/g) || []).length;
+      const close = (t.match(/\)/g) || []).length;
+      if (open > close + 1) return true;
+      return false;
+    }
+    function coverFromActs(acts) {
+      const names = acts.map((a) => String(a.activity_name || '').trim()).filter(Boolean);
+      if (!names.length) return null;
+      if (names.length === 1) return names[0];
+      if (names.length === 2) return `${names[0]} → ${names[1]}`;
+      return `Process from “${names[0]}” through “${names[names.length - 1]}” (${names.length} steps)`;
+    }
+
     for (const [outputCode, outputId] of outputIds.entries()) {
       const [acts] = await conn.query(
         'SELECT activity_name, duration_text FROM sds_activities WHERE output_id=? ORDER BY sequence_no',
@@ -409,22 +497,12 @@ async function main() {
         `UPDATE sds_outputs SET process_text = COALESCE(NULLIF(TRIM(process_text), ''), ?) WHERE id=?`,
         [rebuilt || null, outputId],
       );
-      // Only fill stub descriptions that still look like codes / empty
-      await conn.query(
-        `UPDATE sds_outputs SET service_description = ?
-         WHERE id=? AND (
-           service_description IS NULL
-           OR TRIM(service_description)=''
-           OR service_description LIKE 'Output MUBS/%'
-           OR service_description LIKE 'Output activities:%'
-         )`,
-        [
-          acts.length
-            ? `Output activities: ${acts.slice(0, 3).map((a) => a.activity_name).join('; ')}${acts.length > 3 ? '…' : ''}`
-            : `Output ${outputCode}`,
-          outputId,
-        ],
-      );
+      const [cur] = await conn.query('SELECT service_description FROM sds_outputs WHERE id=?', [outputId]);
+      const currentDesc = cur[0]?.service_description;
+      const cover = coverFromActs(acts);
+      if (cover && isBadDesc(currentDesc)) {
+        await conn.query('UPDATE sds_outputs SET service_description = ? WHERE id=?', [cover, outputId]);
+      }
     }
 
     console.log(JSON.stringify({
