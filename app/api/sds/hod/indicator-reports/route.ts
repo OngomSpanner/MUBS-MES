@@ -12,12 +12,18 @@ import {
 
 export const dynamic = 'force-dynamic';
 
+const HOD_ROLES = ['department head', 'unit head', 'hod'];
+
 async function authHod() {
   const cookieStore = await cookies();
   const token = cookieStore.get('token')?.value;
   if (!token) return { error: NextResponse.json({ message: 'Unauthorized' }, { status: 401 }) };
-  const decoded = verifyToken(token) as { userId?: number } | null;
+  const decoded = verifyToken(token) as { userId?: number; role?: string } | null;
   if (!decoded?.userId) return { error: NextResponse.json({ message: 'Invalid token' }, { status: 401 }) };
+  const role = String(decoded.role || '').trim().toLowerCase();
+  if (!HOD_ROLES.includes(role)) {
+    return { error: NextResponse.json({ message: 'Forbidden: HOD or Unit Head role required' }, { status: 403 }) };
+  }
   const departmentIds = await getVisibleDepartmentIds(decoded.userId);
   if (!departmentIds.length) {
     return { error: NextResponse.json({ message: 'No department assigned' }, { status: 403 }) };
