@@ -26,17 +26,14 @@ The endpoint intentionally does not enable cross-origin browser access. HRMS sho
 
 ## Lookup query parameters
 
-Supply one of the following:
+Supply:
 
-- `hrmsStaffId`: preferred numeric HRMS staff ID, matched to `users.hrms_staff_id`
-- `staffNumber`: matched to `users.employee_id` or a numeric `hrms_staff_id`
-- `email`: matched to `users.email`
-- `userId`: M&E `users.id`
+- `email`: staff email matched to `users.email` (case-insensitive)
 
 Example:
 
 ```text
-GET https://mubsme.mubs.ac.ug/api/sds/hrm/appraisal-assignments?hrmsStaffId=12345
+GET https://mubsme.mubs.ac.ug/api/sds/hrm/appraisal-assignments?email=user@mubs.ac.ug
 ```
 
 ## Response contract
@@ -72,6 +69,7 @@ Predetermined Rating, Self Rating, Supervisor Rating, Agreed Rating, and comment
 ## Status and errors
 
 - `200`: staff found; `entries` may be empty when no active assignments exist
+- `400`: `email` is missing or invalid
 - `401`: shared secret is absent, invalid, or not sent
-- `404`: no M&E user matched the supplied identity
+- `404`: no M&E user matched the supplied email
 - `500`: unexpected M&E service or database error

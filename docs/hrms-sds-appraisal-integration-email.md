@@ -9,9 +9,9 @@ Production API
 Base URL: https://mubsme.mubs.ac.ug
 
 Endpoint:
-GET https://mubsme.mubs.ac.ug/api/sds/hrm/appraisal-assignments?hrmsStaffId=12345
+GET https://mubsme.mubs.ac.ug/api/sds/hrm/appraisal-assignments?email=user@mubs.ac.ug
 
-Please send one staff identifier per request. `hrmsStaffId` is preferred because it is the HRMS-to-M&E identity link. The endpoint also accepts `staffNumber`, `email`, or `userId`.
+Please send one staff email per request using the `email` query parameter. Matching is case-insensitive.
 
 Authentication
 
@@ -57,6 +57,6 @@ Predetermined Rating, Self Rating, Supervisor Rating, Agreed Rating, and all app
 
 Quick test
 
-curl -H "Authorization: Bearer 8c033b3b2a84b4bcdcf3d8de351cc2f7658b355be6809a51" "https://mubsme.mubs.ac.ug/api/sds/hrm/appraisal-assignments?hrmsStaffId=12345"
+curl -H "Authorization: Bearer 8c033b3b2a84b4bcdcf3d8de351cc2f7658b355be6809a51" "https://mubsme.mubs.ac.ug/api/sds/hrm/appraisal-assignments?email=user@mubs.ac.ug"
 
 Please let us know if you need a test staff record or help validating the mapping on the appraisal screen.

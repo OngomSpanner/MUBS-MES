@@ -7,7 +7,7 @@ export const dynamic = 'force-dynamic';
 /**
  * HRM appraisal pull endpoint (pull model).
  * Auth: Authorization: Bearer <SDS_HRM_PULL_SECRET or CRON_SECRET>
- * Lookup by hrmsStaffId, staffNumber, email, or userId.
+ * Lookup by email only.
  * This endpoint is deliberately read-only: HRMS owns appraisal ratings and comments.
  */
 function authorize(request: Request): boolean {
@@ -34,6 +34,15 @@ function toIsoDate(value: unknown): string | null {
   const text = toText(value);
   const match = text?.match(/^\d{4}-\d{2}-\d{2}/);
   return match?.[0] || null;
+}
+
+function normalizeEmail(value: string): string {
+  return value.trim().toLowerCase();
+}
+
+function isValidEmail(value: string): boolean {
+  // Keep this intentionally simple (server-to-server integration, not user input forms).
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
 }
 
 function parseIndicatorList(raw: unknown): string[] {
@@ -88,33 +97,17 @@ export async function GET(request: Request) {
     await ensureSdsSchema();
 
     const url = new URL(request.url);
-    const staffNumber = String(url.searchParams.get('staffNumber') || url.searchParams.get('employeeId') || '').trim();
-    const email = String(url.searchParams.get('email') || '').trim();
-    const userIdParam = Number(url.searchParams.get('userId') || 0);
-    const hrmsStaffId = Number(url.searchParams.get('hrmsStaffId') || 0);
-
-    let userId = userIdParam;
-    if (!userId) {
-      if (hrmsStaffId > 0) {
-        const rows = (await query({
-          query: 'SELECT id FROM users WHERE hrms_staff_id = ? LIMIT 1',
-          values: [hrmsStaffId],
-        })) as { id: number }[];
-        userId = Number(rows[0]?.id || 0);
-      } else if (staffNumber) {
-        const rows = (await query({
-          query: 'SELECT id FROM users WHERE employee_id = ? OR CAST(hrms_staff_id AS CHAR) = ? LIMIT 1',
-          values: [staffNumber, staffNumber],
-        })) as { id: number }[];
-        userId = Number(rows[0]?.id || 0);
-      } else if (email) {
-        const rows = (await query({
-          query: 'SELECT id FROM users WHERE email = ? LIMIT 1',
-          values: [email],
-        })) as { id: number }[];
-        userId = Number(rows[0]?.id || 0);
-      }
+    const emailRaw = String(url.searchParams.get('email') || '').trim();
+    if (!emailRaw || !isValidEmail(emailRaw)) {
+      return NextResponse.json({ message: 'Valid email is required (query param: ?email=...)' }, { status: 400 });
     }
+    const email = normalizeEmail(emailRaw);
+
+    const userMatchRows = (await query({
+      query: 'SELECT id FROM users WHERE LOWER(TRIM(email)) = ? LIMIT 1',
+      values: [email],
+    })) as { id: number }[];
+    const userId = Number(userMatchRows[0]?.id || 0);
 
     if (!userId) {
       return NextResponse.json({ message: 'User not found', entries: [] }, { status: 404 });
