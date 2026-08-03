@@ -13,6 +13,7 @@ import {
   ensureIndicatorTargetsSchema,
   loadIndicatorTargets,
 } from '@/lib/questionnaire-metric-targets';
+import { inputMetricsForIndicator, type MetricTreeNode } from '@/lib/questionnaire/metric-tree';
 
 export const dynamic = 'force-dynamic';
 
@@ -119,15 +120,24 @@ export async function POST(request: Request) {
 
   if (submitForReview) {
     const metrics = (await query({
-      query: 'SELECT id FROM q_metrics WHERE indicator_id = ?',
+      query: `
+        SELECT id, parent_metric_id, is_total, sort_order
+        FROM q_metrics
+        WHERE indicator_id = ?
+        ORDER BY sort_order, id
+      `,
       values: [indicatorId],
-    })) as { id: number }[];
+    })) as MetricTreeNode[];
+    const inputMetrics = inputMetricsForIndicator(metrics);
     const fys = (await query({
       query: 'SELECT financial_year FROM q_indicator_fys WHERE indicator_id = ?',
       values: [indicatorId],
     })) as { financial_year: string }[];
-    const total = metrics.length * fys.length;
-    const filled = entries.filter((e) => String(e.value ?? '').trim() !== '').length;
+    const total = inputMetrics.length * fys.length;
+    const inputIds = new Set(inputMetrics.map((m) => Number(m.id)));
+    const filled = entries.filter(
+      (e) => inputIds.has(Number(e.metric_id)) && String(e.value ?? '').trim() !== '',
+    ).length;
     if (total === 0 || filled < total) {
       return NextResponse.json(
         { message: `Fill in all required metrics before submitting to ${HOD_UNIT_HEAD_LABEL}.` },

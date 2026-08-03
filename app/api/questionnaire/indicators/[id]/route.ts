@@ -7,6 +7,10 @@ import { normalizeFinancialYear } from '@/lib/questionnaire/fy-utils';
 import { ensureQuestionnaireObjectiveSchema, ensureQuestionnaireSubMetricsSchema } from '@/lib/questionnaire-schema';
 import { fetchDepartmentsWithAmbassador } from '@/lib/departments-with-ambassador';
 import {
+  AMBASSADOR_GROUP_ORDER,
+  type AmbassadorDepartmentGroup,
+} from '@/lib/department-ambassador-groups';
+import {
   getIndicatorAssignedGroups,
   refreshIndicatorAssignedGroupFlags,
   syncIndicatorDepartmentGroups,
@@ -197,7 +201,18 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
     await saveIndicatorTargets(Number(id), financialYears, indicatorTargets);
 
     const catalog = await fetchDepartmentsWithAmbassador(true);
-    await refreshIndicatorAssignedGroupFlags(Number(id), departmentIds, catalog);
+    const assignedGroupsRaw: unknown[] = Array.isArray(body.assigned_groups) ? body.assigned_groups : [];
+    const assignedGroups = assignedGroupsRaw
+      .map((g) => String(g))
+      .filter((g): g is AmbassadorDepartmentGroup =>
+        (AMBASSADOR_GROUP_ORDER as readonly string[]).includes(g),
+      );
+    await refreshIndicatorAssignedGroupFlags(
+      Number(id),
+      departmentIds,
+      catalog,
+      Array.isArray(body.assigned_groups) ? assignedGroups : null,
+    );
     await syncIndicatorDepartmentGroups(Number(id), catalog);
 
     return NextResponse.json({ message: 'Updated' });

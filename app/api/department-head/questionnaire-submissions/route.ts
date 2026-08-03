@@ -10,7 +10,7 @@ import {
   ensureIndicatorTargetsSchema,
   loadIndicatorTargets,
 } from '@/lib/questionnaire-metric-targets';
-import { notifyAmbassadorOfIndicatorReview, notifyAdminsOfIndicatorApprovals } from '@/lib/questionnaire-submission-notifications';
+import { notifyAmbassadorOfIndicatorReview } from '@/lib/questionnaire-submission-notifications';
 
 export const dynamic = 'force-dynamic';
 
@@ -175,7 +175,9 @@ export async function PATCH(request: Request) {
       return NextResponse.json({ message: 'indicatorId, departmentId, and action (approve|return) required' }, { status: 400 });
     }
     if (action === 'return' && !comment) {
-      return NextResponse.json({ message: 'Feedback required when requesting revision' }, { status: 400 });
+      return NextResponse.json({
+        message: 'Performance Justification (Reasons for Under performance, on target, or over performance) is required when requesting revision',
+      }, { status: 400 });
     }
 
     if (!auth.departmentIds.includes(departmentId)) {
@@ -183,10 +185,17 @@ export async function PATCH(request: Request) {
     }
 
     const existing = (await query({
-      query: `SELECT submitted_by FROM q_indicator_submissions
+      query: `SELECT hod_review_status, submitted_by FROM q_indicator_submissions
               WHERE indicator_id = ? AND department_id = ?`,
       values: [indicatorId, departmentId],
-    })) as { submitted_by: number | null }[];
+    })) as { hod_review_status: string; submitted_by: number | null }[];
+
+    if (!existing.length) {
+      return NextResponse.json({ message: 'Submission not found' }, { status: 404 });
+    }
+    if (existing[0].hod_review_status !== 'submitted') {
+      return NextResponse.json({ message: 'Not awaiting review' }, { status: 409 });
+    }
 
     const status = action === 'approve' ? 'approved' : 'returned';
     await query({
@@ -209,12 +218,8 @@ export async function PATCH(request: Request) {
         comment: comment || null,
       });
     }
-    if (action === 'approve') {
-      void notifyAdminsOfIndicatorApprovals({
-        items: [{ indicatorId, departmentId }],
-        reviewerUserId: auth.userId,
-      });
-    }
+    // Admin/Strategy notify is bulk-only so sequential single approve does not flood inboxes.
+    // Use "Approve selected" for a consolidated Strategy Manager notification.
 
     return NextResponse.json({ message: action === 'approve' ? 'Approved' : 'Sent back for revision' });
   } catch (error: unknown) {

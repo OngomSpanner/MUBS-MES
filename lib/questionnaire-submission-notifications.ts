@@ -172,7 +172,7 @@ function buildAmbassadorReviewEmailHtml(args: {
       ? 'Your submission was <strong>approved</strong>.'
       : 'Your submission was <strong>returned for revision</strong>.';
   const commentBlock = args.comment
-    ? `<p style="color:#333;font-size:15px;line-height:1.6;margin:0 0 12px;"><strong>Feedback:</strong><br/>${escapeHtml(args.comment).replace(/\n/g, '<br/>')}</p>`
+    ? `<p style="color:#333;font-size:15px;line-height:1.6;margin:0 0 12px;"><strong>Performance Justification:</strong><br/>${escapeHtml(args.comment).replace(/\n/g, '<br/>')}</p>`
     : '';
 
   return brandEmailWrapper(`
@@ -436,7 +436,7 @@ export async function notifyAmbassadorOfIndicatorReview(args: {
   const title = isApprove ? 'Performance indicator approved' : 'Performance indicator needs revision';
   const message = isApprove
     ? `Your submission "${ctx.indicatorText}" was approved.`
-    : `Your submission "${ctx.indicatorText}" was returned for revision.${args.comment ? ` Feedback: ${args.comment}` : ''}`;
+    : `Your submission "${ctx.indicatorText}" was returned for revision.${args.comment ? ` Performance Justification: ${args.comment}` : ''}`;
   const emailSubject = isApprove
     ? 'M&E: Performance indicator approved'
     : 'M&E: Performance indicator needs revision';

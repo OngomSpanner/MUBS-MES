@@ -24,6 +24,8 @@ type Props = {
   departments: DepartmentUnitOption[];
   selectedIds: number[];
   onChange: (ids: number[]) => void;
+  subscribedGroups?: AmbassadorDepartmentGroup[];
+  onSubscribedGroupsChange?: (groups: AmbassadorDepartmentGroup[]) => void;
   label?: string;
   emptyHint?: string;
   showGroupChips?: boolean;
@@ -36,6 +38,8 @@ export default function DepartmentUnitMultiSelect({
   departments,
   selectedIds,
   onChange,
+  subscribedGroups = [],
+  onSubscribedGroupsChange,
   label = 'Department(s) / Unit(s)',
   emptyHint = 'No departments selected yet.',
   showGroupChips = true,
@@ -68,13 +72,28 @@ export default function DepartmentUnitMultiSelect({
     if (disabled) return;
     const ids = filterDepartmentsByGroup(departments, group).map((d) => d.id);
     onChange(Array.from(new Set([...selectedIds, ...ids])));
+    if (onSubscribedGroupsChange && !subscribedGroups.includes(group)) {
+      onSubscribedGroupsChange([...subscribedGroups, group]);
+    }
     setSearchTerm('');
     setShowResults(false);
   };
 
   const removeUnit = (id: number) => {
     if (disabled) return;
-    onChange(selectedIds.filter((i) => i !== id));
+    const nextIds = selectedIds.filter((i) => i !== id);
+    onChange(nextIds);
+    if (onSubscribedGroupsChange && subscribedGroups.length) {
+      const removed = departments.find((d) => d.id === id);
+      const group = removed?.ambassador_group;
+      if (group && subscribedGroups.includes(group)) {
+        const members = filterDepartmentsByGroup(departments, group).map((d) => d.id);
+        const stillComplete = members.length > 0 && members.every((mid) => nextIds.includes(mid));
+        if (!stillComplete) {
+          onSubscribedGroupsChange(subscribedGroups.filter((g) => g !== group));
+        }
+      }
+    }
   };
 
   return (
@@ -82,7 +101,7 @@ export default function DepartmentUnitMultiSelect({
       <Form.Label className="fw-bold small d-flex justify-content-between align-items-center mb-1">
         <span>{label}</span>
         <span className="text-muted fw-normal" style={{ fontSize: '0.65rem' }}>
-          Ambassador units only · click badge to add group
+          Ambassador units only · search one unit, or click badge for whole group
         </span>
       </Form.Label>
 
@@ -92,7 +111,11 @@ export default function DepartmentUnitMultiSelect({
             label="Clear"
             variant="clear"
             title="Remove all selected departments"
-            onClick={() => { if (!disabled) onChange([]); }}
+            onClick={() => {
+              if (disabled) return;
+              onChange([]);
+              onSubscribedGroupsChange?.([]);
+            }}
           />
           {GROUP_ORDER.map((group) => {
             const count = groupCounts[group];

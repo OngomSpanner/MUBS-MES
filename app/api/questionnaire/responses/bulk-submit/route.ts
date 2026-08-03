@@ -4,21 +4,28 @@ import { requireAmbassador } from '@/lib/ambassador/context';
 import { ensureHodReviewWorkflowSchema } from '@/lib/hod-review-workflow';
 import { HOD_UNIT_HEAD_LABEL } from '@/lib/hod-review-workflow-constants';
 import { notifyHodsOfIndicatorSubmission, notifyAmbassadorOfIndicatorSubmission } from '@/lib/questionnaire-submission-notifications';
+import { inputMetricsForIndicator, type MetricTreeNode } from '@/lib/questionnaire/metric-tree';
 
 export const dynamic = 'force-dynamic';
 
 async function indicatorIsComplete(indicatorId: number, departmentId: number): Promise<boolean> {
   const metrics = (await query({
-    query: 'SELECT id FROM q_metrics WHERE indicator_id = ?',
+    query: `
+      SELECT id, parent_metric_id, is_total, sort_order
+      FROM q_metrics
+      WHERE indicator_id = ?
+      ORDER BY sort_order, id
+    `,
     values: [indicatorId],
-  })) as { id: number }[];
+  })) as MetricTreeNode[];
+  const inputMetrics = inputMetricsForIndicator(metrics);
 
   const fys = (await query({
     query: 'SELECT financial_year FROM q_indicator_fys WHERE indicator_id = ?',
     values: [indicatorId],
   })) as { financial_year: string }[];
 
-  const total = metrics.length * fys.length;
+  const total = inputMetrics.length * fys.length;
   if (total === 0) return false;
 
   const responses = (await query({
@@ -33,7 +40,7 @@ async function indicatorIsComplete(indicatorId: number, departmentId: number): P
   }
 
   let filled = 0;
-  for (const m of metrics) {
+  for (const m of inputMetrics) {
     for (const fy of fys) {
       const v = (responseMap.get(`${m.id}_${fy.financial_year}`) ?? '').trim();
       if (v) filled += 1;

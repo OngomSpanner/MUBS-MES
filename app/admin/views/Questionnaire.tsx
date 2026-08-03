@@ -719,6 +719,7 @@ function TemplateModal({
         outcome_id: Number(outcomeId),
         indicator_text: indicatorText.trim(),
         department_ids: deptIds,
+        assigned_groups: subscribedGroups,
         financial_years: selectedFYs,
         override_remove_departments,
         targets: selectedFYs.map((fy) => ({
@@ -820,6 +821,8 @@ function TemplateModal({
             departments={allDepartments}
             selectedIds={deptIds}
             onChange={setDeptIds}
+            subscribedGroups={subscribedGroups}
+            onSubscribedGroupsChange={setSubscribedGroups}
             label="Responsible Department(s) / Unit(s)"
             disabled={loadingDetail}
           />
@@ -1236,6 +1239,7 @@ function TemplateModal({
                 outcome_id: Number(outcomeId),
                 indicator_text: indicatorText.trim(),
                 department_ids: deptIds,
+                assigned_groups: subscribedGroups,
                 financial_years: selectedFYs,
                 override_remove_departments: true,
                 targets: selectedFYs.map((fy) => ({

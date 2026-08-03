@@ -467,7 +467,7 @@ export default function HodQuestionnaireSubmissionsTab() {
   const review = async (action: 'approve' | 'return', advance = true) => {
     if (!selected) return;
     if (action === 'return' && !comment.trim()) {
-      alert('Feedback is required when requesting revision.');
+      alert('Performance Justification (Reasons for Under performance, on target, or over performance) is required when requesting revision.');
       return;
     }
     setActing(true);
@@ -748,7 +748,7 @@ export default function HodQuestionnaireSubmissionsTab() {
               {detail?.hod_review_comment?.trim() ? (
                 <div className={`alert small py-2 mb-3 ${detail.hod_review_status === 'returned' ? 'alert-warning' : 'alert-light border'}`}>
                   <span className="fw-semibold d-block mb-1">
-                    {detail.hod_review_status === 'returned' ? `${HOD_UNIT_HEAD_LABEL} feedback` : 'Review comment'}
+                    {detail.hod_review_status === 'returned' ? 'Performance Justification' : 'Review comment'}
                   </span>
                   {detail.hod_review_comment}
                 </div>
@@ -781,7 +781,9 @@ export default function HodQuestionnaireSubmissionsTab() {
 
               {!viewOnly ? (
                 <Form.Group>
-                  <Form.Label className="small fw-semibold">Feedback (required when requesting revision)</Form.Label>
+                  <Form.Label className="small fw-semibold">
+                    Performance Justification (Reasons for Under performance, on target, or over performance)
+                  </Form.Label>
                   <Form.Control
                     as="textarea"
                     rows={3}
@@ -873,17 +875,19 @@ export default function HodQuestionnaireSubmissionsTab() {
         </Modal.Header>
         <Modal.Body>
           <p className="small text-muted mb-3">
-            The same feedback will be sent to the ambassador for all {selectedEligibleCount} selected submission{selectedEligibleCount === 1 ? '' : 's'}.
+            The same Performance Justification will be sent to the ambassador for all {selectedEligibleCount} selected submission{selectedEligibleCount === 1 ? '' : 's'}.
           </p>
           <Form.Group>
-            <Form.Label className="small fw-semibold">Feedback (required)</Form.Label>
+            <Form.Label className="small fw-semibold">
+              Performance Justification (Reasons for Under performance, on target, or over performance)
+            </Form.Label>
             <Form.Control
               as="textarea"
               rows={4}
               value={bulkReturnComment}
               onChange={(e) => setBulkReturnComment(e.target.value)}
               disabled={bulkActing}
-              placeholder="Explain what needs to be revised…"
+              placeholder="Explain reasons for under performance, on target, or over performance…"
             />
           </Form.Group>
         </Modal.Body>

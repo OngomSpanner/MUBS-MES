@@ -59,7 +59,9 @@ export async function PATCH(request: Request) {
       return NextResponse.json({ message: 'action must be approve or return' }, { status: 400 });
     }
     if (action === 'return' && !comment) {
-      return NextResponse.json({ message: 'Feedback required when requesting revision' }, { status: 400 });
+      return NextResponse.json({
+        message: 'Performance Justification (Reasons for Under performance, on target, or over performance) is required when requesting revision',
+      }, { status: 400 });
     }
 
     const reviewed: BulkItem[] = [];

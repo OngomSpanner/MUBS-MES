@@ -1,5 +1,6 @@
 import { query } from '@/lib/db';
 import {
+  AMBASSADOR_GROUP_ORDER,
   type AmbassadorDepartmentGroup,
   type AmbassadorDepartmentRow,
 } from '@/lib/department-ambassador-groups';
@@ -40,11 +41,16 @@ async function getSelectedDepartmentIds(indicatorId: number): Promise<Set<number
   return new Set(rows.map((r) => Number(r.department_id)));
 }
 
-/** Persist ambassador groups this indicator is subscribed to (any unit selected → full group). */
+/**
+ * Persist ambassador groups this indicator is subscribed to.
+ * Prefer an explicit list from the admin UI (group-chip intent).
+ * Otherwise infer only when every unit in the group is selected.
+ */
 export async function refreshIndicatorAssignedGroupFlags(
   indicatorId: number,
   departmentIds: number[],
   catalog: AmbassadorDepartmentRow[],
+  explicitGroups?: AmbassadorDepartmentGroup[] | null,
 ): Promise<void> {
   await ensureIndicatorGroupSchema();
 
@@ -53,7 +59,12 @@ export async function refreshIndicatorAssignedGroupFlags(
     values: [indicatorId],
   });
 
-  for (const group of inferSubscribedAmbassadorGroups(departmentIds, catalog)) {
+  const groups =
+    explicitGroups != null
+      ? Array.from(new Set(explicitGroups))
+      : inferSubscribedAmbassadorGroups(departmentIds, catalog);
+
+  for (const group of groups) {
     await query({
       query: 'INSERT INTO q_indicator_assigned_groups (indicator_id, ambassador_group) VALUES (?, ?)',
       values: [indicatorId, group],
@@ -78,17 +89,32 @@ async function insertDepartmentAssignment(indicatorId: number, departmentId: num
 }
 
 /**
- * Add all ambassador units for any group that already has at least one assigned unit,
- * and keep groups up to date when the ambassador catalog grows.
+ * Add peer ambassador units only for groups explicitly subscribed
+ * (keeps full-group assignments current when the catalog grows).
+ * Partial selections (one campus/centre) are left alone.
  */
 export async function syncIndicatorDepartmentGroups(
   indicatorId: number,
   catalog: AmbassadorDepartmentRow[],
 ): Promise<boolean> {
   await ensureIndicatorGroupSchema();
-  const assignedGroups = await getAssignedGroupFlags(indicatorId);
   const before = await getSelectedDepartmentIds(indicatorId);
-  const expanded = expandAmbassadorGroupSelection(before, catalog, assignedGroups);
+  const assignedGroups = await getAssignedGroupFlags(indicatorId);
+
+  // Drop stale group flags left from the old "any member ⇒ whole group" behaviour.
+  const pruned = new Set<AmbassadorDepartmentGroup>();
+  for (const group of AMBASSADOR_GROUP_ORDER) {
+    if (!assignedGroups.has(group)) continue;
+    const members = catalog.filter((c) => c.ambassador_group === group).map((c) => c.id);
+    if (members.length > 0 && members.every((id) => before.has(id))) {
+      pruned.add(group);
+    }
+  }
+  if (pruned.size !== assignedGroups.size) {
+    await refreshIndicatorAssignedGroupFlags(indicatorId, Array.from(before), catalog, Array.from(pruned));
+  }
+
+  const expanded = expandAmbassadorGroupSelection(before, catalog, pruned);
 
   let changed = false;
   for (const id of expanded) {
@@ -96,10 +122,6 @@ export async function syncIndicatorDepartmentGroups(
       await insertDepartmentAssignment(indicatorId, id);
       changed = true;
     }
-  }
-
-  if (changed) {
-    await refreshIndicatorAssignedGroupFlags(indicatorId, expanded, catalog);
   }
 
   return changed;
