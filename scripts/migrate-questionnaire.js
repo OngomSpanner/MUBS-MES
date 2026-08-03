@@ -1,9 +1,13 @@
+const path = require('path');
 const mysql = require('mysql2/promise');
-require('dotenv').config({ path: '.env.local' });
+// Production uses .env; local overrides with .env.local when present.
+require('dotenv').config({ path: path.join(process.cwd(), '.env') });
+require('dotenv').config({ path: path.join(process.cwd(), '.env.local') });
 
 async function migrate() {
   const connection = await mysql.createConnection({
     host: process.env.DB_HOST || 'localhost',
+    port: parseInt(process.env.DB_PORT || '3306', 10),
     user: process.env.DB_USER || 'root',
     password: process.env.DB_PASSWORD || '',
     database: process.env.DB_NAME || 'mubs_super_admin',
