@@ -113,6 +113,8 @@ export async function GET(request: Request) {
                COALESCE(qis.hod_review_status, 'draft') AS hod_review_status,
                qis.submitted_at,
                i.indicator_text, o.type AS outcome_type, o.label AS outcome_label,
+               o.strategic_pillar AS outcome_strategic_pillar,
+               o.pillar_code AS outcome_pillar_code,
                COALESCE(NULLIF(TRIM(d.external_name), ''), d.name) AS department_name,
                u.full_name AS submitted_by_name,
                (SELECT COUNT(*) FROM q_metrics m WHERE m.indicator_id = i.id) AS metric_count,

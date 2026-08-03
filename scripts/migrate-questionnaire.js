@@ -177,6 +177,26 @@ async function migrate() {
     } catch (e) {
       if (e.code !== 'ER_DUP_FIELDNAME') throw e;
     }
+
+    try {
+      const [cols] = await connection.execute(
+        `SELECT COUNT(*) AS c FROM information_schema.COLUMNS
+         WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'q_outcomes' AND COLUMN_NAME = 'strategic_pillar'`
+      );
+      if (cols[0].c === 0) {
+        await connection.execute(`
+          ALTER TABLE q_outcomes
+          ADD COLUMN strategic_pillar VARCHAR(255) NULL AFTER strategic_objective,
+          ADD COLUMN pillar_code VARCHAR(16) NULL AFTER strategic_pillar,
+          ADD KEY idx_q_outcomes_pillar (strategic_pillar(191))
+        `);
+        console.log('  added q_outcomes.strategic_pillar + pillar_code');
+      } else {
+        console.log('  skip (exists): q_outcomes.strategic_pillar');
+      }
+    } catch (e) {
+      if (e.code !== 'ER_DUP_FIELDNAME') throw e;
+    }
     console.log('Done.');
   } catch (err) {
     console.error('Migration failed:', err);

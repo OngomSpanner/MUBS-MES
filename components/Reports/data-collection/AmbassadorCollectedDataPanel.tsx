@@ -15,7 +15,7 @@ import AmbassadorDepartmentGroupFilter, {
 import type { AmbassadorDepartmentRow } from '@/lib/department-ambassador-groups';
 import { UOM_OPTIONS } from '@/lib/questionnaire/uom';
 import { normalizeFinancialYear } from '@/lib/questionnaire/fy-utils';
-import { CORE_OBJECTIVES_2025_2030 } from '@/lib/strategic-plan';
+import { CORE_OBJECTIVES_2025_2030, STRATEGIC_PILLARS_2025_2030, strategicPillarShortLabel } from '@/lib/strategic-plan';
 
 type Metric = { id: number; metric_text: string; unit_of_measure: string; sort_order: number };
 type Department = { id: number; name: string };
@@ -27,6 +27,8 @@ type Indicator = {
   outcome_type: string;
   outcome_label: string;
   outcome_strategic_objective: string | null;
+  outcome_strategic_pillar: string | null;
+  outcome_pillar_code: string | null;
   metrics: Metric[];
   departments: Department[];
   financial_years: string[];
@@ -61,6 +63,8 @@ function normalizeIndicator(raw: Indicator): Indicator {
     id: Number(raw.id),
     outcome_id: Number(raw.outcome_id),
     outcome_strategic_objective: raw.outcome_strategic_objective ?? null,
+    outcome_strategic_pillar: raw.outcome_strategic_pillar ?? null,
+    outcome_pillar_code: raw.outcome_pillar_code ?? null,
     metrics: (raw.metrics ?? []).map((m) => ({ ...m, id: Number(m.id) })),
     departments: (raw.departments ?? []).map((d) => ({ ...d, id: Number(d.id) })),
     financial_years: (raw.financial_years ?? []).map((fy) => normalizeFinancialYear(fy)),
@@ -79,6 +83,7 @@ export default function AmbassadorCollectedDataPanel() {
   );
   const [uomFilter, setUomFilter] = useState<string>('all');
   const [objectiveFilter, setObjectiveFilter] = useState<'all' | string>('all');
+  const [pillarFilter, setPillarFilter] = useState<'all' | string>('all');
   const [outcomeFilter, setOutcomeFilter] = useState<'all' | string>('all');
 
   const loadAmbassadorDepartments = useCallback(async () => {
@@ -186,6 +191,13 @@ export default function AmbassadorCollectedDataPanel() {
 
   const indicators = useMemo(() => {
     return departmentFilteredIndicators.filter((ind) => {
+      if (pillarFilter !== 'all') {
+        if (pillarFilter === 'unassigned') {
+          if (ind.outcome_strategic_pillar) return false;
+        } else if (ind.outcome_strategic_pillar !== pillarFilter) {
+          return false;
+        }
+      }
       if (objectiveFilter !== 'all') {
         if (objectiveFilter === 'unassigned') {
           if (ind.outcome_strategic_objective) return false;
@@ -198,9 +210,10 @@ export default function AmbassadorCollectedDataPanel() {
       }
       return true;
     });
-  }, [departmentFilteredIndicators, objectiveFilter, outcomeFilter]);
+  }, [departmentFilteredIndicators, pillarFilter, objectiveFilter, outcomeFilter]);
 
   const hasUnassignedObjective = departmentFilteredIndicators.some((i) => !i.outcome_strategic_objective);
+  const hasUnassignedPillar = departmentFilteredIndicators.some((i) => !i.outcome_strategic_pillar);
 
   const visibleDepartments = useCallback(
     (ind: Indicator) => {
@@ -337,6 +350,24 @@ export default function AmbassadorCollectedDataPanel() {
                 showSearch={false}
               />
             </div>
+            <select
+              className="form-select form-select-sm"
+              value={pillarFilter}
+              onChange={(e) => {
+                setPillarFilter(e.target.value);
+                setOutcomeFilter('all');
+              }}
+              style={{ width: '180px' }}
+              title="Filter by strategic pillar"
+            >
+              <option value="all">All pillars</option>
+              {STRATEGIC_PILLARS_2025_2030.map((pillar, i) => (
+                <option key={pillar} value={pillar}>
+                  P{i + 1}: {strategicPillarShortLabel(pillar)}
+                </option>
+              ))}
+              {hasUnassignedPillar ? <option value="unassigned">Unassigned pillar</option> : null}
+            </select>
             <select
               className="form-select form-select-sm"
               value={objectiveFilter}

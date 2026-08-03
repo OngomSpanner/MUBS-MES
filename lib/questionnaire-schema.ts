@@ -98,6 +98,44 @@ async function runQuestionnaireObjectiveMigration(): Promise<void> {
     if (!isDuplicateSchemaError(error)) throw error;
   }
 
+  // SDS-style pillar linkage on outcomes (nullable; does not touch q_responses).
+  if (!(await columnExists('q_outcomes', 'strategic_pillar'))) {
+    try {
+      await query({
+        query: `
+          ALTER TABLE q_outcomes
+          ADD COLUMN strategic_pillar VARCHAR(255) NULL AFTER strategic_objective
+        `,
+      });
+    } catch (error) {
+      if (!isDuplicateSchemaError(error)) throw error;
+    }
+  }
+
+  if (!(await columnExists('q_outcomes', 'pillar_code'))) {
+    try {
+      await query({
+        query: `
+          ALTER TABLE q_outcomes
+          ADD COLUMN pillar_code VARCHAR(16) NULL AFTER strategic_pillar
+        `,
+      });
+    } catch (error) {
+      if (!isDuplicateSchemaError(error)) throw error;
+    }
+  }
+
+  try {
+    await query({
+      query: `
+        ALTER TABLE q_outcomes
+        ADD KEY idx_q_outcomes_pillar (strategic_pillar(191))
+      `,
+    });
+  } catch (error) {
+    if (!isDuplicateSchemaError(error)) throw error;
+  }
+
   schemaEnsured = true;
 }
 

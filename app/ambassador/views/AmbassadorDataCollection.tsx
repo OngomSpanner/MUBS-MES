@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import StrategicPillarBadge from '@/components/Questionnaire/StrategicPillarBadge';
 import { Modal, Button, Form, Badge, Spinner } from 'react-bootstrap';
 import axios from 'axios';
 import StatCard from '@/components/StatCard';
@@ -32,6 +33,9 @@ type Indicator = {
   is_locked: boolean;
   outcome_type: string;
   outcome_label: string;
+  outcome_strategic_objective?: string | null;
+  outcome_strategic_pillar?: string | null;
+  outcome_pillar_code?: string | null;
   metrics: Metric[];
   targets?: IndicatorTarget[];
   financial_years: string[];
@@ -228,6 +232,10 @@ function IndicatorCard({
           )}
         </div>
         <div className="d-flex flex-wrap gap-1 mb-1">
+          <StrategicPillarBadge
+            pillar={ind.outcome_strategic_pillar}
+            code={ind.outcome_pillar_code}
+          />
           {ind.financial_years.map((fy) => (
             <Badge key={fy} bg="primary" style={{ fontSize: '0.62rem', background: 'var(--mubs-blue)' }}>{fy}</Badge>
           ))}

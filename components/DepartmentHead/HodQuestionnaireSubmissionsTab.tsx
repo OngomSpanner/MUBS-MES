@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import axios from 'axios';
+import StrategicPillarBadge from '@/components/Questionnaire/StrategicPillarBadge';
 import { Badge, Button, Form, Modal, Spinner } from 'react-bootstrap';
 import { normalizeFinancialYear, fyShortLabel } from '@/lib/questionnaire/fy-utils';
 import { METRIC_ENTRY_TABLE, uomTableLabel } from '@/lib/questionnaire/metric-entry-table-layout';
@@ -22,6 +23,8 @@ type Submission = {
   indicator_text: string;
   outcome_type: string;
   outcome_label: string;
+  outcome_strategic_pillar?: string | null;
+  outcome_pillar_code?: string | null;
   department_name: string;
   submitted_by_name: string | null;
   filled: number;
@@ -668,7 +671,13 @@ export default function HodQuestionnaireSubmissionsTab() {
                     )}
                     <td className="small fw-semibold">{r.indicator_text}</td>
                     <td className="small text-muted">
-                      {r.outcome_type}: {r.outcome_label}
+                      <div className="d-flex flex-column gap-1">
+                        <StrategicPillarBadge
+                          pillar={r.outcome_strategic_pillar}
+                          code={r.outcome_pillar_code}
+                        />
+                        <span>{r.outcome_type}: {r.outcome_label}</span>
+                      </div>
                     </td>
                     <td className="small">{r.department_name}</td>
                     <td className="small text-muted">

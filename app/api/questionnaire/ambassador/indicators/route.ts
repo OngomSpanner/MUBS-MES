@@ -28,12 +28,15 @@ export async function GET(request: Request) {
 
   const indicators = await query({
     query: `SELECT i.id, i.indicator_text, i.is_locked,
-                   o.type AS outcome_type, o.label AS outcome_label
+                   o.type AS outcome_type, o.label AS outcome_label,
+                   o.strategic_objective AS outcome_strategic_objective,
+                   o.strategic_pillar AS outcome_strategic_pillar,
+                   o.pillar_code AS outcome_pillar_code
             FROM q_indicators i
             JOIN q_outcomes o ON o.id = i.outcome_id
             JOIN q_indicator_departments qid ON qid.indicator_id = i.id
             WHERE qid.department_id = ?
-            ORDER BY i.indicator_text`,
+            ORDER BY o.strategic_pillar, o.strategic_objective, i.indicator_text`,
     values: [auth.managedUnitId],
   }) as any[];
 

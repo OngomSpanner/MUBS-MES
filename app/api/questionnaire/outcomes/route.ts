@@ -4,7 +4,7 @@ import { cookies } from 'next/headers';
 import { verifyToken } from '@/lib/auth';
 import { canManageStrategicStandards } from '@/lib/role-routing';
 import { ensureQuestionnaireObjectiveSchema } from '@/lib/questionnaire-schema';
-import { parseCoreObjective } from '@/lib/strategic-plan';
+import { parseCoreObjective, parseStrategicPillar, strategicPillarCode } from '@/lib/strategic-plan';
 
 export const dynamic = 'force-dynamic';
 
@@ -26,12 +26,12 @@ export async function GET() {
     if (!verifyToken(token)) return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
 
     const rows = await query({
-      query: `SELECT o.id, o.type, o.label, o.strategic_objective, o.created_at,
+      query: `SELECT o.id, o.type, o.label, o.strategic_objective, o.strategic_pillar, o.pillar_code, o.created_at,
                 COUNT(DISTINCT i.id) AS indicator_count
               FROM q_outcomes o
               LEFT JOIN q_indicators i ON i.outcome_id = o.id
               GROUP BY o.id
-              ORDER BY o.strategic_objective, o.type, o.label`,
+              ORDER BY o.strategic_pillar, o.strategic_objective, o.type, o.label`,
     }) as any[];
     return NextResponse.json(rows);
   } catch (e) {
@@ -48,16 +48,27 @@ export async function POST(request: Request) {
     const type = body.type === 'Output' ? 'Output' : 'Outcome';
     const label = typeof body.label === 'string' ? body.label.trim() : '';
     const strategicObjective = parseCoreObjective(body.strategic_objective);
+    const strategicPillar = parseStrategicPillar(body.strategic_pillar);
+    const pillarCode = strategicPillarCode(strategicPillar);
     if (!label) return NextResponse.json({ message: 'Label is required' }, { status: 400 });
     if (!strategicObjective) {
       return NextResponse.json({ message: 'Strategic objective is required' }, { status: 400 });
     }
+    // Pillar optional for backward compatibility; Strategy can assign later.
     const result = await query({
-      query: 'INSERT INTO q_outcomes (type, label, strategic_objective) VALUES (?, ?, ?)',
-      values: [type, label, strategicObjective],
+      query: `INSERT INTO q_outcomes (type, label, strategic_objective, strategic_pillar, pillar_code)
+              VALUES (?, ?, ?, ?, ?)`,
+      values: [type, label, strategicObjective, strategicPillar, pillarCode],
     }) as any;
     return NextResponse.json(
-      { id: result.insertId, type, label, strategic_objective: strategicObjective },
+      {
+        id: result.insertId,
+        type,
+        label,
+        strategic_objective: strategicObjective,
+        strategic_pillar: strategicPillar,
+        pillar_code: pillarCode,
+      },
       { status: 201 },
     );
   } catch (e) {

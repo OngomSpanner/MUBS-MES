@@ -12,10 +12,11 @@ import {
   IndicatorTargetInputGrid,
   type IndicatorTarget,
 } from '@/components/Questionnaire/IndicatorTargetUI';
+import StrategicPillarBadge from '@/components/Questionnaire/StrategicPillarBadge';
 import DepartmentUnitMultiSelect, { type DepartmentUnitOption } from '@/components/DepartmentUnitMultiSelect';
 import { getAvailableFinancialYears, normalizeFinancialYear, fyShortLabel } from '@/lib/questionnaire/fy-utils';
 import { UOM_OPTIONS } from '@/lib/questionnaire/uom';
-import { CORE_OBJECTIVES_2025_2030, coreObjectiveNumber, coreObjectiveShortTitle } from '@/lib/strategic-plan';
+import { CORE_OBJECTIVES_2025_2030, coreObjectiveNumber, coreObjectiveShortTitle, STRATEGIC_PILLARS_2025_2030, PILLAR_LABELS, type StrategicPillar } from '@/lib/strategic-plan';
 import { summarizeIndicatorDepartments } from '@/lib/summarize-indicator-departments';
 import { expandAmbassadorGroupSelection } from '@/lib/expand-ambassador-group-selection';
 import type { AmbassadorDepartmentGroup } from '@/lib/department-ambassador-groups';
@@ -35,6 +36,8 @@ type Outcome = {
   type: 'Outcome' | 'Output';
   label: string;
   strategic_objective: string | null;
+  strategic_pillar?: string | null;
+  pillar_code?: string | null;
   indicator_count: number;
 };
 type MetricFormRow = {
@@ -50,6 +53,8 @@ type MetricFormRow = {
 type Indicator = {
   id: number; outcome_id: number; indicator_text: string; is_locked: boolean;
   outcome_type: string; outcome_label: string; outcome_strategic_objective: string | null;
+  outcome_strategic_pillar?: string | null;
+  outcome_pillar_code?: string | null;
   created_at: string;
   metrics: {
     id: number;
@@ -119,6 +124,32 @@ function StrategicObjectiveSelect({
       {CORE_OBJECTIVES_2025_2030.map((obj, i) => (
         <option key={obj} value={obj} title={obj}>
           Objective {i + 1}
+        </option>
+      ))}
+    </Form.Select>
+  );
+}
+
+function StrategicPillarSelect({
+  value,
+  onChange,
+  id,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  id?: string;
+}) {
+  return (
+    <Form.Select
+      id={id}
+      size="sm"
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+    >
+      <option value="">Unassigned pillar…</option>
+      {STRATEGIC_PILLARS_2025_2030.map((pillar, i) => (
+        <option key={pillar} value={pillar} title={pillar}>
+          P{i + 1}: {PILLAR_LABELS[pillar as StrategicPillar]}
         </option>
       ))}
     </Form.Select>
@@ -198,6 +229,8 @@ function indicatorSearchHaystack(ind: Indicator): string {
     ind.outcome_label,
     ind.outcome_type,
     ind.outcome_strategic_objective ?? '',
+    ind.outcome_strategic_pillar ?? '',
+    ind.outcome_pillar_code ?? '',
     coreObjectiveShortTitle(ind.outcome_strategic_objective),
     objNum != null ? `objective ${objNum}` : '',
   ]
@@ -214,10 +247,12 @@ function ManageOutcomesPanel({
   const [adding, setAdding] = useState(false);
   const [newType, setNewType] = useState<'Outcome' | 'Output'>('Outcome');
   const [newObjective, setNewObjective] = useState('');
+  const [newPillar, setNewPillar] = useState('');
   const [newLabel, setNewLabel] = useState('');
   const [editId, setEditId] = useState<number | null>(null);
   const [editType, setEditType] = useState<'Outcome' | 'Output'>('Outcome');
   const [editObjective, setEditObjective] = useState('');
+  const [editPillar, setEditPillar] = useState('');
   const [editLabel, setEditLabel] = useState('');
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState<string | null>(null);
@@ -233,10 +268,12 @@ function ManageOutcomesPanel({
         type: newType,
         label: newLabel.trim(),
         strategic_objective: newObjective,
+        strategic_pillar: newPillar || null,
       });
       setAdding(false);
       setNewLabel('');
       setNewObjective('');
+      setNewPillar('');
       onRefresh();
     } catch (e: unknown) { setErr(axios.isAxiosError(e) ? e.response?.data?.message ?? 'Error' : 'Error'); }
     finally { setSaving(false); }
@@ -251,6 +288,7 @@ function ManageOutcomesPanel({
         type: editType,
         label: editLabel.trim(),
         strategic_objective: editObjective,
+        strategic_pillar: editPillar || null,
       });
       setEditId(null); onRefresh();
     } catch (e: unknown) { setErr(axios.isAxiosError(e) ? e.response?.data?.message ?? 'Error' : 'Error'); }
@@ -289,9 +327,13 @@ function ManageOutcomesPanel({
                 <option value="Output">Output</option>
               </Form.Select>
             </div>
-            <div className="col-md-9">
+            <div className="col-md-4">
               <Form.Label className="small fw-bold mb-1">Strategic objective <span className="text-danger">*</span></Form.Label>
               <StrategicObjectiveSelect value={newObjective} onChange={setNewObjective} />
+            </div>
+            <div className="col-md-5">
+              <Form.Label className="small fw-bold mb-1">Strategic pillar</Form.Label>
+              <StrategicPillarSelect value={newPillar} onChange={setNewPillar} />
             </div>
             <div className="col-md-10">
               <Form.Label className="small fw-bold mb-1">Label / Name <span className="text-danger">*</span></Form.Label>
@@ -334,6 +376,7 @@ function ManageOutcomesPanel({
                       </Form.Select>
                       <div className="flex-grow-1 d-flex flex-column gap-2" style={{ minWidth: '220px' }}>
                         <StrategicObjectiveSelect value={editObjective} onChange={setEditObjective} />
+                        <StrategicPillarSelect value={editPillar} onChange={setEditPillar} />
                         <Form.Control size="sm" value={editLabel} onChange={(e) => setEditLabel(e.target.value)} autoFocus />
                       </div>
                       <div className="d-flex gap-1">
@@ -344,6 +387,7 @@ function ManageOutcomesPanel({
                   ) : (
                     <>
                       <Badge bg={o.type === 'Output' ? 'info' : 'warning'} className="text-dark" style={{ fontSize: '0.65rem' }}>{o.type}</Badge>
+                      <StrategicPillarBadge pillar={o.strategic_pillar} code={o.pillar_code} showUnassigned />
                       <span className="flex-grow-1 small fw-semibold" style={{ minWidth: 0 }}>{o.label}</span>
                       <span className="text-muted" style={{ fontSize: '0.72rem', flexShrink: 0 }}>{o.indicator_count} indicator{o.indicator_count !== 1 ? 's' : ''}</span>
                       <div className="d-flex gap-1 flex-shrink-0">
@@ -352,6 +396,7 @@ function ManageOutcomesPanel({
                           setEditType(o.type);
                           setEditLabel(o.label);
                           setEditObjective(o.strategic_objective ?? '');
+                          setEditPillar(o.strategic_pillar ?? '');
                           setErr(null);
                         }}>
                           <span className="material-symbols-outlined" style={{ fontSize: '14px', verticalAlign: 'middle' }}>edit</span>

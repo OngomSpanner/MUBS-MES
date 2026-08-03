@@ -18,11 +18,12 @@ import type {
 } from '@/lib/admin/ambassador-reports-aggregate';
 import type { ReminderAudience } from '@/lib/ambassador-report-reminders';
 
-type SectionTab = 'overview' | 'departments' | 'objectives' | 'outcomes' | 'hod' | 'aging' | 'assignments' | 'collected-data';
+type SectionTab = 'overview' | 'departments' | 'pillars' | 'objectives' | 'outcomes' | 'hod' | 'aging' | 'assignments' | 'collected-data';
 
 const SECTION_TABS: { key: SectionTab; label: string; icon: string }[] = [
   { key: 'overview', label: 'Overview', icon: 'dashboard' },
   { key: 'departments', label: 'By department', icon: 'apartment' },
+  { key: 'pillars', label: 'By pillar', icon: 'account_balance' },
   { key: 'objectives', label: 'By objective', icon: 'flag' },
   { key: 'outcomes', label: 'By outcome', icon: 'account_tree' },
   { key: 'hod', label: 'HOD approvals', icon: 'fact_check' },
@@ -275,6 +276,26 @@ export default function AmbassadorReportsView() {
     );
   };
 
+  const exportPillars = () => {
+    if (!summary) return;
+    exportSheet(
+      'ambassador-progress-by-pillar.xlsx',
+      summary.byPillar.map((p) => ({
+        Pillar: p.pillarShort,
+        Code: p.pillarCode || '',
+        'Full name': p.pillar,
+        Assignments: p.assignments,
+        'Not started': p.notStarted,
+        'In progress': p.inProgress,
+        'Awaiting HOD': p.awaitingReview,
+        Approved: p.approved,
+        Returned: p.needsRevision,
+        'Fill rate %': p.fillRatePct,
+        'Approval rate %': p.approvalRatePct,
+      })),
+    );
+  };
+
   const exportAssignments = () => {
     exportSheet(
       'ambassador-assignments-detail.xlsx',
@@ -282,6 +303,8 @@ export default function AmbassadorReportsView() {
         Department: a.departmentName,
         Ambassador: a.ambassadorName || '',
         Outcome: a.outcomeLabel,
+        Pillar: a.strategicPillar || '',
+        'Pillar code': a.pillarCode || '',
         Objective: a.strategicObjective || '',
         Indicator: a.indicatorText,
         Progress: PROGRESS_LABELS[a.progressStatus],
@@ -504,6 +527,54 @@ export default function AmbassadorReportsView() {
                       <td className="text-center">{d.approved > 0 ? <Badge bg="success">{d.approved}</Badge> : 0}</td>
                       <td className="text-center">{d.fillRatePct}%</td>
                       <td className="text-center">{d.approvalRatePct}%</td>
+                    </>
+                  )}
+                />
+              </div>
+            )}
+
+            {section === 'pillars' && (
+              <div className="bg-white p-4 rounded-3 border">
+                <ReportsSectionHeader
+                  icon="account_balance"
+                  title="Progress by strategic pillar"
+                  count={summary.byPillar.length}
+                  filters={
+                    <Button size="sm" variant="outline-success" onClick={exportPillars}>
+                      Export
+                    </Button>
+                  }
+                />
+                <SortablePaginatedTable
+                  rows={summary.byPillar}
+                  defaultSortKey="fillRatePct"
+                  defaultSortDir="desc"
+                  getSortValue={(p, key) => {
+                    if (key === 'pillar') return p.pillarShort;
+                    return Number((p as Record<string, unknown>)[key] ?? 0);
+                  }}
+                  rowKey={(p) => p.pillar}
+                  columns={[
+                    { key: 'pillar', label: 'Pillar' },
+                    { key: 'assignments', label: 'Assignments', className: 'text-center' },
+                    { key: 'notStarted', label: 'Not started', className: 'text-center' },
+                    { key: 'inProgress', label: 'In progress', className: 'text-center' },
+                    { key: 'awaitingReview', label: 'Awaiting HOD', className: 'text-center' },
+                    { key: 'approved', label: 'Approved', className: 'text-center' },
+                    { key: 'fillRatePct', label: 'Fill %', className: 'text-center' },
+                  ]}
+                  renderRow={(p) => (
+                    <>
+                      <td>
+                        <div className="fw-medium">{p.pillarCode ? `${p.pillarCode} · ${p.pillarShort}` : p.pillarShort}</div>
+                        <div className="small text-muted text-truncate" style={{ maxWidth: 420 }} title={p.pillar}>{p.pillar}</div>
+                      </td>
+                      <td className="text-center">{p.assignments}</td>
+                      <td className="text-center">{p.notStarted}</td>
+                      <td className="text-center">{p.inProgress}</td>
+                      <td className="text-center">{p.awaitingReview}</td>
+                      <td className="text-center">{p.approved}</td>
+                      <td className="text-center">{p.fillRatePct}%</td>
                     </>
                   )}
                 />

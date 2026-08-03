@@ -1,7 +1,7 @@
 import { query } from '@/lib/db';
 import { ensureHodReviewWorkflowSchema } from '@/lib/hod-review-workflow';
 import type { HodReviewStatus } from '@/lib/hod-review-workflow-constants';
-import { coreObjectiveShortTitle } from '@/lib/strategic-plan';
+import { coreObjectiveShortTitle, strategicPillarShortLabel } from '@/lib/strategic-plan';
 
 export type ReportingCategory = 'not-completed' | 'awaiting-review' | 'completed' | 'needs-revision';
 export type ProgressStatus = 'not-started' | 'partial' | 'complete';
@@ -14,6 +14,8 @@ export type AssignmentRow = {
   outcomeLabel: string;
   outcomeType: string;
   strategicObjective: string | null;
+  strategicPillar: string | null;
+  pillarCode: string | null;
   hodReviewStatus: HodReviewStatus;
   filled: number;
   total: number;
@@ -55,11 +57,26 @@ export type ObjectiveRollup = {
   approvalRatePct: number;
 };
 
+export type PillarRollup = {
+  pillar: string;
+  pillarShort: string;
+  pillarCode: string | null;
+  assignments: number;
+  notStarted: number;
+  inProgress: number;
+  awaitingReview: number;
+  approved: number;
+  needsRevision: number;
+  fillRatePct: number;
+  approvalRatePct: number;
+};
+
 export type OutcomeRollup = {
   outcomeKey: string;
   outcomeLabel: string;
   outcomeType: string;
   strategicObjective: string | null;
+  strategicPillar: string | null;
   objectiveShort: string;
   assignments: number;
   notStarted: number;
@@ -110,6 +127,7 @@ export type AmbassadorReportsSummary = {
   assignments: AssignmentRow[];
   byDepartment: DepartmentRollup[];
   byObjective: ObjectiveRollup[];
+  byPillar: PillarRollup[];
   byOutcome: OutcomeRollup[];
   hodByDepartment: HodDepartmentRollup[];
   agingQueue: AgingRow[];
@@ -180,7 +198,7 @@ async function loadRawAssignmentRows(departmentId?: number): Promise<Record<stri
       SELECT qid.indicator_id, qid.department_id,
              COALESCE(NULLIF(TRIM(d.external_name), ''), d.name) AS department_name,
              i.indicator_text, o.label AS outcome_label, o.type AS outcome_type,
-             o.strategic_objective,
+             o.strategic_objective, o.strategic_pillar, o.pillar_code,
              COALESCE(qis.hod_review_status, 'draft') AS hod_review_status,
              qis.submitted_at, qis.hod_reviewed_at,
              (SELECT COUNT(*) FROM q_metrics m WHERE m.indicator_id = i.id) AS metric_count,
@@ -196,7 +214,7 @@ async function loadRawAssignmentRows(departmentId?: number): Promise<Record<stri
       LEFT JOIN q_indicator_submissions qis
         ON qis.indicator_id = qid.indicator_id AND qis.department_id = qid.department_id
       ${deptFilter}
-      ORDER BY o.strategic_objective, o.label, i.indicator_text, department_name
+      ORDER BY o.strategic_pillar, o.strategic_objective, o.label, i.indicator_text, department_name
     `,
     values,
   })) as Record<string, unknown>[];
@@ -224,6 +242,8 @@ function mapRawRowsToAssignments(
       outcomeLabel: String(row.outcome_label || ''),
       outcomeType: String(row.outcome_type || ''),
       strategicObjective: row.strategic_objective != null ? String(row.strategic_objective) : null,
+      strategicPillar: row.strategic_pillar != null ? String(row.strategic_pillar) : null,
+      pillarCode: row.pillar_code != null ? String(row.pillar_code) : null,
       hodReviewStatus: hod,
       filled,
       total,
@@ -336,6 +356,50 @@ function rollupObjectives(assignments: AssignmentRow[]): ObjectiveRollup[] {
   });
 }
 
+function rollupPillars(assignments: AssignmentRow[]): PillarRollup[] {
+  const map = new Map<string, PillarRollup>();
+  for (const a of assignments) {
+    const key = a.strategicPillar || '__unassigned__';
+    let p = map.get(key);
+    if (!p) {
+      p = {
+        pillar: a.strategicPillar || 'Unassigned pillar',
+        pillarShort: strategicPillarShortLabel(a.strategicPillar),
+        pillarCode: a.pillarCode,
+        assignments: 0,
+        notStarted: 0,
+        inProgress: 0,
+        awaitingReview: 0,
+        approved: 0,
+        needsRevision: 0,
+        fillRatePct: 0,
+        approvalRatePct: 0,
+      };
+      map.set(key, p);
+    }
+    p.assignments += 1;
+    if (a.progressStatus === 'not-started') p.notStarted += 1;
+    else if (a.progressStatus === 'partial') p.inProgress += 1;
+    if (a.reportingCategory === 'awaiting-review') p.awaitingReview += 1;
+    else if (a.reportingCategory === 'completed') p.approved += 1;
+    else if (a.reportingCategory === 'needs-revision') p.needsRevision += 1;
+  }
+
+  return [...map.values()].map((p) => {
+    const pillarAssignments = assignments.filter(
+      (a) => (a.strategicPillar || 'Unassigned pillar') === p.pillar
+        || (!a.strategicPillar && p.pillar === 'Unassigned pillar'),
+    );
+    const filled = pillarAssignments.reduce((s, a) => s + a.filled, 0);
+    const total = pillarAssignments.reduce((s, a) => s + a.total, 0);
+    return {
+      ...p,
+      fillRatePct: total > 0 ? Math.round((filled / total) * 100) : 0,
+      approvalRatePct: p.assignments > 0 ? Math.round((p.approved / p.assignments) * 100) : 0,
+    };
+  });
+}
+
 function rollupOutcomes(assignments: AssignmentRow[]): OutcomeRollup[] {
   const map = new Map<string, OutcomeRollup>();
   for (const a of assignments) {
@@ -347,6 +411,7 @@ function rollupOutcomes(assignments: AssignmentRow[]): OutcomeRollup[] {
         outcomeLabel: a.outcomeLabel,
         outcomeType: a.outcomeType,
         strategicObjective: a.strategicObjective,
+        strategicPillar: a.strategicPillar,
         objectiveShort: coreObjectiveShortTitle(a.strategicObjective),
         assignments: 0,
         notStarted: 0,
@@ -450,6 +515,7 @@ export async function buildAmbassadorReportsFromAssignments(
     assignments,
     byDepartment,
     byObjective: rollupObjectives(assignments),
+    byPillar: rollupPillars(assignments),
     byOutcome: rollupOutcomes(assignments),
     hodByDepartment: byDepartment.map((d) => ({
       departmentId: d.departmentId,

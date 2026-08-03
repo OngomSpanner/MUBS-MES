@@ -4,7 +4,7 @@ import { cookies } from 'next/headers';
 import { verifyToken } from '@/lib/auth';
 import { canManageStrategicStandards } from '@/lib/role-routing';
 import { ensureQuestionnaireObjectiveSchema } from '@/lib/questionnaire-schema';
-import { parseCoreObjective } from '@/lib/strategic-plan';
+import { parseCoreObjective, parseStrategicPillar, strategicPillarCode } from '@/lib/strategic-plan';
 
 export const dynamic = 'force-dynamic';
 
@@ -26,13 +26,25 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
     const type = body.type === 'Output' ? 'Output' : 'Outcome';
     const label = typeof body.label === 'string' ? body.label.trim() : '';
     const strategicObjective = parseCoreObjective(body.strategic_objective);
+    // Allow clearing pillar with empty string / null; only reject invalid non-empty values.
+    const pillarRaw = body.strategic_pillar;
+    const strategicPillar =
+      pillarRaw == null || String(pillarRaw).trim() === ''
+        ? null
+        : parseStrategicPillar(pillarRaw);
+    if (pillarRaw != null && String(pillarRaw).trim() !== '' && !strategicPillar) {
+      return NextResponse.json({ message: 'Invalid strategic pillar' }, { status: 400 });
+    }
+    const pillarCode = strategicPillarCode(strategicPillar);
     if (!label) return NextResponse.json({ message: 'Label is required' }, { status: 400 });
     if (!strategicObjective) {
       return NextResponse.json({ message: 'Strategic objective is required' }, { status: 400 });
     }
     await query({
-      query: 'UPDATE q_outcomes SET type=?, label=?, strategic_objective=? WHERE id=?',
-      values: [type, label, strategicObjective, id],
+      query: `UPDATE q_outcomes
+              SET type=?, label=?, strategic_objective=?, strategic_pillar=?, pillar_code=?
+              WHERE id=?`,
+      values: [type, label, strategicObjective, strategicPillar, pillarCode, id],
     });
     return NextResponse.json({ message: 'Updated' });
   } catch (e) {

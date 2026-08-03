@@ -47,6 +47,28 @@ export function coreObjectiveShortTitle(objective: string | null | undefined): s
   return n ? `Objective ${n}` : 'Unassigned objective';
 }
 
+export function isStrategicPillar(value: string): value is StrategicPillar {
+  return (STRATEGIC_PILLARS_2025_2030 as readonly string[]).includes(value);
+}
+
+export function parseStrategicPillar(raw: unknown): StrategicPillar | null {
+  const s = typeof raw === 'string' ? raw.trim() : '';
+  if (!s || !isStrategicPillar(s)) return null;
+  return s;
+}
+
+/** 1-based pillar number (1–6), or null if unset/unknown. Same P1…P6 axis as SDS codes. */
+export function strategicPillarNumber(pillar: string | null | undefined): number | null {
+  if (!pillar) return null;
+  const idx = STRATEGIC_PILLARS_2025_2030.indexOf(pillar as StrategicPillar);
+  return idx >= 0 ? idx + 1 : null;
+}
+
+export function strategicPillarCode(pillar: string | null | undefined): string | null {
+  const n = strategicPillarNumber(pillar);
+  return n ? `P${n}` : null;
+}
+
 /** Optional: short labels for compact UI */
 export const PILLAR_LABELS: Record<StrategicPillar, string> = {
   'Teaching, Learning and Student Success': 'Teaching & Learning',
@@ -56,3 +78,9 @@ export const PILLAR_LABELS: Record<StrategicPillar, string> = {
   'Human Capital, Governance, and Institutional Sustainability': 'Human Capital',
   'Partnerships, Collaborations and Internationalisation': 'Partnerships & International',
 };
+
+export function strategicPillarShortLabel(pillar: string | null | undefined): string {
+  if (!pillar) return 'Unassigned pillar';
+  if (isStrategicPillar(pillar)) return PILLAR_LABELS[pillar];
+  return pillar;
+}
