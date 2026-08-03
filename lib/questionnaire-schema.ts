@@ -2,6 +2,9 @@ import { query } from '@/lib/db';
 
 let schemaEnsured = false;
 let ensurePromise: Promise<void> | null = null;
+/** Separate from schemaEnsured: older deploys could mark objectives “ensured” before pillar columns existed. */
+let pillarSchemaEnsured = false;
+let pillarEnsurePromise: Promise<void> | null = null;
 let subMetricSchemaEnsured = false;
 let subMetricEnsurePromise: Promise<void> | null = null;
 
@@ -17,6 +20,11 @@ async function columnExists(table: string, column: string): Promise<boolean> {
 function isDuplicateSchemaError(error: unknown): boolean {
   const code = (error as { code?: string })?.code;
   return code === 'ER_DUP_FIELDNAME' || code === 'ER_DUP_KEYNAME';
+}
+
+function isUnknownColumnError(error: unknown): boolean {
+  const code = (error as { code?: string })?.code;
+  return code === 'ER_BAD_FIELD_ERROR';
 }
 
 async function ensureMetricSubMetricSchema(): Promise<void> {
@@ -98,6 +106,10 @@ async function runQuestionnaireObjectiveMigration(): Promise<void> {
     if (!isDuplicateSchemaError(error)) throw error;
   }
 
+  schemaEnsured = true;
+}
+
+async function runQuestionnairePillarMigration(): Promise<void> {
   // SDS-style pillar linkage on outcomes (nullable; does not touch q_responses).
   if (!(await columnExists('q_outcomes', 'strategic_pillar'))) {
     try {
@@ -136,20 +148,54 @@ async function runQuestionnaireObjectiveMigration(): Promise<void> {
     if (!isDuplicateSchemaError(error)) throw error;
   }
 
-  schemaEnsured = true;
+  // Only mark done once both columns are actually present (handles races / partial ALTERs).
+  pillarSchemaEnsured =
+    (await columnExists('q_outcomes', 'strategic_pillar')) &&
+    (await columnExists('q_outcomes', 'pillar_code'));
 }
 
-/** Idempotent: link questionnaire outcomes/outputs to strategic plan objectives. */
-export async function ensureQuestionnaireObjectiveSchema(): Promise<void> {
-  if (schemaEnsured) return;
-  if (!ensurePromise) {
-    ensurePromise = runQuestionnaireObjectiveMigration().catch((error) => {
-      ensurePromise = null;
+/** Idempotent: ensure q_outcomes.strategic_pillar + pillar_code exist. */
+export async function ensureQuestionnairePillarColumns(): Promise<void> {
+  if (pillarSchemaEnsured) return;
+  if (!pillarEnsurePromise) {
+    pillarEnsurePromise = runQuestionnairePillarMigration().catch((error) => {
+      pillarEnsurePromise = null;
+      pillarSchemaEnsured = false;
       throw error;
     });
   }
-  await ensurePromise;
+  await pillarEnsurePromise;
+  if (!pillarSchemaEnsured) {
+    pillarEnsurePromise = null;
+    throw new Error('q_outcomes pillar columns are still missing after migration');
+  }
 }
+
+/** Idempotent: link questionnaire outcomes/outputs to strategic plan objectives + pillars. */
+export async function ensureQuestionnaireObjectiveSchema(): Promise<void> {
+  // Always ensure pillars even if an older process already set schemaEnsured for objectives only.
+  if (schemaEnsured && pillarSchemaEnsured) return;
+  if (!schemaEnsured) {
+    if (!ensurePromise) {
+      ensurePromise = runQuestionnaireObjectiveMigration().catch((error) => {
+        ensurePromise = null;
+        throw error;
+      });
+    }
+    await ensurePromise;
+  }
+  await ensureQuestionnairePillarColumns();
+}
+
+/** Reset in-memory flags after unknown-column errors so the next request re-runs ALTER. */
+export function invalidateQuestionnaireObjectiveSchemaCache(): void {
+  schemaEnsured = false;
+  pillarSchemaEnsured = false;
+  ensurePromise = null;
+  pillarEnsurePromise = null;
+}
+
+export { isUnknownColumnError };
 
 /** Idempotent: allow questionnaire metrics to have sub-metrics and auto totals. */
 export async function ensureQuestionnaireSubMetricsSchema(): Promise<void> {

@@ -3,7 +3,11 @@ import { query } from '@/lib/db';
 import { cookies } from 'next/headers';
 import { verifyToken } from '@/lib/auth';
 import { canManageStrategicStandards } from '@/lib/role-routing';
-import { ensureQuestionnaireObjectiveSchema } from '@/lib/questionnaire-schema';
+import {
+  ensureQuestionnaireObjectiveSchema,
+  invalidateQuestionnaireObjectiveSchemaCache,
+  isUnknownColumnError,
+} from '@/lib/questionnaire-schema';
 import { parseCoreObjective, parseStrategicPillar, strategicPillarCode } from '@/lib/strategic-plan';
 
 export const dynamic = 'force-dynamic';
@@ -22,6 +26,10 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
     if (!await requireAdmin()) return NextResponse.json({ message: 'Forbidden' }, { status: 403 });
     await ensureQuestionnaireObjectiveSchema();
     const { id } = await context.params;
+    const outcomeId = Number(id);
+    if (!Number.isFinite(outcomeId) || outcomeId <= 0) {
+      return NextResponse.json({ message: 'Invalid outcome id' }, { status: 400 });
+    }
     const body = await request.json();
     const type = body.type === 'Output' ? 'Output' : 'Outcome';
     const label = typeof body.label === 'string' ? body.label.trim() : '';
@@ -40,16 +48,49 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
     if (!strategicObjective) {
       return NextResponse.json({ message: 'Strategic objective is required' }, { status: 400 });
     }
-    await query({
-      query: `UPDATE q_outcomes
-              SET type=?, label=?, strategic_objective=?, strategic_pillar=?, pillar_code=?
-              WHERE id=?`,
-      values: [type, label, strategicObjective, strategicPillar, pillarCode, id],
+
+    let result: { affectedRows?: number };
+    try {
+      result = await query({
+        query: `UPDATE q_outcomes
+                SET type=?, label=?, strategic_objective=?, strategic_pillar=?, pillar_code=?
+                WHERE id=?`,
+        values: [type, label, strategicObjective, strategicPillar, pillarCode, outcomeId],
+      }) as { affectedRows?: number };
+    } catch (error) {
+      if (isUnknownColumnError(error)) {
+        invalidateQuestionnaireObjectiveSchemaCache();
+        await ensureQuestionnaireObjectiveSchema();
+        result = await query({
+          query: `UPDATE q_outcomes
+                  SET type=?, label=?, strategic_objective=?, strategic_pillar=?, pillar_code=?
+                  WHERE id=?`,
+          values: [type, label, strategicObjective, strategicPillar, pillarCode, outcomeId],
+        }) as { affectedRows?: number };
+      } else {
+        throw error;
+      }
+    }
+
+    if (!result?.affectedRows) {
+      return NextResponse.json({ message: 'Outcome not found' }, { status: 404 });
+    }
+
+    return NextResponse.json({
+      id: outcomeId,
+      type,
+      label,
+      strategic_objective: strategicObjective,
+      strategic_pillar: strategicPillar,
+      pillar_code: pillarCode,
+      message: 'Updated',
     });
-    return NextResponse.json({ message: 'Updated' });
   } catch (e) {
     console.error('q_outcomes PUT', e);
-    return NextResponse.json({ message: 'Error' }, { status: 500 });
+    const msg = isUnknownColumnError(e)
+      ? 'Database is missing pillar columns — restart the app or run scripts/migrate-questionnaire.js'
+      : 'Error';
+    return NextResponse.json({ message: msg }, { status: 500 });
   }
 }
 

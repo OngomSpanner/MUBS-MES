@@ -558,8 +558,58 @@ CREATE TABLE IF NOT EXISTS standard_departments (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- =============================================================================
+-- N. Questionnaire outcomes — strategic pillar (nullable; SDS-style P1…P6)
+-- Safe to re-run: checks information_schema before ALTER.
+-- =============================================================================
+SET @col_exists := (
+  SELECT COUNT(*) FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE()
+    AND TABLE_NAME = 'q_outcomes'
+    AND COLUMN_NAME = 'strategic_pillar'
+);
+SET @sql := IF(
+  @col_exists = 0,
+  'ALTER TABLE q_outcomes ADD COLUMN strategic_pillar VARCHAR(255) NULL AFTER strategic_objective',
+  'SELECT 1'
+);
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @col_exists := (
+  SELECT COUNT(*) FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE()
+    AND TABLE_NAME = 'q_outcomes'
+    AND COLUMN_NAME = 'pillar_code'
+);
+SET @sql := IF(
+  @col_exists = 0,
+  'ALTER TABLE q_outcomes ADD COLUMN pillar_code VARCHAR(16) NULL AFTER strategic_pillar',
+  'SELECT 1'
+);
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @idx_exists := (
+  SELECT COUNT(*) FROM information_schema.STATISTICS
+  WHERE TABLE_SCHEMA = DATABASE()
+    AND TABLE_NAME = 'q_outcomes'
+    AND INDEX_NAME = 'idx_q_outcomes_pillar'
+);
+SET @sql := IF(
+  @idx_exists = 0,
+  'ALTER TABLE q_outcomes ADD KEY idx_q_outcomes_pillar (strategic_pillar(191))',
+  'SELECT 1'
+);
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+-- =============================================================================
 -- Done. Verify:
 --   SHOW TABLES LIKE 'staff_%';
 --   SELECT status, COUNT(*) FROM users GROUP BY status;
 --   SHOW COLUMNS FROM staff_programme_enrollment LIKE 'faculty_name';
+--   SHOW COLUMNS FROM q_outcomes LIKE '%pillar%';
 -- =============================================================================

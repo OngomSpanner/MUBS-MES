@@ -243,7 +243,7 @@ function indicatorSearchHaystack(ind: Indicator): string {
 // ────────────────────────────────────────────────────────────
 function ManageOutcomesPanel({
   outcomes, onRefresh,
-}: { outcomes: Outcome[]; onRefresh: () => void }) {
+}: { outcomes: Outcome[]; onRefresh: () => void | Promise<void> }) {
   const [adding, setAdding] = useState(false);
   const [newType, setNewType] = useState<'Outcome' | 'Output'>('Outcome');
   const [newObjective, setNewObjective] = useState('');
@@ -274,12 +274,16 @@ function ManageOutcomesPanel({
       setNewLabel('');
       setNewObjective('');
       setNewPillar('');
-      onRefresh();
-    } catch (e: unknown) { setErr(axios.isAxiosError(e) ? e.response?.data?.message ?? 'Error' : 'Error'); }
-    finally { setSaving(false); }
+      await Promise.resolve(onRefresh());
+    } catch (e: unknown) {
+      setErr(axios.isAxiosError(e) ? e.response?.data?.message ?? 'Failed to add' : 'Failed to add');
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleEdit = async () => {
+    if (editId == null) return setErr('Nothing to save');
     if (!editObjective) return setErr('Strategic objective is required');
     if (!editLabel.trim()) return setErr('Label is required');
     setSaving(true); setErr(null);
@@ -290,9 +294,13 @@ function ManageOutcomesPanel({
         strategic_objective: editObjective,
         strategic_pillar: editPillar || null,
       });
-      setEditId(null); onRefresh();
-    } catch (e: unknown) { setErr(axios.isAxiosError(e) ? e.response?.data?.message ?? 'Error' : 'Error'); }
-    finally { setSaving(false); }
+      setEditId(null);
+      await Promise.resolve(onRefresh());
+    } catch (e: unknown) {
+      setErr(axios.isAxiosError(e) ? e.response?.data?.message ?? 'Failed to save pillar/outcome' : 'Failed to save');
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleDelete = async () => {
@@ -1936,7 +1944,12 @@ export default function QuestionnaireView() {
   const [targetsIndicator, setTargetsIndicator] = useState<Indicator | null>(null);
 
   const fetchOutcomes = useCallback(async () => {
-    try { const res = await axios.get('/api/questionnaire/outcomes'); setOutcomes(res.data); } catch { /* noop */ }
+    try {
+      const res = await axios.get('/api/questionnaire/outcomes');
+      setOutcomes(Array.isArray(res.data) ? res.data : []);
+    } catch (e: unknown) {
+      console.error('Failed to load outcomes', e);
+    }
   }, []);
 
   const fetchIndicators = useCallback(async () => {
@@ -2049,7 +2062,12 @@ export default function QuestionnaireView() {
 
         <div className="table-card p-3 p-md-4">
           {activeTab === 'outcomes' && (
-            <ManageOutcomesPanel outcomes={outcomes} onRefresh={() => { void fetchOutcomes(); void fetchIndicators(); }} />
+            <ManageOutcomesPanel
+              outcomes={outcomes}
+              onRefresh={async () => {
+                await Promise.all([fetchOutcomes(), fetchIndicators()]);
+              }}
+            />
           )}
           {activeTab === 'indicators' && (
             <IndicatorsPanel

@@ -3,7 +3,11 @@ import { query } from '@/lib/db';
 import { cookies } from 'next/headers';
 import { verifyToken } from '@/lib/auth';
 import { canManageStrategicStandards } from '@/lib/role-routing';
-import { ensureQuestionnaireObjectiveSchema } from '@/lib/questionnaire-schema';
+import {
+  ensureQuestionnaireObjectiveSchema,
+  invalidateQuestionnaireObjectiveSchemaCache,
+  isUnknownColumnError,
+} from '@/lib/questionnaire-schema';
 import { parseCoreObjective, parseStrategicPillar, strategicPillarCode } from '@/lib/strategic-plan';
 
 export const dynamic = 'force-dynamic';
@@ -17,6 +21,17 @@ async function requireAdmin() {
   return decoded;
 }
 
+async function listOutcomes() {
+  return (await query({
+    query: `SELECT o.id, o.type, o.label, o.strategic_objective, o.strategic_pillar, o.pillar_code, o.created_at,
+              COUNT(DISTINCT i.id) AS indicator_count
+            FROM q_outcomes o
+            LEFT JOIN q_indicators i ON i.outcome_id = o.id
+            GROUP BY o.id, o.type, o.label, o.strategic_objective, o.strategic_pillar, o.pillar_code, o.created_at
+            ORDER BY o.strategic_pillar, o.strategic_objective, o.type, o.label`,
+  })) as any[];
+}
+
 export async function GET() {
   try {
     await ensureQuestionnaireObjectiveSchema();
@@ -25,18 +40,20 @@ export async function GET() {
     if (!token) return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
     if (!verifyToken(token)) return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
 
-    const rows = await query({
-      query: `SELECT o.id, o.type, o.label, o.strategic_objective, o.strategic_pillar, o.pillar_code, o.created_at,
-                COUNT(DISTINCT i.id) AS indicator_count
-              FROM q_outcomes o
-              LEFT JOIN q_indicators i ON i.outcome_id = o.id
-              GROUP BY o.id
-              ORDER BY o.strategic_pillar, o.strategic_objective, o.type, o.label`,
-    }) as any[];
-    return NextResponse.json(rows);
+    try {
+      return NextResponse.json(await listOutcomes());
+    } catch (error) {
+      if (!isUnknownColumnError(error)) throw error;
+      invalidateQuestionnaireObjectiveSchemaCache();
+      await ensureQuestionnaireObjectiveSchema();
+      return NextResponse.json(await listOutcomes());
+    }
   } catch (e) {
     console.error('q_outcomes GET', e);
-    return NextResponse.json({ message: 'Error' }, { status: 500 });
+    const msg = isUnknownColumnError(e)
+      ? 'Database is missing pillar columns — restart the app or run scripts/migrate-questionnaire.js'
+      : 'Error';
+    return NextResponse.json({ message: msg }, { status: 500 });
   }
 }
 
