@@ -76,18 +76,22 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
       return NextResponse.json({ message: 'Select at least one department or unit' }, { status: 400 });
     }
 
+    let processParsed: ReturnType<typeof parseStandardProcessesPayload> | null = null;
+    if (body.processes !== undefined) {
+      processParsed = parseStandardProcessesPayload(body.processes);
+      if (!processParsed.ok) {
+        return NextResponse.json({ message: processParsed.message }, { status: 400 });
+      }
+    }
+
     await updateStandardRow(id, parsed);
 
-    if (body.processes !== undefined) {
+    if (processParsed?.ok) {
       await query({
         query: `DELETE FROM standard_processes WHERE standard_id = ?`,
         values: [id],
       });
 
-      const processParsed = parseStandardProcessesPayload(body.processes);
-      if (!processParsed.ok) {
-        return NextResponse.json({ message: processParsed.message }, { status: 400 });
-      }
       const sid = Number(id);
       for (let i = 0; i < processParsed.items.length; i++) {
         const row = processParsed.items[i];
