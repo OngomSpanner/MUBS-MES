@@ -16,12 +16,38 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
     const decoded = verifyToken(token) as { userId?: number } | null;
     if (!decoded?.userId) return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
 
+    const departmentIds = await getVisibleDepartmentIds(decoded.userId);
+    if (departmentIds.length === 0) {
+      return NextResponse.json({ message: 'No department' }, { status: 403 });
+    }
+
+    const pid = Number(id);
+    if (!Number.isFinite(pid) || pid <= 0) {
+      return NextResponse.json({ message: 'Invalid id' }, { status: 400 });
+    }
+
+    const placeholders = inPlaceholders(departmentIds.length);
+    const existing = (await query({
+      query: `
+        SELECT spa.id
+        FROM staff_process_assignments spa
+        JOIN strategic_activities sa ON spa.activity_id = sa.id
+        WHERE spa.id = ? AND sa.department_id IN (${placeholders})
+        LIMIT 1
+      `,
+      values: [pid, ...departmentIds],
+    })) as any[];
+
+    if (existing.length === 0) {
+      return NextResponse.json({ message: 'Process assignment not found' }, { status: 404 });
+    }
+
     const body = await request.json();
     const { status, commentary, start_date, end_date } = body;
 
     await query({
       query: `UPDATE staff_process_assignments SET status = ?, commentary = ?, start_date = ?, end_date = ? WHERE id = ?`,
-      values: [status || 'pending', commentary || null, start_date || null, end_date || null, id]
+      values: [status || 'pending', commentary || null, start_date || null, end_date || null, pid]
     });
 
     const normalized = String(status || '').toLowerCase();
