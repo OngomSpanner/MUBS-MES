@@ -11,7 +11,7 @@ import {
   type NotificationEventType,
 } from '@/lib/notification-deliveries';
 import { insertAppNotification } from '@/lib/notifications';
-import { HOD_UNIT_HEAD_LABEL } from '@/lib/hod-review-workflow-constants';
+import { HOD_UNIT_HEAD_LABEL, STRATEGY_ADMIN_LABEL } from '@/lib/hod-review-workflow-constants';
 
 function baseUrl(): string {
   return String(process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000').replace(/\/+$/, '');
@@ -543,6 +543,124 @@ export async function notifyAdminsOfIndicatorApprovals(args: {
 
     const email = await deliverEmail(payload, recipient.email, recipient.fullName);
     await logDelivery('indicator_approved_admin', payload, recipient.userId, recipient.email, 'email', {
+      status: email.status,
+      error: email.error,
+    });
+  }
+}
+
+/** Strategy / Admin returned an approved submission to the ambassador for revision. */
+export async function notifyAmbassadorOfStrategyReturn(args: {
+  indicatorId: number;
+  departmentId: number;
+  ambassadorUserId: number;
+  reviewerUserId: number;
+  comment: string;
+}): Promise<void> {
+  const ctx = await loadIndicatorContext(args.indicatorId, args.departmentId);
+  if (!ctx) return;
+
+  const ambassador = await loadUserContact(args.ambassadorUserId);
+  if (!ambassador) return;
+
+  const reviewerRows = (await query({
+    query: 'SELECT full_name FROM users WHERE id = ? LIMIT 1',
+    values: [args.reviewerUserId],
+  })) as { full_name: string | null }[];
+  const reviewerName = String(reviewerRows[0]?.full_name || '').trim() || STRATEGY_ADMIN_LABEL;
+
+  const title = 'Performance indicator returned by Strategy';
+  const message = `Strategy returned "${ctx.indicatorText}" for revision. Feedback: ${args.comment}`;
+  const emailSubject = 'M&E: Performance indicator returned by Strategy';
+
+  const payload: IndicatorNotificationPayload = {
+    eventType: 'indicator_returned',
+    indicatorId: args.indicatorId,
+    departmentId: args.departmentId,
+    submittedByUserId: args.ambassadorUserId,
+    reviewerUserId: args.reviewerUserId,
+    reviewAction: 'return',
+    reviewComment: args.comment,
+    recipientFullName: ambassador.fullName,
+    reviewerName,
+    title,
+    message,
+    notificationType: 'warning',
+    actionUrl: AMBASSADOR_REPORTING_PATH,
+    emailSubject,
+  };
+
+  const inApp = await deliverInApp(payload, args.ambassadorUserId);
+  await logDelivery('indicator_returned', payload, args.ambassadorUserId, ambassador.email, 'in_app', {
+    status: inApp.status,
+    notificationId: inApp.notificationId,
+    error: inApp.error,
+  });
+
+  const email = await deliverEmail(payload, ambassador.email, ambassador.fullName);
+  await logDelivery('indicator_returned', payload, args.ambassadorUserId, ambassador.email, 'email', {
+    status: email.status,
+    error: email.error,
+  });
+}
+
+/** Strategy / Admin returned a submission to the Head of Department for re-review. */
+export async function notifyHodsOfStrategyReturn(args: {
+  indicatorId: number;
+  departmentId: number;
+  reviewerUserId: number;
+  comment: string;
+  ambassadorUserId?: number;
+}): Promise<void> {
+  const ctx = await loadIndicatorContext(args.indicatorId, args.departmentId);
+  if (!ctx) return;
+
+  const reviewerRows = (await query({
+    query: 'SELECT full_name FROM users WHERE id = ? LIMIT 1',
+    values: [args.reviewerUserId],
+  })) as { full_name: string | null }[];
+  const reviewerName = String(reviewerRows[0]?.full_name || '').trim() || STRATEGY_ADMIN_LABEL;
+
+  let ambassadorName = 'An ambassador';
+  if (args.ambassadorUserId) {
+    const ambassador = await loadUserContact(args.ambassadorUserId);
+    if (ambassador) ambassadorName = ambassador.fullName;
+  }
+
+  const recipients = await getHodRecipientsForDepartment(args.departmentId);
+  if (!recipients.length) return;
+
+  const title = 'Performance indicator returned for your review';
+  const message = `${reviewerName} (Strategy) returned "${ctx.indicatorText}" (${ctx.departmentName}) for your review. Feedback: ${args.comment}`;
+  const emailSubject = 'M&E: Performance indicator returned by Strategy for review';
+
+  for (const recipient of recipients) {
+    const payload: IndicatorNotificationPayload = {
+      eventType: 'indicator_submitted',
+      indicatorId: args.indicatorId,
+      departmentId: args.departmentId,
+      submittedByUserId: args.ambassadorUserId,
+      reviewerUserId: args.reviewerUserId,
+      reviewComment: args.comment,
+      ambassadorName,
+      recipientFullName: recipient.fullName,
+      reviewerName,
+      title,
+      message,
+      notificationType: 'warning',
+      actionUrl: HOD_REVIEW_PATH,
+      emailSubject,
+    };
+
+    const inApp = await deliverInApp(payload, recipient.userId);
+    await logDelivery('indicator_submitted', payload, recipient.userId, recipient.email, 'in_app', {
+      status: inApp.status,
+      notificationId: inApp.notificationId,
+      error: inApp.error,
+    });
+
+    const email = await deliverEmail(payload, recipient.email, recipient.fullName);
+    await logDelivery('indicator_submitted', payload, recipient.userId, recipient.email, 'email', {
       status: email.status,
       error: email.error,
     });

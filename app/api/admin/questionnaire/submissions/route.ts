@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { verifyToken } from '@/lib/auth';
-import { getVisibleDepartmentIds, inPlaceholders } from '@/lib/department-head';
+import { canManageStrategicStandards } from '@/lib/role-routing';
 import { query } from '@/lib/db';
 import { ensureHodReviewWorkflowSchema } from '@/lib/hod-review-workflow';
 import { ensureMetricCommentsSchema } from '@/lib/questionnaire-metric-comments';
@@ -10,27 +10,36 @@ import {
   ensureIndicatorTargetsSchema,
   loadIndicatorTargets,
 } from '@/lib/questionnaire-metric-targets';
-import { notifyAmbassadorOfIndicatorReview } from '@/lib/questionnaire-submission-notifications';
+import type { AdminReturnTarget } from '@/lib/hod-review-workflow-constants';
+import {
+  notifyAmbassadorOfStrategyReturn,
+  notifyHodsOfStrategyReturn,
+} from '@/lib/questionnaire-submission-notifications';
 
 export const dynamic = 'force-dynamic';
 
-async function authReviewer() {
+async function requireStrategyAdmin() {
   const cookieStore = await cookies();
   const token = cookieStore.get('token')?.value;
-  if (!token) return { error: NextResponse.json({ message: 'Unauthorized' }, { status: 401 }) };
-  const decoded = verifyToken(token) as { userId?: number } | null;
-  if (!decoded?.userId) return { error: NextResponse.json({ message: 'Invalid token' }, { status: 401 }) };
-  const departmentIds = await getVisibleDepartmentIds(decoded.userId);
-  if (departmentIds.length === 0) {
-    return { error: NextResponse.json({ message: 'No department assigned' }, { status: 403 }) };
-  }
-  return { userId: decoded.userId, departmentIds };
+  if (!token) return null;
+  const decoded = verifyToken(token) as { userId?: number; role?: string } | null;
+  if (!decoded?.userId || !canManageStrategicStandards(decoded.role)) return null;
+  return decoded;
+}
+
+const RETURN_ACTIONS = ['return_to_ambassador', 'return_to_hod'] as const;
+type ReturnAction = (typeof RETURN_ACTIONS)[number];
+
+function parseReturnAction(raw: unknown): ReturnAction | null {
+  const s = typeof raw === 'string' ? raw.trim() : '';
+  return (RETURN_ACTIONS as readonly string[]).includes(s) ? (s as ReturnAction) : null;
 }
 
 export async function GET(request: Request) {
   try {
-    const auth = await authReviewer();
-    if ('error' in auth) return auth.error;
+    const auth = await requireStrategyAdmin();
+    if (!auth) return NextResponse.json({ message: 'Forbidden' }, { status: 403 });
+
     await ensureHodReviewWorkflowSchema();
     await ensureMetricCommentsSchema();
     await ensureQuestionnaireSubMetricsSchema();
@@ -41,10 +50,6 @@ export async function GET(request: Request) {
     const departmentId = Number(url.searchParams.get('departmentId'));
 
     if (indicatorId && departmentId) {
-      if (!auth.departmentIds.includes(departmentId)) {
-        return NextResponse.json({ message: 'Not authorized for this department' }, { status: 403 });
-      }
-
       const metrics = (await query({
         query: `SELECT id, metric_text, unit_of_measure, parent_metric_id, aggregation, is_total, sort_order
                 FROM q_metrics WHERE indicator_id = ? ORDER BY sort_order`,
@@ -95,7 +100,7 @@ export async function GET(request: Request) {
         hod_reviewed_at: string | null;
         admin_review_comment: string | null;
         admin_reviewed_at: string | null;
-        admin_return_target: string | null;
+        admin_return_target: AdminReturnTarget | null;
         reviewed_by_name: string | null;
         admin_reviewed_by_name: string | null;
       }[];
@@ -117,12 +122,19 @@ export async function GET(request: Request) {
       });
     }
 
-    const placeholders = inPlaceholders(auth.departmentIds.length);
+    const statusFilter = String(url.searchParams.get('status') || 'approved').trim();
+    const allowedStatuses = statusFilter === 'all'
+      ? ['submitted', 'approved', 'returned']
+      : statusFilter === 'approved'
+        ? ['approved']
+        : ['submitted', 'approved'];
+
+    const placeholders = allowedStatuses.map(() => '?').join(', ');
     const rows = (await query({
       query: `
         SELECT qid.indicator_id, qid.department_id,
                COALESCE(qis.hod_review_status, 'draft') AS hod_review_status,
-               qis.submitted_at,
+               qis.submitted_at, qis.admin_return_target, qis.admin_review_comment,
                i.indicator_text, o.type AS outcome_type, o.label AS outcome_label,
                o.strategic_pillar AS outcome_strategic_pillar,
                o.pillar_code AS outcome_pillar_code,
@@ -138,19 +150,13 @@ export async function GET(request: Request) {
         JOIN q_indicators i ON i.id = qid.indicator_id
         JOIN q_outcomes o ON o.id = i.outcome_id
         JOIN departments d ON d.id = qid.department_id
-        LEFT JOIN q_indicator_submissions qis
+        JOIN q_indicator_submissions qis
           ON qis.indicator_id = qid.indicator_id AND qis.department_id = qid.department_id
         LEFT JOIN users u ON u.id = qis.submitted_by
-        WHERE qid.department_id IN (${placeholders})
-          AND (qis.hod_review_status IS NULL
-               OR qis.hod_review_status IN ('draft', 'submitted', 'approved', 'returned'))
-        ORDER BY
-          CASE COALESCE(qis.hod_review_status, 'draft')
-            WHEN 'submitted' THEN 0 WHEN 'returned' THEN 1 WHEN 'draft' THEN 2 ELSE 3 END,
-          qis.submitted_at DESC,
-          i.indicator_text
+        WHERE qis.hod_review_status IN (${placeholders})
+        ORDER BY qis.submitted_at DESC, i.indicator_text
       `,
-      values: auth.departmentIds,
+      values: allowedStatuses,
     })) as Record<string, unknown>[];
 
     const submissions = rows.map((row) => {
@@ -166,35 +172,32 @@ export async function GET(request: Request) {
     return NextResponse.json({ submissions });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Unknown error';
-    return NextResponse.json({ message: 'Error loading questionnaire submissions', detail: message }, { status: 500 });
+    return NextResponse.json({ message: 'Error loading submissions', detail: message }, { status: 500 });
   }
 }
 
 export async function PATCH(request: Request) {
   try {
-    const auth = await authReviewer();
-    if ('error' in auth) return auth.error;
+    const auth = await requireStrategyAdmin();
+    if (!auth) return NextResponse.json({ message: 'Forbidden' }, { status: 403 });
+
     await ensureHodReviewWorkflowSchema();
-    await ensureMetricCommentsSchema();
-    await ensureIndicatorTargetsSchema();
 
     const body = await request.json();
     const indicatorId = Number(body.indicatorId);
     const departmentId = Number(body.departmentId);
-    const action = String(body.action || '').trim();
+    const action = parseReturnAction(body.action);
     const comment = String(body.comment || '').trim();
 
-    if (!indicatorId || !departmentId || !['approve', 'return'].includes(action)) {
-      return NextResponse.json({ message: 'indicatorId, departmentId, and action (approve|return) required' }, { status: 400 });
-    }
-    if (action === 'return' && !comment) {
+    if (!indicatorId || !departmentId || !action) {
       return NextResponse.json({
-        message: 'Performance Justification (Reasons for Under performance, on target, or over performance) is required when requesting revision',
+        message: 'indicatorId, departmentId, and action (return_to_ambassador|return_to_hod) required',
       }, { status: 400 });
     }
-
-    if (!auth.departmentIds.includes(departmentId)) {
-      return NextResponse.json({ message: 'Not authorized for this department' }, { status: 403 });
+    if (!comment) {
+      return NextResponse.json({
+        message: 'Feedback comment is required when returning a submission',
+      }, { status: 400 });
     }
 
     const existing = (await query({
@@ -206,35 +209,56 @@ export async function PATCH(request: Request) {
     if (!existing.length) {
       return NextResponse.json({ message: 'Submission not found' }, { status: 404 });
     }
-    if (existing[0].hod_review_status !== 'submitted') {
-      return NextResponse.json({ message: 'Not awaiting review' }, { status: 409 });
+
+    const currentStatus = existing[0].hod_review_status;
+    if (currentStatus !== 'approved' && currentStatus !== 'submitted') {
+      return NextResponse.json({
+        message: 'Only approved or HOD-submitted items can be returned by Strategy',
+      }, { status: 409 });
     }
 
-    const status = action === 'approve' ? 'approved' : 'returned';
+    const returnTarget: AdminReturnTarget = action === 'return_to_ambassador' ? 'ambassador' : 'hod';
+    const nextStatus = returnTarget === 'ambassador' ? 'returned' : 'submitted';
+
     await query({
       query: `
         UPDATE q_indicator_submissions
-        SET hod_review_status = ?, hod_reviewed_by = ?, hod_reviewed_at = NOW(), hod_review_comment = ?
+        SET hod_review_status = ?,
+            admin_reviewed_by = ?,
+            admin_reviewed_at = NOW(),
+            admin_review_comment = ?,
+            admin_return_target = ?
         WHERE indicator_id = ? AND department_id = ?
       `,
-      values: [status, auth.userId, comment || null, indicatorId, departmentId],
+      values: [nextStatus, auth.userId, comment, returnTarget, indicatorId, departmentId],
     });
 
-    const ambassadorUserId = existing[0]?.submitted_by;
-    if (ambassadorUserId) {
-      void notifyAmbassadorOfIndicatorReview({
+    const ambassadorUserId = existing[0].submitted_by;
+    if (returnTarget === 'ambassador' && ambassadorUserId) {
+      void notifyAmbassadorOfStrategyReturn({
         indicatorId,
         departmentId,
         ambassadorUserId,
         reviewerUserId: auth.userId,
-        action: action as 'approve' | 'return',
-        comment: comment || null,
+        comment,
+      });
+    } else if (returnTarget === 'hod') {
+      void notifyHodsOfStrategyReturn({
+        indicatorId,
+        departmentId,
+        reviewerUserId: auth.userId,
+        comment,
+        ambassadorUserId: ambassadorUserId ?? undefined,
       });
     }
-    // Admin/Strategy notify is bulk-only so sequential single approve does not flood inboxes.
-    // Use "Approve selected" for a consolidated Strategy Manager notification.
 
-    return NextResponse.json({ message: action === 'approve' ? 'Approved' : 'Sent back for revision' });
+    return NextResponse.json({
+      message: returnTarget === 'ambassador'
+        ? 'Returned to ambassador for revision'
+        : 'Returned to Head of Department for review',
+      hod_review_status: nextStatus,
+      admin_return_target: returnTarget,
+    });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Unknown error';
     return NextResponse.json({ message: 'Error updating submission', detail: message }, { status: 500 });

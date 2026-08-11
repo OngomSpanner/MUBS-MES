@@ -71,11 +71,18 @@ export async function GET(request: Request) {
   }) as any[];
 
   const submissionRows = await query({
-    query: `SELECT indicator_id, hod_review_status, hod_review_comment
+    query: `SELECT indicator_id, hod_review_status, hod_review_comment,
+                   admin_review_comment, admin_return_target
             FROM q_indicator_submissions
             WHERE indicator_id IN (${inClause}) AND department_id = ?`,
     values: [...indicatorIds, auth.managedUnitId],
-  }) as { indicator_id: number; hod_review_status: string; hod_review_comment: string | null }[];
+  }) as {
+    indicator_id: number;
+    hod_review_status: string;
+    hod_review_comment: string | null;
+    admin_review_comment: string | null;
+    admin_return_target: string | null;
+  }[];
 
   const submissionMap = new Map(
     submissionRows.map((s) => [s.indicator_id, s])
@@ -137,6 +144,8 @@ export async function GET(request: Request) {
         department_name: auth.managedUnitName,
         hod_review_status: submissionMap.get(ind.id)?.hod_review_status ?? 'draft',
         hod_review_comment: submissionMap.get(ind.id)?.hod_review_comment ?? null,
+        admin_review_comment: submissionMap.get(ind.id)?.admin_review_comment ?? null,
+        admin_return_target: submissionMap.get(ind.id)?.admin_return_target ?? null,
       };
     })
     .filter(Boolean);

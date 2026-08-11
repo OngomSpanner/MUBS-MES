@@ -3,6 +3,11 @@
 /** User-facing label for the reviewing role (avoid bare "HOD" in UI copy). */
 export const HOD_UNIT_HEAD_LABEL = 'Head of Department / Unit Head';
 
+export const STRATEGY_ADMIN_LABEL = 'Strategy / Admin';
+
+export const ADMIN_RETURN_TARGETS = ['ambassador', 'hod'] as const;
+export type AdminReturnTarget = (typeof ADMIN_RETURN_TARGETS)[number];
+
 export const HOD_REVIEW_STATUSES = ['draft', 'submitted', 'approved', 'returned'] as const;
 export type HodReviewStatus = (typeof HOD_REVIEW_STATUSES)[number];
 

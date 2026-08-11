@@ -46,6 +46,8 @@ type Indicator = {
   department_name: string;
   hod_review_status?: HodReviewStatus;
   hod_review_comment?: string | null;
+  admin_review_comment?: string | null;
+  admin_return_target?: string | null;
 };
 
 type ResponseMap = Record<string, string>;
@@ -791,12 +793,22 @@ export default function AmbassadorDataCollection() {
                   </div>
                 )}
 
-                {entryIndicator.hod_review_status === 'returned' && entryIndicator.hod_review_comment?.trim() && (
-                  <div className="alert alert-warning small py-2 mb-3">
-                    <span className="fw-semibold d-block mb-1">Revision requested by {HOD_UNIT_HEAD_LABEL}</span>
-                    <span className="fw-semibold d-block mb-1">Performance Justification:</span>
-                    {entryIndicator.hod_review_comment}
-                  </div>
+                {entryIndicator.hod_review_status === 'returned' && (
+                  <>
+                    {entryIndicator.admin_return_target === 'ambassador' && entryIndicator.admin_review_comment?.trim() ? (
+                      <div className="alert alert-warning small py-2 mb-3">
+                        <span className="fw-semibold d-block mb-1">Returned by Strategy for revision</span>
+                        {entryIndicator.admin_review_comment}
+                      </div>
+                    ) : null}
+                    {entryIndicator.hod_review_comment?.trim() && entryIndicator.admin_return_target !== 'ambassador' ? (
+                      <div className="alert alert-warning small py-2 mb-3">
+                        <span className="fw-semibold d-block mb-1">Revision requested by {HOD_UNIT_HEAD_LABEL}</span>
+                        <span className="fw-semibold d-block mb-1">Performance Justification:</span>
+                        {entryIndicator.hod_review_comment}
+                      </div>
+                    ) : null}
+                  </>
                 )}
 
                 {entryIndicator.is_locked && (

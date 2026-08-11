@@ -61,6 +61,10 @@ type SubmissionDetail = {
   hod_review_comment: string | null;
   hod_reviewed_at: string | null;
   reviewed_by_name: string | null;
+  admin_review_comment: string | null;
+  admin_reviewed_at: string | null;
+  admin_return_target: string | null;
+  admin_reviewed_by_name: string | null;
 };
 
 type SelectionKey = string;
@@ -442,6 +446,10 @@ export default function HodQuestionnaireSubmissionsTab() {
         hod_review_comment: res.data.hod_review_comment ?? null,
         hod_reviewed_at: res.data.hod_reviewed_at ?? null,
         reviewed_by_name: res.data.reviewed_by_name ?? null,
+        admin_review_comment: res.data.admin_review_comment ?? null,
+        admin_reviewed_at: res.data.admin_reviewed_at ?? null,
+        admin_return_target: res.data.admin_return_target ?? null,
+        admin_reviewed_by_name: res.data.admin_reviewed_by_name ?? null,
       });
     } catch {
       setDetailError('Failed to load submitted data.');
@@ -760,6 +768,19 @@ export default function HodQuestionnaireSubmissionsTab() {
                     {detail.hod_review_status === 'returned' ? 'Performance Justification' : 'Review comment'}
                   </span>
                   {detail.hod_review_comment}
+                </div>
+              ) : null}
+
+              {detail?.admin_review_comment?.trim() && detail.admin_return_target === 'hod' ? (
+                <div className="alert alert-warning small py-2 mb-3">
+                  <span className="fw-semibold d-block mb-1">Strategy feedback</span>
+                  {detail.admin_reviewed_by_name ? (
+                    <span className="text-muted d-block mb-1" style={{ fontSize: '0.72rem' }}>
+                      Returned by {detail.admin_reviewed_by_name}
+                      {detail.admin_reviewed_at ? ` · ${new Date(detail.admin_reviewed_at).toLocaleString()}` : ''}
+                    </span>
+                  ) : null}
+                  {detail.admin_review_comment}
                 </div>
               ) : null}
 

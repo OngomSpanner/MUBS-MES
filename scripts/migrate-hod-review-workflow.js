@@ -2,8 +2,10 @@
  * HOD approval workflow for ambassador reporting data.
  * Run: node scripts/migrate-hod-review-workflow.js
  */
+const path = require('path');
 const mysql = require('mysql2/promise');
-require('dotenv').config({ path: '.env.local' });
+require('dotenv').config({ path: path.join(process.cwd(), '.env') });
+require('dotenv').config({ path: path.join(process.cwd(), '.env.local') });
 
 async function columnExists(connection, table, column) {
   const [rows] = await connection.execute(
@@ -45,6 +47,7 @@ async function addReviewColumns(connection, table) {
 async function migrate() {
   const connection = await mysql.createConnection({
     host: process.env.DB_HOST || 'localhost',
+    port: parseInt(process.env.DB_PORT || '3306', 10),
     user: process.env.DB_USER || 'root',
     password: process.env.DB_PASSWORD || '',
     database: process.env.DB_NAME || 'mubs_super_admin',
@@ -82,6 +85,21 @@ async function migrate() {
       console.log('  created q_indicator_submissions');
     } else {
       console.log('  skip (exists): q_indicator_submissions');
+    }
+
+    if (await tableExists(connection, 'q_indicator_submissions')) {
+      if (!(await columnExists(connection, 'q_indicator_submissions', 'admin_reviewed_by'))) {
+        await connection.execute(`
+          ALTER TABLE q_indicator_submissions
+          ADD COLUMN admin_reviewed_by INT NULL AFTER hod_review_comment,
+          ADD COLUMN admin_reviewed_at TIMESTAMP NULL AFTER admin_reviewed_by,
+          ADD COLUMN admin_review_comment TEXT NULL AFTER admin_reviewed_at,
+          ADD COLUMN admin_return_target ENUM('ambassador','hod') NULL AFTER admin_review_comment
+        `);
+        console.log('  added q_indicator_submissions admin return columns');
+      } else {
+        console.log('  skip (exists): q_indicator_submissions admin return columns');
+      }
     }
 
     console.log('Done.');

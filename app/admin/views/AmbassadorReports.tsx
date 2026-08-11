@@ -5,7 +5,7 @@ import { useSearchParams } from 'next/navigation';
 import Layout from '@/components/Layout';
 import StatCard from '@/components/StatCard';
 import ReportsSectionHeader from '@/components/Reports/ReportsSectionHeader';
-import AmbassadorCollectedDataPanel from '@/components/Reports/data-collection/AmbassadorCollectedDataPanel';
+import StrategyQuestionnaireReturnModal from '@/components/Admin/StrategyQuestionnaireReturnModal';
 import SortablePaginatedTable, { sortDepartmentsByProgress } from '@/components/Reports/SortablePaginatedTable';
 import { Badge, Button, Modal, Spinner } from 'react-bootstrap';
 import axios from 'axios';
@@ -159,6 +159,7 @@ export default function AmbassadorReportsView() {
   const [remindAudience, setRemindAudience] = useState<ReminderAudience | null>(null);
   const [reminding, setReminding] = useState(false);
   const [remindResult, setRemindResult] = useState<string | null>(null);
+  const [returnAssignment, setReturnAssignment] = useState<AssignmentRow | null>(null);
 
   useEffect(() => {
     const urlSection = searchParams.get('section') as SectionTab | null;
@@ -842,6 +843,7 @@ export default function AmbassadorReportsView() {
                     { key: 'filled', label: 'Progress', className: 'text-center' },
                     { key: 'hodReviewStatus', label: 'HOD' },
                     { key: 'reportingCategory', label: 'Status' },
+                    { key: 'actions', label: '', className: 'text-end' },
                   ]}
                   renderRow={(a) => (
                     <>
@@ -860,6 +862,20 @@ export default function AmbassadorReportsView() {
                         <Badge bg={CATEGORY_BADGE[a.reportingCategory].bg}>
                           {CATEGORY_BADGE[a.reportingCategory].label}
                         </Badge>
+                      </td>
+                      <td className="text-end">
+                        {(a.hodReviewStatus === 'approved' || a.hodReviewStatus === 'submitted') ? (
+                          <Button
+                            size="sm"
+                            variant="outline-warning"
+                            onClick={() => setReturnAssignment(a)}
+                            title="Return to ambassador or HOD for changes"
+                          >
+                            Return
+                          </Button>
+                        ) : (
+                          <span className="text-muted small">—</span>
+                        )}
                       </td>
                     </>
                   )}
@@ -890,6 +906,12 @@ export default function AmbassadorReportsView() {
           </Button>
         </Modal.Footer>
       </Modal>
+
+      <StrategyQuestionnaireReturnModal
+        assignment={returnAssignment}
+        onHide={() => setReturnAssignment(null)}
+        onReturned={() => void load()}
+      />
     </Layout>
   );
 }

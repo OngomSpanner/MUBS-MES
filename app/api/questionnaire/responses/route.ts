@@ -182,7 +182,11 @@ export async function POST(request: Request) {
             ON DUPLICATE KEY UPDATE
               hod_review_status = VALUES(hod_review_status),
               submitted_by = VALUES(submitted_by),
-              submitted_at = IF(VALUES(hod_review_status) = 'submitted', VALUES(submitted_at), submitted_at)`,
+              submitted_at = IF(VALUES(hod_review_status) = 'submitted', VALUES(submitted_at), submitted_at),
+              admin_reviewed_by = IF(VALUES(hod_review_status) = 'submitted', NULL, admin_reviewed_by),
+              admin_reviewed_at = IF(VALUES(hod_review_status) = 'submitted', NULL, admin_reviewed_at),
+              admin_review_comment = IF(VALUES(hod_review_status) = 'submitted', NULL, admin_review_comment),
+              admin_return_target = IF(VALUES(hod_review_status) = 'submitted', NULL, admin_return_target)`,
     values: [indicatorId, auth.managedUnitId, hodStatus, auth.userId, submitForReview ? now : null],
   });
 

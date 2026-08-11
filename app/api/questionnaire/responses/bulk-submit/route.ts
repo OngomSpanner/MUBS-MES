@@ -114,7 +114,11 @@ export async function POST(request: Request) {
               ON DUPLICATE KEY UPDATE
                 hod_review_status = 'submitted',
                 submitted_by = VALUES(submitted_by),
-                submitted_at = VALUES(submitted_at)`,
+                submitted_at = VALUES(submitted_at),
+                admin_reviewed_by = NULL,
+                admin_reviewed_at = NULL,
+                admin_review_comment = NULL,
+                admin_return_target = NULL`,
       values: [indicatorId, auth.managedUnitId, auth.userId, now],
     });
 

@@ -69,6 +69,10 @@ export async function ensureHodReviewWorkflowSchema(): Promise<void> {
           hod_reviewed_by INT NULL,
           hod_reviewed_at TIMESTAMP NULL,
           hod_review_comment TEXT NULL,
+          admin_reviewed_by INT NULL,
+          admin_reviewed_at TIMESTAMP NULL,
+          admin_review_comment TEXT NULL,
+          admin_return_target ENUM('ambassador','hod') NULL,
           updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
           PRIMARY KEY (indicator_id, department_id),
           KEY idx_q_ind_sub_status (hod_review_status),
@@ -77,6 +81,23 @@ export async function ensureHodReviewWorkflowSchema(): Promise<void> {
         ) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4
       `,
     });
+  } else {
+    if (!(await columnExists('q_indicator_submissions', 'admin_reviewed_by'))) {
+      try {
+        await query({
+          query: `
+            ALTER TABLE q_indicator_submissions
+            ADD COLUMN admin_reviewed_by INT NULL AFTER hod_review_comment,
+            ADD COLUMN admin_reviewed_at TIMESTAMP NULL AFTER admin_reviewed_by,
+            ADD COLUMN admin_review_comment TEXT NULL AFTER admin_reviewed_at,
+            ADD COLUMN admin_return_target ENUM('ambassador','hod') NULL AFTER admin_review_comment
+          `,
+        });
+      } catch (error) {
+        const code = (error as { code?: string })?.code;
+        if (code !== 'ER_DUP_FIELDNAME') throw error;
+      }
+    }
   }
 
   schemaEnsured = true;
