@@ -18,13 +18,13 @@ import {
 
 export const dynamic = 'force-dynamic';
 
-async function requireStrategyAdmin() {
+async function requireStrategyAdmin(): Promise<{ userId: number; role?: string } | null> {
   const cookieStore = await cookies();
   const token = cookieStore.get('token')?.value;
   if (!token) return null;
   const decoded = verifyToken(token) as { userId?: number; role?: string } | null;
   if (!decoded?.userId || !canManageStrategicStandards(decoded.role)) return null;
-  return decoded;
+  return { userId: decoded.userId, role: decoded.role };
 }
 
 const RETURN_ACTIONS = ['return_to_ambassador', 'return_to_hod'] as const;
