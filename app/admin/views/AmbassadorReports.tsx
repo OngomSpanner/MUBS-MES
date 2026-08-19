@@ -5,6 +5,7 @@ import { useSearchParams } from 'next/navigation';
 import Layout from '@/components/Layout';
 import StatCard from '@/components/StatCard';
 import ReportsSectionHeader from '@/components/Reports/ReportsSectionHeader';
+import AmbassadorCollectedDataPanel from '@/components/Reports/data-collection/AmbassadorCollectedDataPanel';
 import StrategyQuestionnaireReturnModal from '@/components/Admin/StrategyQuestionnaireReturnModal';
 import SortablePaginatedTable, { sortDepartmentsByProgress } from '@/components/Reports/SortablePaginatedTable';
 import { Badge, Button, Modal, Spinner } from 'react-bootstrap';
