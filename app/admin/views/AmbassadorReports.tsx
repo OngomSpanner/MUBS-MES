@@ -8,7 +8,7 @@ import ReportsSectionHeader from '@/components/Reports/ReportsSectionHeader';
 import AmbassadorCollectedDataPanel from '@/components/Reports/data-collection/AmbassadorCollectedDataPanel';
 import StrategyQuestionnaireReturnModal from '@/components/Admin/StrategyQuestionnaireReturnModal';
 import SortablePaginatedTable, { sortDepartmentsByProgress } from '@/components/Reports/SortablePaginatedTable';
-import { Badge, Button, Modal, Spinner } from 'react-bootstrap';
+import { Badge, Button, Form, Modal, Spinner } from 'react-bootstrap';
 import axios from 'axios';
 import * as XLSX from 'xlsx';
 import { HOD_REVIEW_STATUS_LABELS } from '@/lib/hod-review-workflow-constants';
@@ -34,6 +34,14 @@ const SECTION_TABS: { key: SectionTab; label: string; icon: string }[] = [
 ];
 
 const VALID_SECTIONS = new Set<SectionTab>(SECTION_TABS.map((t) => t.key));
+
+function assignmentKey(a: { indicatorId: number; departmentId: number }): string {
+  return `${a.indicatorId}-${a.departmentId}`;
+}
+
+function isStrategyReturnEligible(a: AssignmentRow): boolean {
+  return a.hodReviewStatus === 'approved' || a.hodReviewStatus === 'submitted';
+}
 
 const PROGRESS_LABELS: Record<AssignmentRow['progressStatus'], string> = {
   'not-started': 'Not started',
@@ -161,6 +169,12 @@ export default function AmbassadorReportsView() {
   const [reminding, setReminding] = useState(false);
   const [remindResult, setRemindResult] = useState<string | null>(null);
   const [returnAssignment, setReturnAssignment] = useState<AssignmentRow | null>(null);
+  const [selectedKeys, setSelectedKeys] = useState<Set<string>>(new Set());
+  const [showBulkReturn, setShowBulkReturn] = useState(false);
+  const [bulkReturnTarget, setBulkReturnTarget] = useState<'ambassador' | 'hod'>('ambassador');
+  const [bulkReturnComment, setBulkReturnComment] = useState('');
+  const [bulkActing, setBulkActing] = useState(false);
+  const [bulkMsg, setBulkMsg] = useState<{ type: 'success' | 'danger'; text: string } | null>(null);
 
   useEffect(() => {
     const urlSection = searchParams.get('section') as SectionTab | null;
@@ -218,6 +232,79 @@ export default function AmbassadorReportsView() {
       );
     });
   }, [summary, search, categoryFilter, progressFilter]);
+
+  const bulkEligible = useMemo(
+    () => filteredAssignments.filter(isStrategyReturnEligible),
+    [filteredAssignments],
+  );
+  const selectedEligibleCount = useMemo(
+    () => bulkEligible.filter((a) => selectedKeys.has(assignmentKey(a))).length,
+    [bulkEligible, selectedKeys],
+  );
+  const allEligibleSelected = bulkEligible.length > 0 && bulkEligible.every((a) => selectedKeys.has(assignmentKey(a)));
+
+  const toggleSelected = (key: string, eligible: boolean) => {
+    if (!eligible) return;
+    setSelectedKeys((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  };
+
+  const toggleSelectAllEligible = () => {
+    setSelectedKeys((prev) => {
+      if (allEligibleSelected) {
+        const next = new Set(prev);
+        for (const a of bulkEligible) next.delete(assignmentKey(a));
+        return next;
+      }
+      return new Set([...prev, ...bulkEligible.map(assignmentKey)]);
+    });
+  };
+
+  const runBulkReturn = async () => {
+    if (!bulkReturnComment.trim()) {
+      setBulkMsg({ type: 'danger', text: 'Feedback comment is required' });
+      return;
+    }
+    setBulkActing(true);
+    setBulkMsg(null);
+    try {
+      const eligibleKeys = new Set(bulkEligible.map(assignmentKey));
+      const items = [...selectedKeys]
+        .filter((key) => eligibleKeys.has(key))
+        .map((key) => {
+          const [indicatorId, departmentId] = key.split('-').map(Number);
+          return { indicatorId, departmentId };
+        });
+      if (!items.length) {
+        setBulkMsg({ type: 'danger', text: 'No eligible indicators selected. Choose approved or awaiting-HOD items.' });
+        return;
+      }
+      const res = await axios.patch('/api/admin/questionnaire/submissions/bulk-return', {
+        items,
+        action: bulkReturnTarget === 'ambassador' ? 'return_to_ambassador' : 'return_to_hod',
+        comment: bulkReturnComment.trim(),
+      });
+      const skipped = Array.isArray(res.data?.skipped) ? res.data.skipped as { reason: string }[] : [];
+      let text = String(res.data?.message ?? `Returned ${items.length} indicator(s).`);
+      if (skipped.length > 0) {
+        text += ` Skipped: ${skipped.map((s) => s.reason).join('; ')}`;
+      }
+      setBulkMsg({ type: 'success', text });
+      setSelectedKeys(new Set());
+      setShowBulkReturn(false);
+      setBulkReturnComment('');
+      await load();
+    } catch (e: unknown) {
+      const msg = axios.isAxiosError(e) ? e.response?.data?.message : null;
+      setBulkMsg({ type: 'danger', text: String(msg || 'Bulk return failed') });
+    } finally {
+      setBulkActing(false);
+    }
+  };
 
   const sendReminder = async () => {
     if (!remindAudience) return;
@@ -822,12 +909,40 @@ export default function AmbassadorReportsView() {
                     </>
                   }
                 />
+                {bulkMsg ? <div className={`alert alert-${bulkMsg.type} py-2 small`}>{bulkMsg.text}</div> : null}
+                {bulkEligible.length > 0 ? (
+                  <div
+                    className="d-flex flex-wrap align-items-center gap-3 mb-3 p-3 rounded-3 border"
+                    style={{ background: '#fffbeb', borderColor: '#fcd34d' }}
+                  >
+                    <Form.Check
+                      type="checkbox"
+                      id="strategy-select-all-return"
+                      label={<span className="small fw-semibold">Select all returnable ({bulkEligible.length})</span>}
+                      checked={allEligibleSelected}
+                      onChange={toggleSelectAllEligible}
+                    />
+                    <Button
+                      size="sm"
+                      variant="outline-warning"
+                      disabled={bulkActing || selectedEligibleCount === 0}
+                      onClick={() => {
+                        setBulkMsg(null);
+                        setShowBulkReturn(true);
+                      }}
+                    >
+                      Return selected ({selectedEligibleCount})
+                    </Button>
+                    <span className="small text-muted">Approved or awaiting HOD review</span>
+                  </div>
+                ) : null}
                 <SortablePaginatedTable
                   rows={filteredAssignments}
                   defaultSortKey="filled"
                   defaultSortDir="desc"
                   pageSize={50}
                   getSortValue={(a, key) => {
+                    if (key === 'select') return 0;
                     if (key === 'departmentName') return a.departmentName;
                     if (key === 'ambassadorName') return a.ambassadorName || '';
                     if (key === 'indicatorText') return a.indicatorText;
@@ -836,18 +951,34 @@ export default function AmbassadorReportsView() {
                     if (key === 'reportingCategory') return a.reportingCategory;
                     return Number((a as Record<string, unknown>)[key] ?? 0);
                   }}
-                  rowKey={(a) => `${a.indicatorId}-${a.departmentId}`}
+                  rowKey={(a) => assignmentKey(a)}
                   columns={[
+                    { key: 'select', label: '', sortable: false, className: 'text-center' },
                     { key: 'departmentName', label: 'Department' },
                     { key: 'ambassadorName', label: 'Ambassador' },
                     { key: 'indicatorText', label: 'Indicator' },
                     { key: 'filled', label: 'Progress', className: 'text-center' },
                     { key: 'hodReviewStatus', label: 'HOD' },
                     { key: 'reportingCategory', label: 'Status' },
-                    { key: 'actions', label: '', className: 'text-end' },
+                    { key: 'actions', label: '', className: 'text-end', sortable: false },
                   ]}
-                  renderRow={(a) => (
+                  renderRow={(a) => {
+                    const key = assignmentKey(a);
+                    const eligible = isStrategyReturnEligible(a);
+                    return (
                     <>
+                      <td className="text-center" style={{ width: 36 }}>
+                        {eligible ? (
+                          <Form.Check
+                            type="checkbox"
+                            aria-label={`Select ${a.indicatorText}`}
+                            checked={selectedKeys.has(key)}
+                            onChange={() => toggleSelected(key, true)}
+                          />
+                        ) : (
+                          <span className="text-muted">—</span>
+                        )}
+                      </td>
                       <td>{a.departmentName}</td>
                       <td>{a.ambassadorName || '—'}</td>
                       <td>
@@ -865,7 +996,7 @@ export default function AmbassadorReportsView() {
                         </Badge>
                       </td>
                       <td className="text-end">
-                        {(a.hodReviewStatus === 'approved' || a.hodReviewStatus === 'submitted') ? (
+                        {eligible ? (
                           <Button
                             size="sm"
                             variant="outline-warning"
@@ -879,7 +1010,8 @@ export default function AmbassadorReportsView() {
                         )}
                       </td>
                     </>
-                  )}
+                    );
+                  }}
                 />
               </div>
             )}
@@ -913,6 +1045,63 @@ export default function AmbassadorReportsView() {
         onHide={() => setReturnAssignment(null)}
         onReturned={() => void load()}
       />
+
+      <Modal show={showBulkReturn} onHide={() => !bulkActing && setShowBulkReturn(false)} centered>
+        <Modal.Header closeButton>
+          <Modal.Title className="fs-6">Return selected indicators</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          <p className="small mb-3">
+            {selectedEligibleCount} indicator{selectedEligibleCount === 1 ? '' : 's'} will be returned with the same destination and feedback.
+          </p>
+          <Form.Group className="mb-3">
+            <Form.Label className="small fw-semibold">Return to</Form.Label>
+            <div className="d-flex flex-column gap-2">
+              <Form.Check
+                type="radio"
+                id="bulk-return-ambassador"
+                name="bulkReturnTarget"
+                label="Ambassador — for data corrections and resubmission"
+                checked={bulkReturnTarget === 'ambassador'}
+                onChange={() => setBulkReturnTarget('ambassador')}
+                disabled={bulkActing}
+              />
+              <Form.Check
+                type="radio"
+                id="bulk-return-hod"
+                name="bulkReturnTarget"
+                label="Head of Department — for HOD to review again"
+                checked={bulkReturnTarget === 'hod'}
+                onChange={() => setBulkReturnTarget('hod')}
+                disabled={bulkActing}
+              />
+            </div>
+          </Form.Group>
+          <Form.Group>
+            <Form.Label className="small fw-semibold">
+              Feedback <span className="text-danger">*</span>
+            </Form.Label>
+            <Form.Control
+              as="textarea"
+              rows={4}
+              value={bulkReturnComment}
+              onChange={(e) => setBulkReturnComment(e.target.value)}
+              disabled={bulkActing}
+              placeholder="Explain what needs to be corrected or reviewed…"
+            />
+          </Form.Group>
+        </Modal.Body>
+        <Modal.Footer>
+          <Button variant="light" onClick={() => setShowBulkReturn(false)} disabled={bulkActing}>Cancel</Button>
+          <Button variant="warning" onClick={() => void runBulkReturn()} disabled={bulkActing || !bulkReturnComment.trim()}>
+            {bulkActing
+              ? 'Returning…'
+              : bulkReturnTarget === 'ambassador'
+                ? `Return ${selectedEligibleCount} to ambassador`
+                : `Return ${selectedEligibleCount} to HOD`}
+          </Button>
+        </Modal.Footer>
+      </Modal>
     </Layout>
   );
 }

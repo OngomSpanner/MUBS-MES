@@ -14,7 +14,7 @@ import {
 } from '@/components/Questionnaire/IndicatorTargetUI';
 import StrategicPillarBadge from '@/components/Questionnaire/StrategicPillarBadge';
 import DepartmentUnitMultiSelect, { type DepartmentUnitOption } from '@/components/DepartmentUnitMultiSelect';
-import { getAvailableFinancialYears, normalizeFinancialYear, fyShortLabel } from '@/lib/questionnaire/fy-utils';
+import { getAvailableReportingPeriods, normalizeFinancialYear, fyShortLabel, reportingPeriodHint, isQuarterPeriod } from '@/lib/questionnaire/fy-utils';
 import { UOM_OPTIONS } from '@/lib/questionnaire/uom';
 import { CORE_OBJECTIVES_2025_2030, coreObjectiveNumber, coreObjectiveShortTitle, STRATEGIC_PILLARS_2025_2030, PILLAR_LABELS, type StrategicPillar } from '@/lib/strategic-plan';
 import { summarizeIndicatorDepartments } from '@/lib/summarize-indicator-departments';
@@ -81,7 +81,7 @@ type IndicatorResponse = {
   updated_at: string | null;
 };
 
-const AVAILABLE_FYS = getAvailableFinancialYears();
+const AVAILABLE_PERIODS = getAvailableReportingPeriods();
 
 function emptyMetricRow(): MetricFormRow {
   return {
@@ -530,7 +530,7 @@ function TemplateModal({
         setIndicatorText(ind.indicator_text);
         setSubscribedGroups(groups);
         setDeptIds(expandedIds);
-        setSelectedFYs([...ind.financial_years]);
+        setSelectedFYs(ind.financial_years.map((fy) => normalizeFinancialYear(fy)));
         setTargetsByFy(targetsByFyFromIndicator(ind.targets));
         const rows: MetricFormRow[] =
           ind.metrics.length > 0
@@ -559,7 +559,7 @@ function TemplateModal({
         setIndicatorText(editingIndicator.indicator_text);
         setSubscribedGroups(editingIndicator.assigned_groups ?? []);
         setDeptIds(expandAmbassadorGroupSelection(baseIds, allDepartments, editingIndicator.assigned_groups));
-        setSelectedFYs([...editingIndicator.financial_years]);
+        setSelectedFYs(editingIndicator.financial_years.map((fy) => normalizeFinancialYear(fy)));
         setTargetsByFy(targetsByFyFromIndicator(editingIndicator.targets));
         const rows: MetricFormRow[] =
           editingIndicator.metrics.length > 0
@@ -761,7 +761,7 @@ function TemplateModal({
     if (!outcomeId) return setErr('Select an Outcome / Output.');
     if (!indicatorText.trim()) return setErr('Performance indicator text is required.');
     if (deptIds.length === 0) return setErr('Select at least one department.');
-    if (selectedFYs.length === 0) return setErr('Select at least one financial year.');
+    if (selectedFYs.length === 0) return setErr('Select at least one reporting period.');
     const validMetrics = metrics
       .filter((m) => m.metric_text.trim() && !m.is_total);
     if (validMetrics.length === 0) return setErr('Add at least one performance metric.');
@@ -869,7 +869,7 @@ function TemplateModal({
 
         {/* Section 2 */}
         <div className="border rounded-3 p-3">
-          <h6 className="fw-bold text-primary small mb-3">2. Responsible Departments &amp; Financial Years</h6>
+          <h6 className="fw-bold text-primary small mb-3">2. Responsible Departments &amp; Reporting Periods</h6>
           <DepartmentUnitMultiSelect
             departments={allDepartments}
             selectedIds={deptIds}
@@ -879,17 +879,37 @@ function TemplateModal({
             label="Responsible Department(s) / Unit(s)"
             disabled={loadingDetail}
           />
-          <Form.Label className="small fw-bold mb-1 mt-2">Financial Year(s) <span className="text-danger">*</span></Form.Label>
+          <Form.Label className="small fw-bold mb-1 mt-2">Reporting period(s) <span className="text-danger">*</span></Form.Label>
+          <div className="small text-muted mb-2">Annual financial years, plus quarters for the current year (Q1 ends September).</div>
           <div className="d-flex flex-wrap gap-2">
-            {AVAILABLE_FYS.map((fy) => (
+            {AVAILABLE_PERIODS.filter((p) => !isQuarterPeriod(p)).map((fy) => (
               <button
                 key={fy}
                 type="button"
                 onClick={() => toggleFY(fy)}
                 className={`btn btn-sm ${selectedFYs.includes(fy) ? 'btn-primary' : 'btn-outline-secondary'}`}
                 style={selectedFYs.includes(fy) ? { background: 'var(--mubs-blue)', borderColor: 'var(--mubs-blue)' } : { fontSize: '0.78rem' }}
-              >{fy}</button>
+              >{fyShortLabel(fy)}</button>
             ))}
+          </div>
+          <div className="d-flex flex-wrap gap-2 mt-2">
+            {AVAILABLE_PERIODS.filter((p) => isQuarterPeriod(p)).map((fy) => {
+              const hint = reportingPeriodHint(fy);
+              const selected = selectedFYs.includes(fy);
+              return (
+                <button
+                  key={fy}
+                  type="button"
+                  title={hint ?? fy}
+                  onClick={() => toggleFY(fy)}
+                  className={`btn btn-sm ${selected ? 'btn-primary' : 'btn-outline-secondary'}`}
+                  style={selected ? { background: 'var(--mubs-blue)', borderColor: 'var(--mubs-blue)' } : { fontSize: '0.78rem' }}
+                >
+                  {fyShortLabel(fy)}
+                  {hint ? <span className="d-block fw-normal" style={{ fontSize: '0.62rem', opacity: 0.9 }}>{hint}</span> : null}
+                </button>
+              );
+            })}
           </div>
           {selectedFYs.length > 0 && (
             <div className="mt-2 pt-2 border-top">

@@ -124,7 +124,13 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
     const indicatorText = typeof body.indicator_text === 'string' ? body.indicator_text.trim() : '';
     const outcomeId = Number(body.outcome_id);
     const departmentIds: number[] = Array.isArray(body.department_ids) ? body.department_ids.map(Number).filter((n: number) => Number.isFinite(n) && n > 0) : [];
-    const financialYears: string[] = Array.isArray(body.financial_years) ? body.financial_years.filter((s: unknown) => typeof s === 'string' && (s as string).trim()) : [];
+    const financialYears: string[] = Array.isArray(body.financial_years)
+      ? [...new Set(
+          (body.financial_years as unknown[])
+            .filter((s): s is string => typeof s === 'string' && s.trim() !== '')
+            .map((s) => normalizeFinancialYear(s)),
+        )]
+      : [];
     const metrics: {
       id?: number;
       client_id?: string;
@@ -140,7 +146,7 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
     if (!indicatorText) return NextResponse.json({ message: 'indicator_text is required' }, { status: 400 });
     if (!outcomeId) return NextResponse.json({ message: 'outcome_id is required' }, { status: 400 });
     if (departmentIds.length === 0) return NextResponse.json({ message: 'At least one department is required' }, { status: 400 });
-    if (financialYears.length === 0) return NextResponse.json({ message: 'At least one financial year is required' }, { status: 400 });
+    if (financialYears.length === 0) return NextResponse.json({ message: 'At least one reporting period is required' }, { status: 400 });
     const validMetrics = metrics.filter((m) => typeof m.metric_text === 'string' && m.metric_text.trim());
     if (validMetrics.length === 0) return NextResponse.json({ message: 'At least one metric is required' }, { status: 400 });
 

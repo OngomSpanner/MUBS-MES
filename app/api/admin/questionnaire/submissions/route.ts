@@ -12,9 +12,9 @@ import {
 } from '@/lib/questionnaire-metric-targets';
 import type { AdminReturnTarget } from '@/lib/hod-review-workflow-constants';
 import {
-  notifyAmbassadorOfStrategyReturn,
-  notifyHodsOfStrategyReturn,
-} from '@/lib/questionnaire-submission-notifications';
+  applyStrategyReturns,
+  parseStrategyReturnAction,
+} from '@/lib/questionnaire/strategy-return';
 
 export const dynamic = 'force-dynamic';
 
@@ -27,13 +27,6 @@ async function requireStrategyAdmin(): Promise<{ userId: number; role?: string }
   return { userId: decoded.userId, role: decoded.role };
 }
 
-const RETURN_ACTIONS = ['return_to_ambassador', 'return_to_hod'] as const;
-type ReturnAction = (typeof RETURN_ACTIONS)[number];
-
-function parseReturnAction(raw: unknown): ReturnAction | null {
-  const s = typeof raw === 'string' ? raw.trim() : '';
-  return (RETURN_ACTIONS as readonly string[]).includes(s) ? (s as ReturnAction) : null;
-}
 
 export async function GET(request: Request) {
   try {
@@ -186,7 +179,7 @@ export async function PATCH(request: Request) {
     const body = await request.json();
     const indicatorId = Number(body.indicatorId);
     const departmentId = Number(body.departmentId);
-    const action = parseReturnAction(body.action);
+    const action = parseStrategyReturnAction(body.action);
     const comment = String(body.comment || '').trim();
 
     if (!indicatorId || !departmentId || !action) {
@@ -217,47 +210,25 @@ export async function PATCH(request: Request) {
       }, { status: 409 });
     }
 
-    const returnTarget: AdminReturnTarget = action === 'return_to_ambassador' ? 'ambassador' : 'hod';
-    const nextStatus = returnTarget === 'ambassador' ? 'returned' : 'submitted';
-
-    await query({
-      query: `
-        UPDATE q_indicator_submissions
-        SET hod_review_status = ?,
-            admin_reviewed_by = ?,
-            admin_reviewed_at = NOW(),
-            admin_review_comment = ?,
-            admin_return_target = ?
-        WHERE indicator_id = ? AND department_id = ?
-      `,
-      values: [nextStatus, auth.userId, comment, returnTarget, indicatorId, departmentId],
+    const result = await applyStrategyReturns({
+      reviewerUserId: auth.userId,
+      items: [{ indicatorId, departmentId }],
+      action,
+      comment,
     });
 
-    const ambassadorUserId = existing[0].submitted_by;
-    if (returnTarget === 'ambassador' && ambassadorUserId) {
-      void notifyAmbassadorOfStrategyReturn({
-        indicatorId,
-        departmentId,
-        ambassadorUserId,
-        reviewerUserId: auth.userId,
-        comment,
-      });
-    } else if (returnTarget === 'hod') {
-      void notifyHodsOfStrategyReturn({
-        indicatorId,
-        departmentId,
-        reviewerUserId: auth.userId,
-        comment,
-        ambassadorUserId: ambassadorUserId ?? undefined,
-      });
+    if (!result.reviewed.length) {
+      return NextResponse.json({
+        message: result.skipped[0]?.reason || 'Unable to return this submission',
+      }, { status: 409 });
     }
 
     return NextResponse.json({
-      message: returnTarget === 'ambassador'
+      message: result.returnTarget === 'ambassador'
         ? 'Returned to ambassador for revision'
         : 'Returned to Head of Department for review',
-      hod_review_status: nextStatus,
-      admin_return_target: returnTarget,
+      hod_review_status: result.nextStatus,
+      admin_return_target: result.returnTarget,
     });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Unknown error';

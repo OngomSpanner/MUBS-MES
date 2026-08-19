@@ -8,6 +8,12 @@ export function questionnaireFyLabelFromKey(fyKey: string): string {
   const t = String(fyKey || '')
     .trim()
     .replace(/^FY\s+/i, '');
+  const quarter = t.match(/^(\d{4})\s*\/\s*(\d{2}|\d{4})\s*-?\s*Q([1-4])$/i);
+  if (quarter) {
+    const y1 = parseInt(quarter[1], 10);
+    if (!Number.isFinite(y1)) return t;
+    return `${y1}/${y1 + 1}-Q${quarter[3]}`;
+  }
   const m = t.match(/^(\d{4})\s*\/\s*(\d{2}|\d{4})$/);
   if (!m) return t;
   const y1 = parseInt(m[1], 10);
@@ -17,7 +23,14 @@ export function questionnaireFyLabelFromKey(fyKey: string): string {
 
 /** Long + short FY strings stored in q_responses (e.g. 2024/2025 and 2024/25). */
 export function fyStoredVariants(fyLabel: string): string[] {
-  const long = String(fyLabel || '').trim().match(/^(\d{4})\/(\d{4})$/);
+  const normalized = String(fyLabel || '').trim();
+  const quarter = normalized.match(/^(\d{4})\s*\/\s*(\d{2}|\d{4})\s*-?\s*Q([1-4])$/i);
+  if (quarter) {
+    const start = parseInt(quarter[1], 10);
+    const q = quarter[3];
+    return [`${start}/${start + 1}-Q${q}`, `${start}/${String(start + 1).slice(-2)}-Q${q}`];
+  }
+  const long = normalized.match(/^(\d{4})\/(\d{4})$/);
   if (long) {
     const y1 = long[1];
     const y2 = long[2];
