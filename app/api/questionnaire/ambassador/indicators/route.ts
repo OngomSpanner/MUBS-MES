@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { query } from '@/lib/db';
 import { requireAmbassador } from '@/lib/ambassador/context';
 import { ensureHodReviewWorkflowSchema } from '@/lib/hod-review-workflow';
-import { ensureQuestionnaireObjectiveSchema, ensureQuestionnaireSubMetricsSchema } from '@/lib/questionnaire-schema';
+import { ensureQuestionnaireObjectiveSchema, ensureQuestionnaireSubMetricsSchema, SQL_RESOLVED_INDICATOR_PILLAR, SQL_RESOLVED_INDICATOR_PILLAR_CODE } from '@/lib/questionnaire-schema';
 import {
   ensureIndicatorTargetsSchema,
   loadIndicatorTargets,
@@ -30,13 +30,13 @@ export async function GET(request: Request) {
     query: `SELECT i.id, i.indicator_text, i.is_locked,
                    o.type AS outcome_type, o.label AS outcome_label,
                    o.strategic_objective AS outcome_strategic_objective,
-                   o.strategic_pillar AS outcome_strategic_pillar,
-                   o.pillar_code AS outcome_pillar_code
+                   ${SQL_RESOLVED_INDICATOR_PILLAR} AS outcome_strategic_pillar,
+                   ${SQL_RESOLVED_INDICATOR_PILLAR_CODE} AS outcome_pillar_code
             FROM q_indicators i
             JOIN q_outcomes o ON o.id = i.outcome_id
             JOIN q_indicator_departments qid ON qid.indicator_id = i.id
             WHERE qid.department_id = ?
-            ORDER BY o.strategic_pillar, o.strategic_objective, i.indicator_text`,
+            ORDER BY outcome_strategic_pillar, o.strategic_objective, i.indicator_text`,
     values: [auth.managedUnitId],
   }) as any[];
 
@@ -72,6 +72,7 @@ export async function GET(request: Request) {
 
   const submissionRows = await query({
     query: `SELECT indicator_id, hod_review_status, hod_review_comment,
+                   hod_performance_rating,
                    admin_review_comment, admin_return_target
             FROM q_indicator_submissions
             WHERE indicator_id IN (${inClause}) AND department_id = ?`,
@@ -80,6 +81,7 @@ export async function GET(request: Request) {
     indicator_id: number;
     hod_review_status: string;
     hod_review_comment: string | null;
+    hod_performance_rating: string | null;
     admin_review_comment: string | null;
     admin_return_target: string | null;
   }[];
@@ -144,6 +146,7 @@ export async function GET(request: Request) {
         department_name: auth.managedUnitName,
         hod_review_status: submissionMap.get(ind.id)?.hod_review_status ?? 'draft',
         hod_review_comment: submissionMap.get(ind.id)?.hod_review_comment ?? null,
+        hod_performance_rating: submissionMap.get(ind.id)?.hod_performance_rating ?? null,
         admin_review_comment: submissionMap.get(ind.id)?.admin_review_comment ?? null,
         admin_return_target: submissionMap.get(ind.id)?.admin_return_target ?? null,
       };

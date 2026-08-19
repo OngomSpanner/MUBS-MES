@@ -154,3 +154,48 @@ export const MUBS_CAMPUS_PRESETS = [
   'Mbale Campus',
   'Jinja Campus',
 ] as const;
+
+export const MUBS_GENDER_PRESETS = ['Female', 'Male'] as const;
+
+export const MUBS_PWD_PRESETS = [
+  'Persons with disabilities',
+  'Persons without disabilities',
+] as const;
+
+export function parseLooseNumber(raw: string | null | undefined): number | null {
+  if (raw == null) return null;
+  const s = String(raw).replace(/,/g, '').replace(/%/g, '').trim();
+  if (!s) return null;
+  const n = Number(s);
+  return Number.isFinite(n) ? n : null;
+}
+
+/** Best indicator-level actual per FY: auto-sum parent, else the single standalone metric. */
+export function primaryActualByFy(
+  metrics: MetricTreeNode[],
+  financialYears: string[],
+  getVal: (metricId: number, fy: string) => string | null | undefined,
+): Record<string, string> {
+  const rows = buildMetricDisplayRows(metrics);
+  const autoGroups = rows.filter(
+    (r): r is Extract<MetricDisplayRow, { kind: 'group' }> => r.kind === 'group' && canAutoSumTotal(r.parent),
+  );
+  const standalones = rows.filter(
+    (r): r is Extract<MetricDisplayRow, { kind: 'standalone' }> => r.kind === 'standalone',
+  );
+
+  const out: Record<string, string> = {};
+  for (const fy of financialYears) {
+    if (autoGroups.length === 1) {
+      out[fy] = sumSubMetricValues(autoGroups[0].children, fy, getVal);
+    } else if (autoGroups.length === 0 && standalones.length === 1) {
+      out[fy] = String(getVal(standalones[0].metric.id, fy) ?? '');
+    } else if (autoGroups.length > 1) {
+      const nums = autoGroups
+        .map((g) => parseLooseNumber(sumSubMetricValues(g.children, fy, getVal)))
+        .filter((n): n is number => n != null);
+      if (nums.length === autoGroups.length) out[fy] = String(nums.reduce((a, b) => a + b, 0));
+    }
+  }
+  return out;
+}

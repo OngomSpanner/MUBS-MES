@@ -23,6 +23,20 @@ export function sqlAdminApprovedOnly(alias: string): string {
   return `(${alias}.hod_review_status IS NULL OR ${alias}.hod_review_status = 'approved')`;
 }
 
+export const HOD_PERFORMANCE_RATINGS = ['under', 'on_target', 'over'] as const;
+export type HodPerformanceRating = (typeof HOD_PERFORMANCE_RATINGS)[number];
+
+export const HOD_PERFORMANCE_RATING_LABELS: Record<HodPerformanceRating, string> = {
+  under: 'Under target',
+  on_target: 'On target',
+  over: 'Over target',
+};
+
+export function parseHodPerformanceRating(raw: unknown): HodPerformanceRating | null {
+  const s = typeof raw === 'string' ? raw.trim() : '';
+  return (HOD_PERFORMANCE_RATINGS as readonly string[]).includes(s) ? (s as HodPerformanceRating) : null;
+}
+
 export function isHodReviewStatus(value: string): value is HodReviewStatus {
   return (HOD_REVIEW_STATUSES as readonly string[]).includes(value);
 }

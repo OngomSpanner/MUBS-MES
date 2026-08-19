@@ -8,12 +8,13 @@ import StatCard from '@/components/StatCard';
 import { uomLabel, validateMetricValue, uomPlaceholder } from '@/lib/questionnaire/uom';
 import { fyShortLabel } from '@/lib/questionnaire/fy-utils';
 import { METRIC_ENTRY_TABLE, uomTableLabel } from '@/lib/questionnaire/metric-entry-table-layout';
-import { HOD_REVIEW_STATUS_LABELS, HOD_UNIT_HEAD_LABEL, type HodReviewStatus } from '@/lib/hod-review-workflow-constants';
-import { IndicatorFyTargetGroup, type IndicatorTarget } from '@/components/Questionnaire/IndicatorTargetUI';
+import { HOD_PERFORMANCE_RATING_LABELS, HOD_REVIEW_STATUS_LABELS, HOD_UNIT_HEAD_LABEL, type HodPerformanceRating, type HodReviewStatus } from '@/lib/hod-review-workflow-constants';
+import { IndicatorFyTargetGroup, IndicatorVsTargetSummary, VsTargetHint, indicatorTargetFor, type IndicatorTarget } from '@/components/Questionnaire/IndicatorTargetUI';
 import {
   buildMetricDisplayRows,
   canAutoSumTotal,
   inputMetricsForIndicator,
+  primaryActualByFy,
   subMetricLetter,
   sumSubMetricValues,
 } from '@/lib/questionnaire/metric-tree';
@@ -46,6 +47,7 @@ type Indicator = {
   department_name: string;
   hod_review_status?: HodReviewStatus;
   hod_review_comment?: string | null;
+  hod_performance_rating?: HodPerformanceRating | null;
   admin_review_comment?: string | null;
   admin_return_target?: string | null;
 };
@@ -72,6 +74,11 @@ const FILTER_TABS: { key: IndicatorFilter; label: string }[] = [
 
 function isSubmissionReadOnly(ind: Indicator): boolean {
   return ind.is_locked || ind.hod_review_status === 'submitted' || ind.hod_review_status === 'approved';
+}
+
+function showVsTarget(ind: Indicator): boolean {
+  const hod = ind.hod_review_status ?? 'draft';
+  return hod === 'submitted' || hod === 'approved' || hod === 'returned';
 }
 
 function isBulkSubmitEligible(ind: Indicator): boolean {
@@ -781,6 +788,18 @@ export default function AmbassadorDataCollection() {
                   ) : null}
                 </div>
 
+                {showVsTarget(entryIndicator) ? (
+                  <IndicatorVsTargetSummary
+                    financialYears={entryIndicator.financial_years}
+                    targets={entryIndicator.targets}
+                    actualByFy={primaryActualByFy(
+                      entryIndicator.metrics,
+                      entryIndicator.financial_years,
+                      (metricId, fy) => responses[`${metricId}_${fy}`] ?? '',
+                    )}
+                  />
+                ) : null}
+
                 {entryIndicator.hod_review_status === 'submitted' && (
                   <div className="alert alert-info small py-2 mb-3">
                     This submission is awaiting {HOD_UNIT_HEAD_LABEL} review. You can view the data but cannot edit until a revision is requested.
@@ -789,7 +808,20 @@ export default function AmbassadorDataCollection() {
 
                 {entryIndicator.hod_review_status === 'approved' && (
                   <div className="alert alert-success small py-2 mb-3">
-                    This submission has been approved by the {HOD_UNIT_HEAD_LABEL}. View only.
+                    <span className="fw-semibold d-block mb-1">
+                      Approved by the {HOD_UNIT_HEAD_LABEL}
+                      {entryIndicator.hod_performance_rating
+                        ? ` · ${HOD_PERFORMANCE_RATING_LABELS[entryIndicator.hod_performance_rating]}`
+                        : ''}
+                    </span>
+                    {entryIndicator.hod_review_comment?.trim() ? (
+                      <>
+                        <span className="fw-semibold d-block mb-1">Performance justification</span>
+                        {entryIndicator.hod_review_comment}
+                      </>
+                    ) : (
+                      'View only.'
+                    )}
                   </div>
                 )}
 
@@ -804,6 +836,11 @@ export default function AmbassadorDataCollection() {
                     {entryIndicator.hod_review_comment?.trim() && entryIndicator.admin_return_target !== 'ambassador' ? (
                       <div className="alert alert-warning small py-2 mb-3">
                         <span className="fw-semibold d-block mb-1">Revision requested by {HOD_UNIT_HEAD_LABEL}</span>
+                        {entryIndicator.hod_performance_rating ? (
+                          <span className="fw-semibold d-block mb-1">
+                            Rating: {HOD_PERFORMANCE_RATING_LABELS[entryIndicator.hod_performance_rating]}
+                          </span>
+                        ) : null}
                         <span className="fw-semibold d-block mb-1">Performance Justification:</span>
                         {entryIndicator.hod_review_comment}
                       </div>
@@ -891,12 +928,17 @@ export default function AmbassadorDataCollection() {
                                     }}
                                   >
                                     {readOnly ? (
-                                      <span
-                                        className={`d-block text-center ${displayVal ? 'fw-semibold' : 'text-muted'}`}
-                                        style={{ fontSize: '0.78rem', fontStyle: displayVal ? 'normal' : 'italic', wordBreak: 'break-word' }}
-                                      >
-                                        {displayVal ?? '—'}
-                                      </span>
+                                      <>
+                                        <span
+                                          className={`d-block text-center ${displayVal ? 'fw-semibold' : 'text-muted'}`}
+                                          style={{ fontSize: '0.78rem', fontStyle: displayVal ? 'normal' : 'italic', wordBreak: 'break-word' }}
+                                        >
+                                          {displayVal ?? '—'}
+                                        </span>
+                                        {showVsTarget(entryIndicator) ? (
+                                          <VsTargetHint actual={val} target={indicatorTargetFor(entryIndicator.targets, fy)} />
+                                        ) : null}
+                                      </>
                                     ) : (
                                       <>
                                         <Form.Control
@@ -918,6 +960,9 @@ export default function AmbassadorDataCollection() {
                                         {isMissing && !err && (
                                           <div className="text-danger" style={{ fontSize: '0.65rem' }}>Required</div>
                                         )}
+                                        {showVsTarget(entryIndicator) ? (
+                                          <VsTargetHint actual={val} target={indicatorTargetFor(entryIndicator.targets, fy)} />
+                                        ) : null}
                                       </>
                                     )}
                                   </td>
@@ -983,6 +1028,9 @@ export default function AmbassadorDataCollection() {
                                       <Badge bg="warning" className="text-dark border mt-1" style={{ fontSize: '0.58rem' }}>
                                         Auto total
                                       </Badge>
+                                      {showVsTarget(entryIndicator) ? (
+                                        <VsTargetHint actual={totalVal} target={indicatorTargetFor(entryIndicator.targets, fy)} />
+                                      ) : null}
                                     </div>
                                   ) : (
                                     <span className="d-block text-center text-muted" style={{ fontSize: '0.78rem', fontStyle: 'italic' }}>

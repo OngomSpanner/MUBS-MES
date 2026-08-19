@@ -5,7 +5,7 @@ import { canManageStrategicStandards } from '@/lib/role-routing';
 import { query } from '@/lib/db';
 import { ensureHodReviewWorkflowSchema } from '@/lib/hod-review-workflow';
 import { ensureMetricCommentsSchema } from '@/lib/questionnaire-metric-comments';
-import { ensureQuestionnaireSubMetricsSchema } from '@/lib/questionnaire-schema';
+import { ensureQuestionnaireSubMetricsSchema, ensureQuestionnaireObjectiveSchema, SQL_RESOLVED_INDICATOR_PILLAR, SQL_RESOLVED_INDICATOR_PILLAR_CODE } from '@/lib/questionnaire-schema';
 import {
   ensureIndicatorTargetsSchema,
   loadIndicatorTargets,
@@ -36,6 +36,7 @@ export async function GET(request: Request) {
     await ensureHodReviewWorkflowSchema();
     await ensureMetricCommentsSchema();
     await ensureQuestionnaireSubMetricsSchema();
+    await ensureQuestionnaireObjectiveSchema();
     await ensureIndicatorTargetsSchema();
 
     const url = new URL(request.url);
@@ -129,8 +130,8 @@ export async function GET(request: Request) {
                COALESCE(qis.hod_review_status, 'draft') AS hod_review_status,
                qis.submitted_at, qis.admin_return_target, qis.admin_review_comment,
                i.indicator_text, o.type AS outcome_type, o.label AS outcome_label,
-               o.strategic_pillar AS outcome_strategic_pillar,
-               o.pillar_code AS outcome_pillar_code,
+               ${SQL_RESOLVED_INDICATOR_PILLAR} AS outcome_strategic_pillar,
+               ${SQL_RESOLVED_INDICATOR_PILLAR_CODE} AS outcome_pillar_code,
                COALESCE(NULLIF(TRIM(d.external_name), ''), d.name) AS department_name,
                u.full_name AS submitted_by_name,
                (SELECT COUNT(*) FROM q_metrics m WHERE m.indicator_id = i.id) AS metric_count,

@@ -100,5 +100,19 @@ export async function ensureHodReviewWorkflowSchema(): Promise<void> {
     }
   }
 
+  if (!(await columnExists('q_indicator_submissions', 'hod_performance_rating'))) {
+    try {
+      await query({
+        query: `
+          ALTER TABLE q_indicator_submissions
+          ADD COLUMN hod_performance_rating ENUM('under','on_target','over') NULL AFTER hod_review_comment
+        `,
+      });
+    } catch (error) {
+      const code = (error as { code?: string })?.code;
+      if (code !== 'ER_DUP_FIELDNAME') throw error;
+    }
+  }
+
   schemaEnsured = true;
 }

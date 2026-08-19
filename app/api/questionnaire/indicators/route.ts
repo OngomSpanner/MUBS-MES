@@ -4,7 +4,8 @@ import { cookies } from 'next/headers';
 import { verifyToken } from '@/lib/auth';
 import { canManageStrategicStandards } from '@/lib/role-routing';
 import { normalizeFinancialYear } from '@/lib/questionnaire/fy-utils';
-import { ensureQuestionnaireObjectiveSchema, ensureQuestionnaireSubMetricsSchema } from '@/lib/questionnaire-schema';
+import { ensureQuestionnaireObjectiveSchema, ensureQuestionnaireSubMetricsSchema, SQL_RESOLVED_INDICATOR_PILLAR, SQL_RESOLVED_INDICATOR_PILLAR_CODE } from '@/lib/questionnaire-schema';
+import { parseStrategicPillar, strategicPillarCode } from '@/lib/strategic-plan';
 import { fetchDepartmentsWithAmbassador } from '@/lib/departments-with-ambassador';
 import {
   AMBASSADOR_GROUP_ORDER,
@@ -46,13 +47,15 @@ export async function GET() {
     const catalog = await fetchDepartmentsWithAmbassador(true);
     const indicatorRows = await query({
       query: `SELECT i.id, i.outcome_id, i.indicator_text, i.is_locked, i.created_at,
+                i.strategic_pillar AS indicator_strategic_pillar,
+                i.pillar_code AS indicator_pillar_code,
                 o.type AS outcome_type, o.label AS outcome_label,
                 o.strategic_objective AS outcome_strategic_objective,
-                o.strategic_pillar AS outcome_strategic_pillar,
-                o.pillar_code AS outcome_pillar_code
+                ${SQL_RESOLVED_INDICATOR_PILLAR} AS outcome_strategic_pillar,
+                ${SQL_RESOLVED_INDICATOR_PILLAR_CODE} AS outcome_pillar_code
               FROM q_indicators i
               JOIN q_outcomes o ON o.id = i.outcome_id
-              ORDER BY o.strategic_pillar, o.strategic_objective, o.type, o.label, i.indicator_text`,
+              ORDER BY outcome_strategic_pillar, o.strategic_objective, o.type, o.label, i.indicator_text`,
     }) as any[];
 
     for (const ind of indicatorRows) {
@@ -151,6 +154,8 @@ export async function POST(request: Request) {
       is_total?: boolean | number;
     }[] = Array.isArray(body.metrics) ? body.metrics : [];
     const indicatorTargets: IndicatorTargetInput[] = Array.isArray(body.targets) ? body.targets : [];
+    const strategicPillar = parseStrategicPillar(body.strategic_pillar);
+    const pillarCode = strategicPillarCode(strategicPillar);
 
     if (!outcomeId) return NextResponse.json({ message: 'outcome_id is required' }, { status: 400 });
     if (!indicatorText) return NextResponse.json({ message: 'indicator_text is required' }, { status: 400 });
@@ -160,8 +165,8 @@ export async function POST(request: Request) {
     if (validMetrics.length === 0) return NextResponse.json({ message: 'At least one metric is required' }, { status: 400 });
 
     const result = await query({
-      query: 'INSERT INTO q_indicators (outcome_id, indicator_text) VALUES (?, ?)',
-      values: [outcomeId, indicatorText],
+      query: 'INSERT INTO q_indicators (outcome_id, indicator_text, strategic_pillar, pillar_code) VALUES (?, ?, ?, ?)',
+      values: [outcomeId, indicatorText, strategicPillar, pillarCode],
     }) as any;
     const indicatorId = result.insertId;
 

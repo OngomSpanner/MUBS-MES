@@ -5,12 +5,13 @@ import { getVisibleDepartmentIds, inPlaceholders } from '@/lib/department-head';
 import { query } from '@/lib/db';
 import { ensureHodReviewWorkflowSchema } from '@/lib/hod-review-workflow';
 import { ensureMetricCommentsSchema } from '@/lib/questionnaire-metric-comments';
-import { ensureQuestionnaireSubMetricsSchema } from '@/lib/questionnaire-schema';
+import { ensureQuestionnaireSubMetricsSchema, ensureQuestionnaireObjectiveSchema, SQL_RESOLVED_INDICATOR_PILLAR, SQL_RESOLVED_INDICATOR_PILLAR_CODE } from '@/lib/questionnaire-schema';
 import {
   ensureIndicatorTargetsSchema,
   loadIndicatorTargets,
 } from '@/lib/questionnaire-metric-targets';
 import { notifyAmbassadorOfIndicatorReview } from '@/lib/questionnaire-submission-notifications';
+import { parseHodPerformanceRating } from '@/lib/hod-review-workflow-constants';
 
 export const dynamic = 'force-dynamic';
 
@@ -34,6 +35,7 @@ export async function GET(request: Request) {
     await ensureHodReviewWorkflowSchema();
     await ensureMetricCommentsSchema();
     await ensureQuestionnaireSubMetricsSchema();
+    await ensureQuestionnaireObjectiveSchema();
     await ensureIndicatorTargetsSchema();
 
     const url = new URL(request.url);
@@ -81,6 +83,7 @@ export async function GET(request: Request) {
 
       const submission = (await query({
         query: `SELECT qis.hod_review_status, qis.hod_review_comment, qis.hod_reviewed_at,
+                       qis.hod_performance_rating,
                        qis.admin_review_comment, qis.admin_reviewed_at, qis.admin_return_target,
                        ru.full_name AS reviewed_by_name,
                        au.full_name AS admin_reviewed_by_name
@@ -93,6 +96,7 @@ export async function GET(request: Request) {
         hod_review_status: string;
         hod_review_comment: string | null;
         hod_reviewed_at: string | null;
+        hod_performance_rating: string | null;
         admin_review_comment: string | null;
         admin_reviewed_at: string | null;
         admin_return_target: string | null;
@@ -108,6 +112,7 @@ export async function GET(request: Request) {
         targets,
         hod_review_status: submission[0]?.hod_review_status ?? null,
         hod_review_comment: submission[0]?.hod_review_comment ?? null,
+        hod_performance_rating: submission[0]?.hod_performance_rating ?? null,
         hod_reviewed_at: submission[0]?.hod_reviewed_at ?? null,
         reviewed_by_name: submission[0]?.reviewed_by_name ?? null,
         admin_review_comment: submission[0]?.admin_review_comment ?? null,
@@ -124,8 +129,8 @@ export async function GET(request: Request) {
                COALESCE(qis.hod_review_status, 'draft') AS hod_review_status,
                qis.submitted_at,
                i.indicator_text, o.type AS outcome_type, o.label AS outcome_label,
-               o.strategic_pillar AS outcome_strategic_pillar,
-               o.pillar_code AS outcome_pillar_code,
+               ${SQL_RESOLVED_INDICATOR_PILLAR} AS outcome_strategic_pillar,
+               ${SQL_RESOLVED_INDICATOR_PILLAR_CODE} AS outcome_pillar_code,
                COALESCE(NULLIF(TRIM(d.external_name), ''), d.name) AS department_name,
                u.full_name AS submitted_by_name,
                (SELECT COUNT(*) FROM q_metrics m WHERE m.indicator_id = i.id) AS metric_count,
@@ -183,13 +188,19 @@ export async function PATCH(request: Request) {
     const departmentId = Number(body.departmentId);
     const action = String(body.action || '').trim();
     const comment = String(body.comment || '').trim();
+    const rating = parseHodPerformanceRating(body.performanceRating ?? body.performance_rating);
 
     if (!indicatorId || !departmentId || !['approve', 'return'].includes(action)) {
       return NextResponse.json({ message: 'indicatorId, departmentId, and action (approve|return) required' }, { status: 400 });
     }
-    if (action === 'return' && !comment) {
+    if (!rating) {
       return NextResponse.json({
-        message: 'Performance Justification (Reasons for Under performance, on target, or over performance) is required when requesting revision',
+        message: 'Select whether performance is under target, on target, or over target',
+      }, { status: 400 });
+    }
+    if (!comment) {
+      return NextResponse.json({
+        message: 'Performance justification is required when approving or requesting revision',
       }, { status: 400 });
     }
 
@@ -214,10 +225,11 @@ export async function PATCH(request: Request) {
     await query({
       query: `
         UPDATE q_indicator_submissions
-        SET hod_review_status = ?, hod_reviewed_by = ?, hod_reviewed_at = NOW(), hod_review_comment = ?
+        SET hod_review_status = ?, hod_reviewed_by = ?, hod_reviewed_at = NOW(),
+            hod_review_comment = ?, hod_performance_rating = ?
         WHERE indicator_id = ? AND department_id = ?
       `,
-      values: [status, auth.userId, comment || null, indicatorId, departmentId],
+      values: [status, auth.userId, comment, rating, indicatorId, departmentId],
     });
 
     const ambassadorUserId = existing[0]?.submitted_by;

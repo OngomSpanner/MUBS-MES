@@ -40,7 +40,7 @@ export async function GET(request: Request) {
       query: `SELECT i.id, i.outcome_id, i.indicator_text, i.is_locked,
                 o.type AS outcome_type, o.label AS outcome_label,
                 o.strategic_objective AS outcome_strategic_objective,
-                o.strategic_pillar AS outcome_strategic_pillar,
+                COALESCE(NULLIF(TRIM(i.strategic_pillar), ''), o.strategic_pillar) AS outcome_strategic_pillar,
                 o.pillar_code AS outcome_pillar_code
               FROM q_indicators i
               JOIN q_outcomes o ON o.id = i.outcome_id

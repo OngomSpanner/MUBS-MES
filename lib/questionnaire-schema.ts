@@ -5,6 +5,8 @@ let ensurePromise: Promise<void> | null = null;
 /** Separate from schemaEnsured: older deploys could mark objectives “ensured” before pillar columns existed. */
 let pillarSchemaEnsured = false;
 let pillarEnsurePromise: Promise<void> | null = null;
+let indicatorPillarSchemaEnsured = false;
+let indicatorPillarEnsurePromise: Promise<void> | null = null;
 let subMetricSchemaEnsured = false;
 let subMetricEnsurePromise: Promise<void> | null = null;
 
@@ -22,7 +24,7 @@ function isDuplicateSchemaError(error: unknown): boolean {
   return code === 'ER_DUP_FIELDNAME' || code === 'ER_DUP_KEYNAME';
 }
 
-function isUnknownColumnError(error: unknown): boolean {
+export function isUnknownColumnError(error: unknown): boolean {
   const code = (error as { code?: string })?.code;
   return code === 'ER_BAD_FIELD_ERROR';
 }
@@ -171,10 +173,45 @@ export async function ensureQuestionnairePillarColumns(): Promise<void> {
   }
 }
 
+async function runQuestionnaireIndicatorPillarMigration(): Promise<void> {
+  if (!(await columnExists('q_indicators', 'strategic_pillar'))) {
+    try {
+      await query({
+        query: `ALTER TABLE q_indicators ADD COLUMN strategic_pillar VARCHAR(255) NULL AFTER indicator_text`,
+      });
+    } catch (error) {
+      if (!isDuplicateSchemaError(error)) throw error;
+    }
+  }
+  if (!(await columnExists('q_indicators', 'pillar_code'))) {
+    try {
+      await query({
+        query: `ALTER TABLE q_indicators ADD COLUMN pillar_code VARCHAR(16) NULL AFTER strategic_pillar`,
+      });
+    } catch (error) {
+      if (!isDuplicateSchemaError(error)) throw error;
+    }
+  }
+  indicatorPillarSchemaEnsured =
+    (await columnExists('q_indicators', 'strategic_pillar')) &&
+    (await columnExists('q_indicators', 'pillar_code'));
+}
+
+export async function ensureQuestionnaireIndicatorPillarColumns(): Promise<void> {
+  if (indicatorPillarSchemaEnsured) return;
+  if (!indicatorPillarEnsurePromise) {
+    indicatorPillarEnsurePromise = runQuestionnaireIndicatorPillarMigration().catch((error) => {
+      indicatorPillarEnsurePromise = null;
+      indicatorPillarSchemaEnsured = false;
+      throw error;
+    });
+  }
+  await indicatorPillarEnsurePromise;
+}
+
 /** Idempotent: link questionnaire outcomes/outputs to strategic plan objectives + pillars. */
 export async function ensureQuestionnaireObjectiveSchema(): Promise<void> {
-  // Always ensure pillars even if an older process already set schemaEnsured for objectives only.
-  if (schemaEnsured && pillarSchemaEnsured) return;
+  if (schemaEnsured && pillarSchemaEnsured && indicatorPillarSchemaEnsured) return;
   if (!schemaEnsured) {
     if (!ensurePromise) {
       ensurePromise = runQuestionnaireObjectiveMigration().catch((error) => {
@@ -185,17 +222,21 @@ export async function ensureQuestionnaireObjectiveSchema(): Promise<void> {
     await ensurePromise;
   }
   await ensureQuestionnairePillarColumns();
+  await ensureQuestionnaireIndicatorPillarColumns();
 }
 
 /** Reset in-memory flags after unknown-column errors so the next request re-runs ALTER. */
 export function invalidateQuestionnaireObjectiveSchemaCache(): void {
   schemaEnsured = false;
   pillarSchemaEnsured = false;
+  indicatorPillarSchemaEnsured = false;
   ensurePromise = null;
   pillarEnsurePromise = null;
+  indicatorPillarEnsurePromise = null;
 }
 
-export { isUnknownColumnError };
+export const SQL_RESOLVED_INDICATOR_PILLAR = `COALESCE(NULLIF(TRIM(i.strategic_pillar), ''), o.strategic_pillar)`;
+export const SQL_RESOLVED_INDICATOR_PILLAR_CODE = `COALESCE(NULLIF(TRIM(i.pillar_code), ''), o.pillar_code)`;
 
 /** Idempotent: allow questionnaire metrics to have sub-metrics and auto totals. */
 export async function ensureQuestionnaireSubMetricsSchema(): Promise<void> {

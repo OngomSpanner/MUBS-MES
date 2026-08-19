@@ -6,11 +6,23 @@ import StrategicPillarBadge from '@/components/Questionnaire/StrategicPillarBadg
 import { Badge, Button, Form, Modal, Spinner } from 'react-bootstrap';
 import { normalizeFinancialYear, fyShortLabel } from '@/lib/questionnaire/fy-utils';
 import { METRIC_ENTRY_TABLE, uomTableLabel } from '@/lib/questionnaire/metric-entry-table-layout';
-import { HOD_REVIEW_STATUS_LABELS, HOD_UNIT_HEAD_LABEL, type HodReviewStatus } from '@/lib/hod-review-workflow-constants';
-import { IndicatorFyTargetGroup, type IndicatorTarget } from '@/components/Questionnaire/IndicatorTargetUI';
+import {
+  HOD_PERFORMANCE_RATING_LABELS,
+  HOD_PERFORMANCE_RATINGS,
+  HOD_REVIEW_STATUS_LABELS,
+  HOD_UNIT_HEAD_LABEL,
+  type HodPerformanceRating,
+  type HodReviewStatus,
+} from '@/lib/hod-review-workflow-constants';
+import {
+  IndicatorFyTargetGroup,
+  IndicatorVsTargetSummary,
+  type IndicatorTarget,
+} from '@/components/Questionnaire/IndicatorTargetUI';
 import {
   buildMetricDisplayRows,
   canAutoSumTotal,
+  primaryActualByFy,
   subMetricLetter,
   sumSubMetricValues,
 } from '@/lib/questionnaire/metric-tree';
@@ -59,6 +71,7 @@ type SubmissionDetail = {
   targets?: IndicatorTarget[];
   hod_review_status: HodReviewStatus | null;
   hod_review_comment: string | null;
+  hod_performance_rating: HodPerformanceRating | null;
   hod_reviewed_at: string | null;
   reviewed_by_name: string | null;
   admin_review_comment: string | null;
@@ -108,6 +121,40 @@ function statusBadge(status: HodReviewStatus) {
     default:
       return 'secondary';
   }
+}
+
+function PerformanceRatingField({
+  idPrefix,
+  value,
+  onChange,
+  disabled,
+}: {
+  idPrefix: string;
+  value: HodPerformanceRating | '';
+  onChange: (v: HodPerformanceRating) => void;
+  disabled?: boolean;
+}) {
+  return (
+    <Form.Group className="mb-3">
+      <Form.Label className="small fw-semibold">
+        Performance vs target <span className="text-danger">*</span>
+      </Form.Label>
+      <div className="d-flex flex-wrap gap-3">
+        {HOD_PERFORMANCE_RATINGS.map((r) => (
+          <Form.Check
+            key={r}
+            type="radio"
+            id={`${idPrefix}-${r}`}
+            name={idPrefix}
+            label={HOD_PERFORMANCE_RATING_LABELS[r]}
+            checked={value === r}
+            onChange={() => onChange(r)}
+            disabled={disabled}
+          />
+        ))}
+      </div>
+    </Form.Group>
+  );
 }
 
 function responseValue(
@@ -326,6 +373,7 @@ export default function HodQuestionnaireSubmissionsTab() {
   const [detailLoading, setDetailLoading] = useState(false);
   const [detailError, setDetailError] = useState<string | null>(null);
   const [comment, setComment] = useState('');
+  const [performanceRating, setPerformanceRating] = useState<HodPerformanceRating | ''>('');
   const [acting, setActing] = useState(false);
 
   const [selectedKeys, setSelectedKeys] = useState<Set<SelectionKey>>(new Set());
@@ -334,6 +382,7 @@ export default function HodQuestionnaireSubmissionsTab() {
   const [showBulkReturnModal, setShowBulkReturnModal] = useState(false);
   const [showBulkApproveModal, setShowBulkApproveModal] = useState(false);
   const [bulkReturnComment, setBulkReturnComment] = useState('');
+  const [bulkPerformanceRating, setBulkPerformanceRating] = useState<HodPerformanceRating | ''>('');
 
   const load = useCallback(async (): Promise<Submission[]> => {
     setLoading(true);
@@ -426,6 +475,7 @@ export default function HodQuestionnaireSubmissionsTab() {
     setSelected(submission);
     setViewOnly(readOnly);
     setComment('');
+    setPerformanceRating('');
     setDetail(null);
     setDetailError(null);
     setDetailLoading(true);
@@ -444,6 +494,7 @@ export default function HodQuestionnaireSubmissionsTab() {
         targets: res.data.targets ?? [],
         hod_review_status: res.data.hod_review_status ?? submission.hod_review_status,
         hod_review_comment: res.data.hod_review_comment ?? null,
+        hod_performance_rating: res.data.hod_performance_rating ?? null,
         hod_reviewed_at: res.data.hod_reviewed_at ?? null,
         reviewed_by_name: res.data.reviewed_by_name ?? null,
         admin_review_comment: res.data.admin_review_comment ?? null,
@@ -465,6 +516,7 @@ export default function HodQuestionnaireSubmissionsTab() {
     setDetail(null);
     setDetailError(null);
     setComment('');
+    setPerformanceRating('');
   };
 
   const navigateModal = async (delta: number) => {
@@ -477,8 +529,12 @@ export default function HodQuestionnaireSubmissionsTab() {
 
   const review = async (action: 'approve' | 'return', advance = true) => {
     if (!selected) return;
-    if (action === 'return' && !comment.trim()) {
-      alert('Performance Justification (Reasons for Under performance, on target, or over performance) is required when requesting revision.');
+    if (!performanceRating) {
+      alert('Select whether performance is under target, on target, or over target.');
+      return;
+    }
+    if (!comment.trim()) {
+      alert('Performance justification is required when approving or requesting revision.');
       return;
     }
     setActing(true);
@@ -488,6 +544,7 @@ export default function HodQuestionnaireSubmissionsTab() {
         departmentId: selected.department_id,
         action,
         comment: comment.trim(),
+        performanceRating,
       });
 
       const nextIdx = modalNavIndex;
@@ -511,6 +568,20 @@ export default function HodQuestionnaireSubmissionsTab() {
   };
 
   const runBulkReview = async (action: 'approve' | 'return', bulkComment = '') => {
+    if (!bulkPerformanceRating) {
+      setBulkMsg({
+        type: 'danger',
+        text: 'Select whether performance is under target, on target, or over target.',
+      });
+      return;
+    }
+    if (!bulkComment.trim()) {
+      setBulkMsg({
+        type: 'danger',
+        text: 'Performance justification is required when approving or requesting revision.',
+      });
+      return;
+    }
     setBulkActing(true);
     setBulkMsg(null);
     try {
@@ -535,6 +606,7 @@ export default function HodQuestionnaireSubmissionsTab() {
         items,
         action,
         comment: bulkComment.trim(),
+        performanceRating: bulkPerformanceRating,
       });
 
       const skipped = Array.isArray(res.data?.skipped) ? res.data.skipped as { reason: string }[] : [];
@@ -547,6 +619,7 @@ export default function HodQuestionnaireSubmissionsTab() {
       setShowBulkReturnModal(false);
       setShowBulkApproveModal(false);
       setBulkReturnComment('');
+      setBulkPerformanceRating('');
       if (selected) closeModal();
       await load();
     } catch (e: unknown) {
@@ -762,12 +835,19 @@ export default function HodQuestionnaireSubmissionsTab() {
                 </div>
               ) : null}
 
-              {detail?.hod_review_comment?.trim() ? (
+              {detail?.hod_review_comment?.trim() || detail?.hod_performance_rating ? (
                 <div className={`alert small py-2 mb-3 ${detail.hod_review_status === 'returned' ? 'alert-warning' : 'alert-light border'}`}>
-                  <span className="fw-semibold d-block mb-1">
-                    {detail.hod_review_status === 'returned' ? 'Performance Justification' : 'Review comment'}
-                  </span>
-                  {detail.hod_review_comment}
+                  {detail.hod_performance_rating ? (
+                    <span className="fw-semibold d-block mb-1">
+                      Rating: {HOD_PERFORMANCE_RATING_LABELS[detail.hod_performance_rating]}
+                    </span>
+                  ) : null}
+                  {detail.hod_review_comment?.trim() ? (
+                    <>
+                      <span className="fw-semibold d-block mb-1">Performance justification</span>
+                      {detail.hod_review_comment}
+                    </>
+                  ) : null}
                 </div>
               ) : null}
 
@@ -789,12 +869,23 @@ export default function HodQuestionnaireSubmissionsTab() {
               </div>
 
               {detail && detail.financial_years.length > 0 ? (
-                <div className="mb-2 d-flex flex-wrap gap-1">
-                  <IndicatorFyTargetGroup
+                <>
+                  <div className="mb-2 d-flex flex-wrap gap-1">
+                    <IndicatorFyTargetGroup
+                      financialYears={detail.financial_years}
+                      targets={detail.targets}
+                    />
+                  </div>
+                  <IndicatorVsTargetSummary
                     financialYears={detail.financial_years}
                     targets={detail.targets}
+                    actualByFy={primaryActualByFy(
+                      detail.metrics,
+                      detail.financial_years,
+                      (metricId, fy) => responseValue(detail.responses, metricId, fy),
+                    )}
                   />
-                </div>
+                </>
               ) : null}
 
               {detailLoading ? (
@@ -810,19 +901,27 @@ export default function HodQuestionnaireSubmissionsTab() {
               ) : null}
 
               {!viewOnly ? (
-                <Form.Group>
-                  <Form.Label className="small fw-semibold">
-                    Performance Justification (Reasons for Under performance, on target, or over performance)
-                  </Form.Label>
-                  <Form.Control
-                    as="textarea"
-                    rows={3}
-                    value={comment}
-                    onChange={(e) => setComment(e.target.value)}
+                <>
+                  <PerformanceRatingField
+                    idPrefix="hod-review-rating"
+                    value={performanceRating}
+                    onChange={setPerformanceRating}
                     disabled={acting}
-                    placeholder="Optional for approval. Required if you request revision."
                   />
-                </Form.Group>
+                  <Form.Group>
+                    <Form.Label className="small fw-semibold">
+                      Performance justification <span className="text-danger">*</span>
+                    </Form.Label>
+                    <Form.Control
+                      as="textarea"
+                      rows={3}
+                      value={comment}
+                      onChange={(e) => setComment(e.target.value)}
+                      disabled={acting}
+                      placeholder="Explain under performance, on-target, or over performance…"
+                    />
+                  </Form.Group>
+                </>
               ) : null}
             </>
           ) : null}
@@ -855,13 +954,17 @@ export default function HodQuestionnaireSubmissionsTab() {
           )}
           {!viewOnly ? (
             <>
-              <Button variant="outline-warning" disabled={acting || detailLoading} onClick={() => void review('return')}>
+              <Button
+                variant="outline-warning"
+                disabled={acting || detailLoading || !performanceRating || !comment.trim()}
+                onClick={() => void review('return')}
+              >
                 Request revision
               </Button>
               <Button
                 variant="primary"
                 style={{ background: 'var(--mubs-blue)', borderColor: 'var(--mubs-blue)' }}
-                disabled={acting || detailLoading}
+                disabled={acting || detailLoading || !performanceRating || !comment.trim()}
                 onClick={() => void review('approve')}
               >
                 Approve
@@ -876,13 +979,29 @@ export default function HodQuestionnaireSubmissionsTab() {
           <Modal.Title className="fs-6 fw-bold">Approve selected submissions</Modal.Title>
         </Modal.Header>
         <Modal.Body>
-          <p className="small text-muted mb-2">
-            You are about to approve <strong>{selectedEligibleCount}</strong> performance indicator
-            {selectedEligibleCount === 1 ? '' : 's'}.
+          <p className="small text-muted mb-3">
+            The same rating and justification will be applied to all {selectedEligibleCount} selected submission{selectedEligibleCount === 1 ? '' : 's'}.
+            Each ambassador will receive a confirmation email, and System Administrators / Strategy Managers will be notified.
           </p>
-          <p className="small text-muted mb-0">
-            Each ambassador will receive a confirmation email, and System Administrators / Strategy Managers will be notified of the approved indicators.
-          </p>
+          <PerformanceRatingField
+            idPrefix="hod-bulk-approve-rating"
+            value={bulkPerformanceRating}
+            onChange={setBulkPerformanceRating}
+            disabled={bulkActing}
+          />
+          <Form.Group>
+            <Form.Label className="small fw-semibold">
+              Performance justification <span className="text-danger">*</span>
+            </Form.Label>
+            <Form.Control
+              as="textarea"
+              rows={3}
+              value={bulkReturnComment}
+              onChange={(e) => setBulkReturnComment(e.target.value)}
+              disabled={bulkActing}
+              placeholder="Explain under performance, on-target, or over performance…"
+            />
+          </Form.Group>
         </Modal.Body>
         <Modal.Footer>
           <Button variant="light" onClick={() => setShowBulkApproveModal(false)} disabled={bulkActing}>
@@ -891,8 +1010,8 @@ export default function HodQuestionnaireSubmissionsTab() {
           <Button
             variant="primary"
             style={{ background: 'var(--mubs-blue)', borderColor: 'var(--mubs-blue)' }}
-            disabled={bulkActing}
-            onClick={() => void runBulkReview('approve')}
+            disabled={bulkActing || !bulkPerformanceRating || !bulkReturnComment.trim()}
+            onClick={() => void runBulkReview('approve', bulkReturnComment)}
           >
             {bulkActing ? 'Approving…' : `Approve (${selectedEligibleCount})`}
           </Button>
@@ -905,11 +1024,17 @@ export default function HodQuestionnaireSubmissionsTab() {
         </Modal.Header>
         <Modal.Body>
           <p className="small text-muted mb-3">
-            The same Performance Justification will be sent to the ambassador for all {selectedEligibleCount} selected submission{selectedEligibleCount === 1 ? '' : 's'}.
+            The same rating and Performance Justification will be sent to the ambassador for all {selectedEligibleCount} selected submission{selectedEligibleCount === 1 ? '' : 's'}.
           </p>
+          <PerformanceRatingField
+            idPrefix="hod-bulk-return-rating"
+            value={bulkPerformanceRating}
+            onChange={setBulkPerformanceRating}
+            disabled={bulkActing}
+          />
           <Form.Group>
             <Form.Label className="small fw-semibold">
-              Performance Justification (Reasons for Under performance, on target, or over performance)
+              Performance justification <span className="text-danger">*</span>
             </Form.Label>
             <Form.Control
               as="textarea"
@@ -927,7 +1052,7 @@ export default function HodQuestionnaireSubmissionsTab() {
           </Button>
           <Button
             variant="warning"
-            disabled={bulkActing || !bulkReturnComment.trim()}
+            disabled={bulkActing || !bulkPerformanceRating || !bulkReturnComment.trim()}
             onClick={() => void runBulkReview('return', bulkReturnComment)}
           >
             {bulkActing ? 'Sending…' : `Request revision (${selectedEligibleCount})`}

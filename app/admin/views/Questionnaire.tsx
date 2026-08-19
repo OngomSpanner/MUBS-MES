@@ -20,8 +20,11 @@ import { CORE_OBJECTIVES_2025_2030, coreObjectiveNumber, coreObjectiveShortTitle
 import { summarizeIndicatorDepartments } from '@/lib/summarize-indicator-departments';
 import { expandAmbassadorGroupSelection } from '@/lib/expand-ambassador-group-selection';
 import type { AmbassadorDepartmentGroup } from '@/lib/department-ambassador-groups';
-import { MUBS_CAMPUS_PRESETS, parseBulkSubMetricLines } from '@/lib/questionnaire/metric-tree';
 import {
+  MUBS_CAMPUS_PRESETS,
+  MUBS_GENDER_PRESETS,
+  MUBS_PWD_PRESETS,
+  parseBulkSubMetricLines,
   buildMetricDisplayRows,
   canAutoSumTotal,
   subMetricLetter,
@@ -55,6 +58,8 @@ type Indicator = {
   outcome_type: string; outcome_label: string; outcome_strategic_objective: string | null;
   outcome_strategic_pillar?: string | null;
   outcome_pillar_code?: string | null;
+  indicator_strategic_pillar?: string | null;
+  indicator_pillar_code?: string | null;
   created_at: string;
   metrics: {
     id: number;
@@ -451,6 +456,7 @@ function TemplateModal({
 }) {
   const [outcomeId, setOutcomeId] = useState<string>('');
   const [indicatorText, setIndicatorText] = useState('');
+  const [indicatorPillar, setIndicatorPillar] = useState('');
   const [deptIds, setDeptIds] = useState<number[]>([]);
   const [subscribedGroups, setSubscribedGroups] = useState<AmbassadorDepartmentGroup[]>([]);
   const [selectedFYs, setSelectedFYs] = useState<string[]>([]);
@@ -462,7 +468,7 @@ function TemplateModal({
   const [success, setSuccess] = useState(false);
   const [bulkParentClientId, setBulkParentClientId] = useState<string | null>(null);
   const [bulkText, setBulkText] = useState('');
-  const [bulkSource, setBulkSource] = useState<'programmes' | 'campuses' | 'faculties' | 'manual'>('programmes');
+  const [bulkSource, setBulkSource] = useState<'programmes' | 'campuses' | 'faculties' | 'gender' | 'pwd' | 'manual'>('programmes');
   const [bulkLoading, setBulkLoading] = useState(false);
   const [bulkSearch, setBulkSearch] = useState('');
   const [bulkItems, setBulkItems] = useState<{ id: number; name: string; meta?: string }[]>([]);
@@ -496,6 +502,10 @@ function TemplateModal({
           name: String(r.name || '').trim(),
         })).filter((r: any) => Number.isFinite(r.id) && r.id > 0 && r.name);
         setBulkItems(items);
+      } else if (source === 'gender') {
+        setBulkItems(MUBS_GENDER_PRESETS.map((name, i) => ({ id: i + 1, name })));
+      } else if (source === 'pwd') {
+        setBulkItems(MUBS_PWD_PRESETS.map((name, i) => ({ id: i + 1, name })));
       } else {
         setBulkItems([]);
       }
@@ -528,6 +538,7 @@ function TemplateModal({
 
         setOutcomeId(String(ind.outcome_id));
         setIndicatorText(ind.indicator_text);
+        setIndicatorPillar(ind.indicator_strategic_pillar || ind.outcome_strategic_pillar || '');
         setSubscribedGroups(groups);
         setDeptIds(expandedIds);
         setSelectedFYs(ind.financial_years.map((fy) => normalizeFinancialYear(fy)));
@@ -557,6 +568,7 @@ function TemplateModal({
         const baseIds = editingIndicator.departments.map((d) => d.id);
         setOutcomeId(String(editingIndicator.outcome_id));
         setIndicatorText(editingIndicator.indicator_text);
+        setIndicatorPillar(editingIndicator.indicator_strategic_pillar || editingIndicator.outcome_strategic_pillar || '');
         setSubscribedGroups(editingIndicator.assigned_groups ?? []);
         setDeptIds(expandAmbassadorGroupSelection(baseIds, allDepartments, editingIndicator.assigned_groups));
         setSelectedFYs(editingIndicator.financial_years.map((fy) => normalizeFinancialYear(fy)));
@@ -600,7 +612,7 @@ function TemplateModal({
   // Now we leave the selection as-is and let the backend re-compute group flags.
 
   function resetForm() {
-    setOutcomeId(''); setIndicatorText(''); setDeptIds([]); setSubscribedGroups([]);
+    setOutcomeId(''); setIndicatorText(''); setIndicatorPillar(''); setDeptIds([]); setSubscribedGroups([]);
     setSelectedFYs([]); setTargetsByFy({}); setMetrics([emptyMetricRow()]); setErr(null); setSuccess(false);
   }
 
@@ -771,6 +783,7 @@ function TemplateModal({
       const payload = {
         outcome_id: Number(outcomeId),
         indicator_text: indicatorText.trim(),
+        strategic_pillar: indicatorPillar || null,
         department_ids: deptIds,
         assigned_groups: subscribedGroups,
         financial_years: selectedFYs,
@@ -838,7 +851,16 @@ function TemplateModal({
           <div className="row g-2">
             <div className="col-12">
               <Form.Label className="small fw-bold mb-1">Outcome / Output <span className="text-danger">*</span></Form.Label>
-              <Form.Select size="sm" value={outcomeId} onChange={(e) => setOutcomeId(e.target.value)}>
+              <Form.Select
+                size="sm"
+                value={outcomeId}
+                onChange={(e) => {
+                  const next = e.target.value;
+                  setOutcomeId(next);
+                  const selected = outcomes.find((o) => String(o.id) === next);
+                  if (selected?.strategic_pillar) setIndicatorPillar(selected.strategic_pillar);
+                }}
+              >
                 <option value="">— Select —</option>
                 {CORE_OBJECTIVES_2025_2030.map((obj, i) => {
                   const opts = outcomes.filter((o) => o.strategic_objective === obj);
@@ -859,6 +881,16 @@ function TemplateModal({
                   </optgroup>
                 )}
               </Form.Select>
+            </div>
+            <div className="col-12">
+              <Form.Label className="small fw-bold mb-1">Strategic pillar</Form.Label>
+              <Form.Select size="sm" value={indicatorPillar} onChange={(e) => setIndicatorPillar(e.target.value)}>
+                <option value="">Same as outcome / output (if set)</option>
+                {STRATEGIC_PILLARS_2025_2030.map((p) => (
+                  <option key={p} value={p}>{PILLAR_LABELS[p]}</option>
+                ))}
+              </Form.Select>
+              <div className="small text-muted mt-1">Set this to allocate the indicator to a pillar even if the output sits under a different one.</div>
             </div>
             <div className="col-12">
               <Form.Label className="small fw-bold mb-1">Performance Indicator <span className="text-danger">*</span></Form.Label>
@@ -1090,7 +1122,7 @@ function TemplateModal({
           <span className="fw-semibold">
             {metrics.find((m) => m.client_id === bulkParentClientId)?.metric_text || 'the selected metric'}
           </span>.
-          You can pull from the system (programmes/campuses/faculties) or paste manually.
+          You can pull from the system (programmes, campuses, faculties, gender, PWD) or paste manually.
         </p>
 
         <div className="row g-2 align-items-end mb-2">
@@ -1110,6 +1142,8 @@ function TemplateModal({
               <option value="programmes">Programmes</option>
               <option value="campuses">Campuses</option>
               <option value="faculties">Faculties / Schools</option>
+              <option value="gender">Gender (Female / Male)</option>
+              <option value="pwd">PWD (with / without disabilities)</option>
               <option value="manual">Manual paste</option>
             </Form.Select>
           </div>
@@ -1311,6 +1345,7 @@ function TemplateModal({
               const payload = {
                 outcome_id: Number(outcomeId),
                 indicator_text: indicatorText.trim(),
+                strategic_pillar: indicatorPillar || null,
                 department_ids: deptIds,
                 assigned_groups: subscribedGroups,
                 financial_years: selectedFYs,

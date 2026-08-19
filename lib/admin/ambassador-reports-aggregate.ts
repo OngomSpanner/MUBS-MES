@@ -1,4 +1,5 @@
 import { query } from '@/lib/db';
+import { ensureQuestionnaireObjectiveSchema, SQL_RESOLVED_INDICATOR_PILLAR, SQL_RESOLVED_INDICATOR_PILLAR_CODE } from '@/lib/questionnaire-schema';
 import { ensureHodReviewWorkflowSchema } from '@/lib/hod-review-workflow';
 import type { HodReviewStatus } from '@/lib/hod-review-workflow-constants';
 import { coreObjectiveShortTitle, strategicPillarShortLabel } from '@/lib/strategic-plan';
@@ -190,6 +191,7 @@ async function loadAmbassadorsByUnit(): Promise<Map<number, { userId: number; na
 }
 
 async function loadRawAssignmentRows(departmentId?: number): Promise<Record<string, unknown>[]> {
+  await ensureQuestionnaireObjectiveSchema();
   const deptFilter = departmentId != null ? 'WHERE qid.department_id = ?' : '';
   const values = departmentId != null ? [departmentId] : [];
 
@@ -198,7 +200,9 @@ async function loadRawAssignmentRows(departmentId?: number): Promise<Record<stri
       SELECT qid.indicator_id, qid.department_id,
              COALESCE(NULLIF(TRIM(d.external_name), ''), d.name) AS department_name,
              i.indicator_text, o.label AS outcome_label, o.type AS outcome_type,
-             o.strategic_objective, o.strategic_pillar, o.pillar_code,
+             o.strategic_objective,
+             ${SQL_RESOLVED_INDICATOR_PILLAR} AS strategic_pillar,
+             ${SQL_RESOLVED_INDICATOR_PILLAR_CODE} AS pillar_code,
              COALESCE(qis.hod_review_status, 'draft') AS hod_review_status,
              qis.submitted_at, qis.hod_reviewed_at,
              (SELECT COUNT(*) FROM q_metrics m WHERE m.indicator_id = i.id) AS metric_count,
@@ -214,7 +218,7 @@ async function loadRawAssignmentRows(departmentId?: number): Promise<Record<stri
       LEFT JOIN q_indicator_submissions qis
         ON qis.indicator_id = qid.indicator_id AND qis.department_id = qid.department_id
       ${deptFilter}
-      ORDER BY o.strategic_pillar, o.strategic_objective, o.label, i.indicator_text, department_name
+      ORDER BY strategic_pillar, o.strategic_objective, o.label, i.indicator_text, department_name
     `,
     values,
   })) as Record<string, unknown>[];

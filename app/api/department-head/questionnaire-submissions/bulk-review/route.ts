@@ -5,6 +5,7 @@ import { getVisibleDepartmentIds } from '@/lib/department-head';
 import { query } from '@/lib/db';
 import { ensureHodReviewWorkflowSchema } from '@/lib/hod-review-workflow';
 import { notifyAmbassadorOfIndicatorReview, notifyAdminsOfIndicatorApprovals } from '@/lib/questionnaire-submission-notifications';
+import { parseHodPerformanceRating } from '@/lib/hod-review-workflow-constants';
 
 export const dynamic = 'force-dynamic';
 
@@ -51,6 +52,7 @@ export async function PATCH(request: Request) {
     const items = parseItems(body.items);
     const action = String(body.action || '').trim();
     const comment = String(body.comment || '').trim();
+    const rating = parseHodPerformanceRating(body.performanceRating ?? body.performance_rating);
 
     if (!items.length) {
       return NextResponse.json({ message: 'items array required' }, { status: 400 });
@@ -58,9 +60,14 @@ export async function PATCH(request: Request) {
     if (!['approve', 'return'].includes(action)) {
       return NextResponse.json({ message: 'action must be approve or return' }, { status: 400 });
     }
-    if (action === 'return' && !comment) {
+    if (!rating) {
       return NextResponse.json({
-        message: 'Performance Justification (Reasons for Under performance, on target, or over performance) is required when requesting revision',
+        message: 'Select whether performance is under target, on target, or over target',
+      }, { status: 400 });
+    }
+    if (!comment) {
+      return NextResponse.json({
+        message: 'Performance justification is required when approving or requesting revision',
       }, { status: 400 });
     }
 
@@ -92,10 +99,11 @@ export async function PATCH(request: Request) {
       await query({
         query: `
           UPDATE q_indicator_submissions
-          SET hod_review_status = ?, hod_reviewed_by = ?, hod_reviewed_at = NOW(), hod_review_comment = ?
+          SET hod_review_status = ?, hod_reviewed_by = ?, hod_reviewed_at = NOW(),
+              hod_review_comment = ?, hod_performance_rating = ?
           WHERE indicator_id = ? AND department_id = ?
         `,
-        values: [status, auth.userId, comment || null, item.indicatorId, item.departmentId],
+        values: [status, auth.userId, comment, rating, item.indicatorId, item.departmentId],
       });
 
       const ambassadorUserId = existing[0].submitted_by;
