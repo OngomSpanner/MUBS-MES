@@ -4,7 +4,7 @@ export type MetricTreeNode = {
   unit_of_measure: string;
   parent_metric_id?: number | null;
   aggregation?: string | null;
-  is_total?: boolean | number;
+  is_total?: boolean | number | null;
   sort_order: number;
 };
 
@@ -174,7 +174,7 @@ export type MetricSaveInput = {
   metric_text: string;
   unit_of_measure: string;
   aggregation?: string | null;
-  is_total?: boolean | number;
+  is_total?: boolean | number | null;
 };
 
 export function parseBulkSubMetricLines(text: string): string[] {
