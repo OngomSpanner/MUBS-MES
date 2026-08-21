@@ -111,7 +111,16 @@ export async function GET() {
 
     const result = indicators.map((ind) => {
       const id = Number(ind.id);
-      const rawMetrics = (metricsMap.get(id) ?? []).map((m: { id: number }) => ({ ...m, id: Number(m.id) }));
+      const rawMetrics = (metricsMap.get(id) ?? []).map((m) => ({
+        ...m,
+        id: Number(m.id),
+        metric_text: String(m.metric_text ?? ''),
+        unit_of_measure: String(m.unit_of_measure ?? 'numeric'),
+        parent_metric_id: m.parent_metric_id != null ? Number(m.parent_metric_id) : null,
+        aggregation: m.aggregation ?? null,
+        is_total: m.is_total ?? 0,
+        sort_order: Number(m.sort_order ?? 0),
+      }));
       return {
         ...ind,
         id,

@@ -67,10 +67,14 @@ export function inputMetricsForIndicator<T extends MetricTreeNode>(metrics: T[])
 }
 
 /** Sub-metrics always use the parent unit (number stays number, text stays text). */
-export function withInheritedUnits<T extends MetricTreeNode>(metrics: T[]): T[] {
+export function withInheritedUnits<T extends {
+  id: number;
+  unit_of_measure: string;
+  parent_metric_id?: number | null;
+}>(metrics: T[]): T[] {
   const byId = new Map<number, T>();
   for (const m of metrics) {
-    if (m.id != null) byId.set(Number(m.id), m);
+    byId.set(Number(m.id), m);
   }
   return metrics.map((m) => {
     const parentId = m.parent_metric_id != null ? Number(m.parent_metric_id) : 0;

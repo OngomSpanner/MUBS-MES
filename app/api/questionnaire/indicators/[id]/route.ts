@@ -106,7 +106,16 @@ export async function GET(_request: Request, context: { params: Promise<{ id: st
       ...ind,
       id: indicatorId,
       is_locked: Boolean(ind.is_locked),
-      metrics: withInheritedUnits(metrics.map((m) => ({ ...m, id: Number(m.id) }))),
+      metrics: withInheritedUnits(
+        metrics.map((m) => ({
+          ...m,
+          id: Number(m.id),
+          metric_text: String(m.metric_text ?? ''),
+          unit_of_measure: String(m.unit_of_measure ?? 'numeric'),
+          parent_metric_id: m.parent_metric_id != null ? Number(m.parent_metric_id) : null,
+          sort_order: Number(m.sort_order ?? 0),
+        })),
+      ),
       targets,
       departments: departments.map((d) => ({ id: Number(d.id), name: d.name })),
       financial_years: financialYears.map((f) => normalizeFinancialYear(f.financial_year)),
