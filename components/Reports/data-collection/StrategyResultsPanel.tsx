@@ -23,7 +23,7 @@ import type {
   StrategyFyCell,
   StrategyIndicatorResult,
   StrategyResultsPayload,
-} from '@/lib/questionnaire/compute-strategy-results';
+} from '@/lib/questionnaire/strategy-results-types';
 import { PERFORMANCE_STATUS_LABELS, type PerformanceStatus } from '@/lib/results-framework';
 
 function statusBadge(status: PerformanceStatus | null) {

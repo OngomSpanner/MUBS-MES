@@ -3,7 +3,7 @@
 import { useMemo, useState } from 'react';
 import { Form } from 'react-bootstrap';
 import { strategicPillarNumber, strategicPillarShortLabel } from '@/lib/strategic-plan';
-import type { StrategyIndicatorResult } from '@/lib/questionnaire/compute-strategy-results';
+import type { StrategyIndicatorResult } from '@/lib/questionnaire/strategy-results-types';
 
 export function indicatorMatchesQuery(ind: StrategyIndicatorResult, query: string): boolean {
   const q = query.trim().toLowerCase();

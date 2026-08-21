@@ -7,63 +7,28 @@ import {
   type MetricTreeNode,
 } from '@/lib/questionnaire/metric-tree';
 import { SQL_RESOLVED_INDICATOR_PILLAR, SQL_RESOLVED_INDICATOR_PILLAR_CODE } from '@/lib/questionnaire-schema';
-import { computePerformanceStatus, type PerformanceStatus } from '@/lib/results-framework';
+import { computePerformanceStatus } from '@/lib/results-framework';
 import {
   listResultFormulas,
   type ResultFormulaOperand,
   type ResultOperation,
 } from '@/lib/questionnaire/result-formulas';
+import type {
+  StrategyFormulaResult,
+  StrategyFyCell,
+  StrategyIndicatorResult,
+  StrategyResultMethod,
+  StrategyResultsPayload,
+} from '@/lib/questionnaire/strategy-results-types';
 
-export type StrategyResultMethod = 'sum' | 'single' | 'entered_percent' | 'entered_ratio' | 'not_numeric';
-
-export type StrategyFyCell = {
-  target: string | null;
-  actual: number | null;
-  display: string | null;
-  pctOfTarget: number | null;
-  performance: PerformanceStatus | null;
-  officesWithValues: number;
-  method: StrategyResultMethod;
-  note: string | null;
-};
-
-export type StrategyMetricOption = {
-  id: number;
-  metricText: string;
-  unitOfMeasure: string;
-  isInput: boolean;
-};
-
-export type StrategyIndicatorResult = {
-  indicatorId: number;
-  indicatorText: string;
-  outcomeLabel: string;
-  outcomeType: string;
-  strategicPillar: string | null;
-  pillarCode: string | null;
-  assignedOffices: number;
-  offices: Array<{ id: number; name: string }>;
-  method: StrategyResultMethod;
-  metrics: StrategyMetricOption[];
-  byFy: Record<string, StrategyFyCell>;
-  suggested: Array<{ operation: ResultOperation; label: string; operands: ResultFormulaOperand[] }>;
-};
-
-export type StrategyFormulaResult = {
-  id: number;
-  name: string;
-  operation: ResultOperation;
-  operands: ResultFormulaOperand[];
-  compareIndicatorId: number | null;
-  byFy: Record<string, StrategyFyCell>;
-};
-
-export type StrategyResultsPayload = {
-  financialYears: string[];
-  indicators: StrategyIndicatorResult[];
-  formulas: StrategyFormulaResult[];
-  approvedOnly: boolean;
-};
+export type {
+  StrategyFormulaResult,
+  StrategyFyCell,
+  StrategyIndicatorResult,
+  StrategyMetricOption,
+  StrategyResultMethod,
+  StrategyResultsPayload,
+} from '@/lib/questionnaire/strategy-results-types';
 
 type Dept = { id: number; name: string };
 type TargetRow = { indicator_id: number; financial_year: string; target_value: string | null };
