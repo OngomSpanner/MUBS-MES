@@ -1,12 +1,17 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState, Fragment } from 'react';
 import { Badge, Button, Form, Modal, Spinner } from 'react-bootstrap';
 import axios from 'axios';
 import * as XLSX from 'xlsx';
 import ReportsSectionHeader from '@/components/Reports/ReportsSectionHeader';
 import StrategicPillarBadge from '@/components/Questionnaire/StrategicPillarBadge';
+import IndicatorPickerField, {
+  indicatorMatchesQuery,
+  sortStrategyIndicators,
+} from '@/components/Reports/data-collection/IndicatorPickerField';
 import { fyShortLabel } from '@/lib/questionnaire/fy-utils';
+import { strategicPillarNumber, strategicPillarShortLabel } from '@/lib/strategic-plan';
 import {
   RESULT_OPERATION_LABELS,
   RESULT_OPERATIONS,
@@ -66,6 +71,8 @@ export default function StrategyResultsPanel() {
   const [approvedOnly, setApprovedOnly] = useState(false);
   const [search, setSearch] = useState('');
   const [pillar, setPillar] = useState('all');
+  const [outcome, setOutcome] = useState('all');
+  const [officeId, setOfficeId] = useState('all');
   const [showFormula, setShowFormula] = useState(false);
   const [saving, setSaving] = useState(false);
   const [formName, setFormName] = useState('');
@@ -96,25 +103,77 @@ export default function StrategyResultsPanel() {
   }, [load]);
 
   const pillars = useMemo(() => {
-    const set = new Set<string>();
+    const map = new Map<string, { label: string; code: string | null }>();
     for (const ind of data?.indicators ?? []) {
-      if (ind.strategicPillar) set.add(ind.strategicPillar);
+      if (!ind.strategicPillar) continue;
+      if (!map.has(ind.strategicPillar)) {
+        map.set(ind.strategicPillar, { label: ind.strategicPillar, code: ind.pillarCode });
+      }
     }
-    return [...set].sort();
+    return [...map.values()].sort(
+      (a, b) => (strategicPillarNumber(a.label) ?? 99) - (strategicPillarNumber(b.label) ?? 99),
+    );
   }, [data]);
 
+  const offices = useMemo(() => {
+    const map = new Map<number, string>();
+    for (const ind of data?.indicators ?? []) {
+      for (const o of ind.offices ?? []) map.set(o.id, o.name);
+    }
+    return [...map.entries()]
+      .map(([id, name]) => ({ id, name }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }, [data]);
+
+  const outcomes = useMemo(() => {
+    const set = new Set<string>();
+    for (const ind of data?.indicators ?? []) {
+      if (pillar !== 'all' && ind.strategicPillar !== pillar) continue;
+      if (ind.outcomeLabel) set.add(`${ind.outcomeType}|${ind.outcomeLabel}`);
+    }
+    return [...set]
+      .map((key) => {
+        const [type, label] = key.split('|');
+        return { key, type, label };
+      })
+      .sort((a, b) => a.label.localeCompare(b.label));
+  }, [data, pillar]);
+
   const filteredIndicators = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    return (data?.indicators ?? []).filter((ind) => {
-      if (pillar !== 'all' && ind.strategicPillar !== pillar) return false;
-      if (!q) return true;
-      return (
-        ind.indicatorText.toLowerCase().includes(q)
-        || ind.outcomeLabel.toLowerCase().includes(q)
-        || (ind.strategicPillar ?? '').toLowerCase().includes(q)
-      );
-    });
-  }, [data, search, pillar]);
+    return (data?.indicators ?? [])
+      .filter((ind) => {
+        if (pillar !== 'all' && ind.strategicPillar !== pillar) return false;
+        if (outcome !== 'all') {
+          const [type, label] = outcome.split('|');
+          if (ind.outcomeType !== type || ind.outcomeLabel !== label) return false;
+        }
+        if (officeId !== 'all' && !(ind.offices ?? []).some((o) => String(o.id) === officeId)) return false;
+        return indicatorMatchesQuery(ind, search);
+      })
+      .sort(sortStrategyIndicators);
+  }, [data, search, pillar, outcome, officeId]);
+
+  const groupedRows = useMemo(() => {
+    const groups: Array<{
+      pillarKey: string;
+      pillar: string | null;
+      code: string | null;
+      outcomes: Array<{ key: string; label: string; indicators: StrategyIndicatorResult[] }>;
+    }> = [];
+    for (const ind of filteredIndicators) {
+      const pillarKey = ind.strategicPillar || 'Unassigned';
+      let group = groups[groups.length - 1];
+      if (!group || group.pillarKey !== pillarKey) {
+        group = { pillarKey, pillar: ind.strategicPillar, code: ind.pillarCode, outcomes: [] };
+        groups.push(group);
+      }
+      const outcomeKey = `${ind.outcomeType}|${ind.outcomeLabel}`;
+      const lastOutcome = group.outcomes[group.outcomes.length - 1];
+      if (lastOutcome && lastOutcome.key === outcomeKey) lastOutcome.indicators.push(ind);
+      else group.outcomes.push({ key: outcomeKey, label: `${ind.outcomeType}: ${ind.outcomeLabel}`, indicators: [ind] });
+    }
+    return groups;
+  }, [filteredIndicators]);
 
   const years = data?.financialYears ?? [];
 
@@ -216,7 +275,7 @@ export default function StrategyResultsPanel() {
         icon="calculate"
         title="Indicator results"
         count={filteredIndicators.length}
-        description="Numeric indicators are added across all assigned offices for each financial year. Percentages and ratios are not added together. Use a formula when the result should be Female ÷ Male, a share of total, or two different indicators."
+        description="Numeric indicators are added across all assigned offices for each financial year. Percentages and ratios are not added together. Type to find an indicator, outcome, or office. Results stay grouped by pillar, then outcome."
         filters={(
           <>
             <Form.Check
@@ -226,18 +285,40 @@ export default function StrategyResultsPanel() {
               checked={approvedOnly}
               onChange={(e) => setApprovedOnly(e.target.checked)}
             />
-            <Form.Select size="sm" value={pillar} onChange={(e) => setPillar(e.target.value)} style={{ width: 200 }}>
+            <Form.Select
+              size="sm"
+              value={pillar}
+              onChange={(e) => {
+                setPillar(e.target.value);
+                setOutcome('all');
+              }}
+              style={{ width: 190 }}
+            >
               <option value="all">All pillars</option>
               {pillars.map((p) => (
-                <option key={p} value={p}>{p}</option>
+                <option key={p.label} value={p.label}>
+                  {p.code ? `${p.code} · ${strategicPillarShortLabel(p.label)}` : strategicPillarShortLabel(p.label)}
+                </option>
+              ))}
+            </Form.Select>
+            <Form.Select size="sm" value={outcome} onChange={(e) => setOutcome(e.target.value)} style={{ width: 220 }}>
+              <option value="all">All outcomes</option>
+              {outcomes.map((o) => (
+                <option key={o.key} value={o.key}>{o.label}</option>
+              ))}
+            </Form.Select>
+            <Form.Select size="sm" value={officeId} onChange={(e) => setOfficeId(e.target.value)} style={{ width: 200 }}>
+              <option value="all">All offices</option>
+              {offices.map((o) => (
+                <option key={o.id} value={String(o.id)}>{o.name}</option>
               ))}
             </Form.Select>
             <Form.Control
               size="sm"
-              placeholder="Search indicators…"
+              placeholder="Search indicator, outcome or office…"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              style={{ width: 220 }}
+              style={{ width: 240 }}
             />
             <Button size="sm" variant="outline-primary" onClick={() => setShowFormula(true)}>
               Add formula
@@ -248,6 +329,12 @@ export default function StrategyResultsPanel() {
           </>
         )}
       />
+
+      {officeId !== 'all' ? (
+        <p className="small text-muted mb-2">
+          Showing indicators assigned to that office. The numbers are still school-wide totals, not that office alone.
+        </p>
+      ) : null}
 
       {(data?.formulas.length ?? 0) > 0 ? (
         <div className="mb-4">
@@ -301,35 +388,54 @@ export default function StrategyResultsPanel() {
             </tr>
           </thead>
           <tbody>
-            {filteredIndicators.map((ind) => (
-              <tr key={ind.indicatorId}>
-                <td>
-                  <div className="fw-semibold">{ind.indicatorText}</div>
-                  <div className="text-muted" style={{ fontSize: '0.68rem' }}>
-                    {ind.outcomeType}: {ind.outcomeLabel}
-                  </div>
-                  <div className="mt-1">
-                    <StrategicPillarBadge pillar={ind.strategicPillar} code={ind.pillarCode} />
-                  </div>
-                </td>
-                <td className="text-muted">{ind.assignedOffices}</td>
-                {years.map((fy) => (
-                  <td key={fy}><CellView cell={ind.byFy[fy]} /></td>
+            {groupedRows.map((group) => (
+              <Fragment key={`pillar-${group.pillarKey}`}>
+                <tr className="table-light">
+                  <td colSpan={3 + years.length}>
+                    <StrategicPillarBadge pillar={group.pillar} code={group.code} showUnassigned />
+                    <span className="text-muted small ms-2">
+                      {group.outcomes.reduce((n, o) => n + o.indicators.length, 0)} indicators
+                    </span>
+                  </td>
+                </tr>
+                {group.outcomes.map((og) => (
+                  <Fragment key={`outcome-${group.pillarKey}-${og.key}`}>
+                    <tr>
+                      <td colSpan={3 + years.length} className="py-1" style={{ background: '#f8fafc' }}>
+                        <span className="text-muted small fw-semibold">{og.label}</span>
+                      </td>
+                    </tr>
+                    {og.indicators.map((ind) => (
+                      <tr key={ind.indicatorId}>
+                        <td>
+                          <div className="fw-semibold">{ind.indicatorText}</div>
+                        </td>
+                        <td className="text-muted" title={(ind.offices ?? []).map((o) => o.name).join(', ')}>
+                          {(ind.offices?.length ?? 0) === 1
+                            ? ind.offices[0].name
+                            : `${ind.assignedOffices} offices`}
+                        </td>
+                        {years.map((fy) => (
+                          <td key={fy}><CellView cell={ind.byFy[fy]} /></td>
+                        ))}
+                        <td className="text-nowrap">
+                          {ind.suggested.map((s) => (
+                            <Button
+                              key={`${ind.indicatorId}-${s.operation}`}
+                              size="sm"
+                              variant="outline-primary"
+                              className="me-1 mb-1"
+                              onClick={() => applySuggestion(ind, s)}
+                            >
+                              {s.operation === 'share' ? '% female' : 'Parity'}
+                            </Button>
+                          ))}
+                        </td>
+                      </tr>
+                    ))}
+                  </Fragment>
                 ))}
-                <td className="text-nowrap">
-                  {ind.suggested.map((s) => (
-                    <Button
-                      key={`${ind.indicatorId}-${s.operation}`}
-                      size="sm"
-                      variant="outline-primary"
-                      className="me-1 mb-1"
-                      onClick={() => applySuggestion(ind, s)}
-                    >
-                      {s.operation === 'share' ? '% female' : 'Parity'}
-                    </Button>
-                  ))}
-                </td>
-              </tr>
+              </Fragment>
             ))}
           </tbody>
         </table>
@@ -339,13 +445,13 @@ export default function StrategyResultsPanel() {
         <div className="text-muted small py-3">No indicators match this filter.</div>
       ) : null}
 
-      <Modal show={showFormula} onHide={() => !saving && setShowFormula(false)} centered>
+      <Modal show={showFormula} onHide={() => !saving && setShowFormula(false)} centered size="lg">
         <Modal.Header closeButton>
           <Modal.Title className="fs-6 fw-bold">Add result formula</Modal.Title>
         </Modal.Header>
         <Modal.Body>
           <p className="small text-muted">
-            Each input is first added across offices, then the formula runs. Use Share of total for % female from Female and Male counts. Use Ratio for Female:Male as n:1.
+            Type to find an indicator. Results are grouped by pillar. Each input is first added across offices, then the formula runs.
           </p>
           <Form.Group className="mb-2">
             <Form.Label className="small fw-semibold">Name</Form.Label>
@@ -362,22 +468,18 @@ export default function StrategyResultsPanel() {
           {([formA, formB] as const).map((op, idx) => (
             <div key={idx} className="border rounded-2 p-2 mb-2">
               <div className="small fw-semibold mb-1">{idx === 0 ? 'A' : 'B'}</div>
-              <Form.Select
-                size="sm"
-                className="mb-1"
-                value={op.indicatorId || ''}
-                onChange={(e) => {
-                  const indicatorId = Number(e.target.value) || 0;
-                  const next = { indicatorId, metricId: null };
-                  if (idx === 0) setFormA(next);
-                  else setFormB(next);
-                }}
-              >
-                <option value="">Select indicator…</option>
-                {(data?.indicators ?? []).map((ind) => (
-                  <option key={ind.indicatorId} value={ind.indicatorId}>{ind.indicatorText}</option>
-                ))}
-              </Form.Select>
+              <div className="mb-1">
+                <IndicatorPickerField
+                  indicators={data?.indicators ?? []}
+                  value={op.indicatorId}
+                  onChange={(indicatorId) => {
+                    const next = { indicatorId, metricId: null };
+                    if (idx === 0) setFormA(next);
+                    else setFormB(next);
+                  }}
+                  placeholder="Type to search indicators…"
+                />
+              </div>
               <Form.Select
                 size="sm"
                 value={op.metricId ?? ''}
@@ -398,12 +500,14 @@ export default function StrategyResultsPanel() {
           ))}
           <Form.Group>
             <Form.Label className="small fw-semibold">Compare with target of (optional)</Form.Label>
-            <Form.Select size="sm" value={formCompare} onChange={(e) => setFormCompare(e.target.value ? Number(e.target.value) : '')}>
-              <option value="">None</option>
-              {(data?.indicators ?? []).map((ind) => (
-                <option key={ind.indicatorId} value={ind.indicatorId}>{ind.indicatorText}</option>
-              ))}
-            </Form.Select>
+            <IndicatorPickerField
+              indicators={data?.indicators ?? []}
+              value={typeof formCompare === 'number' ? formCompare : 0}
+              onChange={(id) => setFormCompare(id || '')}
+              allowEmpty
+              emptyLabel="None"
+              placeholder="Type to search an indicator target…"
+            />
           </Form.Group>
         </Modal.Body>
         <Modal.Footer>

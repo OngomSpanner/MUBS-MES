@@ -42,6 +42,7 @@ export type StrategyIndicatorResult = {
   strategicPillar: string | null;
   pillarCode: string | null;
   assignedOffices: number;
+  offices: Array<{ id: number; name: string }>;
   method: StrategyResultMethod;
   metrics: StrategyMetricOption[];
   byFy: Record<string, StrategyFyCell>;
@@ -432,6 +433,7 @@ export async function buildStrategyResults(approvedOnly: boolean): Promise<Strat
       strategicPillar: ind.strategic_pillar != null ? String(ind.strategic_pillar) : null,
       pillarCode: ind.pillar_code != null ? String(ind.pillar_code) : null,
       assignedOffices: assigned.length,
+      offices: assigned,
       method,
       metrics: metrics.map((m) => ({
         id: m.id,
