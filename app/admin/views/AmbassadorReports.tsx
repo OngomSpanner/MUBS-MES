@@ -6,6 +6,7 @@ import Layout from '@/components/Layout';
 import StatCard from '@/components/StatCard';
 import ReportsSectionHeader from '@/components/Reports/ReportsSectionHeader';
 import AmbassadorCollectedDataPanel from '@/components/Reports/data-collection/AmbassadorCollectedDataPanel';
+import StrategyResultsPanel from '@/components/Reports/data-collection/StrategyResultsPanel';
 import StrategyQuestionnaireReturnModal from '@/components/Admin/StrategyQuestionnaireReturnModal';
 import SortablePaginatedTable, { sortDepartmentsByProgress } from '@/components/Reports/SortablePaginatedTable';
 import { Badge, Button, Form, Modal, Spinner } from 'react-bootstrap';
@@ -19,7 +20,7 @@ import type {
 } from '@/lib/admin/ambassador-reports-aggregate';
 import type { ReminderAudience } from '@/lib/ambassador-report-reminders';
 
-type SectionTab = 'overview' | 'departments' | 'pillars' | 'objectives' | 'outcomes' | 'hod' | 'aging' | 'assignments' | 'collected-data';
+type SectionTab = 'overview' | 'departments' | 'pillars' | 'objectives' | 'outcomes' | 'hod' | 'aging' | 'assignments' | 'collected-data' | 'results';
 
 const SECTION_TABS: { key: SectionTab; label: string; icon: string }[] = [
   { key: 'overview', label: 'Overview', icon: 'dashboard' },
@@ -31,6 +32,7 @@ const SECTION_TABS: { key: SectionTab; label: string; icon: string }[] = [
   { key: 'aging', label: 'HOD aging', icon: 'schedule' },
   { key: 'assignments', label: 'Assignment detail', icon: 'list_alt' },
   { key: 'collected-data', label: 'Collected values', icon: 'table_chart' },
+  { key: 'results', label: 'Indicator results', icon: 'calculate' },
 ];
 
 const VALID_SECTIONS = new Set<SectionTab>(SECTION_TABS.map((t) => t.key));
@@ -1018,6 +1020,10 @@ export default function AmbassadorReportsView() {
 
             {section === 'collected-data' && (
               <AmbassadorCollectedDataPanel />
+            )}
+
+            {section === 'results' && (
+              <StrategyResultsPanel />
             )}
           </>
         ) : null}
