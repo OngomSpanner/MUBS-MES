@@ -80,6 +80,21 @@ async function ensureMetricSubMetricSchema(): Promise<void> {
     if (!isDuplicateSchemaError(error)) throw error;
   }
 
+  try {
+    await query({
+      query: `
+        UPDATE q_metrics c
+        INNER JOIN q_metrics p ON p.id = c.parent_metric_id
+        SET c.unit_of_measure = p.unit_of_measure
+        WHERE c.parent_metric_id IS NOT NULL
+          AND c.parent_metric_id <> 0
+          AND c.unit_of_measure <> p.unit_of_measure
+      `,
+    });
+  } catch {
+    // Ignore if parent_metric_id is still missing on a first-run race.
+  }
+
   subMetricSchemaEnsured = true;
 }
 

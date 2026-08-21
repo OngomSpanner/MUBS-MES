@@ -27,11 +27,20 @@ export async function saveIndicatorMetrics(
     }
   }
 
+  const parentUomByClient = new Map<string, string>();
+  const parentUomById = new Map<number, string>();
+  for (const m of validMetrics) {
+    const isChild = Boolean(m.parent_client_id) || (m.parent_metric_id != null && Number(m.parent_metric_id) > 0);
+    if (isChild) continue;
+    const uom = m.unit_of_measure || 'numeric';
+    if (m.client_id) parentUomByClient.set(String(m.client_id), uom);
+    if (m.id) parentUomById.set(Number(m.id), uom);
+  }
+
   const pending = validMetrics.map((m, i) => ({ ...m, sort_order: i }));
   for (let pass = 0; pass < 4 && pending.length; pass++) {
     for (let idx = pending.length - 1; idx >= 0; idx--) {
       const m = pending[idx];
-      const uom = m.unit_of_measure || 'numeric';
       const metricText = String(m.metric_text || '').trim();
       if (!metricText) {
         pending.splice(idx, 1);
@@ -48,6 +57,11 @@ export async function saveIndicatorMetrics(
             : null;
 
       if (parentClient && parentDbIdFromClient == null) continue;
+
+      const inheritedUom =
+        (parentClient ? parentUomByClient.get(parentClient) : undefined)
+        ?? (parentDbId != null ? parentUomById.get(parentDbId) : undefined);
+      const uom = inheritedUom || m.unit_of_measure || 'numeric';
 
       const aggregation =
         m.aggregation != null && String(m.aggregation).trim() ? String(m.aggregation).trim() : null;

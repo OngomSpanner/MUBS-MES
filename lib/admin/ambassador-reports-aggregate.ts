@@ -1,5 +1,6 @@
 import { query } from '@/lib/db';
-import { ensureQuestionnaireObjectiveSchema, SQL_RESOLVED_INDICATOR_PILLAR, SQL_RESOLVED_INDICATOR_PILLAR_CODE } from '@/lib/questionnaire-schema';
+import { ensureQuestionnaireObjectiveSchema, ensureQuestionnaireSubMetricsSchema, SQL_RESOLVED_INDICATOR_PILLAR, SQL_RESOLVED_INDICATOR_PILLAR_CODE } from '@/lib/questionnaire-schema';
+import { sqlFilledInputCellCount, sqlInputMetricCount } from '@/lib/questionnaire/metric-tree';
 import { ensureHodReviewWorkflowSchema } from '@/lib/hod-review-workflow';
 import type { HodReviewStatus } from '@/lib/hod-review-workflow-constants';
 import { coreObjectiveShortTitle, strategicPillarShortLabel } from '@/lib/strategic-plan';
@@ -192,6 +193,7 @@ async function loadAmbassadorsByUnit(): Promise<Map<number, { userId: number; na
 
 async function loadRawAssignmentRows(departmentId?: number): Promise<Record<string, unknown>[]> {
   await ensureQuestionnaireObjectiveSchema();
+  await ensureQuestionnaireSubMetricsSchema();
   const deptFilter = departmentId != null ? 'WHERE qid.department_id = ?' : '';
   const values = departmentId != null ? [departmentId] : [];
 
@@ -205,12 +207,9 @@ async function loadRawAssignmentRows(departmentId?: number): Promise<Record<stri
              ${SQL_RESOLVED_INDICATOR_PILLAR_CODE} AS pillar_code,
              COALESCE(qis.hod_review_status, 'draft') AS hod_review_status,
              qis.submitted_at, qis.hod_reviewed_at,
-             (SELECT COUNT(*) FROM q_metrics m WHERE m.indicator_id = i.id) AS metric_count,
+             ${sqlInputMetricCount('i')} AS metric_count,
              (SELECT COUNT(*) FROM q_indicator_fys f WHERE f.indicator_id = i.id) AS fy_count,
-             (SELECT COUNT(*)
-              FROM q_responses r
-              WHERE r.indicator_id = i.id AND r.department_id = qid.department_id
-                AND r.value IS NOT NULL AND TRIM(r.value) <> '') AS filled
+             ${sqlFilledInputCellCount('i', 'qid.department_id')} AS filled
       FROM q_indicator_departments qid
       JOIN q_indicators i ON i.id = qid.indicator_id
       JOIN q_outcomes o ON o.id = i.outcome_id

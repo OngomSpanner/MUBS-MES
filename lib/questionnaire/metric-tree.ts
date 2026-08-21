@@ -66,6 +66,55 @@ export function inputMetricsForIndicator<T extends MetricTreeNode>(metrics: T[])
   return inputs.sort((a, b) => a.sort_order - b.sort_order);
 }
 
+/** Sub-metrics always use the parent unit (number stays number, text stays text). */
+export function withInheritedUnits<T extends MetricTreeNode>(metrics: T[]): T[] {
+  const byId = new Map<number, T>();
+  for (const m of metrics) {
+    if (m.id != null) byId.set(Number(m.id), m);
+  }
+  return metrics.map((m) => {
+    const parentId = m.parent_metric_id != null ? Number(m.parent_metric_id) : 0;
+    if (!parentId) return m;
+    const parent = byId.get(parentId);
+    if (!parent || parent.unit_of_measure === m.unit_of_measure) return m;
+    return { ...m, unit_of_measure: parent.unit_of_measure };
+  });
+}
+
+/**
+ * Metrics ambassadors actually fill: not auto-total rows, and not parent headers
+ * that only exist so sub-metrics can sit under them.
+ */
+export function sqlIsInputMetric(alias: string): string {
+  return `(
+    (${alias}.is_total IS NULL OR ${alias}.is_total = 0)
+    AND (
+      (${alias}.parent_metric_id IS NOT NULL AND ${alias}.parent_metric_id <> 0)
+      OR NOT EXISTS (
+        SELECT 1 FROM q_metrics ${alias}_ch
+        WHERE ${alias}_ch.parent_metric_id = ${alias}.id
+      )
+    )
+  )`;
+}
+
+export function sqlInputMetricCount(indicatorAlias: string): string {
+  return `(SELECT COUNT(*) FROM q_metrics m WHERE m.indicator_id = ${indicatorAlias}.id AND ${sqlIsInputMetric('m')})`;
+}
+
+export function sqlFilledInputCellCount(indicatorAlias: string, departmentExpr: string): string {
+  return `(SELECT COUNT(*)
+    FROM q_responses r
+    INNER JOIN q_metrics m ON m.id = r.metric_id AND m.indicator_id = ${indicatorAlias}.id
+    INNER JOIN q_indicator_fys f
+      ON f.indicator_id = ${indicatorAlias}.id
+     AND f.financial_year = r.financial_year
+    WHERE r.indicator_id = ${indicatorAlias}.id
+      AND r.department_id = ${departmentExpr}
+      AND r.value IS NOT NULL AND TRIM(r.value) <> ''
+      AND ${sqlIsInputMetric('m')})`;
+}
+
 export function buildMetricDisplayRows<T extends MetricTreeNode>(metrics: T[]): MetricDisplayRow[] {
   const byParent = childrenByParentId(metrics);
   const parents = metrics

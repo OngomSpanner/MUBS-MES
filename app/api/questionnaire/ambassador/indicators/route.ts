@@ -7,7 +7,7 @@ import {
   ensureIndicatorTargetsSchema,
   loadIndicatorTargets,
 } from '@/lib/questionnaire-metric-targets';
-import { inputMetricsForIndicator } from '@/lib/questionnaire/metric-tree';
+import { inputMetricsForIndicator, withInheritedUnits } from '@/lib/questionnaire/metric-tree';
 
 export const dynamic = 'force-dynamic';
 
@@ -54,7 +54,9 @@ export async function GET(request: Request) {
     metricsValues.push(uomFilter);
   }
   metricsQuery += ' ORDER BY indicator_id, sort_order';
-  const metrics = await query({ query: metricsQuery, values: metricsValues }) as any[];
+  const metrics = withInheritedUnits(
+    await query({ query: metricsQuery, values: metricsValues }) as any[],
+  );
 
   let fysQuery = `SELECT indicator_id, financial_year FROM q_indicator_fys WHERE indicator_id IN (${inClause})`;
   const fysValues: any[] = [...indicatorIds];

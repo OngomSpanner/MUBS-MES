@@ -792,16 +792,21 @@ function TemplateModal({
           financial_year: fy,
           target_value: (targetsByFy[fy] ?? '').trim() || null,
         })),
-        metrics: validMetrics.map((m) => ({
-          id: m.id,
-          client_id: m.client_id,
-          parent_metric_id: m.parent_metric_id ?? null,
-          parent_client_id: m.parent_client_id ?? null,
-          metric_text: m.metric_text,
-          unit_of_measure: m.unit_of_measure,
-          aggregation: m.aggregation ?? null,
-          is_total: Boolean(m.is_total),
-        })),
+        metrics: validMetrics.map((m) => {
+          const parent = m.parent_client_id
+            ? metrics.find((x) => x.client_id === m.parent_client_id)
+            : null;
+          return {
+            id: m.id,
+            client_id: m.client_id,
+            parent_metric_id: m.parent_metric_id ?? null,
+            parent_client_id: m.parent_client_id ?? null,
+            metric_text: m.metric_text,
+            unit_of_measure: parent?.unit_of_measure ?? m.unit_of_measure,
+            aggregation: m.aggregation ?? null,
+            is_total: Boolean(m.is_total),
+          };
+        }),
       };
       if (isEditing && editingIndicator) return axios.put(`/api/questionnaire/indicators/${editingIndicator.id}`, payload);
       return axios.post('/api/questionnaire/indicators', payload);
@@ -965,7 +970,7 @@ function TemplateModal({
             </Button>
           </div>
           <p className="text-muted small mb-2" style={{ fontSize: '0.78rem' }}>
-            Add sub-metrics under a parent metric for programmes, campuses, or other breakdowns. Use <strong>Bulk add</strong> to paste many names at once (one per line). Numeric/currency parents auto-sum sub-metrics in data entry.
+            Add sub-metrics under a parent metric for programmes, campuses, or other breakdowns. Use <strong>Bulk add</strong> to paste many names at once (one per line). A sub-metric always uses the same unit as the parent (if the parent is a number, the sub-metric cannot be text or list). Numeric/currency parents auto-sum sub-metrics in data entry.
           </p>
           <div className="d-flex flex-column gap-2">
             {metrics.map((m, i) => {
@@ -1004,11 +1009,11 @@ function TemplateModal({
 
                     <Form.Select
                       size="sm"
-                      value={m.unit_of_measure}
+                      value={isChild ? (parent?.unit_of_measure ?? m.unit_of_measure) : m.unit_of_measure}
                       onChange={(e) => updateMetric(m.client_id, 'unit_of_measure', e.target.value)}
                       style={{ width: '160px', flexShrink: 0 }}
                       disabled={isTotal || isChild}
-                      title={isChild ? 'Sub-metric unit inherits from parent' : 'Unit of measure'}
+                      title={isChild ? 'Sub-metrics use the same unit as the parent' : 'Unit of measure'}
                     >
                       {UOM_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
                     </Form.Select>
@@ -1080,6 +1085,7 @@ function TemplateModal({
                   {isChild && (
                     <div className="text-muted small mt-1" style={{ fontSize: '0.72rem' }}>
                       Under: <span className="fw-semibold">{parent?.metric_text || '—'}</span>
+                      <span className="ms-2">Same unit as parent (cannot mix number with text/list)</span>
                       {isTotal ? <span className="ms-2 badge text-bg-warning">Auto total (sum)</span> : null}
                     </div>
                   )}
@@ -1362,7 +1368,11 @@ function TemplateModal({
                     parent_metric_id: m.parent_metric_id ?? null,
                     parent_client_id: m.parent_client_id ?? null,
                     metric_text: m.metric_text,
-                    unit_of_measure: m.unit_of_measure,
+                    unit_of_measure: (
+                      m.parent_client_id
+                        ? metrics.find((x) => x.client_id === m.parent_client_id)?.unit_of_measure
+                        : m.unit_of_measure
+                    ) ?? m.unit_of_measure,
                     aggregation: m.aggregation ?? null,
                     is_total: Boolean(m.is_total),
                   })),

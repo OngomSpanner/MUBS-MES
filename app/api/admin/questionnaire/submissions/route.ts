@@ -6,6 +6,7 @@ import { query } from '@/lib/db';
 import { ensureHodReviewWorkflowSchema } from '@/lib/hod-review-workflow';
 import { ensureMetricCommentsSchema } from '@/lib/questionnaire-metric-comments';
 import { ensureQuestionnaireSubMetricsSchema, ensureQuestionnaireObjectiveSchema, SQL_RESOLVED_INDICATOR_PILLAR, SQL_RESOLVED_INDICATOR_PILLAR_CODE } from '@/lib/questionnaire-schema';
+import { sqlFilledInputCellCount, sqlInputMetricCount, withInheritedUnits } from '@/lib/questionnaire/metric-tree';
 import {
   ensureIndicatorTargetsSchema,
   loadIndicatorTargets,
@@ -44,7 +45,7 @@ export async function GET(request: Request) {
     const departmentId = Number(url.searchParams.get('departmentId'));
 
     if (indicatorId && departmentId) {
-      const metrics = (await query({
+      const metrics = withInheritedUnits((await query({
         query: `SELECT id, metric_text, unit_of_measure, parent_metric_id, aggregation, is_total, sort_order
                 FROM q_metrics WHERE indicator_id = ? ORDER BY sort_order`,
         values: [indicatorId],
@@ -56,7 +57,7 @@ export async function GET(request: Request) {
         aggregation: string | null;
         is_total: number | null;
         sort_order: number;
-      }[];
+      }[]);
 
       const financialYears = (await query({
         query: 'SELECT financial_year FROM q_indicator_fys WHERE indicator_id = ? ORDER BY financial_year',
@@ -134,12 +135,9 @@ export async function GET(request: Request) {
                ${SQL_RESOLVED_INDICATOR_PILLAR_CODE} AS outcome_pillar_code,
                COALESCE(NULLIF(TRIM(d.external_name), ''), d.name) AS department_name,
                u.full_name AS submitted_by_name,
-               (SELECT COUNT(*) FROM q_metrics m WHERE m.indicator_id = i.id) AS metric_count,
+               ${sqlInputMetricCount('i')} AS metric_count,
                (SELECT COUNT(*) FROM q_indicator_fys f WHERE f.indicator_id = i.id) AS fy_count,
-               (SELECT COUNT(*)
-                FROM q_responses r
-                WHERE r.indicator_id = i.id AND r.department_id = qid.department_id
-                  AND r.value IS NOT NULL AND TRIM(r.value) <> '') AS filled
+               ${sqlFilledInputCellCount('i', 'qid.department_id')} AS filled
         FROM q_indicator_departments qid
         JOIN q_indicators i ON i.id = qid.indicator_id
         JOIN q_outcomes o ON o.id = i.outcome_id

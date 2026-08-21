@@ -23,6 +23,7 @@ import {
   type IndicatorTargetInput,
 } from '@/lib/questionnaire-metric-targets';
 import { saveIndicatorMetrics } from '@/lib/questionnaire/save-indicator-metrics';
+import { withInheritedUnits } from '@/lib/questionnaire/metric-tree';
 
 export const dynamic = 'force-dynamic';
 
@@ -105,7 +106,7 @@ export async function GET(_request: Request, context: { params: Promise<{ id: st
       ...ind,
       id: indicatorId,
       is_locked: Boolean(ind.is_locked),
-      metrics: metrics.map((m) => ({ ...m, id: Number(m.id) })),
+      metrics: withInheritedUnits(metrics.map((m) => ({ ...m, id: Number(m.id) }))),
       targets,
       departments: departments.map((d) => ({ id: Number(d.id), name: d.name })),
       financial_years: financialYears.map((f) => normalizeFinancialYear(f.financial_year)),
