@@ -79,6 +79,142 @@ function looksLikeMale(text: string): boolean {
   return /\bmales?\b/i.test(text) && !/\bfemales?\b/i.test(text);
 }
 
+function indicatorExpectsPercent(text: string): boolean {
+  return /\bpercent(?:age)?s?\b|%/i.test(text);
+}
+
+function indicatorExpectsRatio(text: string): boolean {
+  return /\bratio\b|\bparity\b/i.test(text);
+}
+
+function looksLikeFilledPosts(text: string): boolean {
+  if (/\bestablishment\b|\bceiling\b|\bapproved\s+posts?\b|\bstructure\b/i.test(text)) return false;
+  return /\bfilled\b|\boccupied\b|\bin[\s-]?post\b|\bin[\s-]?position\b/i.test(text);
+}
+
+function looksLikeEstablishment(text: string): boolean {
+  return /\bestablishment\b|\bceiling\b|\bapproved\s+posts?\b|\bstaff\s+structure\b/i.test(text);
+}
+
+function looksLikeTotalOrEnrolled(text: string): boolean {
+  return /\btotals?\b|\benrolled\b|\benrolment\b|\benrollment\b/i.test(text);
+}
+
+function sumMetricIdsAcrossOffices(
+  metrics: MetricTreeNode[],
+  metricIds: number[],
+  fy: string,
+  assigned: Dept[],
+  getVal: (departmentId: number, metricId: number, fy: string) => string | null,
+): { actual: number | null; offices: number } {
+  let actual = 0;
+  let any = false;
+  let offices = 0;
+  for (const metricId of metricIds) {
+    const rolled = metricActualAcrossOffices(metrics, metricId, fy, assigned, getVal);
+    if (rolled.actual == null) continue;
+    actual += rolled.actual;
+    any = true;
+    offices = Math.max(offices, rolled.offices);
+  }
+  return { actual: any ? actual : null, offices };
+}
+
+/** Institutional % or ratio from count metrics. Null if we cannot do it safely. */
+function deriveFromCountMetrics(
+  indicatorText: string,
+  metrics: MetricTreeNode[],
+  fy: string,
+  assigned: Dept[],
+  getVal: (departmentId: number, metricId: number, fy: string) => string | null,
+): { actual: number; display: string; note: string; offices: number; method: StrategyResultMethod } | null {
+  const inputs = inputMetricsForIndicator(metrics).filter((m) => isSummableUom(m.unit_of_measure));
+  if (inputs.length === 0) return null;
+
+  const femaleIds = inputs.filter((m) => looksLikeFemale(m.metric_text)).map((m) => m.id);
+  const maleIds = inputs.filter((m) => looksLikeMale(m.metric_text)).map((m) => m.id);
+  const filledIds = inputs.filter((m) => looksLikeFilledPosts(m.metric_text)).map((m) => m.id);
+  const establishmentIds = inputs.filter((m) => looksLikeEstablishment(m.metric_text)).map((m) => m.id);
+  const totalIds = inputs
+    .filter((m) => looksLikeTotalOrEnrolled(m.metric_text) && !looksLikeFemale(m.metric_text) && !looksLikeMale(m.metric_text))
+    .map((m) => m.id);
+
+  const wantsRatio = indicatorExpectsRatio(indicatorText) && !indicatorExpectsPercent(indicatorText);
+  const wantsPercent = indicatorExpectsPercent(indicatorText);
+  const wantsFemaleShare =
+    wantsPercent || /%\s*female|percent(?:age)?\s+(?:of\s+)?female|female[s]?\s+enrolled/i.test(indicatorText);
+
+  if (femaleIds.length > 0 && maleIds.length > 0 && (wantsFemaleShare || wantsRatio || /\bgender\s+parity/i.test(indicatorText))) {
+    const female = sumMetricIdsAcrossOffices(metrics, femaleIds, fy, assigned, getVal);
+    const male = sumMetricIdsAcrossOffices(metrics, maleIds, fy, assigned, getVal);
+    if (female.actual == null || male.actual == null) return null;
+    const offices = Math.max(female.offices, male.offices);
+    if (wantsRatio) {
+      const display = formatRatioAsNToOne(female.actual, male.actual);
+      const actual = male.actual === 0 ? null : female.actual / male.actual;
+      if (actual == null || display == null) return null;
+      return {
+        actual,
+        display,
+        note: 'Female ÷ Male as n:1, after summing each across offices.',
+        offices,
+        method: 'entered_ratio',
+      };
+    }
+    const total = female.actual + male.actual;
+    if (total === 0) return null;
+    const actual = (female.actual / total) * 100;
+    return {
+      actual,
+      display: `${formatNumber(actual)}%`,
+      note: 'Female ÷ (Female + Male) × 100, after summing each across offices.',
+      offices,
+      method: 'entered_percent',
+    };
+  }
+
+  if (wantsPercent && femaleIds.length > 0 && totalIds.length > 0) {
+    const female = sumMetricIdsAcrossOffices(metrics, femaleIds, fy, assigned, getVal);
+    const total = sumMetricIdsAcrossOffices(metrics, totalIds, fy, assigned, getVal);
+    if (female.actual == null || total.actual == null || total.actual === 0) return null;
+    const actual = (female.actual / total.actual) * 100;
+    return {
+      actual,
+      display: `${formatNumber(actual)}%`,
+      note: 'Female ÷ total enrolled × 100, after summing each across offices.',
+      offices: Math.max(female.offices, total.offices),
+      method: 'entered_percent',
+    };
+  }
+
+  if (wantsPercent && filledIds.length > 0 && establishmentIds.length > 0) {
+    const filled = sumMetricIdsAcrossOffices(metrics, filledIds, fy, assigned, getVal);
+    const establishment = sumMetricIdsAcrossOffices(metrics, establishmentIds, fy, assigned, getVal);
+    if (filled.actual == null || establishment.actual == null || establishment.actual === 0) return null;
+    const actual = (filled.actual / establishment.actual) * 100;
+    return {
+      actual,
+      display: `${formatNumber(actual)}%`,
+      note: 'Filled posts ÷ establishment × 100, after summing each across offices.',
+      offices: Math.max(filled.offices, establishment.offices),
+      method: 'entered_percent',
+    };
+  }
+
+  return null;
+}
+
+function shouldCompareActualToTarget(
+  actual: number | null,
+  targetNum: number | null,
+  method: StrategyResultMethod,
+): boolean {
+  if (actual == null || targetNum == null) return false;
+  // A count sitting on a % scale (e.g. 5963 vs a target of 56.3) is not achievement.
+  if (method === 'entered_percent' && targetNum > 0 && targetNum <= 100 && actual > 150) return false;
+  return true;
+}
+
 function officeActual(
   metrics: MetricTreeNode[],
   fy: string,
@@ -130,14 +266,16 @@ function cellFromActual(
   method: StrategyResultMethod,
   displayOverride?: string | null,
   note?: string | null,
+  compareToTarget = true,
 ): StrategyFyCell {
   const targetNum = parseLooseNumber(targetRaw);
-  const pct = actual != null && targetNum != null && targetNum !== 0
+  const comparable = compareToTarget && shouldCompareActualToTarget(actual, targetNum, method);
+  const pct = comparable && actual != null && targetNum != null && targetNum !== 0
     ? (actual / targetNum) * 100
-    : actual != null && targetNum === 0
+    : comparable && actual != null && targetNum === 0
       ? (actual === 0 ? 100 : null)
       : null;
-  const performance = computePerformanceStatus(targetNum, actual);
+  const performance = comparable ? computePerformanceStatus(targetNum, actual) : null;
   return {
     target: targetRaw,
     actual,
@@ -338,30 +476,48 @@ export async function buildStrategyResults(approvedOnly: boolean): Promise<Strat
     const metrics = metricsByIndicator.get(indicatorId) ?? [];
     const assigned = deptsByIndicator.get(indicatorId) ?? [];
     const fys = (fysByIndicator.get(indicatorId) ?? []).sort(sortFy);
+    const indicatorText = String(ind.indicator_text || '');
+    const expectsPercentOrRatio = indicatorExpectsPercent(indicatorText) || indicatorExpectsRatio(indicatorText);
     const method = methodForMetrics(metrics);
     const inputs = inputMetricsForIndicator(metrics);
     const byFy: Record<string, StrategyFyCell> = {};
+    const getDeptVal = (deptId: number, metricId: number, year: string) =>
+      getVal(indicatorId, deptId, metricId, year);
 
     for (const fy of fys) {
       const target = targetByKey.get(`${indicatorId}|${fy}`) ?? null;
+      const derived = deriveFromCountMetrics(indicatorText, metrics, fy, assigned, getDeptVal);
+      if (derived) {
+        byFy[fy] = cellFromActual(
+          derived.actual,
+          target,
+          derived.offices,
+          derived.method,
+          derived.display,
+          derived.note,
+        );
+        continue;
+      }
       if (method === 'not_numeric') {
         byFy[fy] = cellFromActual(null, target, 0, method, null, 'This indicator is text or mixed units, so it is not auto-totalled.');
         continue;
       }
       if (method === 'entered_percent' || method === 'entered_ratio') {
-        const rolled = metricActualAcrossOffices(metrics, null, fy, assigned, (deptId, metricId, year) =>
-          getVal(indicatorId, deptId, metricId, year),
-        );
+        const rolled = metricActualAcrossOffices(metrics, null, fy, assigned, getDeptVal);
         if (rolled.offices <= 1) {
+          const looksLikeCount = method === 'entered_percent' && rolled.actual != null && rolled.actual > 150;
           byFy[fy] = cellFromActual(
-            rolled.actual,
+            looksLikeCount ? null : rolled.actual,
             target,
             rolled.offices,
-            'single',
-            method === 'entered_percent' && rolled.actual != null ? `${formatNumber(rolled.actual)}%` : null,
-            rolled.offices === 1
-              ? 'One office entered this value. Institutional % or ratio should be calculated from counts (Female and Male), not averaged across offices.'
-              : null,
+            method,
+            looksLikeCount ? null : (method === 'entered_percent' && rolled.actual != null ? `${formatNumber(rolled.actual)}%` : null),
+            looksLikeCount
+              ? `The entered figure (${formatNumber(rolled.actual as number)}) looks like a count, not a percentage. Add a formula from the count cells (e.g. Female ÷ (Female + Male) × 100).`
+              : rolled.offices === 1
+                ? 'One office entered this value. Institutional % or ratio should be calculated from counts (Female and Male), not averaged across offices.'
+                : null,
+            !looksLikeCount,
           );
         } else {
           byFy[fy] = cellFromActual(
@@ -376,10 +532,15 @@ export async function buildStrategyResults(approvedOnly: boolean): Promise<Strat
         continue;
       }
 
-      const rolled = metricActualAcrossOffices(metrics, null, fy, assigned, (deptId, metricId, year) =>
-        getVal(indicatorId, deptId, metricId, year),
-      );
+      const rolled = metricActualAcrossOffices(metrics, null, fy, assigned, getDeptVal);
       const cellMethod: StrategyResultMethod = rolled.offices > 1 ? 'sum' : 'single';
+      if (expectsPercentOrRatio) {
+        const countNote = rolled.actual != null
+          ? `Offices entered counts (total ${formatNumber(rolled.actual)}), not a percentage. This is not compared to the % target. Add a formula, e.g. filled posts ÷ establishment × 100, or Female ÷ (Female + Male) × 100.`
+          : 'This is a % or ratio indicator. Add a formula from the count cells rather than summing raw counts against the target.';
+        byFy[fy] = cellFromActual(null, target, rolled.offices, cellMethod, null, countNote, false);
+        continue;
+      }
       byFy[fy] = cellFromActual(
         rolled.actual,
         target,
@@ -392,7 +553,7 @@ export async function buildStrategyResults(approvedOnly: boolean): Promise<Strat
 
     return {
       indicatorId,
-      indicatorText: String(ind.indicator_text || ''),
+      indicatorText,
       outcomeLabel: String(ind.outcome_label || ''),
       outcomeType: String(ind.outcome_type || ''),
       strategicPillar: ind.strategic_pillar != null ? String(ind.strategic_pillar) : null,

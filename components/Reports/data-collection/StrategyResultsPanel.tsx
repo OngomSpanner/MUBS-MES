@@ -275,7 +275,7 @@ export default function StrategyResultsPanel() {
         icon="calculate"
         title="Indicator results"
         count={filteredIndicators.length}
-        description="Numeric indicators are added across all assigned offices for each financial year. Percentages and ratios are not added together. Type to find an indicator, outcome, or office. Results stay grouped by pillar, then outcome."
+        description="Numeric counts are added across assigned offices for each financial year. Percentages and ratios are not added together, and a count total is not compared to a % target. Where Female and Male or filled posts and establishment are on the form, the institutional % is calculated automatically. Otherwise use Add formula."
         filters={(
           <>
             <Form.Check

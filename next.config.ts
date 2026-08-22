@@ -3,7 +3,7 @@ import type { NextConfig } from "next";
 const lowMemoryBuild = process.env.LOW_MEMORY_BUILD === '1';
 
 const nextConfig: NextConfig = {
-  reactCompiler: true,
+  reactCompiler: !lowMemoryBuild,
   experimental: {
     webpackMemoryOptimizations: true,
     ...(lowMemoryBuild
