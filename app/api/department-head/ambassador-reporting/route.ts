@@ -191,6 +191,32 @@ export async function PATCH(request: Request) {
       return NextResponse.json({ message: 'Comment required when returning' }, { status: 400 });
     }
 
+    const placeholders = inPlaceholders(auth.departmentIds.length);
+    let ownershipCheck: { sql: string; values: unknown[] } | null = null;
+    if (category === 'benefits') {
+      ownershipCheck = {
+        sql: `SELECT e.id FROM ${table} e INNER JOIN users u ON u.id = e.user_id WHERE e.id = ? AND u.department_id IN (${placeholders})`,
+        values: [id, ...auth.departmentIds],
+      };
+    } else if (category === 'workforce' || category === 'skills') {
+      ownershipCheck = {
+        sql: `SELECT id FROM ${table} WHERE id = ? AND managed_unit_id IN (${placeholders})`,
+        values: [id, ...auth.departmentIds],
+      };
+    } else if (category === 'rf-narrative') {
+      ownershipCheck = {
+        sql: `SELECT arn.id FROM ${table} arn INNER JOIN strategic_activities sa ON sa.id = arn.activity_id WHERE arn.id = ? AND sa.department_id IN (${placeholders})`,
+        values: [id, ...auth.departmentIds],
+      };
+    }
+
+    if (ownershipCheck) {
+      const rows = (await query({ query: ownershipCheck.sql, values: ownershipCheck.values })) as { id: number }[];
+      if (rows.length === 0) {
+        return NextResponse.json({ message: 'Record not found or not in your department scope' }, { status: 403 });
+      }
+    }
+
     const status = action === 'approve' ? 'approved' : 'returned';
     await query({
       query: `
