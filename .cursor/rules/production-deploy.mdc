@@ -1,0 +1,27 @@
+---
+description: Multi-PC workflow: pull remote first, then test, push, server pull, build, PM2, verify
+alwaysApply: true
+---
+
+# MUBS-ME: pull, change, test, push, deploy
+
+The developer uses more than one computer. Never assume local files are current.
+
+## Start of every request
+
+1. In the current clone, `git fetch origin main` and `git pull --ff-only origin main` (or rebase onto `origin/main` if already on a feature branch).
+2. Confirm `git log -1 --oneline` matches GitHub `main` before editing. Do not use a stale extra copy of the repo.
+
+## After the work
+
+3. Test the change (app flow, login if auth/UI, or the closest check available).
+4. When the user wants it live: commit if they asked, `git push origin main`.
+5. VPN must be on. Deploy over SSH (`ssh mubs-elc`, host `10.255.7.2`, user `ssendi`). Never store the server password in git, `.env`, rules, or chat.
+
+## On the server (`/var/www/mubsme`)
+
+6. `git fetch origin main && git reset --hard origin/main` (owner is `elias`; use `sudo` if git cannot write).
+7. Production build (`LOW_MEMORY_BUILD=1 ./node_modules/.bin/next build --webpack` as needed). Do not `rm -rf .next` until the new `BUILD_ID` exists.
+8. `sudo chown -R elias:elias .next`
+9. `sudo pm2 start mubsme` or `sudo pm2 restart mubsme` if it is already running. Never `pm2 restart all`. PM2 is root.
+10. Confirm https://mubsme.mubs.ac.ug loads and the changed flow works. `NEXT_PUBLIC_*` is baked at build time; Google Client ID must end with `.apps.googleusercontent.com`.
