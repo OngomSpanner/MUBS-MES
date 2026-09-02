@@ -9,6 +9,7 @@ import DepartmentStaff from './views/DepartmentStaff';
 import DepartmentEvaluations from './views/DepartmentEvaluations';
 import DepartmentReports from './views/DepartmentReports';
 import HodSdsView from './views/HodSds';
+import ActionTrackerPanel from '@/components/ActionTracker/ActionTrackerPanel';
 import PortalNotifications from '@/components/PortalNotifications';
 import { getMergedPortalFlags } from '@/lib/portal-feature-flags';
 import {
@@ -55,6 +56,8 @@ export default async function DepartmentHeadPage({ searchParams }: DepartmentHea
         switch (pg) {
             case 'sds':
                 return <HodSdsView />;
+            case 'action-tracker':
+                return <ActionTrackerPanel portal="hod" />;
             case 'activities':
                 return <DepartmentStrategicActivities />;
             case 'departmental-activities':

@@ -14,6 +14,7 @@ export const PORTAL_FEATURE_CATALOG: PortalFeatureDef[] = [
   // ── HOD side menu ──
   { key: 'hod.menu.dashboard', portal: 'hod', group: 'Side menu', label: 'Dashboard', defaultEnabled: true, route: { pg: 'dashboard' } },
   { key: 'hod.menu.sds', portal: 'hod', group: 'Side menu', label: 'Service Delivery Standards', defaultEnabled: true, route: { pg: 'sds' } },
+  { key: 'hod.menu.action-tracker', portal: 'hod', group: 'Side menu', label: 'Action Tracker', defaultEnabled: true, route: { pg: 'action-tracker' } },
   { key: 'hod.menu.activities', portal: 'hod', group: 'Side menu', label: 'Strategic Activities', defaultEnabled: true, route: { pg: 'activities' } },
   { key: 'hod.menu.departmental-activities', portal: 'hod', group: 'Side menu', label: 'Departmental Activities', defaultEnabled: true, route: { pg: 'departmental-activities' } },
   { key: 'hod.menu.tasks', portal: 'hod', group: 'Side menu', label: 'Processes', defaultEnabled: true, route: { pg: 'tasks' } },
@@ -56,6 +57,7 @@ const FEATURE_BY_KEY = new Map(PORTAL_FEATURE_CATALOG.map((f) => [f.key, f]));
 export const HOD_MENU_FEATURE_KEYS: Record<string, string> = {
   dashboard: 'hod.menu.dashboard',
   sds: 'hod.menu.sds',
+  'action-tracker': 'hod.menu.action-tracker',
   activities: 'hod.menu.activities',
   'departmental-activities': 'hod.menu.departmental-activities',
   tasks: 'hod.menu.tasks',

@@ -10,6 +10,7 @@ import StaffSubmissions from './views/StaffSubmissions';
 import StaffProcessTasks from './views/StaffProcessTasks';
 import StaffAcademicTeaching from './views/StaffAcademicTeaching';
 import StaffSdsView from './views/StaffSds';
+import ActionTrackerPanel from '@/components/ActionTracker/ActionTrackerPanel';
 
 function StaffAcademicTeachingGate() {
     const router = useRouter();
@@ -47,6 +48,8 @@ function StaffContent() {
             return <StaffDashboard />;
         case 'sds':
             return <StaffSdsView />;
+        case 'action-tracker':
+            return <ActionTrackerPanel portal="staff" />;
         case 'tasks':
             return <StaffTasks />;
         case 'deadlines':
