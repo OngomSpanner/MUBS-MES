@@ -1,6 +1,8 @@
 import { query } from '@/lib/db';
+import { seed48thDevelopmentCommittee } from '@/lib/action-tracker/sample-48th';
 
 let ensured = false;
+let ensurePromise: Promise<void> | null = null;
 
 const DEV_SEATS = [
   'Principal',
@@ -37,6 +39,13 @@ async function matchDepartmentId(label: string): Promise<number | null> {
 }
 
 export async function ensureActionTrackerSchema(): Promise<void> {
+  if (ensured) return;
+  if (ensurePromise) return ensurePromise;
+  ensurePromise = ensureActionTrackerSchemaOnce();
+  await ensurePromise;
+}
+
+async function ensureActionTrackerSchemaOnce(): Promise<void> {
   if (ensured) return;
 
   await query({
@@ -157,6 +166,12 @@ export async function ensureActionTrackerSchema(): Promise<void> {
         }
       }
     }
+  }
+
+  try {
+    await seed48thDevelopmentCommittee();
+  } catch (e) {
+    console.error('action-tracker sample 48th seed failed', e);
   }
 
   ensured = true;

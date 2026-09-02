@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { query } from '@/lib/db';
 import { ensureActionTrackerSchema } from '@/lib/action-tracker/schema';
-import { canAssignOnTeam, getActionActor } from '@/lib/action-tracker/access';
+import { canAssignOnTeam, getActionActor, visibleTeamIds } from '@/lib/action-tracker/access';
 
 export const dynamic = 'force-dynamic';
 
@@ -10,13 +10,30 @@ export async function GET(request: Request) {
     const actor = await getActionActor();
     if (!actor) return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
     await ensureActionTrackerSchema();
-    const teamId = Number(new URL(request.url).searchParams.get('team_id'));
-    if (!teamId) return NextResponse.json({ message: 'team_id required' }, { status: 400 });
-    const meetings = await query({
-      query: `SELECT id, team_id, title, meeting_date, venue, notes, created_at
-              FROM action_meetings WHERE team_id = ? ORDER BY meeting_date DESC, id DESC`,
-      values: [teamId],
-    });
+    const teamId = Number(new URL(request.url).searchParams.get('team_id') || 0);
+    const visible = await visibleTeamIds(actor);
+    if (teamId > 0) {
+      const meetings = await query({
+        query: `SELECT m.id, m.team_id, m.title, m.meeting_date, m.venue, m.notes, m.created_at, t.name AS team_name
+                FROM action_meetings m
+                JOIN action_teams t ON t.id = m.team_id
+                WHERE m.team_id = ?
+                ORDER BY m.meeting_date DESC, m.id DESC`,
+        values: [teamId],
+      });
+      return NextResponse.json({ meetings });
+    }
+    let sql = `SELECT m.id, m.team_id, m.title, m.meeting_date, m.venue, m.notes, m.created_at, t.name AS team_name
+               FROM action_meetings m
+               JOIN action_teams t ON t.id = m.team_id`;
+    const values: number[] = [];
+    if (visible !== 'all') {
+      if (visible.length === 0) return NextResponse.json({ meetings: [] });
+      sql += ` WHERE m.team_id IN (${visible.map(() => '?').join(',')})`;
+      values.push(...visible);
+    }
+    sql += ' ORDER BY m.meeting_date DESC, m.id DESC';
+    const meetings = await query({ query: sql, values });
     return NextResponse.json({ meetings });
   } catch (e) {
     console.error('action-tracker meetings GET', e);

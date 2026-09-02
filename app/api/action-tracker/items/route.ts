@@ -3,6 +3,7 @@ import { query } from '@/lib/db';
 import { ensureActionTrackerSchema } from '@/lib/action-tracker/schema';
 import { canAssignOnTeam, getActionActor, visibleTeamIds } from '@/lib/action-tracker/access';
 import { notifyActionAssigned } from '@/lib/action-tracker/notify';
+import { copyAssignedActionToSds } from '@/lib/action-tracker/sds-link';
 
 export const dynamic = 'force-dynamic';
 
@@ -98,6 +99,15 @@ export async function POST(request: Request) {
         deadline: body.deadline ? String(body.deadline).slice(0, 10) : null,
         assignedBy: actor.fullName,
       });
+      try {
+        await copyAssignedActionToSds({
+          actionId: id,
+          assignedBy: actor.userId,
+          assignedByName: actor.fullName,
+        });
+      } catch (err) {
+        console.error('action-tracker auto SDS copy failed', err);
+      }
     }
     return NextResponse.json({ id });
   } catch (e) {

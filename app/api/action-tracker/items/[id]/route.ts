@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { query } from '@/lib/db';
 import { ensureActionTrackerSchema } from '@/lib/action-tracker/schema';
 import { canAssignOnTeam, getActionActor } from '@/lib/action-tracker/access';
-import { copyActionToSds } from '@/lib/action-tracker/sds-link';
+import { copyAssignedActionToSds } from '@/lib/action-tracker/sds-link';
 
 export const dynamic = 'force-dynamic';
 
@@ -53,32 +53,14 @@ export async function PATCH(request: Request, ctx: Ctx) {
 
     if (body.to_sds) {
       if (!canManage) return NextResponse.json({ message: 'Not allowed' }, { status: 403 });
-      const full = (await query({
-        query: 'SELECT title, deadline, assignee_user_id, office_department_id, sds_assignment_id FROM action_items WHERE id = ?',
-        values: [id],
-      })) as {
-        title: string;
-        deadline: string | null;
-        assignee_user_id: number | null;
-        office_department_id: number | null;
-        sds_assignment_id: number | null;
-      }[];
-      const row = full[0];
-      if (!row?.assignee_user_id) {
-        return NextResponse.json({ message: 'Assign a person before copying to SDS.' }, { status: 400 });
-      }
-      if (row.sds_assignment_id) {
-        return NextResponse.json({ message: 'Already on SDS.', id: row.sds_assignment_id });
-      }
-      const assignmentId = await copyActionToSds({
+      const assignmentId = await copyAssignedActionToSds({
         actionId: id,
-        title: row.title,
-        deadline: row.deadline,
-        staffUserId: Number(row.assignee_user_id),
-        departmentId: row.office_department_id != null ? Number(row.office_department_id) : null,
         assignedBy: actor.userId,
         assignedByName: actor.fullName,
       });
+      if (!assignmentId) {
+        return NextResponse.json({ message: 'Assign a person before copying to SDS.' }, { status: 400 });
+      }
       return NextResponse.json({ ok: true, sds_assignment_id: assignmentId });
     }
 
@@ -120,6 +102,17 @@ export async function PATCH(request: Request, ctx: Ctx) {
         query: 'INSERT INTO action_item_updates (action_id, user_id, status, comment) VALUES (?, ?, ?, ?)',
         values: [id, actor.userId, status, comment || `Status: ${status || 'updated'}`],
       });
+    }
+    if (canManage) {
+      try {
+        await copyAssignedActionToSds({
+          actionId: id,
+          assignedBy: actor.userId,
+          assignedByName: actor.fullName,
+        });
+      } catch (err) {
+        console.error('action-tracker auto SDS copy failed', err);
+      }
     }
     return NextResponse.json({ ok: true });
   } catch (e) {

@@ -5,6 +5,9 @@ import axios from 'axios';
 import { Badge, Button, Form, Modal, Spinner } from 'react-bootstrap';
 import * as XLSX from 'xlsx';
 import ReportsSectionHeader from '@/components/Reports/ReportsSectionHeader';
+import SearchableSelect from '@/components/ActionTracker/SearchableSelect';
+import PeopleSearchSelect from '@/components/ActionTracker/PeopleSearchSelect';
+import ActionTrackerReports from '@/components/ActionTracker/ActionTrackerReports';
 
 type Portal = 'admin' | 'hod' | 'staff';
 type Team = {
@@ -28,7 +31,14 @@ type Member = {
   email: string | null;
   is_secretariat: number;
 };
-type Meeting = { id: number; title: string; meeting_date: string; venue: string | null };
+type Meeting = {
+  id: number;
+  team_id?: number;
+  title: string;
+  meeting_date: string;
+  venue: string | null;
+  team_name?: string;
+};
 type Item = {
   id: number;
   team_id: number;
@@ -48,7 +58,6 @@ type Item = {
   meeting_date: string | null;
 };
 type Dept = { id: number; name: string };
-type Person = { id: number; full_name: string; email: string; department_id: number | null };
 
 const STATUS_LABEL: Record<string, string> = {
   not_started: 'Not started',
@@ -67,15 +76,16 @@ function ymd(v: string | null | undefined) {
 }
 
 export default function ActionTrackerPanel({ portal }: { portal: Portal }) {
-  const [tab, setTab] = useState<'actions' | 'teams' | 'mine'>(portal === 'staff' ? 'mine' : 'actions');
+  const [tab, setTab] = useState<'actions' | 'teams' | 'mine' | 'reports'>(portal === 'staff' ? 'mine' : 'actions');
   const [teams, setTeams] = useState<Team[]>([]);
   const [teamId, setTeamId] = useState<number>(0);
   const [members, setMembers] = useState<Member[]>([]);
   const [meetings, setMeetings] = useState<Meeting[]>([]);
   const [items, setItems] = useState<Item[]>([]);
   const [mine, setMine] = useState<Item[]>([]);
+  const [reportItems, setReportItems] = useState<Item[]>([]);
+  const [reportMeetings, setReportMeetings] = useState<Meeting[]>([]);
   const [depts, setDepts] = useState<Dept[]>([]);
-  const [people, setPeople] = useState<Person[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [canCreateCommittee, setCanCreateCommittee] = useState(false);
@@ -139,13 +149,20 @@ export default function ActionTrackerPanel({ portal }: { portal: Portal }) {
     setError('');
     try {
       const list = await loadTeams();
-      const nextId = teamId || list[0]?.id || 0;
+      const preferred = list.find((t) => t.name === 'Development Committee')?.id;
+      const nextId = teamId || preferred || list[0]?.id || 0;
       if (!teamId && nextId) setTeamId(nextId);
       await loadTeamDetail(nextId);
       if (portal === 'staff' || portal === 'hod') {
         const mineRes = await axios.get('/api/action-tracker/items', { params: { mine: '1' } });
         setMine(mineRes.data.items || []);
       }
+      const [allItems, allMeetings] = await Promise.all([
+        axios.get('/api/action-tracker/items'),
+        axios.get('/api/action-tracker/meetings'),
+      ]);
+      setReportItems(allItems.data.items || []);
+      setReportMeetings(allMeetings.data.meetings || []);
     } catch {
       setError('Could not load Action Tracker.');
     } finally {
@@ -164,13 +181,6 @@ export default function ActionTrackerPanel({ portal }: { portal: Portal }) {
     }).catch(() => undefined);
   }, []);
 
-  useEffect(() => {
-    const dept = memberDept || actionOffice;
-    void axios.get('/api/action-tracker/people', { params: dept ? { department_id: dept } : {} }).then((r) => {
-      setPeople(r.data.people || []);
-    }).catch(() => setPeople([]));
-  }, [memberDept, actionOffice]);
-
   const selected = useMemo(() => teams.find((t) => t.id === teamId) || null, [teams, teamId]);
   const counts = useMemo(() => {
     const list = tab === 'mine' ? mine : items;
@@ -181,6 +191,28 @@ export default function ActionTrackerPanel({ portal }: { portal: Portal }) {
       notStarted: list.filter((i) => i.status === 'not_started').length,
     };
   }, [items, mine, tab]);
+
+  const officeOptions = useMemo(() => {
+    const fromMembers = members
+      .filter((m) => m.department_id)
+      .map((m) => ({
+        value: String(m.department_id),
+        label: `${m.seat_label}${m.full_name ? ` · ${m.full_name}` : ''}`,
+      }));
+    const seen = new Set(fromMembers.map((o) => o.value));
+    const fromDepts = depts
+      .filter((d) => !seen.has(String(d.id)))
+      .map((d) => ({ value: String(d.id), label: d.name }));
+    return [...fromMembers, ...fromDepts];
+  }, [members, depts]);
+
+  const memberPeople = useMemo(
+    () => members.filter((m) => m.user_id).map((m) => ({
+      value: String(m.user_id),
+      label: `${m.full_name} (${m.seat_label})`,
+    })),
+    [members],
+  );
 
   const exportReport = () => {
     const rows = items.map((i) => ({
@@ -339,16 +371,24 @@ export default function ActionTrackerPanel({ portal }: { portal: Portal }) {
         icon="groups"
         title="Action Tracker"
         count={counts.total}
-        description="Track actions from committees, unit meetings and teams. Strategy sets up school committees. Heads of units can create their own meeting teams and assign actions. Assigned people get a notification and email. Done / in progress / not started is updated on the action. You can copy an action onto SDS for that staff member."
+        description="Track actions from committees, unit meetings and teams. Assigned actions are copied onto SDS for that staff member automatically. Strategy sets up school committees. Heads of units can create their own meeting teams. Assigned people get a notification and email."
         filters={(
           <>
             {portal !== 'staff' ? (
-              <Form.Select size="sm" value={teamId} onChange={(e) => { const id = Number(e.target.value); setTeamId(id); void loadTeamDetail(id); }} style={{ width: 260 }}>
-                {teams.length === 0 ? <option value={0}>No teams yet</option> : null}
-                {teams.map((t) => (
-                  <option key={t.id} value={t.id}>{t.name}</option>
-                ))}
-              </Form.Select>
+              <div style={{ width: 280 }}>
+                <SearchableSelect
+                  value={teamId ? String(teamId) : ''}
+                  onChange={(v) => {
+                    const id = Number(v || 0);
+                    setTeamId(id);
+                    void loadTeamDetail(id);
+                  }}
+                  options={teams.map((t) => ({ value: String(t.id), label: t.name, hint: t.kind }))}
+                  placeholder="Search committees / teams"
+                  emptyLabel="Select team"
+                  allowEmpty={teams.length === 0}
+                />
+              </div>
             ) : null}
             {(canCreateCommittee || canCreateDepartmental) && portal !== 'staff' ? (
               <Button size="sm" variant="outline-primary" onClick={() => setShowTeam(true)}>New team</Button>
@@ -370,6 +410,7 @@ export default function ActionTrackerPanel({ portal }: { portal: Portal }) {
           <Button size="sm" variant={tab === 'teams' ? 'primary' : 'outline-secondary'} onClick={() => setTab('teams')}>Members</Button>
         ) : null}
         <Button size="sm" variant={tab === 'mine' ? 'primary' : 'outline-secondary'} onClick={() => setTab('mine')}>My actions</Button>
+        <Button size="sm" variant={tab === 'reports' ? 'primary' : 'outline-secondary'} onClick={() => setTab('reports')}>Reports</Button>
         <span className="small text-muted align-self-center ms-2">
           {counts.notStarted} not started · {counts.progress} in progress · {counts.done} done
         </span>
@@ -411,12 +452,23 @@ export default function ActionTrackerPanel({ portal }: { portal: Portal }) {
         </div>
       ) : null}
 
+      {tab === 'reports' ? (
+        <ActionTrackerReports
+          items={portal === 'staff' ? mine : reportItems}
+          meetings={reportMeetings}
+          teams={teams}
+        />
+      ) : null}
+
       {(tab === 'actions' || tab === 'mine') ? (
         <div className="border rounded-3 bg-white">
           {tab === 'actions' ? (
             <div className="p-2 d-flex gap-2 border-bottom">
               <Button size="sm" variant="outline-primary" onClick={() => setShowMeeting(true)} disabled={!teamId}>Record meeting</Button>
-              <Button size="sm" variant="primary" onClick={() => setShowAction(true)} disabled={!teamId}>Assign action</Button>
+              <Button size="sm" variant="primary" onClick={() => {
+                setShowAction(true);
+                if (meetings[0]?.id) setActionMeeting(String(meetings[0].id));
+              }} disabled={!teamId}>Assign action</Button>
             </div>
           ) : null}
           <div className="table-responsive">
@@ -489,10 +541,13 @@ export default function ActionTrackerPanel({ portal }: { portal: Portal }) {
           {teamKind === 'departmental' || !canCreateCommittee ? (
             <Form.Group>
               <Form.Label className="small">Unit</Form.Label>
-              <Form.Select size="sm" value={teamDept} onChange={(e) => setTeamDept(e.target.value)}>
-                <option value="">Select unit</option>
-                {depts.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
-              </Form.Select>
+              <SearchableSelect
+                value={teamDept}
+                onChange={setTeamDept}
+                options={depts.map((d) => ({ value: String(d.id), label: d.name }))}
+                placeholder="Search unit"
+                emptyLabel="Select unit"
+              />
             </Form.Group>
           ) : null}
         </Modal.Body>
@@ -512,17 +567,22 @@ export default function ActionTrackerPanel({ portal }: { portal: Portal }) {
           </Form.Group>
           <Form.Group className="mb-2">
             <Form.Label className="small">Unit in the system</Form.Label>
-            <Form.Select size="sm" value={memberDept} onChange={(e) => setMemberDept(e.target.value)}>
-              <option value="">Select unit</option>
-              {depts.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
-            </Form.Select>
+            <SearchableSelect
+              value={memberDept}
+              onChange={(v) => { setMemberDept(v); setMemberUser(''); }}
+              options={depts.map((d) => ({ value: String(d.id), label: d.name }))}
+              placeholder="Search unit"
+              emptyLabel="Select unit"
+            />
           </Form.Group>
           <Form.Group className="mb-2">
             <Form.Label className="small">Person representing that office</Form.Label>
-            <Form.Select size="sm" value={memberUser} onChange={(e) => setMemberUser(e.target.value)}>
-              <option value="">Select person</option>
-              {people.map((p) => <option key={p.id} value={p.id}>{p.full_name}</option>)}
-            </Form.Select>
+            <PeopleSearchSelect
+              value={memberUser}
+              onChange={setMemberUser}
+              departmentId={memberDept}
+              placeholder="Search person"
+            />
           </Form.Group>
           <Form.Check type="checkbox" label="Secretariat" checked={isSecretariat} onChange={(e) => setIsSecretariat(e.target.checked)} />
         </Modal.Body>
@@ -563,32 +623,33 @@ export default function ActionTrackerPanel({ portal }: { portal: Portal }) {
           </Form.Group>
           <Form.Group className="mb-2">
             <Form.Label className="small">Meeting</Form.Label>
-            <Form.Select size="sm" value={actionMeeting} onChange={(e) => setActionMeeting(e.target.value)}>
-              <option value="">None</option>
-              {meetings.map((m) => <option key={m.id} value={m.id}>{ymd(m.meeting_date)} · {m.title}</option>)}
-            </Form.Select>
+            <SearchableSelect
+              value={actionMeeting}
+              onChange={setActionMeeting}
+              options={meetings.map((m) => ({ value: String(m.id), label: `${ymd(m.meeting_date)} · ${m.title}` }))}
+              placeholder="Search meeting"
+              emptyLabel="None"
+            />
           </Form.Group>
           <Form.Group className="mb-2">
             <Form.Label className="small">Office responsible</Form.Label>
-            <Form.Select size="sm" value={actionOffice} onChange={(e) => setActionOffice(e.target.value)}>
-              <option value="">Select office</option>
-              {members.filter((m) => m.department_id).map((m) => (
-                <option key={m.id} value={m.department_id || ''}>
-                  {m.seat_label}{m.full_name ? ` · ${m.full_name}` : ''}
-                </option>
-              ))}
-              {depts.map((d) => <option key={`d-${d.id}`} value={d.id}>{d.name}</option>)}
-            </Form.Select>
+            <SearchableSelect
+              value={actionOffice}
+              onChange={(v) => { setActionOffice(v); setActionUser(''); }}
+              options={officeOptions}
+              placeholder="Search office or unit"
+              emptyLabel="Select office"
+            />
           </Form.Group>
           <Form.Group className="mb-2">
             <Form.Label className="small">Person responsible</Form.Label>
-            <Form.Select size="sm" value={actionUser} onChange={(e) => setActionUser(e.target.value)}>
-              <option value="">Select person</option>
-              {members.filter((m) => m.user_id).map((m) => (
-                <option key={m.id} value={m.user_id || ''}>{m.full_name} ({m.seat_label})</option>
-              ))}
-              {people.map((p) => <option key={`p-${p.id}`} value={p.id}>{p.full_name}</option>)}
-            </Form.Select>
+            <PeopleSearchSelect
+              value={actionUser}
+              onChange={setActionUser}
+              departmentId={actionOffice}
+              extraOptions={memberPeople}
+              placeholder="Search person"
+            />
           </Form.Group>
           <Form.Group>
             <Form.Label className="small">Deadline</Form.Label>

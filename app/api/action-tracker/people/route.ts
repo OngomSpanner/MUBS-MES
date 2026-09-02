@@ -1,8 +1,6 @@
 import { NextResponse } from 'next/server';
 import { query } from '@/lib/db';
-import { ensureActionTrackerSchema } from '@/lib/action-tracker/schema';
 import { getActionActor } from '@/lib/action-tracker/access';
-
 export const dynamic = 'force-dynamic';
 
 export async function GET(request: Request) {
@@ -24,7 +22,7 @@ export async function GET(request: Request) {
       sql += ' AND (u.full_name LIKE ? OR u.email LIKE ?)';
       values.push(`%${search}%`, `%${search}%`);
     }
-    sql += ' ORDER BY u.full_name ASC LIMIT 80';
+    sql += ' ORDER BY u.full_name ASC LIMIT 120';
     const people = await query({ query: sql, values });
     return NextResponse.json({ people });
   } catch (e) {
