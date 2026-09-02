@@ -8,6 +8,7 @@ import ReportsSectionHeader from '@/components/Reports/ReportsSectionHeader';
 import SearchableSelect from '@/components/ActionTracker/SearchableSelect';
 import PeopleSearchSelect from '@/components/ActionTracker/PeopleSearchSelect';
 import ActionTrackerReports from '@/components/ActionTracker/ActionTrackerReports';
+import ActionMeetingsList from '@/components/ActionTracker/ActionMeetingsList';
 
 type Portal = 'admin' | 'hod' | 'staff';
 type Team = {
@@ -17,6 +18,7 @@ type Team = {
   department_id: number | null;
   department_name: string | null;
   description: string | null;
+  auto_sds: number;
   member_count: number;
   action_count: number;
   done_count: number;
@@ -65,12 +67,6 @@ const STATUS_LABEL: Record<string, string> = {
   done: 'Done',
 };
 
-function statusBadge(status: string) {
-  if (status === 'done') return 'success';
-  if (status === 'in_progress') return 'primary';
-  return 'secondary';
-}
-
 function ymd(v: string | null | undefined) {
   return v ? String(v).slice(0, 10) : '';
 }
@@ -114,6 +110,8 @@ export default function ActionTrackerPanel({ portal }: { portal: Portal }) {
   const [actionUser, setActionUser] = useState('');
   const [actionOffice, setActionOffice] = useState('');
   const [actionDeadline, setActionDeadline] = useState('');
+  const [actionToSds, setActionToSds] = useState(true);
+  const [openMeetingKey, setOpenMeetingKey] = useState<string | null>(null);
   const [updateItem, setUpdateItem] = useState<Item | null>(null);
   const [updateStatus, setUpdateStatus] = useState('in_progress');
   const [updateNote, setUpdateNote] = useState('');
@@ -142,6 +140,10 @@ export default function ActionTrackerPanel({ portal }: { portal: Portal }) {
     setMembers(m.data.members || []);
     setMeetings(g.data.meetings || []);
     setItems(i.data.items || []);
+    const nextMeetings = (g.data.meetings || []) as Meeting[];
+    if (nextMeetings[0]?.id) {
+      setOpenMeetingKey((prev) => prev || `m-${nextMeetings[0].id}`);
+    }
   }, []);
 
   const refresh = useCallback(async () => {
@@ -173,6 +175,14 @@ export default function ActionTrackerPanel({ portal }: { portal: Portal }) {
   useEffect(() => {
     void refresh();
   }, [refresh]);
+
+  useEffect(() => {
+    if (tab === 'mine') {
+      const first = mine.find((i) => i.meeting_id);
+      if (first?.meeting_id) setOpenMeetingKey(`m-${first.meeting_id}`);
+      else if (mine.length) setOpenMeetingKey('unlinked');
+    }
+  }, [tab, mine]);
 
   useEffect(() => {
     void axios.get('/api/departments?active_only=1').then((r) => {
@@ -293,6 +303,7 @@ export default function ActionTrackerPanel({ portal }: { portal: Portal }) {
       });
       setShowMeeting(false);
       setMeetingTitle('');
+      setOpenMeetingKey(null);
       await loadTeamDetail(teamId);
     } catch (e: unknown) {
       alert(axios.isAxiosError(e) ? e.response?.data?.message : 'Save failed');
@@ -312,6 +323,7 @@ export default function ActionTrackerPanel({ portal }: { portal: Portal }) {
         assignee_user_id: actionUser || null,
         office_department_id: actionOffice || null,
         deadline: actionDeadline || null,
+        to_sds: actionToSds,
       });
       setShowAction(false);
       setActionTitle('');
@@ -355,6 +367,23 @@ export default function ActionTrackerPanel({ portal }: { portal: Portal }) {
     }
   };
 
+  const openAssign = (meetingId: number | null) => {
+    setActionMeeting(meetingId ? String(meetingId) : (meetings[0]?.id ? String(meetings[0].id) : ''));
+    setActionToSds(Boolean(selected?.auto_sds ?? 1));
+    setShowAction(true);
+  };
+
+  const saveAutoSds = async (enabled: boolean) => {
+    if (!selected) return;
+    setTeams((prev) => prev.map((t) => (t.id === selected.id ? { ...t, auto_sds: enabled ? 1 : 0 } : t)));
+    try {
+      await axios.patch('/api/action-tracker/teams', { id: selected.id, auto_sds: enabled ? 1 : 0 });
+    } catch (e: unknown) {
+      setTeams((prev) => prev.map((t) => (t.id === selected.id ? { ...t, auto_sds: enabled ? 0 : 1 } : t)));
+      alert(axios.isAxiosError(e) ? e.response?.data?.message : 'Could not save SDS setting');
+    }
+  };
+
   if (loading) {
     return (
       <div className="text-center py-5">
@@ -371,7 +400,7 @@ export default function ActionTrackerPanel({ portal }: { portal: Portal }) {
         icon="groups"
         title="Action Tracker"
         count={counts.total}
-        description="Track actions from committees, unit meetings and teams. Assigned actions are copied onto SDS for that staff member automatically. Strategy sets up school committees. Heads of units can create their own meeting teams. Assigned people get a notification and email."
+        description="Actions sit under each meeting so you can open one sitting at a time. Search units and people the same way as elsewhere in the system. SDS copy is a setting on the committee — automatic, or only when you tick it on an action."
         filters={(
           <>
             {portal !== 'staff' ? (
@@ -381,6 +410,7 @@ export default function ActionTrackerPanel({ portal }: { portal: Portal }) {
                   onChange={(v) => {
                     const id = Number(v || 0);
                     setTeamId(id);
+                    setOpenMeetingKey(null);
                     void loadTeamDetail(id);
                   }}
                   options={teams.map((t) => ({ value: String(t.id), label: t.name, hint: t.kind }))}
@@ -402,22 +432,51 @@ export default function ActionTrackerPanel({ portal }: { portal: Portal }) {
 
       {error ? <div className="alert alert-danger py-2 small">{error}</div> : null}
 
-      <div className="d-flex flex-wrap gap-2 mb-3">
+      <div className="d-flex flex-wrap gap-2 mb-3 border-bottom pb-3">
         {portal !== 'staff' ? (
-          <Button size="sm" variant={tab === 'actions' ? 'primary' : 'outline-secondary'} onClick={() => setTab('actions')}>Actions</Button>
+          <Button size="sm" className="d-flex align-items-center gap-1" variant={tab === 'actions' ? 'primary' : 'outline-secondary'} style={tab === 'actions' ? { background: 'var(--mubs-blue)', borderColor: 'var(--mubs-blue)' } : undefined} onClick={() => setTab('actions')}>
+            <span className="material-symbols-outlined" style={{ fontSize: 15 }}>event_note</span>
+            Meetings
+          </Button>
         ) : null}
         {portal !== 'staff' ? (
-          <Button size="sm" variant={tab === 'teams' ? 'primary' : 'outline-secondary'} onClick={() => setTab('teams')}>Members</Button>
+          <Button size="sm" className="d-flex align-items-center gap-1" variant={tab === 'teams' ? 'primary' : 'outline-secondary'} style={tab === 'teams' ? { background: 'var(--mubs-blue)', borderColor: 'var(--mubs-blue)' } : undefined} onClick={() => setTab('teams')}>
+            <span className="material-symbols-outlined" style={{ fontSize: 15 }}>groups</span>
+            Members
+          </Button>
         ) : null}
-        <Button size="sm" variant={tab === 'mine' ? 'primary' : 'outline-secondary'} onClick={() => setTab('mine')}>My actions</Button>
-        <Button size="sm" variant={tab === 'reports' ? 'primary' : 'outline-secondary'} onClick={() => setTab('reports')}>Reports</Button>
+        <Button size="sm" className="d-flex align-items-center gap-1" variant={tab === 'mine' ? 'primary' : 'outline-secondary'} style={tab === 'mine' ? { background: 'var(--mubs-blue)', borderColor: 'var(--mubs-blue)' } : undefined} onClick={() => setTab('mine')}>
+          <span className="material-symbols-outlined" style={{ fontSize: 15 }}>person</span>
+          My actions
+        </Button>
+        <Button size="sm" className="d-flex align-items-center gap-1" variant={tab === 'reports' ? 'primary' : 'outline-secondary'} style={tab === 'reports' ? { background: 'var(--mubs-blue)', borderColor: 'var(--mubs-blue)' } : undefined} onClick={() => setTab('reports')}>
+          <span className="material-symbols-outlined" style={{ fontSize: 15 }}>monitoring</span>
+          Reports
+        </Button>
         <span className="small text-muted align-self-center ms-2">
           {counts.notStarted} not started · {counts.progress} in progress · {counts.done} done
         </span>
       </div>
 
       {tab === 'teams' && selected ? (
-        <div className="border rounded-3 p-3 bg-white">
+        <div className="d-flex flex-column gap-3">
+          <div className="border rounded-3 p-3 bg-white">
+            <div className="fw-semibold mb-1 d-flex align-items-center gap-2">
+              <span className="material-symbols-outlined text-primary" style={{ fontSize: 18 }}>settings</span>
+              SDS setting
+            </div>
+            <p className="small text-muted mb-2">
+              When this is on, assigning an action also creates an SDS activity for that staff member. Turn it off to keep actions in Action Tracker only, then add SDS on individual actions if needed.
+            </p>
+            <Form.Check
+              type="switch"
+              id="auto-sds-switch"
+              label={selected.auto_sds ? 'Automatically add assigned actions to SDS' : 'Do not add to SDS automatically'}
+              checked={Boolean(selected.auto_sds)}
+              onChange={(e) => void saveAutoSds(e.target.checked)}
+            />
+          </div>
+          <div className="border rounded-3 p-3 bg-white">
           <div className="d-flex justify-content-between align-items-center mb-2">
             <div>
               <div className="fw-semibold">{selected.name}</div>
@@ -450,6 +509,7 @@ export default function ActionTrackerPanel({ portal }: { portal: Portal }) {
             </table>
           </div>
         </div>
+        </div>
       ) : null}
 
       {tab === 'reports' ? (
@@ -461,63 +521,35 @@ export default function ActionTrackerPanel({ portal }: { portal: Portal }) {
       ) : null}
 
       {(tab === 'actions' || tab === 'mine') ? (
-        <div className="border rounded-3 bg-white">
+        <div>
           {tab === 'actions' ? (
-            <div className="p-2 d-flex gap-2 border-bottom">
-              <Button size="sm" variant="outline-primary" onClick={() => setShowMeeting(true)} disabled={!teamId}>Record meeting</Button>
-              <Button size="sm" variant="primary" onClick={() => {
-                setShowAction(true);
-                if (meetings[0]?.id) setActionMeeting(String(meetings[0].id));
-              }} disabled={!teamId}>Assign action</Button>
+            <div className="d-flex flex-wrap gap-2 mb-3">
+              <Button size="sm" variant="outline-primary" onClick={() => setShowMeeting(true)} disabled={!teamId}>
+                <span className="material-symbols-outlined me-1" style={{ fontSize: 16, verticalAlign: 'middle' }}>event</span>
+                Record meeting
+              </Button>
+              <Button size="sm" onClick={() => openAssign(meetings[0]?.id ?? null)} disabled={!teamId} style={{ background: 'var(--mubs-blue)', borderColor: 'var(--mubs-blue)' }}>
+                <span className="material-symbols-outlined me-1" style={{ fontSize: 16, verticalAlign: 'middle' }}>add</span>
+                Assign action
+              </Button>
             </div>
           ) : null}
-          <div className="table-responsive">
-            <table className="table table-sm align-middle mb-0" style={{ fontSize: '0.82rem' }}>
-              <thead className="table-light">
-                <tr>
-                  <th>Minute</th>
-                  <th>Action</th>
-                  <th>Office</th>
-                  <th>Responsible</th>
-                  <th>Deadline</th>
-                  <th>Status</th>
-                  <th />
-                </tr>
-              </thead>
-              <tbody>
-                {list.map((i) => (
-                  <tr key={i.id}>
-                    <td className="text-muted">{i.minute_no || '—'}</td>
-                    <td>
-                      <div className="fw-semibold">{i.title}</div>
-                      <div className="text-muted" style={{ fontSize: '0.7rem' }}>{i.team_name}{i.meeting_title ? ` · ${i.meeting_title}` : ''}</div>
-                      {i.progress_note ? <div className="text-muted mt-1">{i.progress_note}</div> : null}
-                    </td>
-                    <td>{i.office_name || '—'}</td>
-                    <td>{i.assignee_name || '—'}</td>
-                    <td>{ymd(i.deadline) || '—'}</td>
-                    <td>
-                      <Badge bg={statusBadge(i.status)}>{STATUS_LABEL[i.status] || i.status}</Badge>
-                      {i.sds_assignment_id ? <div className="small text-muted">On SDS</div> : null}
-                    </td>
-                    <td className="text-nowrap text-end">
-                      <Button size="sm" variant="outline-primary" className="me-1" onClick={() => {
-                        setUpdateItem(i);
-                        setUpdateStatus(i.status === 'not_started' ? 'in_progress' : i.status);
-                        setUpdateNote(i.progress_note || '');
-                      }}>Update</Button>
-                      {tab === 'actions' && !i.sds_assignment_id ? (
-                        <Button size="sm" variant="outline-secondary" onClick={() => void copySds(i)}>To SDS</Button>
-                      ) : null}
-                    </td>
-                  </tr>
-                ))}
-                {list.length === 0 ? (
-                  <tr><td colSpan={7} className="text-muted small py-4 text-center">No actions yet. Record a meeting and assign actions.</td></tr>
-                ) : null}
-              </tbody>
-            </table>
-          </div>
+          <ActionMeetingsList
+            meetings={tab === 'mine'
+              ? Array.from(new Map(list.filter((i) => i.meeting_id).map((i) => [i.meeting_id as number, { id: i.meeting_id as number, title: i.meeting_title || 'Meeting', meeting_date: i.meeting_date || '' }])).values())
+              : meetings}
+            items={list}
+            openMeetingKey={openMeetingKey}
+            onOpenMeeting={(key) => setOpenMeetingKey(key || null)}
+            canManage={tab === 'actions'}
+            onAssign={tab === 'actions' ? openAssign : undefined}
+            onUpdate={(i) => {
+              setUpdateItem(i as Item);
+              setUpdateStatus(i.status === 'not_started' ? 'in_progress' : i.status);
+              setUpdateNote(i.progress_note || '');
+            }}
+            onCopySds={tab === 'actions' ? (i) => void copySds(i as Item) : undefined}
+          />
         </div>
       ) : null}
 
@@ -655,6 +687,19 @@ export default function ActionTrackerPanel({ portal }: { portal: Portal }) {
             <Form.Label className="small">Deadline</Form.Label>
             <Form.Control size="sm" type="date" value={actionDeadline} onChange={(e) => setActionDeadline(e.target.value)} />
           </Form.Group>
+          <Form.Check
+            className="mt-3"
+            type="switch"
+            id="action-to-sds"
+            label="Add this action to SDS for the assigned person"
+            checked={actionToSds}
+            onChange={(e) => setActionToSds(e.target.checked)}
+          />
+          <div className="small text-muted mt-1">
+            {selected?.auto_sds
+              ? 'This committee currently adds assigned actions to SDS automatically. Turn the switch off to keep this action in Action Tracker only.'
+              : 'This committee does not add to SDS automatically. Turn the switch on to create an SDS activity for this person.'}
+          </div>
         </Modal.Body>
         <Modal.Footer>
           <Button variant="light" onClick={() => setShowAction(false)}>Cancel</Button>

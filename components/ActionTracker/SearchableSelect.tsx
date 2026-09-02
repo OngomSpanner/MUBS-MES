@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Form } from 'react-bootstrap';
 
 export type SearchableOption = { value: string; label: string; hint?: string };
@@ -16,6 +16,7 @@ type Props = {
   onQueryChange?: (query: string) => void;
 };
 
+/** Searchable single-select, same pattern as IndicatorPickerField / department search. */
 export default function SearchableSelect({
   value,
   onChange,
@@ -29,88 +30,89 @@ export default function SearchableSelect({
   const selected = options.find((o) => o.value === value) ?? null;
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
-  const wrapRef = useRef<HTMLDivElement | null>(null);
-
-  useEffect(() => {
-    if (!open) setQuery('');
-  }, [open, value]);
-
-  useEffect(() => {
-    const onDoc = (e: MouseEvent) => {
-      if (!wrapRef.current?.contains(e.target as Node)) setOpen(false);
-    };
-    document.addEventListener('mousedown', onDoc);
-    return () => document.removeEventListener('mousedown', onDoc);
-  }, []);
 
   const matches = useMemo(() => {
-    const q = query.trim().toLowerCase();
+    const q = (open ? query : '').trim().toLowerCase();
     const list = q
       ? options.filter((o) => `${o.label} ${o.hint || ''}`.toLowerCase().includes(q))
       : options;
     return list.slice(0, 80);
-  }, [options, query]);
+  }, [options, open, query]);
 
   const displayValue = open ? query : (selected?.label ?? '');
 
+  const pick = (next: string) => {
+    onChange(next);
+    setQuery('');
+    setOpen(false);
+  };
+
   return (
-    <div className="position-relative" ref={wrapRef}>
+    <div className="position-relative">
+      <span
+        className="material-symbols-outlined position-absolute text-muted"
+        style={{ left: 8, top: '50%', transform: 'translateY(-50%)', fontSize: 18, pointerEvents: 'none' }}
+      >
+        search
+      </span>
       <Form.Control
         size="sm"
         disabled={disabled}
         value={displayValue}
         placeholder={placeholder}
         autoComplete="off"
+        style={{ paddingLeft: '2rem' }}
         onFocus={() => {
-          setOpen(true);
           setQuery('');
+          setOpen(true);
           onQueryChange?.('');
         }}
         onChange={(e) => {
-          const next = e.target.value;
-          setQuery(next);
+          setQuery(e.target.value);
           setOpen(true);
-          onQueryChange?.(next);
-          if (value && next !== selected?.label) onChange('');
+          onQueryChange?.(e.target.value);
         }}
+        onBlur={() => window.setTimeout(() => setOpen(false), 150)}
         onKeyDown={(e) => {
           if (e.key === 'Escape') setOpen(false);
         }}
       />
       {open ? (
         <div
-          className="border rounded-2 bg-white shadow-sm position-absolute w-100 mt-1"
-          style={{ zIndex: 1080, maxHeight: 260, overflowY: 'auto' }}
+          className="position-absolute w-100 bg-white border rounded shadow-sm mt-1 overflow-auto"
+          style={{ zIndex: 1080, maxHeight: 280 }}
         >
           {allowEmpty ? (
             <button
               type="button"
-              className="dropdown-item small py-2"
-              onClick={() => {
-                onChange('');
-                setOpen(false);
-              }}
+              className="btn btn-white w-100 text-start px-2 py-1 border-bottom small"
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => pick('')}
             >
               {emptyLabel}
             </button>
           ) : null}
-          {matches.map((o) => (
-            <button
-              key={o.value}
-              type="button"
-              className={`dropdown-item small py-2 ${o.value === value ? 'active' : ''}`}
-              onClick={() => {
-                onChange(o.value);
-                setOpen(false);
-              }}
-            >
-              <div>{o.label}</div>
-              {o.hint ? <div className="text-muted" style={{ fontSize: '0.7rem' }}>{o.hint}</div> : null}
-            </button>
-          ))}
           {matches.length === 0 ? (
-            <div className="px-3 py-2 small text-muted">No matches</div>
-          ) : null}
+            <div className="px-2 py-2 text-muted small">No matches</div>
+          ) : (
+            matches.map((o) => (
+              <button
+                key={o.value}
+                type="button"
+                className="btn btn-white w-100 text-start px-2 py-1 border-bottom small d-flex justify-content-between align-items-center"
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => pick(o.value)}
+              >
+                <span>
+                  <span className="small d-block">{o.label}</span>
+                  {o.hint ? <span className="text-muted" style={{ fontSize: '0.65rem' }}>{o.hint}</span> : null}
+                </span>
+                {o.value === value ? (
+                  <span className="material-symbols-outlined text-primary" style={{ fontSize: 16 }}>check</span>
+                ) : null}
+              </button>
+            ))
+          )}
         </div>
       ) : null}
     </div>

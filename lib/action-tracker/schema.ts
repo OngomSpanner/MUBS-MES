@@ -1,4 +1,5 @@
 import { query } from '@/lib/db';
+import { columnExists } from '@/lib/db-schema';
 import { seed48thDevelopmentCommittee } from '@/lib/action-tracker/sample-48th';
 
 let ensured = false;
@@ -56,6 +57,7 @@ async function ensureActionTrackerSchemaOnce(): Promise<void> {
         kind VARCHAR(32) NOT NULL DEFAULT 'committee',
         department_id INT NULL,
         description TEXT NULL,
+        auto_sds TINYINT(1) NOT NULL DEFAULT 1,
         is_active TINYINT(1) NOT NULL DEFAULT 1,
         created_by INT NULL,
         created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
@@ -65,6 +67,12 @@ async function ensureActionTrackerSchemaOnce(): Promise<void> {
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
     `,
   });
+
+  if (!(await columnExists('action_teams', 'auto_sds'))) {
+    await query({
+      query: 'ALTER TABLE action_teams ADD COLUMN auto_sds TINYINT(1) NOT NULL DEFAULT 1',
+    });
+  }
 
   await query({
     query: `

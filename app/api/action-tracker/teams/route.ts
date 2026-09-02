@@ -13,7 +13,7 @@ export async function GET() {
 
     const visible = await visibleTeamIds(actor);
     let sql = `
-      SELECT t.id, t.name, t.kind, t.department_id, t.description, t.is_active, t.created_at,
+      SELECT t.id, t.name, t.kind, t.department_id, t.description, t.auto_sds, t.is_active, t.created_at,
              d.name AS department_name,
              (SELECT COUNT(*) FROM action_team_members m WHERE m.team_id = t.id) AS member_count,
              (SELECT COUNT(*) FROM action_items i WHERE i.team_id = t.id) AS action_count,
@@ -101,6 +101,12 @@ export async function PATCH(request: Request) {
       await query({
         query: 'UPDATE action_teams SET is_active = ? WHERE id = ?',
         values: [isActive ? 1 : 0, id],
+      });
+    }
+    if (body.auto_sds === 0 || body.auto_sds === 1 || body.auto_sds === true || body.auto_sds === false) {
+      await query({
+        query: 'UPDATE action_teams SET auto_sds = ? WHERE id = ?',
+        values: [body.auto_sds ? 1 : 0, id],
       });
     }
     return NextResponse.json({ ok: true });

@@ -88,9 +88,9 @@ export async function POST(request: Request) {
     const id = Number(ins.insertId);
     if (body.assignee_user_id) {
       const teams = (await query({
-        query: 'SELECT name FROM action_teams WHERE id = ?',
+        query: 'SELECT name, auto_sds FROM action_teams WHERE id = ?',
         values: [teamId],
-      })) as { name: string }[];
+      })) as { name: string; auto_sds?: number }[];
       await notifyActionAssigned({
         userId: Number(body.assignee_user_id),
         actionId: id,
@@ -99,14 +99,18 @@ export async function POST(request: Request) {
         deadline: body.deadline ? String(body.deadline).slice(0, 10) : null,
         assignedBy: actor.fullName,
       });
-      try {
-        await copyAssignedActionToSds({
-          actionId: id,
-          assignedBy: actor.userId,
-          assignedByName: actor.fullName,
-        });
-      } catch (err) {
-        console.error('action-tracker auto SDS copy failed', err);
+      const autoSds = Number(teams[0]?.auto_sds ?? 1) === 1;
+      const toSds = body.to_sds === true || (body.to_sds !== false && autoSds);
+      if (toSds) {
+        try {
+          await copyAssignedActionToSds({
+            actionId: id,
+            assignedBy: actor.userId,
+            assignedByName: actor.fullName,
+          });
+        } catch (err) {
+          console.error('action-tracker auto SDS copy failed', err);
+        }
       }
     }
     return NextResponse.json({ id });

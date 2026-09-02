@@ -103,17 +103,6 @@ export async function PATCH(request: Request, ctx: Ctx) {
         values: [id, actor.userId, status, comment || `Status: ${status || 'updated'}`],
       });
     }
-    if (canManage) {
-      try {
-        await copyAssignedActionToSds({
-          actionId: id,
-          assignedBy: actor.userId,
-          assignedByName: actor.fullName,
-        });
-      } catch (err) {
-        console.error('action-tracker auto SDS copy failed', err);
-      }
-    }
     return NextResponse.json({ ok: true });
   } catch (e) {
     console.error('action-tracker item PATCH', e);
