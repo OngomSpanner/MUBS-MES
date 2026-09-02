@@ -443,7 +443,9 @@ export async function seed48thDevelopmentCommittee(): Promise<void> {
 
   const pendingSds = (await query({
     query: `SELECT id FROM action_items
-            WHERE assignee_user_id IS NOT NULL AND sds_assignment_id IS NULL`,
+            WHERE assignee_user_id IS NOT NULL AND sds_assignment_id IS NULL
+              AND meeting_id = ?`,
+    values: [meetingId],
   })) as { id: number }[];
   for (const row of pendingSds) {
     if (!assignedBy) break;
