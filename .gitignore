@@ -31,7 +31,11 @@ yarn-error.log*
 .pnpm-debug.log*
 
 # env files (can opt-in for committing if needed)
-.env*
+.env
+.env.*
+!.env.example
+!.env.production.example
+/backups/
 
 # vercel
 .vercel
@@ -44,8 +48,3 @@ next-env.d.ts
 /public/screenshots/*
 /public/system-manual.html
 /public/user-manual.html
-.env
-.env.*
-!.env.example
-!.env.production.example
-/backups/
