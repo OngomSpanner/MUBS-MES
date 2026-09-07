@@ -60,6 +60,7 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen, onLogoutClick }: 
     { key: 'ambassador-reports', href: '/admin?pg=ambassador-reports', icon: 'monitoring', label: 'Ambassador Reports' },
     { key: 'reports', href: '/admin?pg=reports', icon: 'bar_chart', label: 'Reports & Monitoring' },
     { key: 'users', href: '/admin?pg=users', icon: 'manage_accounts', label: 'User & Role Mgmt' },
+    { key: 'documents', href: '/admin?pg=documents', icon: 'folder', label: 'Documents' },
     { key: 'settings', href: '/admin?pg=settings', icon: 'tune', label: 'Settings' },
   ];
 
@@ -109,6 +110,7 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen, onLogoutClick }: 
     { key: 'notifications', href: '/staff?pg=notifications', icon: 'notifications_active', label: 'Notifications & Deadlines' },
     { key: 'submissions', href: '/staff?pg=submissions', icon: 'history', label: 'Submissions & Feedback' },
     { key: 'academic-teaching', href: '/staff?pg=academic-teaching', icon: 'school', label: 'Lecturer teaching data' },
+    { key: 'documents', href: '/staff?pg=documents', icon: 'folder', label: 'Documents' },
   ];
 
   const isAmbassador = pathname.startsWith('/ambassador');

@@ -7,6 +7,7 @@ import AdminDashboardView from './views/Dashboard';
 import QuestionnaireView from './views/Questionnaire';
 import PortalSettingsView from './views/PortalSettings';
 import AdminActionTrackerView from './views/ActionTracker';
+import AdminDocumentsView from './views/Documents';
 import { redirect } from 'next/navigation';
 import { cookies } from 'next/headers';
 import { verifyToken } from '@/lib/auth';
@@ -39,6 +40,8 @@ export default async function AdminDashboard({ searchParams }: AdminPageProps) {
       return <QuestionnaireView />;
     case 'action-tracker':
       return <AdminActionTrackerView />;
+    case 'documents':
+      return <AdminDocumentsView />;
     case 'settings': {
       const cookieStore = await cookies();
       const token = cookieStore.get('token')?.value;

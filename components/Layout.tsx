@@ -78,6 +78,7 @@ function LayoutContent({ children, sidebarOpen, setSidebarOpen }: any) {
       // Staff specific
       'deadlines': 'Notifications & Deadlines',
       'academic-teaching': 'Lecturer teaching data',
+      'documents': 'Documents',
     };
     return pageTitles[key] || 'Dashboard';
   };

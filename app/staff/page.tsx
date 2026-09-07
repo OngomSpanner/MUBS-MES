@@ -10,6 +10,7 @@ import StaffSubmissions from './views/StaffSubmissions';
 import StaffProcessTasks from './views/StaffProcessTasks';
 import StaffAcademicTeaching from './views/StaffAcademicTeaching';
 import StaffSdsView from './views/StaffSds';
+import StaffDocuments from './views/StaffDocuments';
 import ActionTrackerPanel from '@/components/ActionTracker/ActionTrackerPanel';
 
 function StaffAcademicTeachingGate() {
@@ -62,6 +63,8 @@ function StaffContent() {
             return <StaffProcessTasks />;
         case 'academic-teaching':
             return <StaffAcademicTeachingGate />;
+        case 'documents':
+            return <StaffDocuments />;
         default:
             return <StaffDashboard />;
     }
