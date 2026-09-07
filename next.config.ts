@@ -1,8 +1,9 @@
 import type { NextConfig } from "next";
 
-const lowMemoryBuild = process.env.LOW_MEMORY_BUILD === '1';
+const lowMemoryBuild = process.env.LOW_MEMORY_BUILD === "1";
 
 const nextConfig: NextConfig = {
+  output: "standalone",
   reactCompiler: !lowMemoryBuild,
   experimental: {
     webpackMemoryOptimizations: true,
@@ -15,13 +16,13 @@ const nextConfig: NextConfig = {
   },
   /** Serve runtime uploads via API (reads disk); keeps /uploads/* URLs working in prod. */
   async rewrites() {
-    return [{ source: '/uploads/:path*', destination: '/api/uploads/:path*' }];
+    return [{ source: "/uploads/:path*", destination: "/api/uploads/:path*" }];
   },
   images: {
     remotePatterns: [
       {
-        protocol: 'https',
-        hostname: 'lh3.googleusercontent.com',
+        protocol: "https",
+        hostname: "lh3.googleusercontent.com",
       },
     ],
   },

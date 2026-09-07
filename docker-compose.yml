@@ -1,56 +1,90 @@
+name: mubsme
+
 services:
-  mysql8_new:
-    image: mysql:8.0
-    container_name: mysql8_new
-    restart: always
+  db:
+    image: mysql:8.4
+    restart: unless-stopped
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+      - --skip-name-resolve
+      - --max-connections=150
     environment:
       MYSQL_DATABASE: mubs_super_admin
-      MYSQL_ROOT_PASSWORD: RaccoonS!lly4709
-    ports:
-      - "3308:3306"
+      MYSQL_USER: mubsme
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
     volumes:
-      - mysql_data:/var/lib/mysql
+      - mubsme_mysql:/var/lib/mysql
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "mysqladmin",
+          "ping",
+          "-h",
+          "127.0.0.1",
+          "-uroot",
+          "-p${MYSQL_ROOT_PASSWORD}",
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 25s
     networks:
-      - mubs-network
-
-  phpmyadmin_8:
-    image: phpmyadmin/phpmyadmin
-    container_name: phpmyadmin_8
-    restart: always
-    ports:
-      - "8085:80"
-    environment:
-      PMA_HOST: mysql8_new
-      PMA_PORT: 3306
-      MYSQL_ROOT_PASSWORD: RaccoonS!lly4709
-    depends_on:
-      - mysql8_new
-    networks:
-      - mubs-network
+      - mubsme_db
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    security_opt:
+      - no-new-privileges:true
 
   app:
     build:
       context: .
-      dockerfile: Dockerfile
-    container_name: mubs-me-app
-    restart: always
-    ports:
-      - "3000:3000"
-    env_file:
-      - .env
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-https://mubsme.mubs.ac.ug}
+        NEXT_PUBLIC_GOOGLE_CLIENT_ID: ${NEXT_PUBLIC_GOOGLE_CLIENT_ID:-}
+        LOW_MEMORY_BUILD: "1"
+    restart: unless-stopped
+    env_file: .env
     environment:
-      DB_HOST: mysql8_new
-      DB_USER: root
-      DB_PASSWORD: RaccoonS!lly4709
+      NODE_ENV: production
+      HOSTNAME: 0.0.0.0
+      PORT: "3000"
+      DB_HOST: db
+      DB_PORT: "3306"
+      DB_USER: mubsme
+      DB_PASSWORD: ${MYSQL_PASSWORD}
       DB_NAME: mubs_super_admin
+      NEXT_PUBLIC_API_URL: https://mubsme.mubs.ac.ug
+    ports:
+      - "127.0.0.1:3053:3000"
+    volumes:
+      - mubsme_uploads:/app/public/uploads
     depends_on:
-      - mysql8_new
+      db:
+        condition: service_healthy
     networks:
-      - mubs-network
+      - mubsme_db
+      - mubsme_out
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    security_opt:
+      - no-new-privileges:true
 
 volumes:
-  mysql_data:
+  mubsme_mysql:
+  mubsme_uploads:
 
 networks:
-  mubs-network:
-    driver: bridge
+  mubsme_db:
+    name: mubsme_db
+    internal: true
+  mubsme_out:
+    name: mubsme_out
