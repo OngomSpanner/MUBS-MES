@@ -32,13 +32,13 @@ RUN apk add --no-cache su-exec wget \
   && addgroup --system --gid 1001 nodejs \
   && adduser --system --uid 1001 nextjs
 
-COPY --from=builder /app/public ./public
+COPY --from=builder --chown=nextjs:nodejs /app/public ./public
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 COPY docker-entrypoint.sh /docker-entrypoint.sh
 RUN chmod 0555 /docker-entrypoint.sh \
   && mkdir -p /app/public/uploads \
-  && chown nextjs:nodejs /app/public/uploads
+  && chown -R nextjs:nodejs /app/public
 
 EXPOSE 3000
 HEALTHCHECK --interval=30s --timeout=5s --start-period=90s --retries=5 \
