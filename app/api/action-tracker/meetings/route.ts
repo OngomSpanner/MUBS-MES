@@ -13,6 +13,9 @@ export async function GET(request: Request) {
     const teamId = Number(new URL(request.url).searchParams.get('team_id') || 0);
     const visible = await visibleTeamIds(actor);
     if (teamId > 0) {
+      if (visible !== 'all' && !visible.includes(teamId)) {
+        return NextResponse.json({ meetings: [] });
+      }
       const meetings = await query({
         query: `SELECT m.id, m.team_id, m.title, m.meeting_date, m.venue, m.notes, m.created_at, t.name AS team_name
                 FROM action_meetings m

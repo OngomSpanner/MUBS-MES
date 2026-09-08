@@ -39,6 +39,9 @@ export async function GET(request: Request) {
       sql += ' AND i.assignee_user_id = ?';
       values.push(actor.userId);
     } else if (teamId > 0) {
+      if (visible !== 'all' && !visible.includes(teamId)) {
+        return NextResponse.json({ items: [] });
+      }
       sql += ' AND i.team_id = ?';
       values.push(teamId);
     } else if (visible !== 'all') {
